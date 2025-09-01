@@ -86,7 +86,7 @@ python main.py --mode ingestion --harvest-mode from-date --from 2024-01-01
 
 #### Files Modified
 - `shitposts/truth_social_shitposts.py` - Enhanced with CLI modes and harvesting strategies
-- `main.py` - Updated to support new harvesting parameters
+- `shitpost_alpha.py` - Updated to support new harvesting parameters
 - `reference_docs/S3_DATA_LAKE_INTEGRATION_PLAN.md` - Created for future S3 integration
 
 ---

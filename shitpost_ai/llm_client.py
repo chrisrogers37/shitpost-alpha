@@ -84,11 +84,10 @@ class LLMClient:
                 logger.warning("Failed to parse LLM response")
                 return None
             
-            # Check confidence threshold
+            # Always save confidence metadata for future RAG enhancement
             confidence = analysis.get('confidence', 0.0)
-            if confidence < self.confidence_threshold:
-                logger.info(f"Analysis confidence {confidence} below threshold {self.confidence_threshold}")
-                return None
+            analysis['meets_threshold'] = confidence >= self.confidence_threshold
+            analysis['analysis_quality'] = self._get_quality_label(confidence)
             
             # Add metadata
             analysis['original_content'] = content
@@ -96,7 +95,7 @@ class LLMClient:
             analysis['llm_model'] = self.model
             analysis['analysis_timestamp'] = self._get_timestamp()
             
-            logger.info(f"Analysis completed with confidence {confidence}")
+            logger.info(f"Analysis completed with confidence {confidence} (quality: {analysis['analysis_quality']})")
             return analysis
             
         except Exception as e:
@@ -220,6 +219,15 @@ class LLMClient:
         except Exception as e:
             logger.error(f"Error generating summary: {e}")
             return "Analysis summary unavailable"
+
+    def _get_quality_label(self, confidence: float) -> str:
+        """Get quality label based on confidence score."""
+        if confidence >= 0.8:
+            return "high"
+        elif confidence >= 0.6:
+            return "medium"
+        else:
+            return "low"
 
 
 # For testing purposes

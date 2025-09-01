@@ -20,11 +20,33 @@ logger = logging.getLogger(__name__)
 class ShitpostAnalyzer:
     """Analyzes shitposts for financial implications with enhanced context."""
     
-    def __init__(self):
+    def __init__(self, mode="incremental", start_date=None, end_date=None, limit=None, batch_size=5):
+        """Initialize the shitpost analyzer.
+        
+        Args:
+            mode: Analysis mode - "incremental", "backfill", "range", "from_date"
+            start_date: Start date for range/from_date modes (YYYY-MM-DD)
+            end_date: End date for range mode (YYYY-MM-DD)
+            limit: Maximum number of posts to analyze (optional)
+            batch_size: Number of posts to process in each batch
+        """
         self.settings = Settings()
         self.db_manager = ShitpostDatabase()
         self.llm_client = LLMClient()
         self.launch_date = self.settings.SYSTEM_LAUNCH_DATE
+        
+        # Analysis mode configuration
+        self.mode = mode
+        self.start_date = start_date
+        self.end_date = end_date
+        self.limit = limit
+        self.batch_size = batch_size
+        
+        # Parse dates if provided
+        if start_date:
+            self.start_datetime = datetime.fromisoformat(start_date)
+        if end_date:
+            self.end_datetime = datetime.fromisoformat(end_date)
         
     async def initialize(self):
         """Initialize the shitpost analyzer."""
@@ -35,21 +57,186 @@ class ShitpostAnalyzer:
         
         logger.info(f"Shitpost Analyzer initialized with launch date: {self.launch_date}")
     
-    async def analyze_unprocessed_shitposts(self, batch_size: int = 5) -> int:
-        """
-        Analyze unprocessed shitposts from the database.
+    async def analyze_shitposts(self) -> int:
+        """Analyze shitposts based on configured mode."""
+        logger.info(f"Starting shitpost analysis in {self.mode} mode...")
         
-        Args:
-            batch_size: Number of shitposts to process in one batch
-            
-        Returns:
-            Number of shitposts successfully analyzed
-        """
+        if self.mode == "backfill":
+            return await self._analyze_backfill()
+        elif self.mode == "range":
+            return await self._analyze_date_range()
+        elif self.mode == "from_date":
+            return await self._analyze_from_date()
+        else:  # incremental (default)
+            return await self._analyze_incremental()
+    
+    async def _analyze_backfill(self) -> int:
+        """Analyze all unprocessed shitposts from launch date onwards."""
+        logger.info("Starting full backfill analysis of unprocessed shitposts...")
+        
+        total_analyzed = 0
+        
+        while True:
+            try:
+                # Get batch of unprocessed shitposts
+                shitposts = await self.db_manager.get_unprocessed_shitposts(
+                    launch_date=self.launch_date,
+                    limit=self.batch_size
+                )
+                
+                if not shitposts:
+                    logger.info("No more unprocessed shitposts found for backfill analysis")
+                    break
+                
+                # Analyze batch
+                batch_analyzed = await self._analyze_batch(shitposts)
+                total_analyzed += batch_analyzed
+                
+                # Check if we've reached the limit
+                if self.limit and total_analyzed >= self.limit:
+                    logger.info(f"Reached analysis limit of {self.limit} posts")
+                    break
+                
+                logger.info(f"Backfill analysis progress: {total_analyzed} posts analyzed")
+                
+                # Small delay to be respectful to LLM APIs
+                await asyncio.sleep(1)
+                
+            except Exception as e:
+                logger.error(f"Error in backfill analysis: {e}")
+                await handle_exceptions(e)
+                break
+        
+        logger.info(f"Backfill analysis completed. Total posts analyzed: {total_analyzed}")
+        return total_analyzed
+    
+    async def _analyze_date_range(self) -> int:
+        """Analyze shitposts within a specific date range."""
+        logger.info(f"Starting date range analysis from {self.start_date} to {self.end_date}")
+        
+        total_analyzed = 0
+        
+        while True:
+            try:
+                # Get batch of unprocessed shitposts
+                shitposts = await self.db_manager.get_unprocessed_shitposts(
+                    launch_date=self.launch_date,
+                    limit=self.batch_size
+                )
+                
+                if not shitposts:
+                    logger.info("No more unprocessed shitposts found for date range analysis")
+                    break
+                
+                # Filter shitposts by date range
+                filtered_shitposts = []
+                for shitpost in shitposts:
+                    try:
+                        post_timestamp = datetime.fromisoformat(shitpost.get('timestamp').replace('Z', '+00:00'))
+                        
+                        if post_timestamp < self.start_datetime:
+                            logger.info(f"Reached posts before start date {self.start_date}, stopping")
+                            return total_analyzed
+                        
+                        if post_timestamp > self.end_datetime:
+                            # Skip posts after end date, continue to find older ones
+                            continue
+                        
+                        filtered_shitposts.append(shitpost)
+                        
+                    except Exception as e:
+                        logger.error(f"Error parsing timestamp for shitpost {shitpost.get('id')}: {e}")
+                        continue
+                
+                if filtered_shitposts:
+                    # Analyze filtered batch
+                    batch_analyzed = await self._analyze_batch(filtered_shitposts)
+                    total_analyzed += batch_analyzed
+                    
+                    # Check if we've reached the limit
+                    if self.limit and total_analyzed >= self.limit:
+                        logger.info(f"Reached analysis limit of {self.limit} posts")
+                        break
+                
+                logger.info(f"Date range analysis progress: {total_analyzed} posts analyzed")
+                
+                # Small delay to be respectful to LLM APIs
+                await asyncio.sleep(1)
+                
+            except Exception as e:
+                logger.error(f"Error in date range analysis: {e}")
+                await handle_exceptions(e)
+                break
+        
+        logger.info(f"Date range analysis completed. Total posts analyzed: {total_analyzed}")
+        return total_analyzed
+    
+    async def _analyze_from_date(self) -> int:
+        """Analyze shitposts from a specific date onwards."""
+        logger.info(f"Starting analysis from date {self.start_date} onwards")
+        
+        total_analyzed = 0
+        
+        while True:
+            try:
+                # Get batch of unprocessed shitposts
+                shitposts = await self.db_manager.get_unprocessed_shitposts(
+                    launch_date=self.launch_date,
+                    limit=self.batch_size
+                )
+                
+                if not shitposts:
+                    logger.info("No more unprocessed shitposts found for from-date analysis")
+                    break
+                
+                # Filter shitposts by start date
+                filtered_shitposts = []
+                for shitpost in shitposts:
+                    try:
+                        post_timestamp = datetime.fromisoformat(shitpost.get('timestamp').replace('Z', '+00:00'))
+                        
+                        if post_timestamp < self.start_datetime:
+                            logger.info(f"Reached posts before start date {self.start_date}, stopping")
+                            return total_analyzed
+                        
+                        filtered_shitposts.append(shitpost)
+                        
+                    except Exception as e:
+                        logger.error(f"Error parsing timestamp for shitpost {shitpost.get('id')}: {e}")
+                        continue
+                
+                if filtered_shitposts:
+                    # Analyze filtered batch
+                    batch_analyzed = await self._analyze_batch(filtered_shitposts)
+                    total_analyzed += batch_analyzed
+                    
+                    # Check if we've reached the limit
+                    if self.limit and total_analyzed >= self.limit:
+                        logger.info(f"Reached analysis limit of {self.limit} posts")
+                        break
+                
+                logger.info(f"From date analysis progress: {total_analyzed} posts analyzed")
+                
+                # Small delay to be respectful to LLM APIs
+                await asyncio.sleep(1)
+                
+            except Exception as e:
+                logger.error(f"Error in from date analysis: {e}")
+                await handle_exceptions(e)
+                break
+        
+        logger.info(f"From date analysis completed. Total posts analyzed: {total_analyzed}")
+        return total_analyzed
+    
+    async def _analyze_incremental(self) -> int:
+        """Analyze only new unprocessed shitposts (original implementation)."""
+        logger.info("Starting incremental shitpost analysis...")
+        
         try:
             # Get unprocessed shitposts
             shitposts = await self.db_manager.get_unprocessed_shitposts(
                 launch_date=self.launch_date,
-                limit=batch_size
+                limit=self.batch_size
             )
             
             if not shitposts:
@@ -58,46 +245,66 @@ class ShitpostAnalyzer:
             
             logger.info(f"Found {len(shitposts)} unprocessed shitposts to analyze")
             
-            analyzed_count = 0
+            # Analyze batch
+            analyzed_count = await self._analyze_batch(shitposts)
             
-            for shitpost in shitposts:
-                try:
-                    # Check if prediction already exists (double-check)
-                    if await self.db_manager.check_prediction_exists(shitpost['id']):
-                        logger.info(f"Prediction already exists for shitpost {shitpost['id']}, skipping")
-                        continue
-                    
-                    # Analyze the shitpost
-                    analysis = await self._analyze_shitpost(shitpost)
-                    
-                    if analysis:
-                        # Store enhanced analysis with shitpost data
-                        prediction_id = await self.db_manager.store_analysis(
-                            post_id=str(shitpost['id']),
-                            analysis_data=analysis,
-                            post_data=shitpost
-                        )
-                        
-                        if prediction_id:
-                            analyzed_count += 1
-                            logger.info(f"Successfully analyzed shitpost {shitpost['id']} -> prediction {prediction_id}")
-                        else:
-                            logger.error(f"Failed to store analysis for shitpost {shitpost['id']}")
-                    else:
-                        logger.warning(f"No analysis generated for shitpost {shitpost['id']}")
-                        
-                except Exception as e:
-                    logger.error(f"Error analyzing shitpost {shitpost['id']}: {e}")
-                    await handle_exceptions(e)
-                    continue
-            
-            logger.info(f"Batch analysis complete: {analyzed_count}/{len(shitposts)} shitposts analyzed")
+            logger.info(f"Incremental analysis completed: {analyzed_count} shitposts analyzed")
             return analyzed_count
             
         except Exception as e:
-            logger.error(f"Error in batch analysis: {e}")
+            logger.error(f"Error in incremental analysis: {e}")
             await handle_exceptions(e)
             return 0
+    
+    async def _analyze_batch(self, shitposts: List[Dict]) -> int:
+        """Analyze a batch of shitposts."""
+        analyzed_count = 0
+        
+        for shitpost in shitposts:
+            try:
+                # Check if prediction already exists (double-check)
+                if await self.db_manager.check_prediction_exists(shitpost['id']):
+                    logger.info(f"Prediction already exists for shitpost {shitpost['id']}, skipping")
+                    continue
+                
+                # Analyze the shitpost
+                analysis = await self._analyze_shitpost(shitpost)
+                
+                if analysis:
+                    # Store enhanced analysis with shitpost data
+                    prediction_id = await self.db_manager.store_analysis(
+                        post_id=str(shitpost['id']),
+                        analysis_data=analysis,
+                        post_data=shitpost
+                    )
+                    
+                    if prediction_id:
+                        analyzed_count += 1
+                        logger.info(f"Successfully analyzed shitpost {shitpost['id']} -> prediction {prediction_id}")
+                    else:
+                        logger.error(f"Failed to store analysis for shitpost {shitpost['id']}")
+                else:
+                    logger.warning(f"No analysis generated for shitpost {shitpost['id']}")
+                    
+            except Exception as e:
+                logger.error(f"Error analyzing shitpost {shitpost['id']}: {e}")
+                await handle_exceptions(e)
+                continue
+        
+        return analyzed_count
+    
+    async def analyze_unprocessed_shitposts(self, batch_size: int = 5) -> int:
+        """
+        Analyze unprocessed shitposts from the database (legacy method for backward compatibility).
+        
+        Args:
+            batch_size: Number of shitposts to process in one batch
+            
+        Returns:
+            Number of shitposts successfully analyzed
+        """
+        # Use the new mode-based analysis
+        return await self.analyze_shitposts()
     
     async def _analyze_shitpost(self, shitpost: Dict) -> Optional[Dict]:
         """
@@ -244,7 +451,7 @@ class ShitpostAnalyzer:
         
         while True:
             try:
-                analyzed_count = await self.analyze_unprocessed_shitposts(batch_size=5)
+                analyzed_count = await self.analyze_shitposts()
                 
                 if analyzed_count > 0:
                     logger.info(f"Analyzed {analyzed_count} shitposts in this cycle")
@@ -268,15 +475,131 @@ class ShitpostAnalyzer:
         logger.info("Shitpost Analyzer cleaned up")
 
 
-if __name__ == "__main__":
-    # Test the shitpost analyzer
-    async def test():
-        analyzer = ShitpostAnalyzer()
-        try:
-            await analyzer.initialize()
-            analyzed = await analyzer.analyze_unprocessed_shitposts(batch_size=3)
-            print(f"Analyzed {analyzed} shitposts")
-        finally:
-            await analyzer.cleanup()
+async def main():
+    """CLI entry point for shitpost analysis."""
+    import argparse
     
-    asyncio.run(test())
+    parser = argparse.ArgumentParser(
+        description="Shitpost AI analyzer with multiple modes",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Incremental analysis (default)
+  python -m shitpost_ai.shitpost_analyzer
+  
+  # Full historical backfill analysis
+  python -m shitpost_ai.shitpost_analyzer --mode backfill
+  
+  # Date range analysis
+  python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --to 2024-01-31
+  
+  # Analysis from specific date onwards
+  python -m shitpost_ai.shitpost_analyzer --mode from-date --from 2024-01-01
+  
+  # Analysis with custom batch size
+  python -m shitpost_ai.shitpost_analyzer --mode backfill --batch-size 10
+  
+  # Analysis with limit
+  python -m shitpost_ai.shitpost_analyzer --mode backfill --limit 100
+  
+  # Dry run mode
+  python -m shitpost_ai.shitpost_analyzer --mode backfill --dry-run --limit 10
+        """
+    )
+    
+    parser.add_argument(
+        "--mode", 
+        choices=["incremental", "backfill", "range", "from-date"], 
+        default="incremental", 
+        help="Analysis mode (default: incremental)"
+    )
+    parser.add_argument(
+        "--from", 
+        dest="start_date", 
+        help="Start date for range/from-date modes (YYYY-MM-DD)"
+    )
+    parser.add_argument(
+        "--to", 
+        dest="end_date", 
+        help="End date for range mode (YYYY-MM-DD)"
+    )
+    parser.add_argument(
+        "--limit", 
+        type=int, 
+        help="Maximum number of posts to analyze (optional)"
+    )
+    parser.add_argument(
+        "--batch-size", 
+        type=int, 
+        default=5,
+        help="Number of posts to process in each batch (default: 5)"
+    )
+    parser.add_argument(
+        "--dry-run", 
+        action="store_true", 
+        help="Show what would be analyzed without saving to database"
+    )
+    parser.add_argument(
+        "--verbose", "-v", 
+        action="store_true", 
+        help="Enable verbose logging"
+    )
+    
+    args = parser.parse_args()
+    
+    # Validate arguments
+    if args.mode in ["range", "from-date"] and not args.start_date:
+        parser.error(f"--from date is required for {args.mode} mode")
+    
+    if args.mode == "range" and not args.end_date:
+        parser.error("--to date is required for range mode")
+    
+    # Set logging level
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+    
+    print(f"🧠 Starting shitpost analysis in {args.mode} mode...")
+    
+    # Create analyzer with appropriate configuration
+    analyzer = ShitpostAnalyzer(
+        mode=args.mode,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        limit=args.limit,
+        batch_size=args.batch_size
+    )
+    
+    try:
+        await analyzer.initialize()
+        
+        if args.dry_run:
+            print("🔍 DRY RUN MODE - No analysis will be saved to database")
+            # For dry run, we'll just show what would be analyzed
+            # This would require additional implementation to show unprocessed posts
+            print("📝 Would analyze unprocessed shitposts based on current configuration")
+            print(f"   Mode: {args.mode}")
+            if args.start_date:
+                print(f"   From: {args.start_date}")
+            if args.end_date:
+                print(f"   To: {args.end_date}")
+            if args.limit:
+                print(f"   Limit: {args.limit}")
+            print(f"   Batch Size: {args.batch_size}")
+        else:
+            # Run actual analysis
+            analyzed_count = await analyzer.analyze_shitposts()
+            print(f"\n🎉 Analysis completed! Total posts analyzed: {analyzed_count}")
+        
+    except KeyboardInterrupt:
+        print("\n⏹️  Analysis stopped by user")
+    except Exception as e:
+        print(f"\n❌ Analysis failed: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+    finally:
+        await analyzer.cleanup()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
