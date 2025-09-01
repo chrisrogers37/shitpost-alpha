@@ -98,11 +98,13 @@ The business logic orchestrator that coordinates analysis workflows.
 **Purpose:** Orchestrates the complete shitpost analysis pipeline with enhanced context.
 
 **Key Features:**
+- **Multiple analysis modes** - Incremental, backfill, date range, and from-date modes
 - **Batch processing** - Efficient analysis of multiple shitposts
 - **Enhanced context** - Incorporates Truth Social engagement data
 - **Deduplication** - Prevents duplicate analysis
 - **Continuous operation** - Long-running analysis service
 - **Error resilience** - Graceful error handling and recovery
+- **CLI interface** - Command-line tools for different analysis strategies
 
 #### Key Methods
 
@@ -198,7 +200,29 @@ def get_alert_prompt(analysis: Dict) -> str
 ```python
 from shitpost_ai.shitpost_analyzer import ShitpostAnalyzer
 
+# Basic incremental analyzer (default)
 analyzer = ShitpostAnalyzer()
+await analyzer.initialize()
+
+# Full historical backfill analysis
+analyzer = ShitpostAnalyzer(mode="backfill", limit=1000, batch_size=10)
+await analyzer.initialize()
+
+# Date range analysis
+analyzer = ShitpostAnalyzer(
+    mode="range", 
+    start_date="2024-01-01", 
+    end_date="2024-01-31",
+    batch_size=5
+)
+await analyzer.initialize()
+
+# Analysis from specific date onwards
+analyzer = ShitpostAnalyzer(
+    mode="from_date", 
+    start_date="2024-01-01",
+    confidence_threshold=0.8
+)
 await analyzer.initialize()
 ```
 
@@ -223,6 +247,84 @@ print(f"Analyzed {analyzed_count} shitposts")
 ```python
 # Runs continuously, analyzing new shitposts every 5 minutes
 await analyzer.run_continuous_analysis(interval_seconds=300)
+```
+
+## 🖥️ Command Line Interface (CLI)
+
+The shitpost analyzer includes a comprehensive CLI for different analysis modes and operational flexibility.
+
+### CLI Modes
+
+#### 1. **Incremental Mode** (Default)
+```bash
+# Analyze only new unprocessed posts
+python -m shitpost_ai.shitpost_analyzer
+
+# With verbose logging
+python -m shitpost_ai.shitpost_analyzer --verbose
+```
+
+#### 2. **Backfill Mode**
+```bash
+# Full historical analysis of all unprocessed posts
+python -m shitpost_ai.shitpost_analyzer --mode backfill
+
+# Limited backfill (e.g., last 100 posts)
+python -m shitpost_ai.shitpost_analyzer --mode backfill --limit 100
+
+# With custom batch size
+python -m shitpost_ai.shitpost_analyzer --mode backfill --batch-size 10
+
+# Dry run to see what would be analyzed
+python -m shitpost_ai.shitpost_analyzer --mode backfill --dry-run --limit 10
+```
+
+#### 3. **Date Range Mode**
+```bash
+# Analyze posts within specific date range
+python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --to 2024-01-31
+
+# With limit and custom batch size
+python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --to 2024-01-31 --limit 500 --batch-size 10
+```
+
+#### 4. **From Date Mode**
+```bash
+# Analyze posts from specific date onwards
+python -m shitpost_ai.shitpost_analyzer --mode from-date --from 2024-01-01
+
+# With limit and batch size
+python -m shitpost_ai.shitpost_analyzer --mode from-date --from 2024-01-01 --limit 200 --batch-size 15
+```
+
+### CLI Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--mode` | Analysis mode | `--mode backfill` |
+| `--from` | Start date (YYYY-MM-DD) | `--from 2024-01-01` |
+| `--to` | End date (YYYY-MM-DD) | `--to 2024-01-31` |
+| `--limit` | Maximum posts to analyze | `--limit 100` |
+| `--batch-size` | Posts per analysis batch | `--batch-size 10` |
+
+| `--dry-run` | Show what would be analyzed | `--dry-run` |
+| `--verbose` | Enable verbose logging | `--verbose` |
+| `--help` | Show help message | `--help` |
+
+### CLI Examples
+
+```bash
+# Quick test with 5 posts
+python -m shitpost_ai.shitpost_analyzer --mode backfill --limit 5 --dry-run
+
+# Analyze last week's posts with custom batch size
+python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-15 --to 2024-01-22 --batch-size 15
+
+# Continuous analysis with verbose logging
+python -m shitpost_ai.shitpost_analyzer --verbose
+
+# Analyze posts from election day onwards
+python -m shitpost_ai.shitpost_analyzer --mode from-date --from 2024-11-05 --limit 1000 --batch-size 20
 ```
 
 ### Custom Prompt Usage
