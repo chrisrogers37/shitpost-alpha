@@ -115,19 +115,26 @@ DEBUG=true
 
 ### New Workflow Architecture
 
-The system now supports three distinct operational modes:
+The system now supports three distinct operational modes with enhanced CLI options:
 
 #### 1. Ingestion Only (Truth Social Scraping)
 ```bash
-python main.py ingestion
+# Basic ingestion
+python main.py --mode ingestion
+
+# Ingestion with custom harvesting mode
+python main.py --mode ingestion --harvest-mode backfill --limit 100
+python main.py --mode ingestion --harvest-mode range --from 2024-01-01 --to 2024-01-31
+python main.py --mode ingestion --harvest-mode from-date --from 2024-01-01
 ```
 - Scrapes Truth Social posts and stores them in the database
 - No LLM analysis performed
 - Cost-effective for bulk data collection
+- **New**: Supports multiple harvesting strategies
 
 #### 2. Analysis Only (LLM Processing)
 ```bash
-python main.py analysis
+python main.py --mode analysis
 ```
 - Queries database for unprocessed posts after system launch date
 - Performs LLM analysis with enhanced Truth Social data
@@ -136,11 +143,16 @@ python main.py analysis
 
 #### 3. Full Pipeline (Both)
 ```bash
-python main.py full
+# Basic full pipeline
+python main.py --mode full
+
+# Full pipeline with custom harvesting
+python main.py --harvest-mode backfill --limit 500
 ```
 - Runs both ingestion and analysis concurrently
 - Real-time processing of new posts
 - Recommended for production deployment
+- **New**: Supports custom harvesting parameters
 
 ### Environment Configuration
 
@@ -159,21 +171,49 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 SCRAPECREATORS_API_KEY=your_scrapecreators_api_key
 ```
 
+### Enhanced CLI Functionality
+
+The Truth Social harvester now includes a comprehensive CLI for different harvesting modes:
+
+#### Direct Harvester CLI
+```bash
+# Show help
+python -m shitposts.truth_social_shitposts --help
+
+# Different harvesting modes
+python -m shitposts.truth_social_shitposts --mode backfill --limit 100
+python -m shitposts.truth_social_shitposts --mode range --from 2024-01-01 --to 2024-01-31
+python -m shitposts.truth_social_shitposts --mode from-date --from 2024-01-01
+
+# Dry run mode (no database writes)
+python -m shitposts.truth_social_shitposts --mode backfill --dry-run --limit 10
+```
+
+#### Main.py Integration
+```bash
+# Show main.py help
+python main.py --help
+
+# Run with custom harvesting
+python main.py --harvest-mode backfill --limit 500
+python main.py --mode ingestion --harvest-mode range --from 2024-01-01 --to 2024-01-31
+```
+
 ### Testing
 
 Test the new workflow architecture:
 ```bash
-python tests/test_workflow_validation.py
+python shit/tests/test_workflow_validation.py
 ```
 
 Test Truth Social shitpost harvesting:
 ```bash
-python shitposts/truth_social_shitposts.py
+python -m shitposts.truth_social_shitposts --mode backfill --limit 5 --dry-run
 ```
 
 Test database queries:
 ```bash
-python tests/test_database_query.py
+python shit/tests/test_database_query.py
 ```
 Test shitpost analyzer:
 ```bash

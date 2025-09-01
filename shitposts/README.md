@@ -1,4 +1,4 @@
-# Shitposts Directory
+ update the g# Shitposts Directory
 
 This directory contains the shitpost collection and harvesting system for the Shitpost-Alpha project, responsible for gathering Truth Social content from Donald Trump's account using the ScrapeCreators API.
 
@@ -43,12 +43,14 @@ The main harvester class that manages all Truth Social data collection.
 **Purpose:** Harvests shitposts from Donald Trump's Truth Social account using ScrapeCreators API.
 
 **Key Features:**
+- **Multiple harvesting modes** - Incremental, backfill, date range, and from-date modes
 - **Real-time monitoring** - Continuous harvesting with configurable intervals
 - **API integration** - Seamless ScrapeCreators API integration
 - **Data transformation** - Converts API data to internal format
 - **Restart resilience** - Remembers last processed shitpost
 - **Error handling** - Robust error management and recovery
 - **Async operations** - Non-blocking HTTP requests
+- **CLI interface** - Command-line tools for different harvesting strategies
 
 #### Key Methods
 
@@ -109,7 +111,27 @@ SCRAPECREATORS_API_KEY=your_api_key_here     # ScrapeCreators API key
 ```python
 from shitposts.truth_social_shitposts import TruthSocialShitposts
 
+# Basic incremental harvester (default)
 harvester = TruthSocialShitposts()
+await harvester.initialize()
+
+# Full historical backfill
+harvester = TruthSocialShitposts(mode="backfill", limit=1000)
+await harvester.initialize()
+
+# Date range harvesting
+harvester = TruthSocialShitposts(
+    mode="range", 
+    start_date="2024-01-01", 
+    end_date="2024-01-31"
+)
+await harvester.initialize()
+
+# Harvest from specific date onwards
+harvester = TruthSocialShitposts(
+    mode="from-date", 
+    start_date="2024-01-01"
+)
 await harvester.initialize()
 ```
 
@@ -131,7 +153,80 @@ for shitpost in recent_shitposts:
 ### Test Harvester
 ```python
 # Run the built-in test
-python shitposts/truth_social_shitposts.py
+python shitposts.truth_social_shitposts.py
+```
+
+## 🖥️ Command Line Interface (CLI)
+
+The Truth Social harvester includes a comprehensive CLI for different harvesting modes and operational flexibility.
+
+### CLI Modes
+
+#### 1. **Incremental Mode** (Default)
+```bash
+# Continuous monitoring of new posts
+python -m shitposts.truth_social_shitposts
+
+# With verbose logging
+python -m shitposts.truth_social_shitposts --verbose
+```
+
+#### 2. **Backfill Mode**
+```bash
+# Full historical data harvesting
+python -m shitposts.truth_social_shitposts --mode backfill
+
+# Limited backfill (e.g., last 100 posts)
+python -m shitposts.truth_social_shitposts --mode backfill --limit 100
+
+# Dry run to see what would be harvested
+python -m shitposts.truth_social_shitposts --mode backfill --dry-run
+```
+
+#### 3. **Date Range Mode**
+```bash
+# Harvest posts within specific date range
+python -m shitposts.truth_social_shitposts --mode range --from 2024-01-01 --to 2024-01-31
+
+# With limit and verbose logging
+python -m shitposts.truth_social_shitposts --mode range --from 2024-01-01 --to 2024-01-31 --limit 500 --verbose
+```
+
+#### 4. **From Date Mode**
+```bash
+# Harvest posts from specific date onwards
+python -m shitposts.truth_social_shitposts --mode from-date --from 2024-01-01
+
+# With limit
+python -m shitposts.truth_social_shitposts --mode from-date --from 2024-01-01 --limit 200
+```
+
+### CLI Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--mode` | Harvesting mode | `--mode backfill` |
+| `--from` | Start date (YYYY-MM-DD) | `--from 2024-01-01` |
+| `--to` | End date (YYYY-MM-DD) | `--to 2024-01-31` |
+| `--limit` | Maximum posts to harvest | `--limit 100` |
+| `--dry-run` | Show what would be harvested | `--dry-run` |
+| `--verbose` | Enable verbose logging | `--verbose` |
+| `--help` | Show help message | `--help` |
+
+### CLI Examples
+
+```bash
+# Quick test with 5 posts
+python -m shitposts.truth_social_shitposts --mode backfill --limit 5 --dry-run
+
+# Harvest last week's posts
+python -m shitposts.truth_social_shitposts --mode range --from 2024-01-15 --to 2024-01-22
+
+# Continuous monitoring with verbose logging
+python -m shitposts.truth_social_shitposts --verbose
+
+# Harvest posts from election day onwards
+python -m shitposts.truth_social_shitposts --mode from-date --from 2024-11-05 --limit 1000
 ```
 
 ## 📊 Data Format
