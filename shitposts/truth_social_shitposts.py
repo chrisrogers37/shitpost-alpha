@@ -20,10 +20,29 @@ logger = logging.getLogger(__name__)
 class TruthSocialShitposts:
     """Harvester for Truth Social shitposts using ScrapeCreators."""
     
-    def __init__(self):
-        """Initialize the Truth Social shitpost harvester."""
+    def __init__(self, mode="incremental", start_date=None, end_date=None, limit=None):
+        """Initialize the Truth Social shitpost harvester.
+        
+        Args:
+            mode: Harvesting mode - "incremental", "backfill", "range", "from_date"
+            start_date: Start date for range/from_date modes (YYYY-MM-DD)
+            end_date: End date for range mode (YYYY-MM-DD)
+            limit: Maximum number of posts to harvest (optional)
+        """
         self.username = settings.TRUTH_SOCIAL_USERNAME
         self.monitor_interval = settings.TRUTH_SOCIAL_SHITPOST_INTERVAL
+        
+        # Harvesting mode configuration
+        self.mode = mode
+        self.start_date = start_date
+        self.end_date = end_date
+        self.limit = limit
+        
+        # Parse dates if provided
+        if start_date:
+            self.start_datetime = datetime.fromisoformat(start_date)
+        if end_date:
+            self.end_datetime = datetime.fromisoformat(end_date)
         
         # API configuration
         self.api_key = settings.SCRAPECREATORS_API_KEY
@@ -129,8 +148,188 @@ class TruthSocialShitposts:
             return []
     
     async def harvest_shitposts(self) -> AsyncGenerator[Dict, None]:
-        """Harvest shitposts from Truth Social continuously."""
-        logger.info("Starting shitpost harvest from Truth Social...")
+        """Harvest shitposts based on configured mode."""
+        logger.info(f"Starting shitpost harvest in {self.mode} mode...")
+        
+        if self.mode == "backfill":
+            async for shitpost in self._harvest_backfill():
+                yield shitpost
+        elif self.mode == "range":
+            async for shitpost in self._harvest_date_range():
+                yield shitpost
+        elif self.mode == "from_date":
+            async for shitpost in self._harvest_from_date():
+                yield shitpost
+        else:  # incremental (default)
+            async for shitpost in self._harvest_incremental():
+                yield shitpost
+    
+    async def _harvest_backfill(self) -> AsyncGenerator[Dict, None]:
+        """Harvest all historical Truth Social posts."""
+        logger.info("Starting full backfill of Truth Social posts...")
+        
+        max_id = None
+        total_harvested = 0
+        
+        while True:
+            try:
+                # Fetch batch of posts
+                shitposts = await self._fetch_recent_shitposts(max_id)
+                
+                if not shitposts:
+                    logger.info("No more posts to harvest in backfill")
+                    break
+                
+                # Process each shitpost
+                for shitpost in shitposts:
+                    try:
+                        processed_shitpost = await self._process_shitpost(shitpost)
+                        if processed_shitpost:
+                            yield processed_shitpost
+                            total_harvested += 1
+                            
+                            # Check if we've reached the limit
+                            if self.limit and total_harvested >= self.limit:
+                                logger.info(f"Reached harvest limit of {self.limit} posts")
+                                return
+                            
+                            # Update max_id for next batch
+                            max_id = shitpost.get('id')
+                            
+                    except Exception as e:
+                        logger.error(f"Error processing shitpost {shitpost.get('id')}: {e}")
+                        continue
+                
+                logger.info(f"Backfill progress: {total_harvested} posts harvested")
+                
+                # Small delay to be respectful to API
+                await asyncio.sleep(1)
+                
+            except Exception as e:
+                logger.error(f"Error in backfill harvest: {e}")
+                await handle_exceptions(e)
+                break
+        
+        logger.info(f"Backfill completed. Total posts harvested: {total_harvested}")
+    
+    async def _harvest_date_range(self) -> AsyncGenerator[Dict, None]:
+        """Harvest posts within a specific date range."""
+        logger.info(f"Starting date range harvest from {self.start_date} to {self.end_date}")
+        
+        max_id = None
+        total_harvested = 0
+        
+        while True:
+            try:
+                # Fetch batch of posts
+                shitposts = await self._fetch_recent_shitposts(max_id)
+                
+                if not shitposts:
+                    logger.info("No more posts to harvest in date range")
+                    break
+                
+                # Process each shitpost
+                for shitpost in shitposts:
+                    try:
+                        # Check if post is within date range
+                        post_timestamp = datetime.fromisoformat(shitpost.get('created_at').replace('Z', '+00:00'))
+                        
+                        if post_timestamp < self.start_datetime:
+                            logger.info(f"Reached posts before start date {self.start_date}, stopping")
+                            return
+                        
+                        if post_timestamp > self.end_datetime:
+                            # Skip posts after end date, continue to find older ones
+                            max_id = shitpost.get('id')
+                            continue
+                        
+                        processed_shitpost = await self._process_shitpost(shitpost)
+                        if processed_shitpost:
+                            yield processed_shitpost
+                            total_harvested += 1
+                            
+                            # Check if we've reached the limit
+                            if self.limit and total_harvested >= self.limit:
+                                logger.info(f"Reached harvest limit of {self.limit} posts")
+                                return
+                            
+                        # Update max_id for next batch
+                        max_id = shitpost.get('id')
+                        
+                    except Exception as e:
+                        logger.error(f"Error processing shitpost {shitpost.get('id')}: {e}")
+                        continue
+                
+                logger.info(f"Date range harvest progress: {total_harvested} posts harvested")
+                
+                # Small delay to be respectful to API
+                await asyncio.sleep(1)
+                
+            except Exception as e:
+                logger.error(f"Error in date range harvest: {e}")
+                await handle_exceptions(e)
+                break
+        
+        logger.info(f"Date range harvest completed. Total posts harvested: {total_harvested}")
+    
+    async def _harvest_from_date(self) -> AsyncGenerator[Dict, None]:
+        """Harvest posts from a specific date onwards."""
+        logger.info(f"Starting harvest from date {self.start_date} onwards")
+        
+        max_id = None
+        total_harvested = 0
+        
+        while True:
+            try:
+                # Fetch batch of posts
+                shitposts = await self._fetch_recent_shitposts(max_id)
+                
+                if not shitposts:
+                    logger.info("No more posts to harvest from date")
+                    break
+                
+                # Process each shitpost
+                for shitpost in shitposts:
+                    try:
+                        # Check if post is from start date onwards
+                        post_timestamp = datetime.fromisoformat(shitpost.get('created_at').replace('Z', '+00:00'))
+                        
+                        if post_timestamp < self.start_datetime:
+                            logger.info(f"Reached posts before start date {self.start_date}, stopping")
+                            return
+                        
+                        processed_shitpost = await self._process_shitpost(shitpost)
+                        if processed_shitpost:
+                            yield processed_shitpost
+                            total_harvested += 1
+                            
+                            # Check if we've reached the limit
+                            if self.limit and total_harvested >= self.limit:
+                                logger.info(f"Reached harvest limit of {self.limit} posts")
+                                return
+                            
+                        # Update max_id for next batch
+                        max_id = shitpost.get('id')
+                        
+                    except Exception as e:
+                        logger.error(f"Error processing shitpost {shitpost.get('id')}: {e}")
+                        continue
+                
+                logger.info(f"From date harvest progress: {total_harvested} posts harvested")
+                
+                # Small delay to be respectful to API
+                await asyncio.sleep(1)
+                
+            except Exception as e:
+                logger.error(f"Error in from date harvest: {e}")
+                await handle_exceptions(e)
+                break
+        
+        logger.info(f"From date harvest completed. Total posts harvested: {total_harvested}")
+    
+    async def _harvest_incremental(self) -> AsyncGenerator[Dict, None]:
+        """Harvest only new posts since last check (original implementation)."""
+        logger.info("Starting incremental shitpost harvest from Truth Social...")
         
         while True:
             try:
@@ -287,32 +486,120 @@ class TruthSocialShitposts:
         logger.info("Truth Social shitpost harvester cleaned up")
 
 
-# For testing purposes
-async def test_truth_social_shitposts():
-    """Test function to verify Truth Social shitpost harvesting."""
-    harvester = TruthSocialShitposts()
+async def main():
+    """CLI entry point for Truth Social shitpost harvesting."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description="Truth Social shitpost harvester with multiple modes",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Incremental harvesting (default)
+  python -m shitposts.truth_social_shitposts
+  
+  # Full historical backfill
+  python -m shitposts.truth_social_shitposts --mode backfill
+  
+  # Date range harvesting
+  python -m shitposts.truth_social_shitposts --mode range --from 2024-01-01 --to 2024-01-31
+  
+  # Harvest from specific date onwards
+  python -m shitposts.truth_social_shitposts --mode from-date --from 2024-01-01
+  
+  # Harvest before specific date
+  python -m shitposts.truth_social_shitposts --mode from-date --from 2024-01-01 --limit 100
+        """
+    )
+    
+    parser.add_argument(
+        "--mode", 
+        choices=["incremental", "backfill", "range", "from-date"], 
+        default="incremental", 
+        help="Harvesting mode (default: incremental)"
+    )
+    parser.add_argument(
+        "--from", 
+        dest="start_date", 
+        help="Start date for range/from-date modes (YYYY-MM-DD)"
+    )
+    parser.add_argument(
+        "--to", 
+        dest="end_date", 
+        help="End date for range mode (YYYY-MM-DD)"
+    )
+    parser.add_argument(
+        "--limit", 
+        type=int, 
+        help="Maximum number of posts to harvest (optional)"
+    )
+    parser.add_argument(
+        "--dry-run", 
+        action="store_true", 
+        help="Show what would be harvested without saving to database"
+    )
+    parser.add_argument(
+        "--verbose", "-v", 
+        action="store_true", 
+        help="Enable verbose logging"
+    )
+    
+    args = parser.parse_args()
+    
+    # Validate arguments
+    if args.mode in ["range", "from-date"] and not args.start_date:
+        parser.error(f"--from date is required for {args.mode} mode")
+    
+    if args.mode == "range" and not args.end_date:
+        parser.error("--to date is required for range mode")
+    
+    # Set logging level
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+    
+    print(f"🚀 Starting Truth Social shitpost harvesting in {args.mode} mode...")
+    
+    # Create harvester with appropriate configuration
+    harvester = TruthSocialShitposts(
+        mode=args.mode,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        limit=args.limit
+    )
     
     try:
         await harvester.initialize()
         
-        print("Testing Truth Social shitpost harvesting...")
-        shitposts = await harvester.get_recent_shitposts(limit=3)
+        # Harvest shitposts
+        harvested_count = 0
+        async for shitpost in harvester.harvest_shitposts():
+            if args.dry_run:
+                print(f"📝 Would harvest: {shitpost['id']} - {shitpost['text'][:100]}...")
+            else:
+                print(f"✅ Harvested: {shitpost['id']} - {shitpost['text'][:100]}...")
+            
+            harvested_count += 1
+            
+            # Apply limit if specified
+            if args.limit and harvested_count >= args.limit:
+                print(f"🎯 Reached harvest limit of {args.limit} posts")
+                break
         
-        for shitpost in shitposts:
-            print(f"Shitpost ID: {shitpost.get('id')}")
-            print(f"Content: {shitpost.get('content', '')[:100]}...")
-            print(f"Timestamp: {shitpost.get('created_at')}")
-            print("---")
+        print(f"\n🎉 Harvesting completed! Total posts: {harvested_count}")
         
-        print(f"Successfully fetched {len(shitposts)} shitposts")
+        if args.dry_run:
+            print("🔍 This was a dry run - no posts were saved to database")
         
+    except KeyboardInterrupt:
+        print("\n⏹️  Harvesting stopped by user")
     except Exception as e:
-        print(f"Test failed: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"\n❌ Harvesting failed: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
     finally:
         await harvester.cleanup()
 
 
 if __name__ == "__main__":
-    asyncio.run(test_truth_social_shitposts())
+    asyncio.run(main())

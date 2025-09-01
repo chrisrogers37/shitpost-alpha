@@ -25,10 +25,15 @@ logger = logging.getLogger(__name__)
 class ShitpostAlpha:
     """Main orchestrator for the Shitpost-Alpha pipeline."""
     
-    def __init__(self):
+    def __init__(self, harvest_mode="incremental", start_date=None, end_date=None, limit=None):
         self.settings = Settings()
         self.db_manager = ShitpostDatabase()
-        self.truth_monitor = TruthSocialShitposts()
+        self.truth_monitor = TruthSocialShitposts(
+            mode=harvest_mode,
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit
+        )
         self.llm_analyzer = ShitpostAnalyzer()
         
     async def initialize(self):
@@ -136,28 +141,93 @@ class ShitpostAlpha:
 async def main():
     """Main entry point."""
     import sys
+    import argparse
     
-    # Parse command line arguments
-    mode = "full"  # default
-    if len(sys.argv) > 1:
-        mode = sys.argv[1].lower()
+    parser = argparse.ArgumentParser(
+        description="Shitpost-Alpha: Truth Social monitoring and analysis pipeline",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Run full pipeline (default)
+  python main.py
+  
+  # Run ingestion only
+  python main.py --mode ingestion
+  
+  # Run analysis only
+  python main.py --mode analysis
+  
+  # Run with specific harvesting mode
+  python main.py --harvest-mode backfill --limit 100
+  
+  # Run with date range
+  python main.py --harvest-mode range --from 2024-01-01 --to 2024-01-31
+        """
+    )
     
-    app = ShitpostAlpha()
+    parser.add_argument(
+        "--mode", 
+        choices=["ingestion", "analysis", "full"], 
+        default="full", 
+        help="Pipeline mode (default: full)"
+    )
+    parser.add_argument(
+        "--harvest-mode", 
+        choices=["incremental", "backfill", "range", "from-date"], 
+        default="incremental", 
+        help="Truth Social harvesting mode (default: incremental)"
+    )
+    parser.add_argument(
+        "--from", 
+        dest="start_date", 
+        help="Start date for range/from-date harvest modes (YYYY-MM-DD)"
+    )
+    parser.add_argument(
+        "--to", 
+        dest="end_date", 
+        help="End date for range harvest mode (YYYY-MM-DD)"
+    )
+    parser.add_argument(
+        "--limit", 
+        type=int, 
+        help="Maximum number of posts to harvest (optional)"
+    )
     
-    if mode == "ingestion":
+    args = parser.parse_args()
+    
+    # Validate arguments
+    if args.harvest_mode in ["range", "from-date"] and not args.start_date:
+        parser.error(f"--from date is required for {args.harvest_mode} harvest mode")
+    
+    if args.harvest_mode == "range" and not args.end_date:
+        parser.error("--to date is required for range harvest mode")
+    
+    app = ShitpostAlpha(
+        harvest_mode=args.harvest_mode,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        limit=args.limit
+    )
+    
+    if args.mode == "ingestion":
         print("🚀 Running Truth Social shitpost harvesting only...")
         await app.run_ingestion_only()
-    elif mode == "analysis":
+    elif args.mode == "analysis":
         print("🧠 Running shitpost analysis only...")
         await app.run_analysis_only()
-    elif mode == "full":
+    elif args.mode == "full":
         print("🎯 Running full pipeline (shitpost harvesting + analysis)...")
         await app.run_full_pipeline()
     else:
-        print("Usage: python main.py [ingestion|analysis|full]")
-        print("  ingestion: Run only Truth Social shitpost harvesting")
-        print("  analysis:  Run only shitpost analysis")
-        print("  full:      Run both shitpost harvesting and analysis (default)")
+        print("Usage: python main.py [--mode ingestion|analysis|full]")
+        print("  --mode ingestion: Run only Truth Social shitpost harvesting")
+        print("  --mode analysis:  Run only shitpost analysis")
+        print("  --mode full:      Run both shitpost harvesting and analysis (default)")
+        print("\nHarvesting options:")
+        print("  --harvest-mode: incremental, backfill, range, from-date")
+        print("  --from: Start date (YYYY-MM-DD)")
+        print("  --to: End date (YYYY-MM-DD)")
+        print("  --limit: Maximum posts to harvest")
 
 
 if __name__ == "__main__":
