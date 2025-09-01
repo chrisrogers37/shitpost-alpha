@@ -12,7 +12,7 @@ from main import ShitpostAlpha
 from shitposts.truth_social_shitposts import TruthSocialShitposts
 # ContentParser removed - no longer used in main application
 from shitpost_ai.llm_client import LLMClient
-from database.shitpost_db import ShitpostDatabase
+from shitvault.shitpost_db import ShitpostDatabase
 
 
 class TestFullPipeline:

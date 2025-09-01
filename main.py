@@ -8,11 +8,11 @@ import asyncio
 import logging
 from typing import Optional
 
-from config.shitpost_settings import Settings
+from shit.config.shitpost_settings import Settings
 from shitposts.truth_social_shitposts import TruthSocialShitposts
 from shitpost_ai.shitpost_analyzer import ShitpostAnalyzer
-from database.shitpost_db import ShitpostDatabase
-from utils.error_handling import handle_exceptions
+from shitvault.shitpost_db import ShitpostDatabase
+from shit.utils.error_handling import handle_exceptions
 
 # Configure logging
 logging.basicConfig(
@@ -27,7 +27,7 @@ class ShitpostAlpha:
     
     def __init__(self):
         self.settings = Settings()
-        self.db_manager = DatabaseManager()
+        self.db_manager = ShitpostDatabase()
         self.truth_monitor = TruthSocialShitposts()
         self.llm_analyzer = ShitpostAnalyzer()
         
@@ -57,7 +57,7 @@ class ShitpostAlpha:
             # Start harvesting shitposts
             async for shitpost in self.truth_monitor.harvest_shitposts():
                 # Store shitposts directly in database
-                shitpost_id = await self.db_manager.store_post(shitpost)
+                shitpost_id = await self.db_manager.store_shitpost(shitpost)
                 if shitpost_id:
                     logger.info(f"Stored shitpost {shitpost_id} in database")
                 
@@ -113,7 +113,7 @@ class ShitpostAlpha:
         """Internal shitpost harvesting task."""
         try:
             async for shitpost in self.truth_monitor.harvest_shitposts():
-                shitpost_id = await self.db_manager.store_post(shitpost)
+                shitpost_id = await self.db_manager.store_shitpost(shitpost)
                 if shitpost_id:
                     logger.info(f"Stored shitpost {shitpost_id} in database")
         except Exception as e:

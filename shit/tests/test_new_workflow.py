@@ -7,9 +7,9 @@ Validate the separated ingestion and analysis workflow.
 import asyncio
 import pytest
 from datetime import datetime
-from database.shitpost_db import ShitpostDatabase
+from shitvault.shitpost_db import ShitpostDatabase
 from shitpost_ai.shitpost_analyzer import ShitpostAnalyzer
-from config.shitpost_settings import Settings
+from shit.config.shitpost_settings import Settings
 
 @pytest.mark.asyncio
 async def test_unprocessed_posts_query():

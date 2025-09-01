@@ -9,9 +9,9 @@ from typing import Dict, Optional, List
 import openai
 import anthropic
 
-from config.shitpost_settings import settings
+from shit.config.shitpost_settings import settings
 from shitpost_ai.prompts import get_analysis_prompt
-from utils.error_handling import handle_exceptions
+from shit.utils.error_handling import handle_exceptions
 
 logger = logging.getLogger(__name__)
 

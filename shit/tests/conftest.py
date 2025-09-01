@@ -48,10 +48,10 @@ def mock_settings():
         mock_settings.LLM_PROVIDER = "openai"
         mock_settings.LLM_MODEL = "gpt-4"
         mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
-        mock_settings.TRUTH_SOCIAL_MONITOR_INTERVAL = 30
+        mock_settings.TRUTH_SOCIAL_SHITPOST_INTERVAL = 30
         mock_settings.SCRAPECREATORS_API_KEY = "test_scrapecreators_key"
         mock_settings.CONFIDENCE_THRESHOLD = 0.7
-        mock_settings.MAX_POST_LENGTH = 4000
+        mock_settings.MAX_SHITPOST_LENGTH = 4000
         mock_settings.get_llm_api_key.return_value = "test_api_key"
         yield mock_settings
 
