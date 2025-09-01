@@ -95,7 +95,7 @@ shitpost-alpha/
 - **Better error handling**: Centralized exception handling and recovery
 
 #### Documentation
-- **Comprehensive READMEs** for `database/`, `shitpost_ai/`, and `shitposts/` directories
+- **Comprehensive READMEs** for `shitvault/`, `shitpost_ai/`, and `shitposts/` directories
 - **Updated main README** with new architecture and testing instructions
 - **API documentation** and usage examples
 - **Deployment and scaling considerations**

@@ -329,9 +329,9 @@ TRUTH_SOCIAL_SHITPOST_INTERVAL=10 python shitposts/truth_social_shitposts.py
 ## 📚 Related Documentation
 
 - **Main README** - Project overview and setup
-- **Database Layer** - `database/` directory
+- **Database Layer** - `shitvault/` directory
 - **AI Engine** - `shitpost_ai/` directory
-- **Configuration** - `config/shitpost_settings.py`
+- **Configuration** - `shit/config/shitpost_settings.py`
 
 ## 🚀 Deployment Considerations
 

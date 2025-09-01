@@ -413,8 +413,8 @@ async def test_analyzer():
 ## 📚 Related Documentation
 
 - **Main README** - Project overview and setup
-- **Database Layer** - `database/` directory
-- **Configuration** - `config/shitpost_settings.py`
+- **Database Layer** - `shitvault/` directory
+- **Configuration** - `shit/config/shitpost_settings.py`
 - **Shitpost Collection** - `shitposts/` directory
 
 ## 🚀 Deployment Considerations

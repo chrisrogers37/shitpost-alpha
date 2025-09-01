@@ -20,20 +20,31 @@ Shitpost-Alpha monitors Donald Trump's Truth Social account in real-time, analyz
 ```
 shitpost_alpha/
 ├── main.py                 # Main orchestrator
-├── config/shitpost_settings.py # Configuration management
-├── shitposts/              # Shitpost collection
-│   └── truth_social_shitposts.py
-├── shitpost_ai/            # AI analysis engine
-│   ├── llm_client.py       # LLM API interaction layer
-│   ├── shitpost_analyzer.py # Shitpost analysis orchestrator
-│   └── prompts.py          # Analysis prompts
-├── database/               # Data persistence
+├── shit/                   # Supporting infrastructure
+│   ├── config/             # Configuration management
+│   ├── tests/              # Testing framework
+│   └── utils/              # Utility functions
+├── shitvault/              # Data persistence
 │   ├── shitpost_models.py  # Shitpost database models
 │   └── shitpost_db.py      # Shitpost database manager
-├── utils/                  # Utilities
-│   └── error_handling.py
-└── tests/                  # Test suite
+├── shitposts/              # Shitpost collection
+│   └── truth_social_shitposts.py
+└── shitpost_ai/            # AI analysis engine
+    ├── llm_client.py       # LLM API interaction layer
+    ├── shitpost_analyzer.py # Shitpost analysis orchestrator
+    └── prompts.py          # Analysis prompts
 ```
+
+### 🎭 Directory Structure Benefits
+
+The project uses a delightfully themed directory structure that's both memorable and logical:
+
+- **`shit/`** - Universal container for supporting infrastructure (config, tests, utils)
+- **`shitvault/`** - Secure data storage with memorable naming
+- **`shitposts/`** - Content harvesting and monitoring
+- **`shitpost_ai/`** - AI analysis and LLM integration
+
+This structure improves code organization while adding a touch of humor that makes the project unforgettable!
 
 ## 📋 Requirements
 
@@ -171,7 +182,7 @@ python shitpost_ai/shitpost_analyzer.py
 
 Test database operations:
 ```bash
-python database/db.py
+python shitvault/shitpost_db.py
 ```
 
 ## 🧪 Testing
@@ -186,7 +197,7 @@ pytest
 pytest --cov=.
 
 # Run specific test file
-pytest tests/test_llm_client.py
+pytest shit/tests/test_llm_client.py
 
 # Run async tests
 pytest tests/ -v

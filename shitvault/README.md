@@ -1,6 +1,6 @@
-# Database Directory
+# Shitvault Directory
 
-This directory contains the complete database layer for the Shitpost-Alpha project, handling all data persistence, models, and database operations.
+This directory contains the database layer for the Shitpost-Alpha project, responsible for data persistence, models, and database management operations. The name "shitvault" reflects its role as a secure storage vault for all shitpost data.
 
 ## 📁 Contents
 
@@ -18,7 +18,7 @@ This directory contains the complete database layer for the Shitpost-Alpha proje
 The database layer follows a clean separation of concerns:
 
 ```
-database/
+shitvault/
 ├── shitpost_db.py      # Database operations & connection management
 ├── shitpost_models.py  # Data models & schema definitions
 └── shitpost_alpha.db  # SQLite database (runtime generated)
