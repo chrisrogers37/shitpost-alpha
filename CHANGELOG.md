@@ -13,6 +13,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Additional LLM provider support
 - Real-time alerting system
 - Dashboard and monitoring interface
+- S3 data lake integration for raw API data preservation
+
+## [0.3.0] - 2024-09-01
+
+### 🚀 **CLI Enhancement for Truth Social Harvester**
+
+#### Added
+- **Multiple harvesting modes** for operational flexibility
+  - `incremental`: Default mode for continuous monitoring
+  - `backfill`: Full historical data harvesting
+  - `range`: Date range harvesting with start/end dates
+  - `from-date`: Harvest from specific date onwards
+- **Date filtering capabilities** with `--from` and `--to` parameters
+- **Harvest limit functionality** with `--limit` parameter
+- **Dry-run mode** for testing without database writes
+- **Comprehensive CLI help** with examples and usage instructions
+- **Enhanced main.py integration** supporting new harvesting parameters
+
+#### Changed
+- **Enhanced `TruthSocialShitposts` class** with mode-based harvesting
+- **Updated `main.py`** to support new harvesting parameters
+- **Improved argument parsing** with proper validation
+- **Better error handling** for invalid date ranges and modes
+
+#### New CLI Usage Examples
+```bash
+# Incremental harvesting (default)
+python -m shitposts.truth_social_shitposts
+
+# Full historical backfill
+python -m shitposts.truth_social_shitposts --mode backfill
+
+# Date range harvesting
+python -m shitposts.truth_social_shitposts --mode range --from 2024-01-01 --to 2024-01-31
+
+# Harvest from specific date onwards
+python -m shitposts.truth_social_shitposts --mode from-date --from 2024-01-01
+
+# Harvest with limit
+python -m shitposts.truth_social_shitposts --mode backfill --limit 100
+
+# Dry run mode
+python -m shitposts.truth_social_shitposts --mode backfill --dry-run
+```
+
+#### Enhanced Main.py Integration
+```bash
+# Run with specific harvesting mode
+python main.py --harvest-mode backfill --limit 100
+
+# Run with date range
+python main.py --harvest-mode range --from 2024-01-01 --to 2024-01-31
+
+# Run ingestion only with custom harvesting
+python main.py --mode ingestion --harvest-mode from-date --from 2024-01-01
+```
+
+#### Technical Improvements
+- **Maintained backward compatibility** with existing functionality
+- **Added proper date parsing** and validation
+- **Enhanced logging** for different harvesting modes
+- **Improved error handling** for invalid configurations
+- **Added progress tracking** for long-running operations
+
+#### Benefits
+- **Operational flexibility** for different use cases
+- **Better testing capabilities** with dry-run mode
+- **Efficient data harvesting** with date filtering
+- **Professional CLI interface** with comprehensive help
+- **Future-ready architecture** for additional harvesting sources
+
+#### Files Modified
+- `shitposts/truth_social_shitposts.py` - Enhanced with CLI modes and harvesting strategies
+- `main.py` - Updated to support new harvesting parameters
+- `reference_docs/S3_DATA_LAKE_INTEGRATION_PLAN.md` - Created for future S3 integration
+
+---
 
 ## [0.2.0] - 2024-09-01
 
