@@ -7,8 +7,8 @@ Validate the new separated workflow architecture without requiring LLM API keys.
 import asyncio
 import pytest
 from datetime import datetime
-from database.shitpost_db import ShitpostDatabase
-from config.shitpost_settings import Settings
+from shitvault.shitpost_db import ShitpostDatabase
+from shit.config.shitpost_settings import Settings
 
 @pytest.mark.asyncio
 async def test_workflow_architecture():

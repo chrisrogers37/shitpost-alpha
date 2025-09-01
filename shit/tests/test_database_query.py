@@ -7,7 +7,7 @@ Query and display Truth Social posts from the database.
 import asyncio
 import json
 import pytest
-from database.shitpost_db import ShitpostDatabase
+from shitvault.shitpost_db import ShitpostDatabase
 
 @pytest.mark.asyncio
 async def test_database_query():
@@ -57,7 +57,7 @@ async def test_database_query():
         # Query total count
         async with db_manager.get_session() as session:
             from sqlalchemy import select, func
-            from database.shitpost_models import TruthSocialShitpost
+            from shitvault.shitpost_models import TruthSocialShitpost
             
             # Total posts
             stmt = select(func.count(TruthSocialShitpost.id))

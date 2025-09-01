@@ -9,10 +9,10 @@ import logging
 from typing import Dict, List, Optional
 from datetime import datetime
 
-from config.shitpost_settings import Settings
+from shit.config.shitpost_settings import Settings
 from shitpost_ai.llm_client import LLMClient
-from database.shitpost_db import ShitpostDatabase
-from utils.error_handling import handle_exceptions
+from shitvault.shitpost_db import ShitpostDatabase
+from shit.utils.error_handling import handle_exceptions
 
 logger = logging.getLogger(__name__)
 

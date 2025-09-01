@@ -11,8 +11,8 @@ from typing import AsyncGenerator, Dict, Optional, List
 import aiohttp
 import json
 
-from config.shitpost_settings import settings
-from utils.error_handling import handle_exceptions
+from shit.config.shitpost_settings import settings
+from shit.utils.error_handling import handle_exceptions
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ class TruthSocialShitposts:
             await self._test_connection()
             
             # Initialize database connection for deduplication
-            from database.shitpost_db import ShitpostDatabase
+            from shitvault.shitpost_db import ShitpostDatabase
             self.db_manager = ShitpostDatabase()
             await self.db_manager.initialize()
             

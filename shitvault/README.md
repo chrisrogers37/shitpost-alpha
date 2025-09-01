@@ -205,7 +205,7 @@ def market_movement_to_dict(movement: MarketMovement) -> Dict[str, Any]
 
 ### Initialize Database
 ```python
-from database.shitpost_db import ShitpostDatabase
+from shitvault.shitpost_db import ShitpostDatabase
 
 db_manager = ShitpostDatabase()
 await db_manager.initialize()

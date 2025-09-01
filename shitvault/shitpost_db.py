@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from config.shitpost_settings import settings
-from database.shitpost_models import Base
+from shit.config.shitpost_settings import settings
+from shitvault.shitpost_models import Base
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class ShitpostDatabase:
     async def store_shitpost(self, shitpost_data: Dict[str, Any]) -> Optional[str]:
         """Store a shitpost in the database."""
         try:
-            from database.shitpost_models import TruthSocialShitpost
+            from shitvault.shitpost_models import TruthSocialShitpost
             from sqlalchemy.exc import IntegrityError
             
             async with self.get_session() as session:
@@ -176,7 +176,7 @@ class ShitpostDatabase:
     async def store_analysis(self, shitpost_id: str, analysis_data: Dict[str, Any], shitpost_data: Dict[str, Any] = None) -> Optional[str]:
         """Store LLM analysis results in the database with enhanced shitpost data."""
         try:
-            from database.shitpost_models import Prediction
+            from shitvault.shitpost_models import Prediction
             
             async with self.get_session() as session:
                 # Calculate engagement scores
@@ -242,7 +242,7 @@ class ShitpostDatabase:
     async def get_recent_shitposts(self, limit: int = 10) -> list:
         """Get recent shitposts."""
         try:
-            from database.shitpost_models import TruthSocialShitpost
+            from shitvault.shitpost_models import TruthSocialShitpost
             
             async with self.get_session() as session:
                 from sqlalchemy import select
@@ -288,7 +288,7 @@ class ShitpostDatabase:
     async def get_last_shitpost_id(self) -> Optional[str]:
         """Get the most recent shitpost ID from the database."""
         try:
-            from database.shitpost_models import TruthSocialShitpost
+            from shitvault.shitpost_models import TruthSocialShitpost
             
             async with self.get_session() as session:
                 from sqlalchemy import select
@@ -317,7 +317,7 @@ class ShitpostDatabase:
         3. Shitpost has sufficient content for analysis
         """
         try:
-            from database.shitpost_models import TruthSocialShitpost, Prediction
+            from shitvault.shitpost_models import TruthSocialShitpost, Prediction
             from datetime import datetime
             from sqlalchemy import select, and_, not_, exists
             
@@ -384,7 +384,7 @@ class ShitpostDatabase:
     async def check_prediction_exists(self, shitpost_id: int) -> bool:
         """Check if a prediction already exists for a shitpost."""
         try:
-            from database.shitpost_models import Prediction
+            from shitvault.shitpost_models import Prediction
             
             async with self.get_session() as session:
                 from sqlalchemy import select
@@ -399,7 +399,7 @@ class ShitpostDatabase:
     async def get_shitpost_analysis(self, shitpost_id: str) -> Optional[Dict]:
         """Get analysis for a specific shitpost."""
         try:
-            from database.shitpost_models import TruthSocialShitpost, Prediction
+            from shitvault.shitpost_models import TruthSocialShitpost, Prediction
             
             async with self.get_session() as session:
                 # Get shitpost
@@ -441,7 +441,7 @@ class ShitpostDatabase:
     async def get_analysis_stats(self) -> Dict[str, Any]:
         """Get basic statistics about stored shitpost data."""
         try:
-            from database.shitpost_models import TruthSocialShitpost, Prediction
+            from shitvault.shitpost_models import TruthSocialShitpost, Prediction
             from sqlalchemy import func
             
             async with self.get_session() as session:

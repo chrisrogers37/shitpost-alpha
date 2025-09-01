@@ -69,7 +69,7 @@ shitpost_alpha/
 
 5. **Initialize database**
    ```bash
-   python -c "from database.shitpost_db import ShitpostDatabase; import asyncio; asyncio.run(ShitpostDatabase().initialize())"
+   python -c "from shitvault.shitpost_db import ShitpostDatabase; import asyncio; asyncio.run(ShitpostDatabase().initialize())"
    ```
 
 ## ⚙ Configuration
