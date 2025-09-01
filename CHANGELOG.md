@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the Shitpost-Alpha project will be documented in this file.
+All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -14,6 +14,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Real-time alerting system
 - Dashboard and monitoring interface
 - S3 data lake integration for raw API data preservation
+- RAG enhancement system for combining multiple analyses
+- Advanced confidence scoring and quality metrics
+- Batch processing optimizations
+- Real-time streaming analysis
+
+---
+
+## [0.4.0] - 2024-09-01
+
+### 🎭 **Enhanced CLI Architecture and Project Branding**
+
+#### Added
+- **CLI enhancements for LLM analysis operations** - Comprehensive command-line interface for shitpost analysis
+- **Unified mode parameter** - Single `--mode` parameter that mirrors sub-CLI structure exactly
+- **Always save analyses** - Removed confidence threshold filtering to preserve all LLM insights for RAG enhancement
+- **Enhanced separation of concerns** - Clean orchestration between harvesting and analysis phases
+
+#### Changed
+- **`main.py` → `shitpost_alpha.py`** - Renamed main orchestrator to match project namesake for better branding
+- **Simplified CLI architecture** - Removed redundant `--harvest-mode` and `--analyze-mode` parameters
+- **Unified processing modes** - Single `--mode` parameter applies to both harvesting and analysis
+- **Confidence threshold handling** - Now always saves analyses with confidence metadata for future RAG enhancement
+- **CLI examples** - Updated all documentation to use new `shitpost_alpha.py` filename
+
+#### Removed
+- **`--confidence-threshold` CLI parameter** - No longer needed as all analyses are saved
+- **Redundant mode parameters** - Eliminated `--harvest-mode` and `--analyze-mode` in favor of unified `--mode`
+- **Confidence filtering** - LLM responses are always saved regardless of confidence score
+
+#### Architecture Improvements
+- **Cleaner CLI design** - Mirrors sub-CLI parameter structure exactly
+- **Better orchestration** - Sequential execution (harvesting → analysis) with shared parameters
+- **RAG-ready storage** - All analyses preserved for future retrieval and enhancement
+- **Professional branding** - Project identity strengthened through consistent naming
+
+#### Technical Details
+- **Files changed**: 7 files
+- **Breaking changes**: File rename (`main.py` → `shitpost_alpha.py`)
+- **CLI improvements**: Simplified parameter structure and better user experience
+- **Documentation**: Comprehensive updates across all README files
+
+#### Benefits
+- **Stronger project identity** with consistent "shitpost-alpha" branding
+- **Better user experience** with simplified, intuitive CLI
+- **Future-ready architecture** for RAG enhancement and analysis combination
+- **Professional appearance** with enterprise-grade naming conventions
+- **Cleaner codebase** with unified parameter handling
+
+---
 
 ## [0.3.0] - 2024-09-01
 
@@ -117,109 +166,4 @@ python main.py --mode ingestion --harvest-mode from-date --from 2024-01-01
 
 #### New Directory Structure
 ```
-shitpost-alpha/
-├── shit/                    # Supporting infrastructure
-│   ├── config/             # Configuration files
-│   ├── tests/              # Testing framework
-│   └── utils/              # Utility functions
-├── shitvault/              # Database storage
-├── shitposts/              # Content harvesting
-└── shitpost_ai/            # AI analysis engine
 ```
-
-#### Benefits
-- **Memorable structure** that developers will never forget
-- **Logical organization** that improves code navigation
-- **Professional quality** with a touch of humor
-- **Future-ready** for continued development
-
-#### Technical Details
-- **Files changed**: 17 files
-- **Import updates**: All internal imports updated
-- **Testing**: All imports verified to work correctly
-- **Breaking changes**: None - all functionality preserved
-
----
-
-## [0.1.0] - 2024-09-01
-
-### 🎉 **Initial Release: Complete Shitpost-Alpha Refactor**
-
-#### Added
-- **Complete codebase refactor** with shitpost nomenclature
-- **Enhanced separation of concerns** between LLM client and analyzer
-- **Comprehensive error handling** and resilience mechanisms
-- **Database schema improvements** with enhanced models
-- **Configuration management** using Pydantic
-- **Extensive documentation** for all major directories
-
-#### Changed
-- **Directory names**: `ingestion/` → `shitposts/`, `llm_engine/` → `shitpost_ai/`
-- **File names**: `db.py` → `shitpost_db.py`, `models.py` → `shitpost_models.py`, `settings.py` → `shitpost_settings.py`
-- **Class names**: `DatabaseManager` → `ShitpostDatabase`, `TruthSocialPost` → `TruthSocialShitpost`
-- **Method names**: `store_post` → `store_shitpost`, `analyze_unprocessed_posts` → `analyze_unprocessed_shitposts`
-- **Variable names**: Throughout codebase updated for consistency
-
-#### Removed
-- **Vestigial components**: `content_parser.py`, `analyzer.py`, `database_analyzer.py`
-- **Unused test files**: `test_content_parser.py`, `test_truth_social_api_monitor.py`
-- **Old database file**: Regenerated `shitpost_alpha.db` with new schema
-
-#### Architecture Improvements
-- **Clear separation of concerns**: `LLMClient` vs `ShitpostAnalyzer`
-- **Enhanced database models**: Better field mapping and relationships
-- **Improved configuration**: Environment variable validation and defaults
-- **Better error handling**: Centralized exception handling and recovery
-
-#### Documentation
-- **Comprehensive READMEs** for `shitvault/`, `shitpost_ai/`, and `shitposts/` directories
-- **Updated main README** with new architecture and testing instructions
-- **API documentation** and usage examples
-- **Deployment and scaling considerations**
-
-#### Testing & Quality
-- **Updated all tests** to reflect new architecture
-- **Integration tests** for complete pipeline
-- **Error handling tests** and resilience validation
-- **Performance optimization** considerations
-
----
-
-## Development Notes
-
-### Versioning Strategy
-- **Major versions (0.x.0)**: Significant architectural changes or new features
-- **Minor versions (0.0.x)**: Bug fixes and minor improvements
-- **Pre-release versions**: Alpha/beta releases for testing
-
-### Breaking Changes
-- **v0.2.0**: Directory restructuring - import paths changed
-- **v0.1.0**: Complete refactor - class names, method names, and structure changed
-
-### Migration Guide
-- **v0.1.0 → v0.2.0**: Update import statements to use new directory structure
-- **v0.0.x → v0.1.0**: Complete rewrite - new codebase structure
-
-### Future Considerations
-- **API stability**: Aim for stable public APIs in v1.0.0+
-- **Backward compatibility**: Maintain compatibility within major versions
-- **Documentation**: Keep changelog updated with each release
-
----
-
-## Contributing
-
-When contributing to this project, please:
-
-1. **Update this changelog** with your changes
-2. **Follow the existing format** and style
-3. **Group changes** by type (Added, Changed, Removed, Fixed)
-4. **Use clear, descriptive language** for all changes
-5. **Include technical details** when relevant
-
-## Links
-
-- [Project Repository](https://github.com/chrisrogers37/shitpost-alpha)
-- [Release Tags](https://github.com/chrisrogers37/shitpost-alpha/tags)
-- [Issues](https://github.com/chrisrogers37/shitpost-alpha/issues)
-- [Pull Requests](https://github.com/chrisrogers37/shitpost-alpha/pulls)
