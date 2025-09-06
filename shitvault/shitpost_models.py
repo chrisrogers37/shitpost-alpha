@@ -105,13 +105,17 @@ class Prediction(Base):
     __tablename__ = "predictions"
     
     id = Column(Integer, primary_key=True, index=True)
-    post_id = Column(Integer, ForeignKey("truth_social_shitposts.id"), nullable=False)  # Foreign key to TruthSocialShitpost
+    shitpost_id = Column(String(255), ForeignKey("truth_social_shitposts.shitpost_id"), nullable=False)  # Foreign key to TruthSocialShitpost.shitpost_id
     
     # Analysis results
     assets = Column(JSON, default=list)  # List of asset tickers
     market_impact = Column(JSON, default=dict)  # Dict of asset -> sentiment
-    confidence = Column(Float, nullable=False)  # Confidence score 0.0-1.0
+    confidence = Column(Float, nullable=True)  # Confidence score 0.0-1.0 (nullable for bypassed posts)
     thesis = Column(Text, nullable=True)  # Investment thesis
+    
+    # Analysis metadata
+    analysis_status = Column(String(50), nullable=False, default='pending')  # 'completed', 'bypassed', 'error'
+    analysis_comment = Column(String(255), nullable=True)  # Reason for bypass/error
     
     # Enhanced analysis using Truth Social data
     engagement_score = Column(Float, nullable=True)  # Calculated from engagement metrics
@@ -256,10 +260,12 @@ def prediction_to_dict(prediction: Prediction) -> Dict[str, Any]:
     """Convert Prediction to dictionary."""
     return {
         'id': prediction.id,
-        'post_id': prediction.post_id,
+        'shitpost_id': prediction.shitpost_id,
         'assets': prediction.assets,
         'market_impact': prediction.market_impact,
         'confidence': prediction.confidence,
+        'analysis_status': prediction.analysis_status,
+        'analysis_comment': prediction.analysis_comment,
         'thesis': prediction.thesis,
         'llm_provider': prediction.llm_provider,
         'llm_model': prediction.llm_model,

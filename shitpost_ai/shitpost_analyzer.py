@@ -78,11 +78,14 @@ class ShitpostAnalyzer:
         
         while True:
             try:
+                logger.info(f"Fetching batch of unprocessed shitposts (batch_size: {self.batch_size})...")
                 # Get batch of unprocessed shitposts
                 shitposts = await self.db_manager.get_unprocessed_shitposts(
                     launch_date=self.launch_date,
                     limit=self.batch_size
                 )
+                
+                logger.info(f"Retrieved {len(shitposts) if shitposts else 0} unprocessed shitposts")
                 
                 if not shitposts:
                     logger.info("No more unprocessed shitposts found for backfill analysis")
@@ -263,8 +266,8 @@ class ShitpostAnalyzer:
         for shitpost in shitposts:
             try:
                 # Check if prediction already exists (double-check)
-                if await self.db_manager.check_prediction_exists(shitpost['id']):
-                    logger.info(f"Prediction already exists for shitpost {shitpost['id']}, skipping")
+                if await self.db_manager.check_prediction_exists(shitpost['shitpost_id']):
+                    logger.info(f"Prediction already exists for shitpost {shitpost['shitpost_id']}, skipping")
                     continue
                 
                 # Analyze the shitpost
@@ -273,9 +276,9 @@ class ShitpostAnalyzer:
                 if analysis:
                     # Store enhanced analysis with shitpost data
                     prediction_id = await self.db_manager.store_analysis(
-                        post_id=str(shitpost['id']),
+                        shitpost_id=str(shitpost['shitpost_id']),  # Use Truth Social API post ID
                         analysis_data=analysis,
-                        post_data=shitpost
+                        shitpost_data=shitpost
                     )
                     
                     if prediction_id:
@@ -317,15 +320,30 @@ class ShitpostAnalyzer:
             Enhanced analysis results
         """
         try:
+            # Check if post has analyzable content BEFORE sending to LLM
+            if self._should_bypass_post(shitpost):
+                # Create bypassed prediction record immediately
+                await self.db_manager.handle_no_text_prediction(
+                    shitpost_id=shitpost['shitpost_id'],
+                    shitpost_data=shitpost
+                )
+                logger.info(f"Bypassed shitpost {shitpost['shitpost_id']} - no analyzable content")
+                return None  # Skip LLM entirely
+            
+            logger.info(f"Preparing enhanced content for shitpost {shitpost.get('id')}...")
             # Prepare enhanced content for analysis
             enhanced_content = self._prepare_enhanced_content(shitpost)
             
+            logger.info(f"Calling LLM client for analysis...")
             # Analyze with LLM
             analysis = await self.llm_client.analyze(enhanced_content)
+            
+            logger.info(f"LLM analysis result: {analysis is not None}")
             
             if not analysis:
                 return None
             
+            logger.info(f"Enhancing analysis with shitpost data...")
             # Enhance analysis with Truth Social data
             enhanced_analysis = self._enhance_analysis_with_shitpost_data(analysis, shitpost)
             
@@ -334,6 +352,28 @@ class ShitpostAnalyzer:
         except Exception as e:
             logger.error(f"Error in shitpost analysis: {e}")
             return None
+    
+    def _should_bypass_post(self, shitpost: Dict) -> bool:
+        """Determine if a post should be bypassed for analysis."""
+        text_content = shitpost.get('text', '').strip()
+        
+        # Check for various bypass conditions
+        if not text_content:
+            return True  # No text at all
+        
+        # Check if it's just a URL with no context
+        if text_content.startswith('http') and len(text_content.split()) <= 2:
+            return True
+        
+        # Check if it's just emojis/symbols
+        if all(ord(char) < 128 for char in text_content) and len(text_content.strip()) < 3:
+            return True
+        
+        # Check if it's just media (has media but no text)
+        if shitpost.get('has_media', False) and not text_content:
+            return True
+        
+        return False  # Post has analyzable content
     
     def _prepare_enhanced_content(self, shitpost: Dict) -> str:
         """
