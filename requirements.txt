@@ -8,6 +8,9 @@ asyncio-mqtt>=0.16.0
 aiohttp>=3.8.0
 requests>=2.31.0
 
+# AWS S3
+boto3>=1.26.0
+
 # LLM providers
 openai>=1.0.0
 anthropic>=0.7.0

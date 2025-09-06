@@ -9,7 +9,7 @@ from unittest.mock import patch, AsyncMock
 import json
 
 from main import ShitpostAlpha
-from shitposts.truth_social_shitposts import TruthSocialShitposts
+from shitposts.truth_social_s3_harvester import TruthSocialS3Harvester
 # ContentParser removed - no longer used in main application
 from shitpost_ai.llm_client import LLMClient
 from shitvault.shitpost_db import ShitpostDatabase

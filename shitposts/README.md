@@ -5,7 +5,9 @@ This directory contains the shitpost collection and harvesting system for the Sh
 ## 📁 Contents
 
 ### Core Files
-- **`truth_social_shitposts.py`** - Truth Social shitpost harvester
+- **`truth_social_s3_harvester.py`** - Truth Social S3 harvester (stores raw data in S3)
+- **`s3_data_lake.py`** - S3 data lake management for raw data storage
+- **`cli.py`** - Shared CLI functionality for harvesters
 - **`README.md`** - This documentation file
 
 ### Generated Files
@@ -17,40 +19,57 @@ The shitpost collection system follows a clean, focused design:
 
 ```
 shitposts/
-├── truth_social_shitposts.py  # Truth Social harvester
-├── README.md                  # This documentation
-└── __pycache__/              # Python cache (auto-generated)
+├── truth_social_s3_harvester.py  # Truth Social S3 harvester
+├── s3_data_lake.py               # S3 data lake management
+├── cli.py                        # Shared CLI functionality
+├── README.md                     # This documentation
+└── __pycache__/                  # Python cache (auto-generated)
 ```
 
 ## 🎯 Purpose
 
 The shitposts directory serves as the **data ingestion layer** of the Shitpost-Alpha pipeline, responsible for:
 
-- **Real-time harvesting** of Truth Social posts
-- **Data transformation** from API format to internal schema
-- **Deduplication** and restart resilience
+- **S3-based harvesting** of Truth Social posts (API → S3)
+- **Raw data storage** in organized S3 structure
+- **Resume capability** for large backfill operations
 - **Error handling** and connection management
-- **Continuous monitoring** of Trump's Truth Social activity
+- **Multiple harvesting modes** (incremental, backfill, date ranges)
 
 ## 🧠 Core Components
 
-### Truth Social Shitposts (`truth_social_shitposts.py`)
+### Truth Social S3 Harvester (`truth_social_s3_harvester.py`)
 
-The main harvester class that manages all Truth Social data collection.
+The main harvester class that manages all Truth Social data collection and S3 storage.
 
-#### Class: `TruthSocialShitposts`
+#### Class: `TruthSocialS3Harvester`
 
-**Purpose:** Harvests shitposts from Donald Trump's Truth Social account using ScrapeCreators API.
+**Purpose:** Harvests shitposts from Donald Trump's Truth Social account and stores raw data in S3.
 
 **Key Features:**
 - **Multiple harvesting modes** - Incremental, backfill, date range, and from-date modes
-- **Real-time monitoring** - Continuous harvesting with configurable intervals
+- **S3 storage** - Raw data stored in organized S3 structure (`truth-social/raw/YYYY/MM/DD/post_id.json`)
+- **Resume capability** - Can resume from specific post ID for large backfill operations
 - **API integration** - Seamless ScrapeCreators API integration
-- **Data transformation** - Converts API data to internal format
-- **Restart resilience** - Remembers last processed shitpost
+- **Raw data preservation** - Stores complete API responses for future processing
 - **Error handling** - Robust error management and recovery
-- **Async operations** - Non-blocking HTTP requests
+- **Async operations** - Non-blocking HTTP requests and S3 uploads
 - **CLI interface** - Command-line tools for different harvesting strategies
+
+### S3 Data Lake (`s3_data_lake.py`)
+
+Manages raw data storage and retrieval in AWS S3.
+
+#### Class: `S3DataLake`
+
+**Purpose:** Handles S3 operations for raw shitpost data storage and retrieval.
+
+**Key Features:**
+- **Organized storage** - Data stored by date structure for easy querying
+- **Metadata tracking** - Stores harvest metadata with each file
+- **Statistics** - Provides storage statistics and data insights
+- **Streaming support** - Can stream data for processing
+- **Cleanup utilities** - Tools for data management and cleanup
 
 #### Key Methods
 
@@ -165,40 +184,43 @@ The Truth Social harvester includes a comprehensive CLI for different harvesting
 #### 1. **Incremental Mode** (Default)
 ```bash
 # Continuous monitoring of new posts
-python -m shitposts.truth_social_shitposts
+python -m shitposts.truth_social_s3_harvester
 
 # With verbose logging
-python -m shitposts.truth_social_shitposts --verbose
+python -m shitposts.truth_social_s3_harvester --verbose
 ```
 
 #### 2. **Backfill Mode**
 ```bash
 # Full historical data harvesting
-python -m shitposts.truth_social_shitposts --mode backfill
+python -m shitposts.truth_social_s3_harvester --mode backfill
 
 # Limited backfill (e.g., last 100 posts)
-python -m shitposts.truth_social_shitposts --mode backfill --limit 100
+python -m shitposts.truth_social_s3_harvester --mode backfill --limit 100
+
+# Resume backfill from specific post ID
+python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915682735686
 
 # Dry run to see what would be harvested
-python -m shitposts.truth_social_shitposts --mode backfill --dry-run
+python -m shitposts.truth_social_s3_harvester --mode backfill --dry-run
 ```
 
 #### 3. **Date Range Mode**
 ```bash
 # Harvest posts within specific date range
-python -m shitposts.truth_social_shitposts --mode range --from 2024-01-01 --to 2024-01-31
+python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --to 2024-01-31
 
 # With limit and verbose logging
-python -m shitposts.truth_social_shitposts --mode range --from 2024-01-01 --to 2024-01-31 --limit 500 --verbose
+python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --to 2024-01-31 --limit 500 --verbose
 ```
 
 #### 4. **From Date Mode**
 ```bash
 # Harvest posts from specific date onwards
-python -m shitposts.truth_social_shitposts --mode from-date --from 2024-01-01
+python -m shitposts.truth_social_s3_harvester --mode from-date --from 2024-01-01
 
 # With limit
-python -m shitposts.truth_social_shitposts --mode from-date --from 2024-01-01 --limit 200
+python -m shitposts.truth_social_s3_harvester --mode from-date --from 2024-01-01 --limit 200
 ```
 
 ### CLI Options
@@ -217,16 +239,19 @@ python -m shitposts.truth_social_shitposts --mode from-date --from 2024-01-01 --
 
 ```bash
 # Quick test with 5 posts
-python -m shitposts.truth_social_shitposts --mode backfill --limit 5 --dry-run
+python -m shitposts.truth_social_s3_harvester --mode backfill --limit 5 --dry-run
 
 # Harvest last week's posts
-python -m shitposts.truth_social_shitposts --mode range --from 2024-01-15 --to 2024-01-22
+python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-15 --to 2024-01-22
 
 # Continuous monitoring with verbose logging
-python -m shitposts.truth_social_shitposts --verbose
+python -m shitposts.truth_social_s3_harvester --verbose
 
 # Harvest posts from election day onwards
-python -m shitposts.truth_social_shitposts --mode from-date --from 2024-11-05 --limit 1000
+python -m shitposts.truth_social_s3_harvester --mode from-date --from 2024-11-05 --limit 1000
+
+# Resume large backfill from specific post ID
+python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915682735686
 ```
 
 ## 📊 Data Format

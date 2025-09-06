@@ -169,22 +169,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### New CLI Usage Examples
 ```bash
 # Incremental harvesting (default)
-python -m shitposts.truth_social_shitposts
+python -m shitposts.truth_social_s3_harvester
 
 # Full historical backfill
-python -m shitposts.truth_social_shitposts --mode backfill
+python -m shitposts.truth_social_s3_harvester --mode backfill
 
 # Date range harvesting
-python -m shitposts.truth_social_shitposts --mode range --from 2024-01-01 --to 2024-01-31
+python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --to 2024-01-31
 
 # Harvest from specific date onwards
-python -m shitposts.truth_social_shitposts --mode from-date --from 2024-01-01
+python -m shitposts.truth_social_s3_harvester --mode from-date --from 2024-01-01
 
 # Harvest with limit
-python -m shitposts.truth_social_shitposts --mode backfill --limit 100
+python -m shitposts.truth_social_s3_harvester --mode backfill --limit 100
+
+# Resume from specific post ID
+python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915682735686
 
 # Dry run mode
-python -m shitposts.truth_social_shitposts --mode backfill --dry-run
+python -m shitposts.truth_social_s3_harvester --mode backfill --dry-run
 ```
 
 #### Enhanced Main.py Integration
@@ -214,9 +217,64 @@ python main.py --mode ingestion --harvest-mode from-date --from 2024-01-01
 - **Future-ready architecture** for additional harvesting sources
 
 #### Files Modified
-- `shitposts/truth_social_shitposts.py` - Enhanced with CLI modes and harvesting strategies
+- `shitposts/truth_social_s3_harvester.py` - New S3-based harvester with CLI modes and harvesting strategies
+- `shitposts/s3_data_lake.py` - S3 data lake management for raw data storage
+- `shitposts/cli.py` - Shared CLI functionality for harvesters
 - `shitpost_alpha.py` - Updated to support new harvesting parameters
 - `reference_docs/S3_DATA_LAKE_INTEGRATION_PLAN.md` - Created for future S3 integration
+
+---
+
+## [0.7.0] - 2025-01-15
+
+### 🚀 S3 Data Lake Migration - Complete
+
+**Major milestone:** Successfully migrated from API → Database to API → S3 architecture, completing the S3 data lake integration.
+
+#### 🎯 Key Achievements
+
+- **✅ Complete S3 Migration** - Fully transitioned from legacy database harvesting to S3-based raw data storage
+- **✅ Resume Capability** - Added `--max-id` parameter for resuming large backfill operations
+- **✅ Legacy Cleanup** - Removed obsolete `truth_social_shitposts.py` and updated all references
+- **✅ Documentation Update** - Comprehensive documentation refresh for S3-only approach
+- **✅ Orchestrator Update** - Main pipeline now uses S3 harvester exclusively
+
+#### 🔧 Technical Improvements
+
+- **S3 Data Lake Integration** - Raw data stored in organized structure (`truth-social/raw/YYYY/MM/DD/post_id.json`)
+- **Resume Functionality** - Can resume backfill from specific post ID for large operations
+- **Simplified Storage** - Removed overwrite complexity, always replace for reliability
+- **Enhanced CLI** - Added `--max-id` parameter for resuming operations
+- **Clean Architecture** - Removed legacy code and updated all references
+
+#### 📊 New CLI Features
+
+```bash
+# Resume backfill from specific post ID
+python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915682735686
+
+# Full backfill with resume capability
+python -m shitposts.truth_social_s3_harvester --mode backfill
+
+# All existing modes now use S3 storage
+python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --to 2024-01-31
+```
+
+#### 🗂️ Files Modified
+
+- **Removed:** `shitposts/truth_social_shitposts.py` - Legacy database harvester
+- **Updated:** `shitpost_alpha.py` - Now uses S3 harvester exclusively
+- **Updated:** `shit/tests/test_integration.py` - Updated imports for S3 harvester
+- **Updated:** All README files - Reflect S3-only approach
+- **Updated:** `CHANGELOG.md` - Document S3 migration completion
+
+#### 🎉 Impact
+
+- **Scalable Architecture** - S3-based storage can handle unlimited data volume
+- **Resume Capability** - Large backfill operations can be resumed from any point
+- **Raw Data Preservation** - Complete API responses stored for future processing
+- **Clean Codebase** - Removed legacy code and simplified architecture
+- **Future Ready** - Foundation set for S3 → Database processing pipeline
 
 ---
 

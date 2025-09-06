@@ -62,6 +62,13 @@ class Settings(BaseSettings):
     # ScrapeCreators API Configuration
     SCRAPECREATORS_API_KEY: Optional[str] = Field(default=None, env="SCRAPECREATORS_API_KEY")
     
+    # S3 Data Lake Configuration
+    S3_BUCKET_NAME: str = Field(default="shitpost-alpha-raw-data", env="S3_BUCKET_NAME")
+    S3_PREFIX: str = Field(default="truth-social", env="S3_PREFIX")
+    AWS_ACCESS_KEY_ID: Optional[str] = Field(default=None, env="AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY: Optional[str] = Field(default=None, env="AWS_SECRET_ACCESS_KEY")
+    AWS_REGION: str = Field(default="us-east-1", env="AWS_REGION")
+    
     # Logging
     LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
     

@@ -28,7 +28,9 @@ shitpost_alpha/
 │   ├── shitpost_models.py  # Shitpost database models
 │   └── shitpost_db.py      # Shitpost database manager
 ├── shitposts/              # Shitpost collection
-│   └── truth_social_shitposts.py
+│   ├── truth_social_s3_harvester.py  # S3-based harvester
+│   ├── s3_data_lake.py               # S3 data lake management
+│   └── cli.py                        # Shared CLI functionality
 └── shitpost_ai/            # AI analysis engine
     ├── llm_client.py       # LLM API interaction layer
     ├── shitpost_analyzer.py # Shitpost analysis orchestrator
@@ -163,9 +165,9 @@ The system now includes comprehensive CLIs for both harvesting and analysis, orc
 
 #### Direct Sub-CLI Usage
 ```bash
-# Truth Social Harvester CLI
-python -m shitposts.truth_social_shitposts --help
-python -m shitposts.truth_social_shitposts --mode backfill --limit 100
+# Truth Social S3 Harvester CLI
+python -m shitposts.truth_social_s3_harvester --help
+python -m shitposts.truth_social_s3_harvester --mode backfill --limit 100
 
 # LLM Analyzer CLI  
 python -m shitpost_ai.shitpost_analyzer --help
@@ -200,7 +202,7 @@ python shit/tests/test_workflow_validation.py
 Test individual sub-CLIs:
 ```bash
 # Test harvesting CLI
-python -m shitposts.truth_social_shitposts --mode backfill --limit 5 --dry-run
+python -m shitposts.truth_social_s3_harvester --mode backfill --limit 5 --dry-run
 
 # Test analysis CLI
 python -m shitpost_ai.shitpost_analyzer --mode backfill --limit 5 --dry-run

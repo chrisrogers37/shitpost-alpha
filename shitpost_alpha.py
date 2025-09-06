@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 async def execute_harvesting_cli(args) -> bool:
     """Execute the harvesting CLI with appropriate parameters."""
     cmd = [
-        sys.executable, "-m", "shitposts.truth_social_shitposts",
+        sys.executable, "-m", "shitposts.truth_social_s3_harvester",
         "--mode", args.mode
     ]
     
@@ -32,6 +32,8 @@ async def execute_harvesting_cli(args) -> bool:
         cmd.extend(["--to", args.to_date])
     if args.limit:
         cmd.extend(["--limit", str(args.limit)])
+    if hasattr(args, 'max_id') and args.max_id:
+        cmd.extend(["--max-id", args.max_id])
     
     if args.verbose:
         cmd.append("--verbose")
