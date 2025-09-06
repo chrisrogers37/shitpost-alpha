@@ -18,6 +18,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced confidence scoring and quality metrics
 - Batch processing optimizations
 - Real-time streaming analysis
+- Categorical analysis status tracking for complete audit trail
+
+---
+
+## [0.6.0] - 2024-09-01
+
+### 🎯 **Categorical Analysis Status Tracking - Complete Audit Trail**
+
+#### Added
+- **Categorical analysis status tracking** - Every harvested post now gets a prediction record with status tracking
+- **Smart bypass logic** - Automatically detects and bypasses posts with no analyzable content
+- **Analysis status fields** - `analysis_status` ('completed', 'bypassed', 'error') and `analysis_comment` for detailed tracking
+- **Bypass reason detection** - Smart content analysis to determine why posts are bypassed ('no_text', 'url_only', 'symbols_only', 'media_only')
+- **Helper functions** - `handle_no_text_prediction()` and `_get_bypass_reason()` for bypass handling
+- **Complete audit trail** - Every harvested post has a prediction record, ensuring no posts are "lost"
+
+#### Changed
+- **Database schema** - Added `analysis_status` and `analysis_comment` fields to `Prediction` model
+- **Confidence field** - Made `confidence` nullable for bypassed posts
+- **Analysis flow** - Posts are checked for analyzable content before sending to LLM
+- **Query logic** - `get_unprocessed_shitposts()` now includes posts with no text for bypass processing
+- **Store analysis** - Sets `analysis_status='completed'` for successful analyses
+
+#### Benefits
+- **Complete data integrity** - Every harvested post tracked with appropriate status
+- **Cost optimization** - No wasted LLM API calls on unanalyzable content
+- **Easy debugging** - Can query by status to see what happened to each post
+- **Smart content filtering** - Automatically detects various types of unanalyzable content
+- **Audit trail** - Full visibility into why posts were processed or bypassed
+
+#### Technical Details
+- **Files modified**: 3 files (shitvault/shitpost_models.py, shitvault/shitpost_db.py, shitpost_ai/shitpost_analyzer.py)
+- **New fields**: `analysis_status` (String, default 'pending'), `analysis_comment` (String, nullable)
+- **Bypass reasons**: 'no_text', 'url_only', 'symbols_only', 'media_only', 'unanalyzable_content'
+- **Impact**: 100% post coverage - every harvested post gets a prediction record
+
+#### Example Results
+```
+3 posts harvested → 3 prediction records created
+├── 2 posts analyzed → status: 'completed', comment: null
+└── 1 post bypassed → status: 'bypassed', comment: 'no_text'
+```
+
+---
+
+## [0.5.0] - 2024-09-01
+
+### 🔧 **Critical Pipeline Fixes and Schema Consistency**
+
+#### Fixed
+- **Schema inconsistency between `post_id` and `shitpost_id`** - Fixed foreign key relationships to use Truth Social API IDs consistently
+- **API response parsing errors** - Corrected key extraction from `data.get('data', [])` to `data.get('posts', [])`
+- **DateTime type errors** - Added proper timestamp string-to-datetime conversion for database storage
+- **Pipeline hanging issues** - Added 30-second timeouts to LLM API calls to prevent indefinite hanging
+- **Missing posts in analysis** - Temporarily removed launch date filter to ensure all harvested posts can be analyzed
+- **Foreign key relationship errors** - Updated all database queries to use correct `shitpost_id` references
+
+#### Added
+- **Enhanced logging throughout pipeline** - Comprehensive debug logging for better troubleshooting
+- **Timestamp parsing helper** - `_parse_timestamp()` method for robust datetime conversion
+- **API timeout handling** - `asyncio.wait_for()` wrappers for OpenAI and Anthropic API calls
+- **Better error handling** - Improved exception handling with traceback logging
+
+#### Changed
+- **Database schema consistency** - `Prediction.shitpost_id` now properly references `TruthSocialShitpost.shitpost_id`
+- **Method signatures** - Updated `check_prediction_exists()` to accept string IDs instead of integers
+- **Pipeline flow** - Enhanced backfill logic to save posts to database before yielding
+- **API integration** - Fixed response parsing to match actual Truth Social API structure
+
+#### Technical Details
+- **Files modified**: 5 files (104 insertions, 40 deletions)
+- **Core fixes**: Schema consistency, API parsing, datetime handling, timeout management
+- **Impact**: Pipeline should now properly process all harvested posts with correct foreign key relationships
+
+#### Benefits
+- **Reliable data pipeline** with proper schema consistency
+- **Better debugging capabilities** with enhanced logging
+- **Robust API integration** with timeout handling
+- **Complete data integrity** with correct foreign key relationships
+- **Improved error visibility** for faster issue resolution
 
 ---
 

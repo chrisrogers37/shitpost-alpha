@@ -100,11 +100,14 @@ class TruthSocialShitposts:
         try:
             # Test with a simple API call
             url = f"{self.base_url}/truthsocial/user/posts?user_id={self.user_id}&limit=1"
+            logger.info(f"Testing API connection to: {url}")
             async with self.session.get(url) as response:
+                logger.info(f"API test response status: {response.status}")
                 if response.status != 200:
                     raise Exception(f"API connection test failed: {response.status}")
                 
                 data = await response.json()
+                logger.info(f"API test response data: {data}")
                 if not data.get('success'):
                     raise Exception(f"API returned error: {data}")
                 
@@ -127,18 +130,21 @@ class TruthSocialShitposts:
             if next_max_id:
                 params['max_id'] = next_max_id
             
+            logger.info(f"Making API request to: {url} with params: {params}")
             async with self.session.get(url, params=params) as response:
+                logger.info(f"API response status: {response.status}")
                 if response.status != 200:
                     logger.error(f"API request failed: {response.status}")
                     return []
                 
                 data = await response.json()
+                logger.info(f"API response data: {data}")
                 
                 if not data.get('success'):
                     logger.error(f"API returned error: {data}")
                     return []
                 
-                shitposts = data.get('data', [])
+                shitposts = data.get('posts', [])  # API returns 'posts' not 'data'
                 logger.info(f"Fetched {len(shitposts)} shitposts from Truth Social")
                 
                 return shitposts
@@ -171,20 +177,30 @@ class TruthSocialShitposts:
         max_id = None
         total_harvested = 0
         
+        logger.info(f"Starting backfill with max_id: {max_id}")
+        
         while True:
             try:
-                # Fetch batch of posts
+                logger.info(f"Fetching batch of posts with max_id: {max_id}")
+                # Fetch batch of posts from API (start with most recent, no max_id)
                 shitposts = await self._fetch_recent_shitposts(max_id)
+                
+                logger.info(f"API returned {len(shitposts) if shitposts else 0} posts")
                 
                 if not shitposts:
                     logger.info("No more posts to harvest in backfill")
                     break
                 
-                # Process each shitpost
+                # Process and save each shitpost to database
                 for shitpost in shitposts:
                     try:
                         processed_shitpost = await self._process_shitpost(shitpost)
                         if processed_shitpost:
+                            # Save to database first
+                            await self.db_manager.store_shitpost(processed_shitpost)
+                            logger.info(f"Saved shitpost {processed_shitpost.get('shitpost_id')} to database")
+                            
+                            # Then yield for external processing
                             yield processed_shitpost
                             total_harvested += 1
                             
@@ -193,24 +209,26 @@ class TruthSocialShitposts:
                                 logger.info(f"Reached harvest limit of {self.limit} posts")
                                 return
                             
-                            # Update max_id for next batch
+                            # Update max_id for next batch (use the last post's ID for pagination)
                             max_id = shitpost.get('id')
                             
                     except Exception as e:
                         logger.error(f"Error processing shitpost {shitpost.get('id')}: {e}")
                         continue
                 
-                logger.info(f"Backfill progress: {total_harvested} posts harvested")
+                logger.info(f"Backfill progress: {total_harvested} posts harvested and saved")
                 
-                # Small delay to be respectful to API
+                                # Small delay to be respectful to API
                 await asyncio.sleep(1)
                 
             except Exception as e:
                 logger.error(f"Error in backfill harvest: {e}")
+                import traceback
+                logger.error(f"Full traceback: {traceback.format_exc()}")
                 await handle_exceptions(e)
                 break
         
-        logger.info(f"Backfill completed. Total posts harvested: {total_harvested}")
+        logger.info(f"Backfill completed. Total posts harvested and saved: {total_harvested}")
     
     async def _harvest_date_range(self) -> AsyncGenerator[Dict, None]:
         """Harvest posts within a specific date range."""
@@ -374,11 +392,22 @@ class TruthSocialShitposts:
             # Extract basic shitpost data
             shitpost_id = raw_shitpost.get('id')
             content = raw_shitpost.get('content', '')
-            timestamp = raw_shitpost.get('created_at')
+            timestamp_str = raw_shitpost.get('created_at')
             
             if not shitpost_id or not content:
                 logger.warning(f"Invalid shitpost data: {raw_shitpost}")
                 return None
+            
+            # Convert timestamp string to Python datetime object
+            try:
+                if timestamp_str:
+                    # Remove 'Z' and parse ISO format
+                    timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                else:
+                    timestamp = datetime.now()
+            except Exception as e:
+                logger.warning(f"Could not parse timestamp {timestamp_str}, using current time: {e}")
+                timestamp = datetime.now()
             
             # Transform to our format
             processed_shitpost = {
@@ -497,7 +526,7 @@ async def main():
 Examples:
   # Incremental harvesting (default)
   python -m shitposts.truth_social_shitposts
-  
+  Please or exam
   # Full historical backfill
   python -m shitposts.truth_social_shitposts --mode backfill
   
@@ -571,8 +600,10 @@ Examples:
         await harvester.initialize()
         
         # Harvest shitposts
+        print("🔄 Starting harvest process...")
         harvested_count = 0
         async for shitpost in harvester.harvest_shitposts():
+            print(f"🔄 Processing shitpost from generator...")
             if args.dry_run:
                 print(f"📝 Would harvest: {shitpost['id']} - {shitpost['text'][:100]}...")
             else:

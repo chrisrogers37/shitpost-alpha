@@ -8,6 +8,7 @@ import logging
 from typing import Dict, Optional, List
 import openai
 import anthropic
+import asyncio
 
 from shit.config.shitpost_settings import settings
 from shitpost_ai.prompts import get_analysis_prompt
@@ -107,26 +108,32 @@ class LLMClient:
         """Call the LLM with the given prompt."""
         try:
             if self.provider == "openai":
-                response = await self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": "You are a financial analyst specializing in market sentiment analysis."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    max_tokens=1000,
-                    temperature=0.3
+                response = await asyncio.wait_for(
+                    self.client.chat.completions.create(
+                        model=self.model,
+                        messages=[
+                            {"role": "system", "content": "You are a financial analyst specializing in market sentiment analysis."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        max_tokens=1000,
+                        temperature=0.3
+                    ),
+                    timeout=30.0  # 30 second timeout
                 )
                 return response.choices[0].message.content
             
             elif self.provider == "anthropic":
-                response = await self.client.messages.create(
-                    model=self.model,
-                    max_tokens=1000,
-                    temperature=0.3,
-                    system="You are a financial analyst specializing in market sentiment analysis.",
-                    messages=[
-                        {"role": "user", "content": prompt}
-                    ]
+                response = await asyncio.wait_for(
+                    self.client.messages.create(
+                        model=self.model,
+                        max_tokens=1000,
+                        temperature=0.3,
+                        system="You are a financial analyst specializing in market sentiment analysis.",
+                        messages=[
+                            {"role": "user", "content": prompt}
+                        ]
+                    ),
+                    timeout=30.0  # 30 second timeout
                 )
                 return response.content[0].text
             

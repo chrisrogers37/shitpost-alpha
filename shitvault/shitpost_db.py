@@ -4,7 +4,9 @@ Handles database connections and operations for shitpost storage using SQLAlchem
 """
 
 import logging
-from typing import Optional, Dict, Any, List
+import asyncio
+from typing import Dict, List, Optional, Any
+from datetime import datetime
 from sqlalchemy import create_engine, MetaData
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -198,11 +200,15 @@ class ShitpostDatabase:
                         viral_score = reblogs / favourites
                 
                 prediction = Prediction(
-                    post_id=shitpost_id,
+                    shitpost_id=shitpost_id,
                     assets=analysis_data.get('assets', []),
                     market_impact=analysis_data.get('market_impact', {}),
                     confidence=analysis_data.get('confidence', 0.0),
                     thesis=analysis_data.get('thesis', ''),
+                    
+                    # Set analysis status for successful analyses
+                    analysis_status='completed',
+                    analysis_comment=None,
                     
                     # Enhanced analysis scores
                     engagement_score=engagement_score,
@@ -225,7 +231,7 @@ class ShitpostDatabase:
                     # LLM metadata
                     llm_provider=analysis_data.get('llm_provider'),
                     llm_model=analysis_data.get('llm_model'),
-                    analysis_timestamp=analysis_data.get('analysis_timestamp')
+                    analysis_timestamp=self._parse_timestamp(analysis_data.get('analysis_timestamp'))
                 )
                 
                 session.add(prediction)
@@ -238,6 +244,91 @@ class ShitpostDatabase:
         except Exception as e:
             logger.error(f"Error storing analysis: {e}")
             return None
+    
+    def _parse_timestamp(self, timestamp_str: str) -> datetime:
+        """Parse timestamp string to datetime object."""
+        try:
+            if isinstance(timestamp_str, str):
+                # Handle ISO format with or without timezone
+                if timestamp_str.endswith('Z'):
+                    timestamp_str = timestamp_str.replace('Z', '+00:00')
+                return datetime.fromisoformat(timestamp_str)
+            elif isinstance(timestamp_str, datetime):
+                return timestamp_str
+            else:
+                return datetime.now()
+        except Exception as e:
+            logger.warning(f"Could not parse timestamp {timestamp_str}, using current time: {e}")
+            return datetime.now()
+    
+    async def handle_no_text_prediction(self, shitpost_id: str, shitpost_data: Dict[str, Any]) -> Optional[str]:
+        """Create a prediction record for posts that can't be analyzed."""
+        try:
+            from shitvault.shitpost_models import Prediction
+            
+            # Determine the bypass reason based on content
+            reason = self._get_bypass_reason(shitpost_data)
+            
+            async with self.get_session() as session:
+                prediction = Prediction(
+                    shitpost_id=shitpost_id,
+                    analysis_status='bypassed',
+                    analysis_comment=reason,
+                    # Set minimal required fields for bypassed posts
+                    confidence=None,
+                    thesis=None,
+                    assets=[],
+                    market_impact={},
+                    engagement_score=None,
+                    viral_score=None,
+                    sentiment_score=None,
+                    urgency_score=None,
+                    has_media=shitpost_data.get('has_media', False),
+                    mentions_count=len(shitpost_data.get('mentions', [])),
+                    hashtags_count=len(shitpost_data.get('hashtags', [])),
+                    content_length=len(shitpost_data.get('text', '')),
+                    replies_at_analysis=shitpost_data.get('replies_count', 0),
+                    reblogs_at_analysis=shitpost_data.get('reblogs_count', 0),
+                    favourites_at_analysis=shitpost_data.get('favourites_count', 0),
+                    upvotes_at_analysis=shitpost_data.get('upvotes_count', 0),
+                    llm_provider=None,
+                    llm_model=None,
+                    analysis_timestamp=datetime.now()
+                )
+                
+                session.add(prediction)
+                await session.commit()
+                await session.refresh(prediction)
+                
+                logger.info(f"Created bypassed prediction for {shitpost_id}: {reason}")
+                return str(prediction.id)
+                
+        except Exception as e:
+            logger.error(f"Error creating bypassed prediction: {e}")
+            return None
+    
+    def _get_bypass_reason(self, shitpost_data: Dict[str, Any]) -> str:
+        """Determine why a post should be bypassed for analysis."""
+        text_content = shitpost_data.get('text', '').strip()
+        
+        # Check for various bypass conditions
+        if not text_content:
+            return 'no_text'
+        
+        # Check if it's just a URL with no context
+        if text_content.startswith('http') and len(text_content.split()) <= 2:
+            return 'url_only'
+        
+        # Check if it's just emojis/symbols
+        if all(ord(char) < 128 for char in text_content) and len(text_content.strip()) < 3:
+            return 'symbols_only'
+        
+        # Check if it's just media (has media but no text)
+        if shitpost_data.get('has_media', False) and not text_content:
+            return 'media_only'
+        
+        # Default fallback
+        return 'unanalyzable_content'
     
     async def get_recent_shitposts(self, limit: int = 10) -> list:
         """Get recent shitposts."""
@@ -326,16 +417,15 @@ class ShitpostDatabase:
             
             async with self.get_session() as session:
                 # Subquery to check if prediction exists
-                prediction_exists = select(Prediction.id).where(Prediction.post_id == TruthSocialShitpost.id)
+                prediction_exists = select(Prediction.id).where(Prediction.shitpost_id == TruthSocialShitpost.shitpost_id)
                 
-                # Main query
+                # Main query - TEMPORARILY REMOVED LAUNCH DATE FILTER FOR TESTING
+                # Include ALL posts (even those with no text) so they can be bypassed
                 stmt = select(TruthSocialShitpost).where(
                     and_(
-                        TruthSocialShitpost.timestamp >= launch_datetime,
-                        not_(exists(prediction_exists)),
-                        TruthSocialShitpost.text.isnot(None),
-                        TruthSocialShitpost.text != '',
-                        TruthSocialShitpost.text != 'None'
+                        # TruthSocialShitpost.timestamp >= launch_datetime,  # TEMPORARILY COMMENTED OUT
+                        not_(exists(prediction_exists))
+                        # Removed text filters so posts with no text can be processed and bypassed
                     )
                 ).order_by(TruthSocialShitpost.timestamp.desc()).limit(limit)
                 
@@ -381,14 +471,14 @@ class ShitpostDatabase:
             logger.error(f"Error fetching unprocessed shitposts: {e}")
             return []
     
-    async def check_prediction_exists(self, shitpost_id: int) -> bool:
+    async def check_prediction_exists(self, shitpost_id: str) -> bool:
         """Check if a prediction already exists for a shitpost."""
         try:
             from shitvault.shitpost_models import Prediction
             
             async with self.get_session() as session:
                 from sqlalchemy import select
-                stmt = select(Prediction.id).where(Prediction.post_id == shitpost_id)
+                stmt = select(Prediction.id).where(Prediction.shitpost_id == shitpost_id)
                 result = await session.execute(stmt)
                 return result.scalar_one_or_none() is not None
                 
@@ -415,7 +505,7 @@ class ShitpostDatabase:
                 # Get analysis
                 analysis_result = await session.execute(
                     session.query(Prediction)
-                    .filter(Prediction.post_id == shitpost_id)
+                    .filter(Prediction.shitpost_id == shitpost_id)
                 )
                 analysis = analysis_result.scalar_one_or_none()
                 
