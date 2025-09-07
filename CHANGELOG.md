@@ -13,12 +13,141 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Additional LLM provider support
 - Real-time alerting system
 - Dashboard and monitoring interface
-- S3 data lake integration for raw API data preservation
 - RAG enhancement system for combining multiple analyses
 - Advanced confidence scoring and quality metrics
 - Batch processing optimizations
 - Real-time streaming analysis
-- Categorical analysis status tracking for complete audit trail
+
+---
+
+## [0.7.1] - 2025-01-15
+
+### 📚 **Documentation Overhaul and Mode Consolidation**
+
+#### Added
+- **Comprehensive README updates** - All directory READMEs now accurately reflect current functionality
+- **Root README restructure** - Now serves as clear overview focusing on main entry point (`shitpost_alpha.py`)
+- **Enhanced documentation links** - Easy navigation between detailed component documentation
+- **Recent improvements sections** - Documents v0.7.0 changes and consolidations
+- **Manual testing examples** - Comprehensive testing documentation for all components
+
+#### Changed
+- **Mode consolidation** - Removed `from-date` mode globally, functionality integrated into `range` mode
+- **Incremental mode enhancement** - Now stops when encountering existing posts in S3 with clear logging
+- **Unified code path** - All harvesting modes (`incremental`, `backfill`, `range`) now use single `_harvest_backfill()` method
+- **CLI simplification** - Cleaner command-line interface with fewer mode options
+- **Documentation accuracy** - All READMEs now match actual implementation
+
+#### Removed
+- **`from-date` mode** - Removed from all CLIs (orchestrator, harvester, analyzer)
+- **Code duplication** - Consolidated multiple harvesting methods into unified approach
+- **Outdated examples** - Removed references to deprecated modes and functionality
+
+#### Technical Improvements
+- **S3 existence checks** - Efficient `head_object` API calls for incremental mode
+- **Enhanced logging** - Clear feedback about which posts are found and why harvest stops
+- **Consistent behavior** - All date-based analysis uses same `range` mode logic
+- **Better error handling** - Consistent error management across all modes
+
+#### Documentation Updates
+- **Root README** - Complete restructure as system overview with main entry point focus
+- **shitposts/README.md** - Updated to reflect S3 harvester and mode consolidations
+- **shitvault/README.md** - Enhanced with S3 processing and categorical tracking details
+- **shitpost_ai/README.md** - Updated to reflect mode consolidation and bypass functionality
+- **All CLI examples** - Updated to use current mode structure
+
+#### CLI Examples
+```bash
+# Main orchestrator (recommended entry point)
+python shitpost_alpha.py --mode backfill --limit 100
+python shitpost_alpha.py --mode range --from 2024-01-01 --limit 100
+
+# Individual components (for advanced usage)
+python -m shitposts.truth_social_s3_harvester --mode incremental --limit 5
+python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --limit 100
+```
+
+#### Files Modified
+- `README.md` - Complete restructure as system overview
+- `shitposts/README.md` - Updated for S3 harvester and mode consolidations
+- `shitvault/README.md` - Enhanced with S3 processing details
+- `shitpost_ai/README.md` - Updated for mode consolidation and bypass functionality
+- `shitposts/truth_social_s3_harvester.py` - Mode consolidation and enhanced logging
+- `shitposts/cli.py` - Removed `from-date` mode references
+- `shitpost_ai/shitpost_analyzer.py` - Removed `from-date` mode and updated examples
+- `shitpost_alpha.py` - Updated CLI validation and examples
+
+#### Benefits
+- **Simplified user experience** - Fewer modes to understand, consistent behavior
+- **Better documentation** - Clear navigation and accurate examples
+- **Reduced code complexity** - Unified code path for all harvesting modes
+- **Enhanced maintainability** - Less code duplication and clearer logic
+- **Improved user guidance** - Root README clearly directs users to main entry point
+
+---
+
+## [0.7.0] - 2025-01-15
+
+### 🚀 **S3 Data Lake Migration - Complete Success**
+
+#### Added
+- **S3 Data Lake Integration** - Complete migration from API → DB to API → S3 architecture
+- **Truth Social S3 Harvester** - New `truth_social_s3_harvester.py` for raw data storage in S3
+- **S3 Shared Utilities** - Centralized S3 operations in `shit/s3/` directory
+- **Resume Capability** - `--max-id` parameter for resuming interrupted backfills
+- **S3 to Database Processor** - Infrastructure for future S3 → Database processing
+- **Database CLI** - Command-line interface for database operations (`shitvault.cli`)
+
+#### Changed
+- **Architecture** - Migrated from direct API → Database to API → S3 → Database pipeline
+- **Data Storage** - Raw API data now stored in S3 with date-based key structure (`truth-social/raw/YYYY/MM/DD/post_id.json`)
+- **Main Orchestrator** - Updated `shitpost_alpha.py` to use S3 harvester instead of legacy harvester
+- **Documentation** - Updated all README files to reflect new S3-based architecture
+
+#### Removed
+- **Legacy Harvester** - Deleted `truth_social_shitposts.py` (API → DB direct harvester)
+- **Overwrite Protection** - Simplified S3 storage to always replace (removed file existence checks)
+
+#### Technical Achievements
+- **Massive Backfill Success** - Successfully harvested all ~28,000 historical tweets to S3
+- **Raw Data Preservation** - Complete API responses stored for future analysis and debugging
+- **Scalable Architecture** - S3-based storage supports unlimited data growth
+- **Resume Functionality** - Can resume interrupted backfills from any post ID
+- **Multiple Harvesting Modes** - incremental, backfill, range, from-date with consistent CLI interface
+
+#### CLI Examples
+```bash
+# Full historical backfill (successfully completed ~28,000 posts)
+python -m shitposts.truth_social_s3_harvester --mode backfill
+
+# Resume backfill from specific post ID
+python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915682735686
+
+# Date range harvesting
+python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --to 2024-01-31
+
+# Dry run testing
+python -m shitposts.truth_social_s3_harvester --mode backfill --limit 100 --dry-run
+```
+
+#### Files Modified
+- `shitposts/truth_social_s3_harvester.py` (new)
+- `shitposts/cli.py` (updated)
+- `shitpost_alpha.py` (updated)
+- `shit/s3/` (new directory with shared utilities)
+- `shitvault/s3_to_database_processor.py` (new)
+- `shitvault/cli.py` (new)
+- `shitvault/shitpost_db.py` (enhanced)
+- All README files updated
+- `CHANGELOG.md` (this entry)
+
+#### Benefits
+- **Data Preservation** - Raw API data preserved in S3 for future analysis
+- **Scalability** - S3 storage supports unlimited data growth
+- **Cost Efficiency** - Raw data storage in S3 is more cost-effective than database storage
+- **Flexibility** - Can reprocess raw data with different analysis strategies
+- **Resume Capability** - No need to restart backfills from beginning
+- **Audit Trail** - Complete raw data available for debugging and analysis
 
 ---
 
@@ -225,58 +354,6 @@ python main.py --mode ingestion --harvest-mode from-date --from 2024-01-01
 
 ---
 
-## [0.7.0] - 2025-01-15
-
-### 🚀 S3 Data Lake Migration - Complete
-
-**Major milestone:** Successfully migrated from API → Database to API → S3 architecture, completing the S3 data lake integration.
-
-#### 🎯 Key Achievements
-
-- **✅ Complete S3 Migration** - Fully transitioned from legacy database harvesting to S3-based raw data storage
-- **✅ Resume Capability** - Added `--max-id` parameter for resuming large backfill operations
-- **✅ Legacy Cleanup** - Removed obsolete `truth_social_shitposts.py` and updated all references
-- **✅ Documentation Update** - Comprehensive documentation refresh for S3-only approach
-- **✅ Orchestrator Update** - Main pipeline now uses S3 harvester exclusively
-
-#### 🔧 Technical Improvements
-
-- **S3 Data Lake Integration** - Raw data stored in organized structure (`truth-social/raw/YYYY/MM/DD/post_id.json`)
-- **Resume Functionality** - Can resume backfill from specific post ID for large operations
-- **Simplified Storage** - Removed overwrite complexity, always replace for reliability
-- **Enhanced CLI** - Added `--max-id` parameter for resuming operations
-- **Clean Architecture** - Removed legacy code and updated all references
-
-#### 📊 New CLI Features
-
-```bash
-# Resume backfill from specific post ID
-python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915682735686
-
-# Full backfill with resume capability
-python -m shitposts.truth_social_s3_harvester --mode backfill
-
-# All existing modes now use S3 storage
-python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --to 2024-01-31
-```
-
-#### 🗂️ Files Modified
-
-- **Removed:** `shitposts/truth_social_shitposts.py` - Legacy database harvester
-- **Updated:** `shitpost_alpha.py` - Now uses S3 harvester exclusively
-- **Updated:** `shit/tests/test_integration.py` - Updated imports for S3 harvester
-- **Updated:** All README files - Reflect S3-only approach
-- **Updated:** `CHANGELOG.md` - Document S3 migration completion
-
-#### 🎉 Impact
-
-- **Scalable Architecture** - S3-based storage can handle unlimited data volume
-- **Resume Capability** - Large backfill operations can be resumed from any point
-- **Raw Data Preservation** - Complete API responses stored for future processing
-- **Clean Codebase** - Removed legacy code and simplified architecture
-- **Future Ready** - Foundation set for S3 → Database processing pipeline
-
----
 
 ## [0.2.0] - 2024-09-01
 

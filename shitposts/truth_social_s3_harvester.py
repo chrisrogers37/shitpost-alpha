@@ -13,7 +13,7 @@ import json
 
 from shit.config.shitpost_settings import settings
 from shit.utils.error_handling import handle_exceptions
-from shitposts.s3_data_lake import S3DataLake
+from shit.s3 import S3DataLake, S3Config
 from shitposts.cli import (
     create_harvester_parser, validate_harvester_args, setup_harvester_logging,
     print_harvest_start, print_harvest_progress, print_harvest_complete,
@@ -51,6 +51,9 @@ class TruthSocialS3Harvester:
             self.start_datetime = datetime.fromisoformat(start_date).replace(tzinfo=None)
         if end_date:
             self.end_datetime = datetime.fromisoformat(end_date).replace(tzinfo=None)
+        else:
+            # Default end_date to today if not provided
+            self.end_datetime = datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)
         
         # API configuration
         self.api_key = settings.SCRAPECREATORS_API_KEY
@@ -66,11 +69,13 @@ class TruthSocialS3Harvester:
     async def initialize(self, dry_run: bool = False):
         """Initialize the Truth Social S3 harvester."""
         logger.info(f"Initializing Truth Social S3 harvester for @{self.username}")
+        logger.info(f"🔧 Initialize method called with dry_run: {dry_run}")
         
         if not self.api_key:
             raise ValueError("SCRAPECREATORS_API_KEY not configured. Please add it to your .env file.")
         
         try:
+            logger.info("🌐 Creating aiohttp session...")
             # Create aiohttp session
             self.session = aiohttp.ClientSession(
                 headers={
@@ -81,15 +86,26 @@ class TruthSocialS3Harvester:
             )
             
             # Test API connection
+            logger.info("🔗 Testing API connection...")
             await self._test_connection()
+            logger.info("✅ API connection test completed")
             
             # Initialize S3 Data Lake only if not in dry run mode
             if not dry_run:
-                self.s3_data_lake = S3DataLake()
+                logger.info("☁️ Initializing S3 Data Lake...")
+                # Create S3 config from settings
+                s3_config = S3Config(
+                    bucket_name=settings.S3_BUCKET_NAME,
+                    prefix=settings.S3_PREFIX,
+                    region=settings.AWS_REGION,
+                    access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+                )
+                self.s3_data_lake = S3DataLake(s3_config)
                 await self.s3_data_lake.initialize()
-                logger.info("S3 Data Lake initialized successfully")
+                logger.info("✅ S3 Data Lake initialized")
             else:
-                logger.info("Dry run mode - skipping S3 initialization")
+                logger.info("🔍 Dry run mode - skipping S3 initialization")
             
             logger.info("Truth Social S3 harvester initialized successfully")
             
@@ -104,7 +120,8 @@ class TruthSocialS3Harvester:
             # Test with a simple API call
             url = f"{self.base_url}/truthsocial/user/posts?user_id={self.user_id}&limit=1"
             logger.info(f"Testing API connection to: {url}")
-            async with self.session.get(url) as response:
+            timeout = aiohttp.ClientTimeout(total=10)  # 10 second timeout for test
+            async with self.session.get(url, timeout=timeout) as response:
                 logger.info(f"API test response status: {response.status}")
                 if response.status != 200:
                     raise Exception(f"API connection test failed: {response.status}")
@@ -133,9 +150,11 @@ class TruthSocialS3Harvester:
             if next_max_id:
                 params['next_max_id'] = next_max_id
             
-            logger.info(f"Making API request to: {url} with params: {params}")
+            logger.info(f"🌐 Making API request to: {url} with params: {params}")
+            logger.info(f"⏱️  Starting API call with 30 second timeout...")
             timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout
             async with self.session.get(url, params=params, timeout=timeout) as response:
+                logger.info(f"📡 API response received, status: {response.status}")
                 logger.info(f"API response status: {response.status}")
                 if response.status != 200:
                     logger.error(f"API request failed: {response.status}")
@@ -155,32 +174,55 @@ class TruthSocialS3Harvester:
                 
         except Exception as e:
             logger.error(f"Error fetching shitposts: {e}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
             return []
     
     async def harvest_shitposts(self, dry_run: bool = False) -> AsyncGenerator[Dict, None]:
         """Harvest shitposts based on configured mode."""
         logger.info(f"Starting shitpost harvest in {self.mode} mode...")
+        logger.info(f"🔍 About to enter mode-specific harvest logic for: {self.mode}")
         
         if self.mode == "backfill":
+            logger.info("🔄 Entering backfill mode")
             async for result in self._harvest_backfill(dry_run):
                 yield result
         elif self.mode == "range":
-            async for result in self._harvest_date_range(dry_run):
+            logger.info("📅 Entering range mode")
+            async for result in self._harvest_backfill(dry_run, self.start_datetime, self.end_datetime):
                 yield result
         elif self.mode == "from_date":
-            async for result in self._harvest_from_date(dry_run):
+            logger.info("📆 Entering from_date mode (using range with end_date=today)")
+            async for result in self._harvest_backfill(dry_run, self.start_datetime, self.end_datetime):
                 yield result
         else:  # incremental (default)
-            async for result in self._harvest_incremental(dry_run):
+            logger.info("🔄 Entering incremental mode")
+            async for result in self._harvest_backfill(dry_run, incremental_mode=True):
                 yield result
     
-    async def _harvest_backfill(self, dry_run: bool = False) -> AsyncGenerator[Dict, None]:
-        """Harvest all historical Truth Social posts to S3."""
-        logger.info("Starting full backfill of Truth Social posts to S3...")
+    async def _harvest_backfill(self, dry_run: bool = False, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None, incremental_mode: bool = False) -> AsyncGenerator[Dict, None]:
+        """Harvest historical Truth Social posts to S3.
+        
+        Args:
+            dry_run: If True, don't actually store to S3
+            start_date: Optional start date filter (inclusive)
+            end_date: Optional end date filter (inclusive)
+            incremental_mode: If True, stop when encountering existing posts in S3
+        """
+        if incremental_mode:
+            logger.info("Starting incremental harvest - will stop when encountering existing posts in S3")
+            print("🔄 Incremental mode: Will stop when finding posts that already exist in S3")
+        elif start_date and end_date:
+            logger.info(f"Starting date range harvest from {start_date.date()} to {end_date.date()}")
+            logger.info("🔄 Note: API doesn't support date filtering - crawling backwards through all posts")
+        else:
+            logger.info("Starting full backfill of Truth Social posts to S3...")
         
         # Use provided max_id or start from most recent
         max_id = self.max_id
         total_harvested = 0
+        posts_processed = 0
         
         if max_id:
             logger.info(f"Resuming backfill from post ID: {max_id}")
@@ -199,6 +241,9 @@ class TruthSocialS3Harvester:
                     logger.info("No more posts to harvest in backfill")
                     break
                 
+                if incremental_mode:
+                    print(f"📡 Processing {len(shitposts)} posts from API (checking for existing posts in S3)...")
+                
                 # Check if we've reached the limit before processing
                 if self.limit and total_harvested >= self.limit:
                     logger.info(f"Reached harvest limit of {self.limit} posts")
@@ -207,6 +252,42 @@ class TruthSocialS3Harvester:
                 # Process and store each shitpost to S3
                 for shitpost in shitposts:
                     try:
+                        posts_processed += 1
+                        
+                        # Apply date filtering if specified
+                        if start_date or end_date:
+                            post_timestamp = datetime.fromisoformat(shitpost.get('created_at').replace('Z', '+00:00')).replace(tzinfo=None)
+                            
+                            # Check if post is before start date (stop crawling)
+                            if start_date and post_timestamp < start_date:
+                                logger.info(f"📅 Reached posts before start date {start_date.date()}, stopping crawl")
+                                logger.info(f"📈 Total posts processed: {posts_processed}, Found {total_harvested} in target range")
+                                return
+                            
+                            # Check if post is after end date (skip this post)
+                            if end_date and post_timestamp > end_date:
+                                max_id = shitpost.get('id')
+                                continue  # Skip this post, continue to next
+                        
+                        # Check for incremental mode - stop if post already exists in S3
+                        if incremental_mode and not dry_run:
+                            # Generate expected S3 key for this post
+                            post_timestamp = datetime.fromisoformat(shitpost.get('created_at').replace('Z', '+00:00')).replace(tzinfo=None)
+                            expected_s3_key = self.s3_data_lake._generate_s3_key(shitpost.get('id'), post_timestamp)
+                            
+                            print(f"🔍 Checking if post {shitpost.get('id')} already exists in S3...")
+                            
+                            # Check if post already exists in S3
+                            if await self.s3_data_lake.check_object_exists(expected_s3_key):
+                                print(f"✅ Found existing post {shitpost.get('id')} in S3")
+                                print(f"🔄 Incremental mode: Stopping harvest (no new posts to process)")
+                                print(f"📈 Total new posts harvested: {total_harvested}")
+                                logger.info(f"Incremental harvest completed - found existing post {shitpost.get('id')}")
+                                return
+                            else:
+                                print(f"📝 Post {shitpost.get('id')} is new - will process")
+                        
+                        # Post passed date filtering and incremental checks - process it
                         if dry_run:
                             # In dry run mode, just create a mock result
                             s3_key = f"truth-social/raw/2024/01/01/{shitpost.get('id')}.json"
@@ -252,202 +333,6 @@ class TruthSocialS3Harvester:
         
         logger.info(f"Backfill completed. Total posts harvested and stored to S3: {total_harvested}")
     
-    async def _harvest_date_range(self, dry_run: bool = False) -> AsyncGenerator[Dict, None]:
-        """Harvest posts within a specific date range to S3."""
-        logger.info(f"Starting date range harvest from {self.start_date} to {self.end_date}")
-        
-        max_id = None
-        total_harvested = 0
-        
-        while True:
-            try:
-                # Fetch batch of posts
-                shitposts = await self._fetch_recent_shitposts(max_id)
-                
-                if not shitposts:
-                    logger.info("No more posts to harvest in date range")
-                    break
-                
-                # Process each shitpost
-                for shitpost in shitposts:
-                    try:
-                        # Check if post is within date range
-                        post_timestamp = datetime.fromisoformat(shitpost.get('created_at').replace('Z', '+00:00')).replace(tzinfo=None)
-                        
-                        if post_timestamp < self.start_datetime:
-                            logger.info(f"Reached posts before start date {self.start_date}, stopping")
-                            return
-                        
-                        if post_timestamp > self.end_datetime:
-                            # Skip posts after end date, continue to find older ones
-                            max_id = shitpost.get('id')
-                            continue
-                        
-                        if dry_run:
-                            # In dry run mode, just create a mock result
-                            s3_key = f"truth-social/raw/2024/01/01/{shitpost.get('id')}.json"
-                        else:
-                            # Store raw data to S3
-                            s3_key = await self.s3_data_lake.store_raw_data(shitpost)
-                        
-                        # Create result object
-                        result = {
-                            'shitpost_id': shitpost.get('id'),
-                            's3_key': s3_key,
-                            'timestamp': shitpost.get('created_at'),
-                            'content_preview': shitpost.get('content', '')[:100] + '...' if shitpost.get('content') else 'No content',
-                            'stored_at': datetime.now().isoformat()
-                        }
-                        
-                        yield result
-                        total_harvested += 1
-                        
-                        # Check if we've reached the limit
-                        if self.limit and total_harvested >= self.limit:
-                            logger.info(f"Reached harvest limit of {self.limit} posts")
-                            return
-                        
-                        # Update max_id for next batch
-                        max_id = shitpost.get('id')
-                        
-                    except Exception as e:
-                        logger.error(f"Error processing shitpost {shitpost.get('id')}: {e}")
-                        continue
-                
-                logger.info(f"Date range harvest progress: {total_harvested} posts harvested to S3")
-                
-                # Small delay to be respectful to API
-                await asyncio.sleep(1)
-                
-            except Exception as e:
-                logger.error(f"Error in date range harvest: {e}")
-                await handle_exceptions(e)
-                break
-        
-        logger.info(f"Date range harvest completed. Total posts harvested to S3: {total_harvested}")
-    
-    async def _harvest_from_date(self, dry_run: bool = False) -> AsyncGenerator[Dict, None]:
-        """Harvest posts from a specific date onwards to S3."""
-        logger.info(f"Starting harvest from date {self.start_date} onwards")
-        
-        max_id = None
-        total_harvested = 0
-        
-        while True:
-            try:
-                # Fetch batch of posts
-                shitposts = await self._fetch_recent_shitposts(max_id)
-                
-                if not shitposts:
-                    logger.info("No more posts to harvest from date")
-                    break
-                
-                # Process each shitpost
-                for shitpost in shitposts:
-                    try:
-                        # Check if post is from start date onwards
-                        post_timestamp = datetime.fromisoformat(shitpost.get('created_at').replace('Z', '+00:00')).replace(tzinfo=None)
-                        
-                        if post_timestamp < self.start_datetime:
-                            logger.info(f"Reached posts before start date {self.start_date}, stopping")
-                            return
-                        
-                        if dry_run:
-                            # In dry run mode, just create a mock result
-                            s3_key = f"truth-social/raw/2024/01/01/{shitpost.get('id')}.json"
-                        else:
-                            # Store raw data to S3
-                            s3_key = await self.s3_data_lake.store_raw_data(shitpost)
-                        
-                        # Create result object
-                        result = {
-                            'shitpost_id': shitpost.get('id'),
-                            's3_key': s3_key,
-                            'timestamp': shitpost.get('created_at'),
-                            'content_preview': shitpost.get('content', '')[:100] + '...' if shitpost.get('content') else 'No content',
-                            'stored_at': datetime.now().isoformat()
-                        }
-                        
-                        yield result
-                        total_harvested += 1
-                        
-                        # Check if we've reached the limit
-                        if self.limit and total_harvested >= self.limit:
-                            logger.info(f"Reached harvest limit of {self.limit} posts")
-                            return
-                        
-                        # Update max_id for next batch
-                        max_id = shitpost.get('id')
-                        
-                    except Exception as e:
-                        logger.error(f"Error processing shitpost {shitpost.get('id')}: {e}")
-                        continue
-                
-                logger.info(f"From date harvest progress: {total_harvested} posts harvested to S3")
-                
-                # Small delay to be respectful to API
-                await asyncio.sleep(1)
-                
-            except Exception as e:
-                logger.error(f"Error in from date harvest: {e}")
-                await handle_exceptions(e)
-                break
-        
-        logger.info(f"From date harvest completed. Total posts harvested to S3: {total_harvested}")
-    
-    async def _harvest_incremental(self, dry_run: bool = False) -> AsyncGenerator[Dict, None]:
-        """Harvest only new posts since last check (incremental mode)."""
-        logger.info("Starting incremental shitpost harvest from Truth Social to S3...")
-        
-        # For incremental mode, we'll start from the most recent posts
-        # In a production system, you'd want to track the last processed post
-        max_id = None
-        
-        while True:
-            try:
-                # Fetch recent shitposts
-                shitposts = await self._fetch_recent_shitposts(max_id)
-                
-                if not shitposts:
-                    logger.debug("No new shitposts found")
-                    await asyncio.sleep(30)  # Wait 30 seconds before next check
-                    continue
-                
-                # Process each shitpost
-                for shitpost in shitposts:
-                    try:
-                        if dry_run:
-                            # In dry run mode, just create a mock result
-                            s3_key = f"truth-social/raw/2024/01/01/{shitpost.get('id')}.json"
-                        else:
-                            # Store raw data to S3
-                            s3_key = await self.s3_data_lake.store_raw_data(shitpost)
-                        
-                        # Create result object
-                        result = {
-                            'shitpost_id': shitpost.get('id'),
-                            's3_key': s3_key,
-                            'timestamp': shitpost.get('created_at'),
-                            'content_preview': shitpost.get('content', '')[:100] + '...' if shitpost.get('content') else 'No content',
-                            'stored_at': datetime.now().isoformat()
-                        }
-                        
-                        yield result
-                        
-                        # Update max_id for next batch
-                        max_id = shitpost.get('id')
-                        
-                    except Exception as e:
-                        logger.error(f"Error processing shitpost {shitpost.get('id')}: {e}")
-                        continue
-                
-                # Wait before next check
-                await asyncio.sleep(30)
-                
-            except Exception as e:
-                logger.error(f"Error in shitpost harvest loop: {e}")
-                await handle_exceptions(e)
-                await asyncio.sleep(30)
     
     async def get_s3_stats(self) -> Dict[str, any]:
         """Get statistics about S3 storage."""

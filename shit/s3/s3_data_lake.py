@@ -1,5 +1,5 @@
 """
-S3 Data Lake for Raw Truth Social Data
+S3 Data Lake
 Handles storage and retrieval of raw API data in S3.
 """
 
@@ -8,10 +8,11 @@ import json
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional, AsyncGenerator
-import boto3
 from botocore.exceptions import ClientError
 
-from shit.config.shitpost_settings import settings
+from .s3_client import S3Client
+from .s3_config import S3Config
+from .s3_models import S3StorageData, S3Stats, S3KeyInfo
 
 logger = logging.getLogger(__name__)
 
@@ -19,44 +20,27 @@ logger = logging.getLogger(__name__)
 class S3DataLake:
     """Manages raw shitpost data storage and retrieval in S3."""
     
-    def __init__(self):
-        self.bucket_name = settings.S3_BUCKET_NAME
-        self.prefix = settings.S3_PREFIX
-        self.s3_client = None
+    def __init__(self, config: Optional[S3Config] = None):
+        """Initialize S3 Data Lake.
+        
+        Args:
+            config: S3 configuration (optional, uses default if not provided)
+        """
+        self.config = config or S3Config(
+            bucket_name="shitpost-alpha",  # Default bucket
+            prefix="truth-social"
+        )
+        self.s3_client = S3Client(self.config)
         
     async def initialize(self):
         """Initialize S3 client and verify bucket access."""
         try:
-            # Initialize S3 client
-            self.s3_client = boto3.client(
-                's3',
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                region_name=settings.AWS_REGION
-            )
-            
-            # Verify bucket exists and is accessible
-            await self._verify_bucket_access()
-            
-            logger.info(f"S3 Data Lake initialized successfully. Bucket: {self.bucket_name}")
+            await self.s3_client.initialize()
+            logger.info(f"S3 Data Lake initialized successfully. Bucket: {self.config.bucket_name}")
             
         except Exception as e:
             logger.error(f"Failed to initialize S3 Data Lake: {e}")
             raise
-    
-    async def _verify_bucket_access(self):
-        """Verify S3 bucket exists and is accessible."""
-        try:
-            self.s3_client.head_bucket(Bucket=self.bucket_name)
-            logger.info(f"S3 bucket {self.bucket_name} is accessible")
-        except ClientError as e:
-            error_code = e.response['Error']['Code']
-            if error_code == '404':
-                raise Exception(f"S3 bucket {self.bucket_name} does not exist")
-            elif error_code == '403':
-                raise Exception(f"Access denied to S3 bucket {self.bucket_name}")
-            else:
-                raise Exception(f"Error accessing S3 bucket {self.bucket_name}: {e}")
     
     def _generate_s3_key(self, shitpost_id: str, post_timestamp: datetime) -> str:
         """Generate S3 key for raw shitpost data.
@@ -64,7 +48,7 @@ class S3DataLake:
         Format: truth-social/raw/YYYY/MM/DD/post_id.json
         """
         date_str = post_timestamp.strftime("%Y/%m/%d")
-        return f"{self.prefix}/raw/{date_str}/{shitpost_id}.json"
+        return f"{self.config.raw_prefix}/{date_str}/{shitpost_id}.json"
     
     async def store_raw_data(self, raw_data: Dict) -> str:
         """Store raw shitpost data in S3.
@@ -102,17 +86,17 @@ class S3DataLake:
             logger.info(f"Storing data to S3: {s3_key}")
             
             # Prepare data for storage
-            storage_data = {
-                'shitpost_id': shitpost_id,
-                'post_timestamp': post_timestamp.isoformat(),
-                'raw_api_data': raw_data,
-                'metadata': {
+            storage_data = S3StorageData(
+                shitpost_id=shitpost_id,
+                post_timestamp=post_timestamp.isoformat(),
+                raw_api_data=raw_data,
+                metadata={
                     'stored_at': datetime.now().isoformat(),
                     'source': 'truth_social_api',
                     'version': '1.0',
                     'harvester': 'truth_social_s3_harvester'
                 }
-            }
+            )
             
             # Upload to S3 with timeout
             logger.info(f"Uploading data to S3: {s3_key}")
@@ -120,10 +104,10 @@ class S3DataLake:
                 await asyncio.wait_for(
                     asyncio.get_event_loop().run_in_executor(
                         None,
-                        lambda: self.s3_client.put_object(
-                            Bucket=self.bucket_name,
+                        lambda: self.s3_client.client.put_object(
+                            Bucket=self.config.bucket_name,
                             Key=s3_key,
-                            Body=json.dumps(storage_data, indent=2),
+                            Body=json.dumps(storage_data.__dict__, indent=2),
                             ContentType='application/json',
                             Metadata={
                                 'shitpost_id': shitpost_id,
@@ -132,7 +116,7 @@ class S3DataLake:
                             }
                         )
                     ),
-                    timeout=30.0  # 30 second timeout
+                    timeout=self.config.timeout_seconds
                 )
                 logger.info(f"S3 upload completed successfully: {s3_key}")
             except asyncio.TimeoutError:
@@ -149,6 +133,34 @@ class S3DataLake:
             logger.error(f"Error storing raw data in S3: {e}")
             raise
     
+    async def check_object_exists(self, s3_key: str) -> bool:
+        """Check if an S3 object exists without downloading it.
+        
+        Args:
+            s3_key: S3 key to check
+            
+        Returns:
+            True if object exists, False otherwise
+        """
+        try:
+            await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: self.s3_client.client.head_object(Bucket=self.config.bucket_name, Key=s3_key)
+            )
+            logger.debug(f"Object exists in S3: {s3_key}")
+            return True
+            
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchKey':
+                logger.debug(f"Object does not exist in S3: {s3_key}")
+                return False
+            else:
+                logger.error(f"Error checking object existence in S3: {e}")
+                raise
+        except Exception as e:
+            logger.error(f"Error checking object existence in S3: {e}")
+            raise
+
     async def get_raw_data(self, s3_key: str) -> Optional[Dict]:
         """Retrieve raw shitpost data from S3.
         
@@ -161,7 +173,7 @@ class S3DataLake:
         try:
             response = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: self.s3_client.get_object(Bucket=self.bucket_name, Key=s3_key)
+                lambda: self.s3_client.client.get_object(Bucket=self.config.bucket_name, Key=s3_key)
             )
             
             data = json.loads(response['Body'].read().decode('utf-8'))
@@ -199,13 +211,13 @@ class S3DataLake:
             else:
                 date_prefix = ""
             
-            prefix = f"{self.prefix}/raw/{date_prefix}"
+            prefix = f"{self.config.raw_prefix}/{date_prefix}"
             
             # List objects
-            paginator = self.s3_client.get_paginator('list_objects_v2')
+            paginator = self.s3_client.client.get_paginator('list_objects_v2')
             s3_keys = []
             
-            for page in paginator.paginate(Bucket=self.bucket_name, Prefix=prefix):
+            for page in paginator.paginate(Bucket=self.config.bucket_name, Prefix=prefix):
                 if 'Contents' in page:
                     for obj in page['Contents']:
                         s3_keys.append(obj['Key'])
@@ -248,43 +260,43 @@ class S3DataLake:
             logger.error(f"Error streaming raw data from S3: {e}")
             raise
     
-    async def get_data_stats(self) -> Dict[str, any]:
+    async def get_data_stats(self) -> S3Stats:
         """Get statistics about stored raw data.
         
         Returns:
-            Dictionary with storage statistics
+            S3Stats object with storage statistics
         """
         try:
             # Count total objects
-            paginator = self.s3_client.get_paginator('list_objects_v2')
+            paginator = self.s3_client.client.get_paginator('list_objects_v2')
             total_count = 0
             total_size = 0
             
-            for page in paginator.paginate(Bucket=self.bucket_name, Prefix=f"{self.prefix}/raw/"):
+            for page in paginator.paginate(Bucket=self.config.bucket_name, Prefix=f"{self.config.raw_prefix}/"):
                 if 'Contents' in page:
                     for obj in page['Contents']:
                         total_count += 1
                         total_size += obj['Size']
             
-            return {
-                'total_files': total_count,
-                'total_size_bytes': total_size,
-                'total_size_mb': round(total_size / (1024 * 1024), 2),
-                'bucket': self.bucket_name,
-                'prefix': self.prefix
-            }
+            return S3Stats(
+                total_files=total_count,
+                total_size_bytes=total_size,
+                total_size_mb=0.0,  # Will be calculated in __post_init__
+                bucket=self.config.bucket_name,
+                prefix=self.config.prefix
+            )
             
         except Exception as e:
             logger.error(f"Error getting S3 data stats: {e}")
-            return {
-                'total_files': 0,
-                'total_size_bytes': 0,
-                'total_size_mb': 0,
-                'bucket': self.bucket_name,
-                'prefix': self.prefix
-            }
+            return S3Stats(
+                total_files=0,
+                total_size_bytes=0,
+                total_size_mb=0.0,
+                bucket=self.config.bucket_name,
+                prefix=self.config.prefix
+            )
     
     async def cleanup(self):
         """Cleanup S3 resources."""
-        # S3 client doesn't need explicit cleanup
+        await self.s3_client.cleanup()
         logger.info("S3 Data Lake cleanup completed")

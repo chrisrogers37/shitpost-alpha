@@ -26,7 +26,7 @@ def create_harvester_parser(description: str, epilog: str = None) -> argparse.Ar
     # Harvesting mode
     parser.add_argument(
         "--mode", 
-        choices=["incremental", "backfill", "range", "from-date"], 
+        choices=["incremental", "backfill", "range"], 
         default="incremental", 
         help="Harvesting mode (default: incremental)"
     )
@@ -35,7 +35,7 @@ def create_harvester_parser(description: str, epilog: str = None) -> argparse.Ar
     parser.add_argument(
         "--from", 
         dest="start_date", 
-        help="Start date for range/from-date modes (YYYY-MM-DD)"
+        help="Start date for range mode (YYYY-MM-DD)"
     )
     parser.add_argument(
         "--to", 
@@ -77,11 +77,10 @@ def validate_harvester_args(args) -> None:
     Raises:
         SystemExit: If arguments are invalid
     """
-    if args.mode in ["range", "from-date"] and not args.start_date:
-        raise SystemExit(f"--from date is required for {args.mode} mode")
+    if args.mode == "range" and not args.start_date:
+        raise SystemExit("--from date is required for range mode")
     
-    if args.mode == "range" and not args.end_date:
-        raise SystemExit("--to date is required for range mode")
+    # Note: --to date is optional for range mode (defaults to today)
 
 
 def setup_harvester_logging(verbose: bool = False) -> None:
@@ -154,17 +153,27 @@ def print_harvest_interrupted() -> None:
     print("\n⏹️  Harvesting stopped by user")
 
 
-def print_s3_stats(stats: dict) -> None:
+def print_s3_stats(stats) -> None:
     """Print S3 storage statistics.
     
     Args:
-        stats: S3 statistics dictionary
+        stats: S3 statistics (dict or S3Stats object)
     """
     print(f"\n📊 S3 Storage Statistics:")
-    print(f"   Total files: {stats.get('total_files', 0)}")
-    print(f"   Total size: {stats.get('total_size_mb', 0)} MB")
-    print(f"   Bucket: {stats.get('bucket', 'N/A')}")
-    print(f"   Prefix: {stats.get('prefix', 'N/A')}")
+    
+    # Handle both dict and S3Stats object
+    if hasattr(stats, 'total_files'):
+        # S3Stats object
+        print(f"   Total files: {stats.total_files}")
+        print(f"   Total size: {stats.total_size_mb} MB")
+        print(f"   Bucket: {stats.bucket}")
+        print(f"   Prefix: {stats.prefix}")
+    else:
+        # Dictionary
+        print(f"   Total files: {stats.get('total_files', 0)}")
+        print(f"   Total size: {stats.get('total_size_mb', 0)} MB")
+        print(f"   Bucket: {stats.get('bucket', 'N/A')}")
+        print(f"   Prefix: {stats.get('prefix', 'N/A')}")
 
 
 def print_database_stats(stats: dict) -> None:
@@ -192,8 +201,8 @@ Examples:
   # Date range harvesting to S3
   python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --to 2024-01-31
   
-  # Harvest from specific date onwards to S3
-  python -m shitposts.truth_social_s3_harvester --mode from-date --from 2024-01-01
+  # Harvest from specific date onwards to S3 (using range mode)
+  python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01
   
   # Limited backfill with dry run
   python -m shitposts.truth_social_s3_harvester --mode backfill --limit 100 --dry-run

@@ -69,6 +69,54 @@ async def execute_harvesting_cli(args) -> bool:
         return False
 
 
+async def execute_s3_to_database_cli(args) -> bool:
+    """Execute the S3 to Database CLI with appropriate parameters."""
+    cmd = [
+        sys.executable, "-m", "shitvault.cli",
+        "process-s3"
+    ]
+    
+    # Add date parameters (use same names as sub-CLI)
+    if args.from_date:
+        cmd.extend(["--start-date", args.from_date])
+    if args.to_date:
+        cmd.extend(["--end-date", args.to_date])
+    if args.limit:
+        cmd.extend(["--limit", str(args.limit)])
+    
+    # Note: verbose is handled by the main parser, not subcommands
+    
+    logger.info(f"💾 Executing S3 to Database CLI: {' '.join(cmd)}")
+    
+    try:
+        # Execute S3 to Database CLI
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        # Stream output in real-time for progress reporting
+        stdout, stderr = await process.communicate()
+        
+        if process.returncode == 0:
+            logger.info("✅ S3 to Database processing completed successfully")
+            if stdout:
+                print("📊 S3 to Database Output:")
+                print(stdout.decode())
+            return True
+        else:
+            logger.error(f"❌ S3 to Database processing failed with return code {process.returncode}")
+            if stderr:
+                print("🚨 S3 to Database Errors:")
+                print(stderr.decode())
+            return False
+            
+    except Exception as e:
+        logger.error(f"❌ Failed to execute S3 to Database CLI: {e}")
+        return False
+
+
 async def execute_analysis_cli(args) -> bool:
     """Execute the analysis CLI with appropriate parameters."""
     cmd = [
@@ -135,21 +183,24 @@ Examples:
   # Full historical backfill
   python shitpost_alpha.py --mode backfill --limit 1000
   
-  # Date range processing
+  # Date range processing (with end date)
   python shitpost_alpha.py --mode range --from 2024-01-01 --to 2024-01-31 --limit 100
   
-  # Process from specific date onwards
-  python shitpost_alpha.py --mode from-date --from 2024-01-01 --limit 100
+  # Date range processing (from date to today)
+  python shitpost_alpha.py --mode range --from 2024-01-01 --limit 100
   
   # Custom analysis parameters
   python shitpost_alpha.py --mode backfill --batch-size 10
+  
+  # Complete pipeline: API → S3 → Database → LLM → Database
+  python shitpost_alpha.py --mode incremental --limit 50
         """
     )
     
     # Pipeline mode (mirrors sub-CLI exactly)
     parser.add_argument(
         "--mode", 
-        choices=["incremental", "backfill", "range", "from-date"], 
+        choices=["incremental", "backfill", "range"], 
         default="incremental", 
         help="Processing mode for both harvesting and analysis (default: incremental)"
     )
@@ -202,32 +253,87 @@ Examples:
         if not args.from_date:
             parser.error(f"--from date is required for {args.mode} mode")
     
-    if args.mode == "range":
-        if not args.to_date:
-            parser.error("--to date is required for range mode")
+    # Note: --to date is optional for range mode (defaults to today)
     
     if args.dry_run:
         print("🔍 DRY RUN MODE - No commands will be executed")
         print(f"Processing Mode: {args.mode}")
         print(f"Shared Settings: from={args.from_date}, to={args.to_date}, limit={args.limit}")
         print(f"Analysis Parameters: batch_size={args.batch_size}")
+        print("\n📋 Commands that would be executed:")
+        
+        # Show harvesting command
+        harvest_cmd = [
+            sys.executable, "-m", "shitposts.truth_social_s3_harvester",
+            "--mode", args.mode
+        ]
+        if args.from_date:
+            harvest_cmd.extend(["--from", args.from_date])
+        if args.to_date:
+            harvest_cmd.extend(["--to", args.to_date])
+        if args.limit:
+            harvest_cmd.extend(["--limit", str(args.limit)])
+        if args.verbose:
+            harvest_cmd.append("--verbose")
+        print(f"  1. Harvesting: {' '.join(harvest_cmd)}")
+        
+        # Show S3 to Database command
+        s3_cmd = [
+            sys.executable, "-m", "shitvault.cli",
+            "process-s3"
+        ]
+        if args.from_date:
+            s3_cmd.extend(["--start-date", args.from_date])
+        if args.to_date:
+            s3_cmd.extend(["--end-date", args.to_date])
+        if args.limit:
+            s3_cmd.extend(["--limit", str(args.limit)])
+        print(f"  2. S3 to Database: {' '.join(s3_cmd)}")
+        
+        # Show LLM Analysis command
+        analysis_cmd = [
+            sys.executable, "-m", "shitpost_ai.shitpost_analyzer",
+            "--mode", args.mode,
+            "--batch-size", str(args.batch_size)
+        ]
+        if args.from_date:
+            analysis_cmd.extend(["--from", args.from_date])
+        if args.to_date:
+            analysis_cmd.extend(["--to", args.to_date])
+        if args.limit:
+            analysis_cmd.extend(["--limit", str(args.limit)])
+        if args.verbose:
+            analysis_cmd.append("--verbose")
+        print(f"  3. LLM Analysis: {' '.join(analysis_cmd)}")
+        
         return
     
     print(f"🎯 Starting Shitpost-Alpha pipeline in {args.mode} mode...")
     
     try:
-        print("🚀 Phase 1: Truth Social Harvesting")
+        print("🚀 Phase 1: Truth Social Harvesting (API → S3)")
         harvest_success = await execute_harvesting_cli(args)
         
         if not harvest_success:
             print("❌ Harvesting failed! Stopping pipeline.")
             sys.exit(1)
         
-        print("🧠 Phase 2: LLM Analysis")
+        print("💾 Phase 2: S3 to Database Processing")
+        s3_to_db_success = await execute_s3_to_database_cli(args)
+        
+        if not s3_to_db_success:
+            print("❌ S3 to Database processing failed! Stopping pipeline.")
+            sys.exit(1)
+        
+        print("🧠 Phase 3: LLM Analysis")
         analysis_success = await execute_analysis_cli(args)
         
         if analysis_success:
             print("🎉 Full pipeline completed successfully!")
+            print("📊 Pipeline Summary:")
+            print("  ✅ API → S3: Raw data harvested")
+            print("  ✅ S3 → Database: Data loaded")
+            print("  ✅ Database → LLM → Database: Analysis complete")
         else:
             print("❌ Analysis failed! Pipeline incomplete.")
             sys.exit(1)
