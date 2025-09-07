@@ -7,6 +7,8 @@ This directory contains the database layer for the Shitpost-Alpha project, respo
 ### Core Files
 - **`shitpost_db.py`** - Database manager and operations
 - **`shitpost_models.py`** - SQLAlchemy models and schema definitions
+- **`s3_to_database_processor.py`** - S3 to Database processor for loading raw data
+- **`cli.py`** - Command-line interface for database operations
 - **`README.md`** - This documentation file
 
 ### Generated Files
@@ -19,9 +21,11 @@ The database layer follows a clean separation of concerns:
 
 ```
 shitvault/
-├── shitpost_db.py      # Database operations & connection management
-├── shitpost_models.py  # Data models & schema definitions
-└── shitpost_alpha.db  # SQLite database (runtime generated)
+├── shitpost_db.py                    # Database operations & connection management
+├── shitpost_models.py                # Data models & schema definitions
+├── s3_to_database_processor.py       # S3 to Database processor
+├── cli.py                           # Database CLI operations
+└── shitpost_alpha.db                # SQLite database (runtime generated)
 ```
 
 ## 📊 Database Schema
@@ -57,17 +61,30 @@ Stores LLM analysis results for each shitpost.
 
 **Key Fields:**
 - `id` - Primary key
-- `post_id` - Foreign key to `truth_social_shitposts.id`
+- `shitpost_id` - Foreign key to `truth_social_shitposts.shitpost_id` (API ID)
 - `assets` - List of asset tickers mentioned
 - `market_impact` - Dict of asset → sentiment mapping
-- `confidence` - Confidence score (0.0-1.0)
+- `confidence` - Confidence score (0.0-1.0, nullable for bypassed posts)
 - `thesis` - Investment thesis explanation
+
+**Analysis Status:**
+- `analysis_status` - "completed", "bypassed", "error", "pending"
+- `analysis_comment` - Reason for bypass/error
 
 **Enhanced Analysis:**
 - `engagement_score` - Calculated from engagement metrics
 - `viral_score` - Reblogs/favourites ratio
 - `sentiment_score` - Sentiment analysis score
 - `urgency_score` - Urgency indicator
+
+**Content Analysis:**
+- `has_media` - Whether post has media attachments
+- `mentions_count` - Number of @mentions
+- `hashtags_count` - Number of hashtags
+- `content_length` - Content length in characters
+
+**Engagement at Analysis Time:**
+- `replies_at_analysis`, `reblogs_at_analysis`, `favourites_at_analysis`, `upvotes_at_analysis`
 
 **LLM Metadata:**
 - `llm_provider` - "openai", "anthropic", etc.
@@ -136,13 +153,16 @@ async def get_last_shitpost_id() -> Optional[str]
 
 **Analysis Operations:**
 ```python
-async def store_analysis(shitpost_id: str, analysis_data: Dict[str, Any]) -> Optional[str]
-# Stores LLM analysis results
+async def store_analysis(shitpost_id: str, analysis_data: Dict[str, Any], shitpost_data: Dict[str, Any] = None) -> Optional[str]
+# Stores LLM analysis results with enhanced shitpost data
+
+async def handle_no_text_prediction(shitpost_id: str, shitpost_data: Dict[str, Any]) -> Optional[str]
+# Creates bypassed prediction records for unanalyzable posts
 
 async def get_unprocessed_shitposts(launch_date: str, limit: int = 10) -> List[Dict]
 # Gets shitposts that need LLM analysis
 
-async def check_prediction_exists(shitpost_id: int) -> bool
+async def check_prediction_exists(shitpost_id: str) -> bool
 # Checks if prediction already exists (deduplication)
 ```
 
@@ -153,6 +173,9 @@ async def get_shitpost_analysis(shitpost_id: str) -> Optional[Dict]
 
 async def get_analysis_stats() -> Dict[str, Any]
 # Gets basic statistics about stored data
+
+async def get_database_stats() -> Dict[str, Any]
+# Gets comprehensive database statistics including analysis status counts
 ```
 
 **Resource Management:**
@@ -203,6 +226,46 @@ def market_movement_to_dict(movement: MarketMovement) -> Dict[str, Any]
 
 ## 🚀 Usage Examples
 
+### S3 to Database Processing
+
+The `s3_to_database_processor.py` handles loading raw data from S3 into the database:
+
+```python
+from shitvault.s3_to_database_processor import S3ToDatabaseProcessor
+
+# Initialize processor
+processor = S3ToDatabaseProcessor()
+await processor.initialize()
+
+# Process S3 data with date filtering
+stats = await processor.process_s3_stream(
+    start_date=datetime(2024, 1, 1),
+    end_date=datetime(2024, 1, 31),
+    limit=1000
+)
+
+# Get processing statistics
+stats = await processor.get_processing_stats()
+```
+
+### Database CLI Operations
+
+The `cli.py` provides command-line access to database operations:
+
+```bash
+# Process S3 data to database
+python -m shitvault.cli process-s3 --limit 100
+
+# Process with date range
+python -m shitvault.cli process-s3 --start-date 2024-01-01 --end-date 2024-01-31
+
+# Get database statistics
+python -m shitvault.cli stats
+
+# Get processing statistics
+python -m shitvault.cli processing-stats
+```
+
 ### Initialize Database
 ```python
 from shitvault.shitpost_db import ShitpostDatabase
@@ -238,7 +301,8 @@ analysis_data = {
     'llm_model': 'gpt-4'
 }
 
-analysis_id = await db_manager.store_analysis(shitpost_id, analysis_data)
+# Enhanced analysis with shitpost data for engagement metrics
+analysis_id = await db_manager.store_analysis(shitpost_id, analysis_data, shitpost_data)
 ```
 
 ### Get Unprocessed Shitposts
@@ -251,25 +315,32 @@ unprocessed = await db_manager.get_unprocessed_shitposts(
 
 ### Get Statistics
 ```python
+# Basic statistics
 stats = await db_manager.get_analysis_stats()
 # Returns: {'total_shitposts': 100, 'total_analyses': 85, ...}
+
+# Comprehensive database statistics
+db_stats = await db_manager.get_database_stats()
+# Returns: {'total_shitposts': 100, 'total_analyses': 85, 'analyzed_count': 80, 'bypassed_count': 5, ...}
 ```
 
 ## 🔒 Data Integrity
 
 ### Deduplication
-- Shitposts are deduplicated by `shitpost_id`
-- Predictions are deduplicated by `post_id`
+- Shitposts are deduplicated by `shitpost_id` (API ID)
+- Predictions are deduplicated by `shitpost_id` (API ID)
 - Subscribers are deduplicated by `phone_number`
 
 ### Foreign Key Relationships
-- `predictions.post_id` → `truth_social_shitposts.id`
+- `predictions.shitpost_id` → `truth_social_shitposts.shitpost_id` (API ID)
 - `market_movements.prediction_id` → `predictions.id`
 - `llm_feedback.prediction_id` → `predictions.id`
 
 ### Constraints
 - Unique indexes on `shitpost_id`, `phone_number`
-- Required fields: `content`, `timestamp`, `username`, `confidence`
+- Required fields: `content`, `timestamp`, `username`
+- `confidence` is nullable for bypassed posts
+- `analysis_status` tracks processing state: "completed", "bypassed", "error", "pending"
 - JSON fields for flexible data storage
 
 ## 🛠️ Database Configuration
@@ -309,12 +380,26 @@ All database operations are logged with appropriate levels:
 
 ### Statistics
 ```python
+# Basic statistics
 stats = await db_manager.get_analysis_stats()
 # Monitor: total_shitposts, total_analyses, average_confidence, analysis_rate
+
+# Comprehensive statistics
+db_stats = await db_manager.get_database_stats()
+# Monitor: analysis status counts, date ranges, processing rates
 ```
 
 ### Raw Data Access
 The `raw_api_data` field stores complete API responses for debugging and analysis.
+
+### Categorical Analysis Tracking
+The database implements a categorical approach to track all harvested posts:
+- **Completed**: Posts successfully analyzed by LLM
+- **Bypassed**: Posts that couldn't be analyzed (no text, media-only, etc.)
+- **Error**: Posts that failed during LLM analysis
+- **Pending**: Posts awaiting analysis
+
+This ensures comprehensive tracking of all harvested content, not just successfully analyzed posts.
 
 ## 🧪 Testing
 

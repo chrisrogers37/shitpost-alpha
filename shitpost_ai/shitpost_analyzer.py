@@ -24,8 +24,8 @@ class ShitpostAnalyzer:
         """Initialize the shitpost analyzer.
         
         Args:
-            mode: Analysis mode - "incremental", "backfill", "range", "from_date"
-            start_date: Start date for range/from_date modes (YYYY-MM-DD)
+            mode: Analysis mode - "incremental", "backfill", "range"
+            start_date: Start date for range mode (YYYY-MM-DD)
             end_date: End date for range mode (YYYY-MM-DD)
             limit: Maximum number of posts to analyze (optional)
             batch_size: Number of posts to process in each batch
@@ -47,6 +47,10 @@ class ShitpostAnalyzer:
             self.start_datetime = datetime.fromisoformat(start_date)
         if end_date:
             self.end_datetime = datetime.fromisoformat(end_date)
+        elif mode == "range" and start_date:
+            # Default end_date to today for range mode
+            self.end_datetime = datetime.now()
+            self.end_date = self.end_datetime.strftime("%Y-%m-%d")
         
     async def initialize(self):
         """Initialize the shitpost analyzer."""
@@ -65,8 +69,6 @@ class ShitpostAnalyzer:
             return await self._analyze_backfill()
         elif self.mode == "range":
             return await self._analyze_date_range()
-        elif self.mode == "from_date":
-            return await self._analyze_from_date()
         else:  # incremental (default)
             return await self._analyze_incremental()
     
@@ -174,62 +176,6 @@ class ShitpostAnalyzer:
         logger.info(f"Date range analysis completed. Total posts analyzed: {total_analyzed}")
         return total_analyzed
     
-    async def _analyze_from_date(self) -> int:
-        """Analyze shitposts from a specific date onwards."""
-        logger.info(f"Starting analysis from date {self.start_date} onwards")
-        
-        total_analyzed = 0
-        
-        while True:
-            try:
-                # Get batch of unprocessed shitposts
-                shitposts = await self.db_manager.get_unprocessed_shitposts(
-                    launch_date=self.launch_date,
-                    limit=self.batch_size
-                )
-                
-                if not shitposts:
-                    logger.info("No more unprocessed shitposts found for from-date analysis")
-                    break
-                
-                # Filter shitposts by start date
-                filtered_shitposts = []
-                for shitpost in shitposts:
-                    try:
-                        post_timestamp = datetime.fromisoformat(shitpost.get('timestamp').replace('Z', '+00:00'))
-                        
-                        if post_timestamp < self.start_datetime:
-                            logger.info(f"Reached posts before start date {self.start_date}, stopping")
-                            return total_analyzed
-                        
-                        filtered_shitposts.append(shitpost)
-                        
-                    except Exception as e:
-                        logger.error(f"Error parsing timestamp for shitpost {shitpost.get('id')}: {e}")
-                        continue
-                
-                if filtered_shitposts:
-                    # Analyze filtered batch
-                    batch_analyzed = await self._analyze_batch(filtered_shitposts)
-                    total_analyzed += batch_analyzed
-                    
-                    # Check if we've reached the limit
-                    if self.limit and total_analyzed >= self.limit:
-                        logger.info(f"Reached analysis limit of {self.limit} posts")
-                        break
-                
-                logger.info(f"From date analysis progress: {total_analyzed} posts analyzed")
-                
-                # Small delay to be respectful to LLM APIs
-                await asyncio.sleep(1)
-                
-            except Exception as e:
-                logger.error(f"Error in from date analysis: {e}")
-                await handle_exceptions(e)
-                break
-        
-        logger.info(f"From date analysis completed. Total posts analyzed: {total_analyzed}")
-        return total_analyzed
     
     async def _analyze_incremental(self) -> int:
         """Analyze only new unprocessed shitposts (original implementation)."""
@@ -533,8 +479,8 @@ Examples:
   # Date range analysis
   python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --to 2024-01-31
   
-  # Analysis from specific date onwards
-  python -m shitpost_ai.shitpost_analyzer --mode from-date --from 2024-01-01
+  # Date range analysis (from date to today)
+  python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01
   
   # Analysis with custom batch size
   python -m shitpost_ai.shitpost_analyzer --mode backfill --batch-size 10
@@ -549,14 +495,14 @@ Examples:
     
     parser.add_argument(
         "--mode", 
-        choices=["incremental", "backfill", "range", "from-date"], 
+        choices=["incremental", "backfill", "range"], 
         default="incremental", 
         help="Analysis mode (default: incremental)"
     )
     parser.add_argument(
         "--from", 
         dest="start_date", 
-        help="Start date for range/from-date modes (YYYY-MM-DD)"
+        help="Start date for range mode (YYYY-MM-DD)"
     )
     parser.add_argument(
         "--to", 
@@ -588,11 +534,10 @@ Examples:
     args = parser.parse_args()
     
     # Validate arguments
-    if args.mode in ["range", "from-date"] and not args.start_date:
-        parser.error(f"--from date is required for {args.mode} mode")
+    if args.mode == "range" and not args.start_date:
+        parser.error("--from date is required for range mode")
     
-    if args.mode == "range" and not args.end_date:
-        parser.error("--to date is required for range mode")
+    # Note: --to date is optional for range mode (defaults to today)
     
     # Set logging level
     if args.verbose:
@@ -639,7 +584,7 @@ Examples:
             traceback.print_exc()
     finally:
         await analyzer.cleanup()
-
+    
 
 if __name__ == "__main__":
     asyncio.run(main())

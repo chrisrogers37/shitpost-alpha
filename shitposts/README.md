@@ -1,4 +1,4 @@
- update the g# Shitposts Directory
+# Shitposts Directory
 
 This directory contains the shitpost collection and harvesting system for the Shitpost-Alpha project, responsible for gathering Truth Social content from Donald Trump's account using the ScrapeCreators API.
 
@@ -6,7 +6,6 @@ This directory contains the shitpost collection and harvesting system for the Sh
 
 ### Core Files
 - **`truth_social_s3_harvester.py`** - Truth Social S3 harvester (stores raw data in S3)
-- **`s3_data_lake.py`** - S3 data lake management for raw data storage
 - **`cli.py`** - Shared CLI functionality for harvesters
 - **`README.md`** - This documentation file
 
@@ -20,11 +19,12 @@ The shitpost collection system follows a clean, focused design:
 ```
 shitposts/
 ├── truth_social_s3_harvester.py  # Truth Social S3 harvester
-├── s3_data_lake.py               # S3 data lake management
 ├── cli.py                        # Shared CLI functionality
 ├── README.md                     # This documentation
 └── __pycache__/                  # Python cache (auto-generated)
 ```
+
+**Note:** S3 data lake management has been moved to `shit/s3/` for shared utilities across the project.
 
 ## 🎯 Purpose
 
@@ -47,25 +47,26 @@ The main harvester class that manages all Truth Social data collection and S3 st
 **Purpose:** Harvests shitposts from Donald Trump's Truth Social account and stores raw data in S3.
 
 **Key Features:**
-- **Multiple harvesting modes** - Incremental, backfill, date range, and from-date modes
+- **Multiple harvesting modes** - Incremental, backfill, and date range modes
 - **S3 storage** - Raw data stored in organized S3 structure (`truth-social/raw/YYYY/MM/DD/post_id.json`)
 - **Resume capability** - Can resume from specific post ID for large backfill operations
+- **Incremental mode** - Stops when encountering posts that already exist in S3
 - **API integration** - Seamless ScrapeCreators API integration
 - **Raw data preservation** - Stores complete API responses for future processing
 - **Error handling** - Robust error management and recovery
 - **Async operations** - Non-blocking HTTP requests and S3 uploads
 - **CLI interface** - Command-line tools for different harvesting strategies
 
-### S3 Data Lake (`s3_data_lake.py`)
+### S3 Data Lake Integration
 
-Manages raw data storage and retrieval in AWS S3.
+The harvester integrates with the shared S3 Data Lake utilities located in `shit/s3/`:
 
-#### Class: `S3DataLake`
+#### S3DataLake Class (from `shit/s3/s3_data_lake.py`)
 
 **Purpose:** Handles S3 operations for raw shitpost data storage and retrieval.
 
 **Key Features:**
-- **Organized storage** - Data stored by date structure for easy querying
+- **Organized storage** - Data stored by date structure (`truth-social/raw/YYYY/MM/DD/post_id.json`)
 - **Metadata tracking** - Stores harvest metadata with each file
 - **Statistics** - Provides storage statistics and data insights
 - **Streaming support** - Can stream data for processing
@@ -73,49 +74,52 @@ Manages raw data storage and retrieval in AWS S3.
 
 #### Key Methods
 
-**Initialization:**
+**Storage Operations:**
 ```python
-async def initialize(self)
-# Sets up API connection, tests connectivity, initializes database
+async def store_raw_data(self, raw_data: Dict) -> str
+# Stores raw shitpost data in S3, returns S3 key
 
-async def _test_connection(self)
-# Tests ScrapeCreators API connectivity
+async def get_raw_data(self, s3_key: str) -> Optional[Dict]
+# Retrieves raw data from S3 by key
+
+async def check_object_exists(self, s3_key: str) -> bool
+# Checks if an S3 object exists without downloading it (for incremental mode)
 ```
 
-**Core Harvesting:**
+**Data Management:**
 ```python
-async def harvest_shitposts(self) -> AsyncGenerator[Dict, None]
-# Main harvesting method - yields shitposts continuously
+async def list_raw_data(self, start_date: Optional[datetime] = None, 
+                       end_date: Optional[datetime] = None, 
+                       limit: Optional[int] = None) -> List[str]
+# Lists S3 keys for raw data files
 
-async def _fetch_recent_shitposts(self, next_max_id: Optional[str] = None) -> List[Dict]
-# Fetches shitposts from ScrapeCreators API
+async def stream_raw_data(self, start_date: Optional[datetime] = None,
+                         end_date: Optional[datetime] = None,
+                         limit: Optional[int] = None) -> AsyncGenerator[Dict, None]
+# Streams raw data from S3 for processing
 ```
 
-**Data Processing:**
+**Statistics:**
 ```python
-async def _process_shitpost(self, raw_shitpost: Dict) -> Optional[Dict]
-# Transforms raw API data to internal format
-
-def _extract_text_content(self, content: str) -> str
-# Extracts plain text from HTML content
-```
-
-**Utility Methods:**
-```python
-async def get_recent_shitposts(self, limit: int = 10) -> List[Dict]
-# Gets recent shitposts for testing/debugging
-
-async def cleanup(self)
-# Properly closes connections and resources
+async def get_data_stats(self) -> S3Stats
+# Returns storage statistics (file count, size, etc.)
 ```
 
 ## 🔧 Configuration
 
 ### Environment Variables
 ```bash
+# Truth Social Configuration
 TRUTH_SOCIAL_USERNAME=realDonaldTrump        # Target username
 TRUTH_SOCIAL_SHITPOST_INTERVAL=30            # Harvest interval (seconds)
 SCRAPECREATORS_API_KEY=your_api_key_here     # ScrapeCreators API key
+
+# S3 Data Lake Configuration
+S3_BUCKET_NAME=your-s3-bucket-name           # S3 bucket for raw data storage
+S3_PREFIX=truth-social                       # S3 prefix for data organization
+AWS_REGION=us-east-1                         # AWS region
+AWS_ACCESS_KEY_ID=your_aws_access_key        # AWS access key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key    # AWS secret key
 ```
 
 ### API Configuration
@@ -128,27 +132,27 @@ SCRAPECREATORS_API_KEY=your_api_key_here     # ScrapeCreators API key
 
 ### Initialize Harvester
 ```python
-from shitposts.truth_social_shitposts import TruthSocialShitposts
+from shitposts.truth_social_s3_harvester import TruthSocialS3Harvester
 
 # Basic incremental harvester (default)
-harvester = TruthSocialShitposts()
+harvester = TruthSocialS3Harvester()
 await harvester.initialize()
 
 # Full historical backfill
-harvester = TruthSocialShitposts(mode="backfill", limit=1000)
+harvester = TruthSocialS3Harvester(mode="backfill", limit=1000)
 await harvester.initialize()
 
 # Date range harvesting
-harvester = TruthSocialShitposts(
+harvester = TruthSocialS3Harvester(
     mode="range", 
     start_date="2024-01-01", 
     end_date="2024-01-31"
 )
 await harvester.initialize()
 
-# Harvest from specific date onwards
-harvester = TruthSocialShitposts(
-    mode="from-date", 
+# Harvest from specific date onwards (using range mode)
+harvester = TruthSocialS3Harvester(
+    mode="range", 
     start_date="2024-01-01"
 )
 await harvester.initialize()
@@ -156,23 +160,24 @@ await harvester.initialize()
 
 ### Harvest Shitposts Continuously
 ```python
-async for shitpost in harvester.harvest_shitposts():
-    print(f"New shitpost: {shitpost['id']}")
-    print(f"Content: {shitpost['text'][:100]}...")
-    # Process shitpost...
+async for result in harvester.harvest_shitposts():
+    print(f"New shitpost: {result['shitpost_id']}")
+    print(f"S3 Key: {result['s3_key']}")
+    print(f"Content: {result['content_preview']}")
+    # Process result...
 ```
 
-### Get Recent Shitposts
+### Get S3 Statistics
 ```python
-recent_shitposts = await harvester.get_recent_shitposts(limit=5)
-for shitpost in recent_shitposts:
-    print(f"ID: {shitpost['id']}, Content: {shitpost['content'][:50]}...")
+stats = await harvester.get_s3_stats()
+print(f"Total files: {stats.total_files}")
+print(f"Total size: {stats.total_size_mb} MB")
 ```
 
 ### Test Harvester
 ```python
 # Run the built-in test
-python shitposts.truth_social_shitposts.py
+python -m shitposts.truth_social_s3_harvester --mode backfill --limit 5 --dry-run
 ```
 
 ## 🖥️ Command Line Interface (CLI)
@@ -214,13 +219,13 @@ python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --t
 python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --to 2024-01-31 --limit 500 --verbose
 ```
 
-#### 4. **From Date Mode**
+#### 4. **Date Range Mode (From Date to Today)**
 ```bash
-# Harvest posts from specific date onwards
-python -m shitposts.truth_social_s3_harvester --mode from-date --from 2024-01-01
+# Harvest posts from specific date to today
+python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01
 
 # With limit
-python -m shitposts.truth_social_s3_harvester --mode from-date --from 2024-01-01 --limit 200
+python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --limit 200
 ```
 
 ### CLI Options
@@ -248,7 +253,7 @@ python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-15 --t
 python -m shitposts.truth_social_s3_harvester --verbose
 
 # Harvest posts from election day onwards
-python -m shitposts.truth_social_s3_harvester --mode from-date --from 2024-11-05 --limit 1000
+python -m shitposts.truth_social_s3_harvester --mode range --from 2024-11-05 --limit 1000
 
 # Resume large backfill from specific post ID
 python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915682735686
@@ -256,7 +261,9 @@ python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915
 
 ## 📊 Data Format
 
-### Raw API Data Structure
+### Raw API Data Structure (Stored in S3)
+The S3 harvester stores the complete raw API response from ScrapeCreators:
+
 ```json
 {
     "id": "123456789",
@@ -265,44 +272,70 @@ python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915
     "replies_count": 150,
     "reblogs_count": 75,
     "favourites_count": 500,
+    "upvotes_count": 500,
+    "downvotes_count": 0,
     "account": {
         "id": "107780257626128497",
         "display_name": "Donald J. Trump",
+        "username": "realDonaldTrump",
         "followers_count": 10564743,
-        "verified": true
+        "following_count": 0,
+        "statuses_count": 50000,
+        "verified": true,
+        "website": ""
     },
     "media_attachments": [],
     "mentions": [],
-    "tags": []
+    "tags": [],
+    "language": "en",
+    "visibility": "public",
+    "sensitive": false,
+    "spoiler_text": "",
+    "uri": "https://truthsocial.com/posts/123456789",
+    "url": "https://truthsocial.com/posts/123456789",
+    "in_reply_to_id": null,
+    "quote_id": null,
+    "in_reply_to_account_id": null,
+    "card": null,
+    "group": null,
+    "quote": null,
+    "in_reply_to": null,
+    "reblog": null,
+    "sponsored": false,
+    "reaction": null,
+    "favourited": false,
+    "reblogged": false,
+    "muted": false,
+    "pinned": false,
+    "bookmarked": false,
+    "poll": null,
+    "emojis": [],
+    "votable": false,
+    "edited_at": null,
+    "version": "1.0",
+    "editable": false,
+    "title": ""
 }
 ```
 
-### Processed Shitpost Format
+### S3 Storage Structure
+Raw data is stored in S3 with the following key structure:
+```
+truth-social/raw/YYYY/MM/DD/post_id.json
+```
+
+Example: `truth-social/raw/2024/01/15/123456789.json`
+
+### Harvest Result Format
+The harvester yields result objects with metadata:
+
 ```json
 {
-    "id": "123456789",
-    "content": "<p>Tesla is destroying American jobs!</p>",
-    "text": "Tesla is destroying American jobs!",
+    "shitpost_id": "123456789",
+    "s3_key": "truth-social/raw/2024/01/15/123456789.json",
     "timestamp": "2024-01-01T12:00:00Z",
-    "username": "realDonaldTrump",
-    "platform": "truth_social",
-    
-    "replies_count": 150,
-    "reblogs_count": 75,
-    "favourites_count": 500,
-    "upvotes_count": 500,
-    
-    "account_id": "107780257626128497",
-    "account_display_name": "Donald J. Trump",
-    "account_followers_count": 10564743,
-    "account_verified": true,
-    
-    "has_media": false,
-    "media_attachments": [],
-    "mentions": [],
-    "tags": [],
-    
-    "raw_api_data": { /* original API response */ }
+    "content_preview": "Tesla is destroying American jobs!...",
+    "stored_at": "2024-01-01T12:00:01.123456"
 }
 ```
 
@@ -311,53 +344,64 @@ python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915
 ### 1. Initialization Phase
 - **API Key Validation** - Ensures ScrapeCreators API key is configured
 - **Connection Testing** - Tests API connectivity with simple request
-- **Database Setup** - Initializes database connection for deduplication
-- **State Recovery** - Retrieves last processed shitpost ID for restart resilience
+- **S3 Setup** - Initializes S3 Data Lake connection for raw data storage
+- **Configuration** - Sets up harvesting mode and parameters
 
-### 2. Harvesting Loop
+### 2. Incremental Mode Behavior
+- **S3 Existence Check** - For each post, generates expected S3 key and checks if it exists
+- **Early Termination** - Stops immediately when encountering posts that already exist in S3
+- **Efficient Processing** - Uses `head_object` API call for fast existence checks
+- **Clear Logging** - Provides detailed feedback about which posts are found and why harvest stops
+
+### 3. Harvesting Loop
 - **Fetch Recent Shitposts** - Calls ScrapeCreators API with pagination
-- **Data Processing** - Transforms raw API data to internal format
-- **Deduplication** - Checks against database to avoid duplicates
-- **Yield Results** - Yields processed shitposts to calling code
-- **State Update** - Updates last processed shitpost ID
-- **Interval Wait** - Waits configured interval before next check
+- **Raw Data Storage** - Stores complete API response directly to S3
+- **S3 Key Generation** - Creates organized S3 keys by date structure
+- **Yield Results** - Yields harvest result metadata to calling code
+- **Pagination** - Updates max_id for next batch retrieval
+- **Mode-Specific Logic** - Handles different harvesting modes (backfill, range, etc.)
 
-### 3. Error Handling
+### 4. Error Handling
 - **API Failures** - Logs errors and continues with next iteration
 - **Connection Issues** - Implements retry logic with exponential backoff
-- **Data Validation** - Validates shitpost data before processing
+- **S3 Errors** - Handles S3 storage failures gracefully
 - **Resource Cleanup** - Properly closes connections on errors
 
 ## 🔍 Data Processing Pipeline
 
-### Raw Data Transformation
-1. **Extract Core Fields** - ID, content, timestamp, username
-2. **Parse Engagement Metrics** - Replies, reblogs, favourites, upvotes
-3. **Extract Account Information** - Followers, verification status, etc.
-4. **Process Media & Attachments** - Media presence, mentions, hashtags
-5. **HTML Text Extraction** - Convert HTML content to plain text
-6. **Metadata Addition** - Add platform, processing timestamp
-7. **Raw Data Preservation** - Store original API response for debugging
+### Consolidated Architecture
+The harvester uses a **unified code path** for all harvesting modes:
+- **Single Method**: All modes (`incremental`, `backfill`, `range`) use `_harvest_backfill()`
+- **Mode Parameters**: Different behaviors controlled by parameters (`incremental_mode`, `start_date`, `end_date`)
+- **Consistent Logic**: Same pagination, error handling, and logging across all modes
+- **Efficient Processing**: Optimized S3 existence checks for incremental mode
 
-### Content Processing
-- **HTML Tag Removal** - Strips HTML tags from content
-- **Entity Decoding** - Converts HTML entities (&amp;, &lt;, etc.)
-- **Whitespace Normalization** - Cleans up extra spaces and formatting
-- **Text Extraction** - Creates clean plain text version
+### S3 Storage Process
+1. **API Response Capture** - Receives complete raw API response
+2. **S3 Key Generation** - Creates date-based S3 key structure
+3. **Metadata Addition** - Adds harvest metadata (timestamp, etc.)
+4. **S3 Upload** - Stores raw data directly to S3 bucket
+5. **Result Generation** - Creates harvest result with S3 key and metadata
+
+### S3 Key Structure
+- **Date Organization** - `truth-social/raw/YYYY/MM/DD/post_id.json`
+- **Uniqueness** - Each post gets unique S3 key based on ID
+- **Queryability** - Date structure enables efficient date-based queries
+- **Scalability** - Supports millions of posts with organized structure
 
 ## 🔒 Data Integrity
 
-### Deduplication Strategy
-- **Shitpost ID Tracking** - Uses Truth Social post ID for uniqueness
-- **Database Integration** - Checks against existing shitposts
-- **Restart Resilience** - Remembers last processed shitpost
-- **State Persistence** - Maintains state across application restarts
+### S3 Storage Strategy
+- **Raw Data Preservation** - Stores complete API responses without modification
+- **Overwrite Protection** - S3 handles deduplication at storage level
+- **Atomic Operations** - Each S3 upload is atomic (success or failure)
+- **Metadata Tracking** - Harvest metadata includes timestamps and S3 keys
 
 ### Data Validation
-- **Required Fields** - Validates ID, content, timestamp
-- **Content Quality** - Ensures content is not empty or malformed
-- **Timestamp Validation** - Verifies timestamp format and validity
-- **Account Verification** - Confirms account information is present
+- **API Response Validation** - Validates API response structure
+- **Required Fields** - Ensures ID and timestamp are present
+- **S3 Upload Verification** - Confirms successful S3 storage
+- **Error Logging** - Comprehensive logging for debugging
 
 ## 🛠️ Error Handling & Resilience
 
@@ -405,46 +449,57 @@ python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915
 ```python
 # Test harvester initialization
 async def test_harvester_init():
-    harvester = TruthSocialShitposts()
-    await harvester.initialize()
+    harvester = TruthSocialS3Harvester()
+    await harvester.initialize(dry_run=True)
     assert harvester.session is not None
 
-# Test data processing
-async def test_shitpost_processing():
-    harvester = TruthSocialShitposts()
-    raw_data = {"id": "123", "content": "<p>Test</p>"}
-    processed = await harvester._process_shitpost(raw_data)
-    assert processed['text'] == "Test"
+# Test S3 storage (dry run)
+async def test_s3_storage():
+    harvester = TruthSocialS3Harvester()
+    await harvester.initialize(dry_run=True)
+    # Test harvest result generation
+    result = {
+        'shitpost_id': '123',
+        's3_key': 'truth-social/raw/2024/01/01/123.json',
+        'content_preview': 'Test content...'
+    }
+    assert result['shitpost_id'] == '123'
 ```
 
 ### Integration Tests
 - **API Integration** - Test ScrapeCreators API connectivity
-- **Database Integration** - Test deduplication and state management
+- **S3 Integration** - Test S3 data lake operations
 - **End-to-End Harvesting** - Test complete harvesting workflow
 - **Error Scenarios** - Test error handling and recovery
 
 ### Manual Testing
 ```bash
-# Run built-in test
-python shitposts/truth_social_shitposts.py
+# Test incremental mode (stops when finding existing posts)
+python -m shitposts.truth_social_s3_harvester --mode incremental --limit 5
 
-# Test with specific configuration
-TRUTH_SOCIAL_SHITPOST_INTERVAL=10 python shitposts/truth_social_shitposts.py
+# Test with dry run (no S3 storage)
+python -m shitposts.truth_social_s3_harvester --mode backfill --limit 5 --dry-run
+
+# Test actual S3 storage
+python -m shitposts.truth_social_s3_harvester --mode backfill --limit 5
+
+# Test different modes
+python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --to 2024-01-02 --dry-run
 ```
 
 ## 🔄 Continuous Operation
 
 ### Long-Running Service
-- **Infinite Loop** - Continuous harvesting until stopped
+- **Predictable Execution** - Incremental mode processes once and exits when finding existing posts
 - **Graceful Shutdown** - Proper cleanup on interruption
-- **State Persistence** - Maintains progress across restarts
+- **S3 State Tracking** - Uses S3 key structure for progress tracking
 - **Health Monitoring** - Tracks service health and performance
 
 ### Restart Resilience
-- **Last Shitpost Tracking** - Remembers last processed shitpost
-- **Database State** - Retrieves state from database on startup
-- **Incremental Processing** - Processes only new shitposts
-- **No Data Loss** - Ensures no shitposts are missed
+- **S3 Key Tracking** - Uses S3 key structure for progress tracking
+- **Resume Capability** - Can resume from specific post ID with `--max-id`
+- **Mode Flexibility** - Supports incremental, backfill, and date range modes
+- **No Data Loss** - S3 storage ensures data persistence
 
 ## 📚 Related Documentation
 
@@ -453,25 +508,44 @@ TRUTH_SOCIAL_SHITPOST_INTERVAL=10 python shitposts/truth_social_shitposts.py
 - **AI Engine** - `shitpost_ai/` directory
 - **Configuration** - `shit/config/shitpost_settings.py`
 
+## 🚀 Recent Improvements
+
+### Mode Consolidation (v0.7.0)
+- **Unified Code Path** - All harvesting modes now use a single `_harvest_backfill()` method
+- **Removed `from-date` Mode** - Functionality consolidated into `range` mode (defaults end date to today)
+- **Enhanced Incremental Mode** - Now stops when encountering existing posts in S3
+- **Improved Logging** - Clear feedback about which posts are found and why harvest stops
+- **S3 Existence Checks** - Efficient `head_object` API calls for fast existence verification
+
+### Performance Optimizations
+- **Reduced Code Duplication** - Single method handles all harvesting scenarios
+- **Faster S3 Checks** - Uses metadata-only API calls instead of downloading files
+- **Better Error Handling** - Consistent error management across all modes
+- **Predictable Behavior** - Incremental mode processes once and exits (no infinite loops)
+
 ## 🚀 Deployment Considerations
 
 ### Production Setup
-- **API Key Management** - Secure credential storage
+- **API Key Management** - Secure credential storage for ScrapeCreators API
+- **S3 Configuration** - AWS credentials and bucket configuration
 - **Rate Limiting** - Respect ScrapeCreators API limits
-- **Monitoring** - Health checks and alerting
+- **Monitoring** - Health checks and alerting for S3 operations
 - **Logging** - Comprehensive logging for debugging
 
 ### Scaling Considerations
 - **Single Instance** - Designed for single harvester instance
-- **Database Scaling** - Database handles multiple consumers
+- **S3 Scaling** - S3 handles massive scale automatically
 - **API Limits** - ScrapeCreators API rate limits
 - **Resource Usage** - Minimal memory and CPU footprint
+- **Storage Costs** - S3 storage costs scale with data volume
 
 ### Security
 - **API Key Protection** - Secure storage of ScrapeCreators API key
+- **AWS Credentials** - Secure storage of AWS access keys
+- **S3 Permissions** - Proper IAM roles and bucket policies
 - **Input Validation** - Validate all API responses
 - **Error Logging** - Avoid logging sensitive data
-- **Network Security** - Secure HTTPS connections
+- **Network Security** - Secure HTTPS connections to APIs and S3
 
 ---
 

@@ -98,7 +98,7 @@ The business logic orchestrator that coordinates analysis workflows.
 **Purpose:** Orchestrates the complete shitpost analysis pipeline with enhanced context.
 
 **Key Features:**
-- **Multiple analysis modes** - Incremental, backfill, date range, and from-date modes
+- **Multiple analysis modes** - Incremental, backfill, and date range modes
 - **Batch processing** - Efficient analysis of multiple shitposts
 - **Enhanced context** - Incorporates Truth Social engagement data
 - **Deduplication** - Prevents duplicate analysis
@@ -133,6 +133,9 @@ def _prepare_enhanced_content(shitpost: Dict) -> str
 
 def _enhance_analysis_with_shitpost_data(analysis: Dict, shitpost: Dict) -> Dict
 # Enhances LLM analysis with Truth Social data
+
+def _should_bypass_post(shitpost: Dict) -> bool
+# Determines if a post should be bypassed for analysis (no analyzable content)
 ```
 
 **Continuous Operation:**
@@ -145,10 +148,11 @@ async def run_continuous_analysis(interval_seconds: int = 300)
 
 1. **Fetch Unprocessed Shitposts** - Gets shitposts needing analysis
 2. **Deduplication Check** - Ensures no duplicate analysis
-3. **Content Enhancement** - Adds engagement and context data
-4. **LLM Analysis** - Calls AI for financial analysis
-5. **Result Enhancement** - Adds Truth Social metrics
-6. **Database Storage** - Stores enhanced analysis results
+3. **Content Filtering** - Bypasses posts with no analyzable content (URLs only, emojis, etc.)
+4. **Content Enhancement** - Adds engagement and context data
+5. **LLM Analysis** - Calls AI for financial analysis
+6. **Result Enhancement** - Adds Truth Social metrics
+7. **Database Storage** - Stores enhanced analysis results or bypass records
 
 ### 3. Prompts (`prompts.py`)
 
@@ -217,11 +221,10 @@ analyzer = ShitpostAnalyzer(
 )
 await analyzer.initialize()
 
-# Analysis from specific date onwards
+# Analysis from specific date onwards (using range mode)
 analyzer = ShitpostAnalyzer(
-    mode="from_date", 
-    start_date="2024-01-01",
-    confidence_threshold=0.8
+    mode="range", 
+    start_date="2024-01-01"
 )
 await analyzer.initialize()
 ```
@@ -288,13 +291,13 @@ python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --to 2024
 python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --to 2024-01-31 --limit 500 --batch-size 10
 ```
 
-#### 4. **From Date Mode**
+#### 4. **Date Range Mode (From Date to Today)**
 ```bash
-# Analyze posts from specific date onwards
-python -m shitpost_ai.shitpost_analyzer --mode from-date --from 2024-01-01
+# Analyze posts from specific date to today
+python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01
 
 # With limit and batch size
-python -m shitpost_ai.shitpost_analyzer --mode from-date --from 2024-01-01 --limit 200 --batch-size 15
+python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --limit 200 --batch-size 15
 ```
 
 ### CLI Options
@@ -324,7 +327,7 @@ python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-15 --to 2024
 python -m shitpost_ai.shitpost_analyzer --verbose
 
 # Analyze posts from election day onwards
-python -m shitpost_ai.shitpost_analyzer --mode from-date --from 2024-11-05 --limit 1000 --batch-size 20
+python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-11-05 --limit 1000 --batch-size 20
 ```
 
 ### Custom Prompt Usage
@@ -365,6 +368,19 @@ analysis = await client._call_llm(prompt)
 }
 ```
 
+### Bypassed Post Response
+For posts with no analyzable content, the system creates a bypass record:
+```json
+{
+    "analysis_status": "bypassed",
+    "analysis_comment": "No analyzable text content",
+    "confidence": null,
+    "assets": [],
+    "market_impact": {},
+    "thesis": null
+}
+```
+
 ### Enhanced Analysis Features
 
 **Engagement Scoring:**
@@ -377,6 +393,12 @@ analysis = await client._call_llm(prompt)
 - Mention and hashtag counting
 - Content length analysis
 - Real-time engagement metrics
+
+**Categorical Analysis Tracking:**
+- **Analysis Status** - Tracks whether posts were analyzed, bypassed, or failed
+- **Bypass Reasons** - Records why posts were skipped (no text, URL-only, etc.)
+- **Complete Coverage** - Ensures all harvested posts are tracked in the database
+- **Quality Metrics** - Monitors analysis success rates and bypass patterns
 
 ## 🔧 Configuration
 
@@ -492,6 +514,24 @@ async def test_analyzer():
 - **Error scenarios** - Failure mode testing
 - **Performance testing** - Load and stress testing
 
+### Manual Testing
+```bash
+# Test incremental analysis (analyzes new unprocessed posts)
+python -m shitpost_ai.shitpost_analyzer --mode incremental --limit 5
+
+# Test with dry run (no database storage)
+python -m shitpost_ai.shitpost_analyzer --mode backfill --limit 5 --dry-run
+
+# Test actual analysis
+python -m shitpost_ai.shitpost_analyzer --mode backfill --limit 5
+
+# Test date range analysis
+python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --to 2024-01-02 --dry-run
+
+# Test "from date to today" functionality
+python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --dry-run
+```
+
 ### Prompt Testing
 - **Output validation** - JSON format verification
 - **Content analysis** - Asset identification accuracy
@@ -518,6 +558,20 @@ async def test_analyzer():
 - **Database Layer** - `shitvault/` directory
 - **Configuration** - `shit/config/shitpost_settings.py`
 - **Shitpost Collection** - `shitposts/` directory
+
+## 🚀 Recent Improvements
+
+### Mode Consolidation (v0.7.0)
+- **Removed `from-date` Mode** - Functionality consolidated into `range` mode (defaults end date to today)
+- **Simplified CLI** - Cleaner command-line interface with fewer mode options
+- **Consistent Behavior** - All date-based analysis now uses the same `range` mode logic
+- **Better Documentation** - Updated examples and help text to reflect current functionality
+
+### Enhanced Analysis Pipeline
+- **Pre-LLM Filtering** - Bypasses posts with no analyzable content before sending to LLM
+- **Categorical Tracking** - Tracks all harvested posts, including those bypassed by analysis
+- **Enhanced Context** - Incorporates Truth Social engagement data into analysis
+- **Robust Error Handling** - Graceful handling of analysis failures and edge cases
 
 ## 🚀 Deployment Considerations
 
