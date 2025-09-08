@@ -178,12 +178,7 @@ class ShitpostDatabase:
                     title=shitpost_data.get('title'),
                     
                     # Raw API data
-                    raw_api_data=shitpost_data.get('raw_api_data'),
-                    
-                    # Legacy fields
-                    original_length=shitpost_data.get('original_length'),
-                    cleaned_length=shitpost_data.get('cleaned_length'),
-                    hashtags=shitpost_data.get('hashtags')
+                    raw_api_data=shitpost_data.get('raw_api_data')
                 )
                 
                 session.add(shitpost)
@@ -310,7 +305,7 @@ class ShitpostDatabase:
                     urgency_score=None,
                     has_media=shitpost_data.get('has_media', False),
                     mentions_count=len(shitpost_data.get('mentions', [])),
-                    hashtags_count=len(shitpost_data.get('hashtags', [])),
+                    hashtags_count=len(shitpost_data.get('tags', [])),
                     content_length=len(shitpost_data.get('text', '')),
                     replies_at_analysis=shitpost_data.get('replies_count', 0),
                     reblogs_at_analysis=shitpost_data.get('reblogs_count', 0),
@@ -355,73 +350,7 @@ class ShitpostDatabase:
         # Default fallback
         return 'unanalyzable_content'
     
-    async def get_recent_shitposts(self, limit: int = 10) -> list:
-        """Get recent shitposts."""
-        try:
-            from shitvault.shitpost_models import TruthSocialShitpost
-            
-            async with self.get_session() as session:
-                from sqlalchemy import select
-                stmt = select(TruthSocialShitpost).order_by(TruthSocialShitpost.timestamp.desc()).limit(limit)
-                result = await session.execute(stmt)
-                shitposts = result.scalars().all()
-                
-                return [
-                    {
-                        'id': shitpost.id,
-                        'shitpost_id': shitpost.shitpost_id,
-                        'content': shitpost.content,
-                        'text': shitpost.text,
-                        'timestamp': shitpost.timestamp,
-                        'username': shitpost.username,
-                        'platform': shitpost.platform,
-                        'language': shitpost.language,
-                        'visibility': shitpost.visibility,
-                        'sensitive': shitpost.sensitive,
-                        'uri': shitpost.uri,
-                        'url': shitpost.url,
-                        'replies_count': shitpost.replies_count,
-                        'reblogs_count': shitpost.reblogs_count,
-                        'favourites_count': shitpost.favourites_count,
-                        'upvotes_count': shitpost.upvotes_count,
-                        'downvotes_count': shitpost.downvotes_count,
-                        'account_id': shitpost.account_id,
-                        'account_display_name': shitpost.account_display_name,
-                        'account_verified': shitpost.account_verified,
-                        'has_media': shitpost.has_media,
-                        'media_attachments': shitpost.media_attachments,
-                        'mentions': shitpost.mentions,
-                        'tags': shitpost.tags,
-                        'raw_api_data': shitpost.raw_api_data
-                    }
-                    for shitpost in shitposts
-                ]
-                
-        except Exception as e:
-            logger.error(f"Error fetching recent shitposts: {e}")
-            return []
     
-    async def get_last_shitpost_id(self) -> Optional[str]:
-        """Get the most recent shitpost ID from the database."""
-        try:
-            from shitvault.shitpost_models import TruthSocialShitpost
-            
-            async with self.get_session() as session:
-                from sqlalchemy import select
-                stmt = select(TruthSocialShitpost.shitpost_id).order_by(TruthSocialShitpost.timestamp.desc()).limit(1)
-                result = await session.execute(stmt)
-                last_shitpost = result.scalar_one_or_none()
-                
-                if last_shitpost:
-                    logger.info(f"Found last shitpost ID in database: {last_shitpost}")
-                    return last_shitpost
-                else:
-                    logger.info("No shitposts found in database")
-                    return None
-                
-        except Exception as e:
-            logger.error(f"Error fetching last shitpost ID: {e}")
-            return None
     
     async def get_unprocessed_shitposts(self, launch_date: str, limit: int = 10) -> List[Dict]:
         """
@@ -511,47 +440,6 @@ class ShitpostDatabase:
             logger.error(f"Error checking prediction existence: {e}")
             return False
     
-    async def get_shitpost_analysis(self, shitpost_id: str) -> Optional[Dict]:
-        """Get analysis for a specific shitpost."""
-        try:
-            from shitvault.shitpost_models import TruthSocialShitpost, Prediction
-            
-            async with self.get_session() as session:
-                # Get shitpost
-                shitpost_result = await session.execute(
-                    session.query(TruthSocialShitpost)
-                    .filter(TruthSocialShitpost.id == shitpost_id)
-                )
-                shitpost = shitpost_result.scalar_one_or_none()
-                
-                if not shitpost:
-                    return None
-                
-                # Get analysis
-                analysis_result = await session.execute(
-                    session.query(Prediction)
-                    .filter(Prediction.shitpost_id == shitpost_id)
-                )
-                analysis = analysis_result.scalar_one_or_none()
-                
-                return {
-                    'shitpost': {
-                        'id': shitpost.id,
-                        'content': shitpost.content,
-                        'timestamp': shitpost.timestamp,
-                        'username': shitpost.username
-                    },
-                    'analysis': {
-                        'assets': analysis.assets if analysis else [],
-                        'market_impact': analysis.market_impact if analysis else {},
-                        'confidence': analysis.confidence if analysis else 0.0,
-                        'thesis': analysis.thesis if analysis else ''
-                    } if analysis else None
-                }
-                
-        except Exception as e:
-            logger.error(f"Error fetching shitpost analysis: {e}")
-            return None
     
     async def get_analysis_stats(self) -> Dict[str, Any]:
         """Get basic statistics about stored shitpost data."""

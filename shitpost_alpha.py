@@ -73,7 +73,7 @@ async def execute_s3_to_database_cli(args) -> bool:
     """Execute the S3 to Database CLI with appropriate parameters."""
     cmd = [
         sys.executable, "-m", "shitvault.cli",
-        "process-s3"
+        "load-database-from-s3"
     ]
     
     # Add date parameters (use same names as sub-CLI)
@@ -280,7 +280,7 @@ Examples:
         # Show S3 to Database command
         s3_cmd = [
             sys.executable, "-m", "shitvault.cli",
-            "process-s3"
+            "load-database-from-s3"
         ]
         if args.from_date:
             s3_cmd.extend(["--start-date", args.from_date])
