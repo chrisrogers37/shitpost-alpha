@@ -238,13 +238,13 @@ While `shitpost_alpha.py` is the recommended entry point, you can also run indiv
 
 ```bash
 # Truth Social S3 Harvester
-python -m shitposts.truth_social_s3_harvester --help
+python -m shitposts --help
 
 # S3 to Database Processor  
-python -m shitvault.cli --help
+python -m shitvault --help
 
 # LLM Analyzer
-python -m shitpost_ai.shitpost_analyzer --help
+python -m shitpost_ai --help
 ```
 
 **Note:** The main orchestrator (`shitpost_alpha.py`) is designed to coordinate all phases with shared parameters and proper error handling.
@@ -275,13 +275,13 @@ Test individual components directly:
 
 ```bash
 # Test harvesting
-python -m shitposts.truth_social_s3_harvester --mode backfill --limit 5 --dry-run
+python -m shitposts --mode backfill --limit 5 --dry-run
 
 # Test S3 to Database processing
-python -m shitvault.cli process-s3 --limit 5
+python -m shitvault load-database-from-s3 --limit 5
 
 # Test LLM analysis
-python -m shitpost_ai.shitpost_analyzer --mode backfill --limit 5 --dry-run
+python -m shitpost_ai --mode backfill --limit 5 --dry-run
 ```
 
 ### Test Suite

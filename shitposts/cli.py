@@ -193,23 +193,23 @@ def print_database_stats(stats: dict) -> None:
 HARVESTER_EXAMPLES = """
 Examples:
   # Incremental harvesting (default)
-  python -m shitposts.truth_social_s3_harvester
+  python -m shitposts
   
   # Full historical backfill to S3
-  python -m shitposts.truth_social_s3_harvester --mode backfill
+  python -m shitposts --mode backfill
   
   # Date range harvesting to S3
-  python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --to 2024-01-31
+  python -m shitposts --mode range --from 2024-01-01 --to 2024-01-31
   
   # Harvest from specific date onwards to S3 (using range mode)
-  python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01
+  python -m shitposts --mode range --from 2024-01-01
   
   # Limited backfill with dry run
-  python -m shitposts.truth_social_s3_harvester --mode backfill --limit 100 --dry-run
+  python -m shitposts --mode backfill --limit 100 --dry-run
   
   # Verbose logging
-  python -m shitposts.truth_social_s3_harvester --verbose
+  python -m shitposts --verbose
   
   # Resume backfill from specific post ID
-  python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915682735686
+  python -m shitposts --mode backfill --max-id 114858915682735686
 """

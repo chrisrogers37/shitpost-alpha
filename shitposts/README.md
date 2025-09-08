@@ -177,7 +177,7 @@ print(f"Total size: {stats.total_size_mb} MB")
 ### Test Harvester
 ```python
 # Run the built-in test
-python -m shitposts.truth_social_s3_harvester --mode backfill --limit 5 --dry-run
+python -m shitposts --mode backfill --limit 5 --dry-run
 ```
 
 ## 🖥️ Command Line Interface (CLI)
@@ -189,43 +189,43 @@ The Truth Social harvester includes a comprehensive CLI for different harvesting
 #### 1. **Incremental Mode** (Default)
 ```bash
 # Continuous monitoring of new posts
-python -m shitposts.truth_social_s3_harvester
+python -m shitposts
 
 # With verbose logging
-python -m shitposts.truth_social_s3_harvester --verbose
+python -m shitposts --verbose
 ```
 
 #### 2. **Backfill Mode**
 ```bash
 # Full historical data harvesting
-python -m shitposts.truth_social_s3_harvester --mode backfill
+python -m shitposts --mode backfill
 
 # Limited backfill (e.g., last 100 posts)
-python -m shitposts.truth_social_s3_harvester --mode backfill --limit 100
+python -m shitposts --mode backfill --limit 100
 
 # Resume backfill from specific post ID
-python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915682735686
+python -m shitposts --mode backfill --max-id 114858915682735686
 
 # Dry run to see what would be harvested
-python -m shitposts.truth_social_s3_harvester --mode backfill --dry-run
+python -m shitposts --mode backfill --dry-run
 ```
 
 #### 3. **Date Range Mode**
 ```bash
 # Harvest posts within specific date range
-python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --to 2024-01-31
+python -m shitposts --mode range --from 2024-01-01 --to 2024-01-31
 
 # With limit and verbose logging
-python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --to 2024-01-31 --limit 500 --verbose
+python -m shitposts --mode range --from 2024-01-01 --to 2024-01-31 --limit 500 --verbose
 ```
 
 #### 4. **Date Range Mode (From Date to Today)**
 ```bash
 # Harvest posts from specific date to today
-python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01
+python -m shitposts --mode range --from 2024-01-01
 
 # With limit
-python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --limit 200
+python -m shitposts --mode range --from 2024-01-01 --limit 200
 ```
 
 ### CLI Options
@@ -244,19 +244,19 @@ python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --l
 
 ```bash
 # Quick test with 5 posts
-python -m shitposts.truth_social_s3_harvester --mode backfill --limit 5 --dry-run
+python -m shitposts --mode backfill --limit 5 --dry-run
 
 # Harvest last week's posts
-python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-15 --to 2024-01-22
+python -m shitposts --mode range --from 2024-01-15 --to 2024-01-22
 
 # Continuous monitoring with verbose logging
-python -m shitposts.truth_social_s3_harvester --verbose
+python -m shitposts --verbose
 
 # Harvest posts from election day onwards
-python -m shitposts.truth_social_s3_harvester --mode range --from 2024-11-05 --limit 1000
+python -m shitposts --mode range --from 2024-11-05 --limit 1000
 
 # Resume large backfill from specific post ID
-python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915682735686
+python -m shitposts --mode backfill --max-id 114858915682735686
 ```
 
 ## 📊 Data Format
@@ -475,16 +475,16 @@ async def test_s3_storage():
 ### Manual Testing
 ```bash
 # Test incremental mode (stops when finding existing posts)
-python -m shitposts.truth_social_s3_harvester --mode incremental --limit 5
+python -m shitposts --mode incremental --limit 5
 
 # Test with dry run (no S3 storage)
-python -m shitposts.truth_social_s3_harvester --mode backfill --limit 5 --dry-run
+python -m shitposts --mode backfill --limit 5 --dry-run
 
 # Test actual S3 storage
-python -m shitposts.truth_social_s3_harvester --mode backfill --limit 5
+python -m shitposts --mode backfill --limit 5
 
 # Test different modes
-python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --to 2024-01-02 --dry-run
+python -m shitposts --mode range --from 2024-01-01 --to 2024-01-02 --dry-run
 ```
 
 ## 🔄 Continuous Operation

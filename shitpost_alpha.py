@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 async def execute_harvesting_cli(args) -> bool:
     """Execute the harvesting CLI with appropriate parameters."""
     cmd = [
-        sys.executable, "-m", "shitposts.truth_social_s3_harvester",
+        sys.executable, "-m", "shitposts",
         "--mode", args.mode
     ]
     
@@ -72,7 +72,7 @@ async def execute_harvesting_cli(args) -> bool:
 async def execute_s3_to_database_cli(args) -> bool:
     """Execute the S3 to Database CLI with appropriate parameters."""
     cmd = [
-        sys.executable, "-m", "shitvault.cli",
+        sys.executable, "-m", "shitvault",
         "load-database-from-s3"
     ]
     
@@ -264,7 +264,7 @@ Examples:
         
         # Show harvesting command
         harvest_cmd = [
-            sys.executable, "-m", "shitposts.truth_social_s3_harvester",
+            sys.executable, "-m", "shitposts",
             "--mode", args.mode
         ]
         if args.from_date:
@@ -279,7 +279,7 @@ Examples:
         
         # Show S3 to Database command
         s3_cmd = [
-            sys.executable, "-m", "shitvault.cli",
+            sys.executable, "-m", "shitvault",
             "load-database-from-s3"
         ]
         if args.from_date:
