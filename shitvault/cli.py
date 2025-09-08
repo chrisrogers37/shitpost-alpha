@@ -25,19 +25,19 @@ def create_database_parser() -> argparse.ArgumentParser:
         epilog="""
 Examples:
   # Load all S3 data to database
-  python -m shitvault.cli load-database-from-s3
+  python -m shitvault load-database-from-s3
 
   # Load S3 data with date range
-  python -m shitvault.cli load-database-from-s3 --start-date 2024-01-01 --end-date 2024-01-31
+  python -m shitvault load-database-from-s3 --start-date 2024-01-01 --end-date 2024-01-31
 
   # Load S3 data with limit
-  python -m shitvault.cli load-database-from-s3 --limit 1000
+  python -m shitvault load-database-from-s3 --limit 1000
 
   # Get database statistics
-  python -m shitvault.cli stats
+  python -m shitvault stats
 
   # Get processing statistics
-  python -m shitvault.cli processing-stats
+  python -m shitvault processing-stats
         """
     )
     
@@ -238,5 +238,4 @@ async def main():
         sys.exit(1)
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# CLI entry point removed - use 'python -m shitvault' instead

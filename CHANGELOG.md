@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **CLI Standardization**: Standardized CLI entry points across all packages
+  - All packages now use `python -m package` execution pattern
+  - Created `__main__.py` files for `shitposts` and `shitvault` packages
+  - Updated main orchestrator to use standardized commands
+  - Fixed documentation inconsistencies across all README files
+
+### Changed
+- **CLI Commands**: Updated all CLI examples to use standardized commands
+  - `python -m shitposts` (instead of `python -m shitposts.truth_social_s3_harvester`)
+  - `python -m shitvault` (instead of `python -m shitvault.cli`)
+  - `python -m shitpost_ai` (already correct)
+- **Documentation**: Updated all README files and CHANGELOG examples
+- **Orchestrator**: Updated `shitpost_alpha.py` to use standardized CLI calls
+
+### Fixed
+- **Documentation Errors**: Fixed incorrect CLI examples in `shitpost_ai/cli.py`
+- **Command Consistency**: All packages now follow the same CLI execution pattern
+
+### Removed
+- **Old CLI Commands**: Completely removed old CLI entry points
+  - `python -m shitposts.truth_social_s3_harvester` → Use `python -m shitposts`
+  - `python -m shitvault.cli` → Use `python -m shitvault`
+  - Old commands now produce no output and are effectively disabled
+
 ### Planned
 - Enhanced error handling and resilience
 - Performance optimizations
@@ -184,8 +209,8 @@ python shitpost_alpha.py --mode backfill --limit 100
 python shitpost_alpha.py --mode range --from 2024-01-01 --limit 100
 
 # Individual components (for advanced usage)
-python -m shitposts.truth_social_s3_harvester --mode incremental --limit 5
-python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --limit 100
+python -m shitposts --mode incremental --limit 5
+python -m shitpost_ai --mode range --from 2024-01-01 --limit 100
 ```
 
 #### Files Modified
@@ -239,16 +264,16 @@ python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --limit 1
 #### CLI Examples
 ```bash
 # Full historical backfill (successfully completed ~28,000 posts)
-python -m shitposts.truth_social_s3_harvester --mode backfill
+python -m shitposts --mode backfill
 
 # Resume backfill from specific post ID
-python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915682735686
+python -m shitposts --mode backfill --max-id 114858915682735686
 
 # Date range harvesting
-python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --to 2024-01-31
+python -m shitposts --mode range --from 2024-01-01 --to 2024-01-31
 
 # Dry run testing
-python -m shitposts.truth_social_s3_harvester --mode backfill --limit 100 --dry-run
+python -m shitposts --mode backfill --limit 100 --dry-run
 ```
 
 #### Files Modified
@@ -419,25 +444,25 @@ python -m shitposts.truth_social_s3_harvester --mode backfill --limit 100 --dry-
 #### New CLI Usage Examples
 ```bash
 # Incremental harvesting (default)
-python -m shitposts.truth_social_s3_harvester
+python -m shitposts
 
 # Full historical backfill
-python -m shitposts.truth_social_s3_harvester --mode backfill
+python -m shitposts --mode backfill
 
 # Date range harvesting
-python -m shitposts.truth_social_s3_harvester --mode range --from 2024-01-01 --to 2024-01-31
+python -m shitposts --mode range --from 2024-01-01 --to 2024-01-31
 
 # Harvest from specific date onwards
-python -m shitposts.truth_social_s3_harvester --mode from-date --from 2024-01-01
+python -m shitposts --mode from-date --from 2024-01-01
 
 # Harvest with limit
-python -m shitposts.truth_social_s3_harvester --mode backfill --limit 100
+python -m shitposts --mode backfill --limit 100
 
 # Resume from specific post ID
-python -m shitposts.truth_social_s3_harvester --mode backfill --max-id 114858915682735686
+python -m shitposts --mode backfill --max-id 114858915682735686
 
 # Dry run mode
-python -m shitposts.truth_social_s3_harvester --mode backfill --dry-run
+python -m shitposts --mode backfill --dry-run
 ```
 
 #### Enhanced Main.py Integration

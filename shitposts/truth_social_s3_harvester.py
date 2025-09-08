@@ -414,5 +414,4 @@ async def main():
         await harvester.cleanup()
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# CLI entry point removed - use 'python -m shitposts' instead

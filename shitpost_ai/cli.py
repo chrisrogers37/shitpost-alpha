@@ -223,23 +223,23 @@ def print_analysis_error_result(shitpost_id: str, error: str, dry_run: bool = Fa
 ANALYZER_EXAMPLES = """
 Examples:
   # Incremental analysis (default)
-  python -m shitpost_ai.shitpost_analyzer
+  python -m shitpost_ai
   
   # Full historical backfill analysis
-  python -m shitpost_ai.shitpost_analyzer --mode backfill
+  python -m shitpost_ai --mode backfill
   
   # Date range analysis
-  python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --to 2024-01-31
+  python -m shitpost_ai --mode range --from 2024-01-01 --to 2024-01-31
   
   # Analysis from specific date onwards (using range mode)
-  python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01
+  python -m shitpost_ai --mode range --from 2024-01-01
   
   # Limited backfill with custom batch size
-  python -m shitpost_ai.shitpost_analyzer --mode backfill --limit 100 --batch-size 10
+  python -m shitpost_ai --mode backfill --limit 100 --batch-size 10
   
   # Dry run to see what would be analyzed
-  python -m shitpost_ai.shitpost_analyzer --mode backfill --limit 10 --dry-run
+  python -m shitpost_ai --mode backfill --limit 10 --dry-run
   
   # Verbose logging
-  python -m shitpost_ai.shitpost_analyzer --verbose
+  python -m shitpost_ai --verbose
 """

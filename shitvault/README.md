@@ -253,16 +253,16 @@ The `cli.py` provides command-line access to database operations:
 
 ```bash
 # Process S3 data to database
-python -m shitvault.cli process-s3 --limit 100
+python -m shitvault load-database-from-s3 --limit 100
 
 # Process with date range
-python -m shitvault.cli process-s3 --start-date 2024-01-01 --end-date 2024-01-31
+python -m shitvault load-database-from-s3 --start-date 2024-01-01 --end-date 2024-01-31
 
 # Get database statistics
-python -m shitvault.cli stats
+python -m shitvault stats
 
 # Get processing statistics
-python -m shitvault.cli processing-stats
+python -m shitvault processing-stats
 ```
 
 ### Initialize Database
