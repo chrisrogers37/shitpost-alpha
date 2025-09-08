@@ -12,7 +12,6 @@ from typing import Optional
 
 from shit.config.shitpost_settings import settings
 from shit.utils.error_handling import handle_exceptions
-from .s3_to_database_processor import S3ToDatabaseProcessor
 from .shitpost_db import ShitpostDatabase
 
 logger = logging.getLogger(__name__)
@@ -50,17 +49,21 @@ Examples:
     process_parser.add_argument('--end-date', type=str, help='End date (YYYY-MM-DD)')
     process_parser.add_argument('--limit', type=int, help='Maximum number of records to process')
     process_parser.add_argument('--dry-run', action='store_true', help='Dry run mode (no database writes)')
+    process_parser.add_argument('--verbose', '-v', action='store_true', help='Verbose logging')
+    process_parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], 
+                               default='WARNING', help='Log level (default: WARNING)')
     
     # Database stats command
     stats_parser = subparsers.add_parser('stats', help='Get database statistics')
+    stats_parser.add_argument('--verbose', '-v', action='store_true', help='Verbose logging')
+    stats_parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], 
+                             default='WARNING', help='Log level (default: WARNING)')
     
     # Processing stats command
     processing_stats_parser = subparsers.add_parser('processing-stats', help='Get S3 to database processing statistics')
-    
-    # Global options
-    parser.add_argument('--verbose', '-v', action='store_true', help='Verbose logging')
-    parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], 
-                       default='INFO', help='Log level')
+    processing_stats_parser.add_argument('--verbose', '-v', action='store_true', help='Verbose logging')
+    processing_stats_parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], 
+                                        default='WARNING', help='Log level (default: WARNING)')
     
     return parser
 
@@ -76,6 +79,21 @@ def setup_database_logging(args):
             logging.StreamHandler(sys.stdout)
         ]
     )
+    
+    # Reduce third-party library logging verbosity
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)
+    logging.getLogger('sqlalchemy.pool').setLevel(logging.ERROR)
+    logging.getLogger('sqlalchemy.dialects').setLevel(logging.ERROR)
+    logging.getLogger('sqlalchemy.orm').setLevel(logging.ERROR)
+    logging.getLogger('sqlalchemy').setLevel(logging.ERROR)
+    
+    # Reduce AWS SDK logging verbosity
+    logging.getLogger('botocore').setLevel(logging.WARNING)
+    logging.getLogger('boto3').setLevel(logging.WARNING)
+    logging.getLogger('urllib3').setLevel(logging.WARNING)
+    
+    # Reduce aiosqlite logging verbosity
+    logging.getLogger('aiosqlite').setLevel(logging.WARNING)
     
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -126,26 +144,21 @@ async def process_s3_data(args):
         if args.end_date:
             end_date = datetime.strptime(args.end_date, '%Y-%m-%d')
         
-        # Initialize processor
-        processor = S3ToDatabaseProcessor()
-        await processor.initialize()
+        # Initialize database with S3 support
+        db_manager = ShitpostDatabase()
+        await db_manager.initialize(init_s3=True)
         
-        if args.dry_run:
-            logger.info("Dry run mode - no database writes will be performed")
-            # In dry run, just get stats
-            stats = await processor.get_processing_stats()
-            print_database_complete(stats)
-        else:
-            # Process S3 data
-            stats = await processor.process_s3_stream(
-                start_date=start_date,
-                end_date=end_date,
-                limit=args.limit
-            )
-            print_database_complete(stats)
+        # Process S3 data using consolidated method (dry_run parameter controls actual processing)
+        stats = await db_manager.process_s3_to_database(
+            start_date=start_date,
+            end_date=end_date,
+            limit=args.limit,
+            dry_run=args.dry_run
+        )
+        print_database_complete(stats)
         
         # Cleanup
-        await processor.cleanup()
+        await db_manager.cleanup()
         
     except Exception as e:
         print_database_error(e)
@@ -178,16 +191,16 @@ async def get_processing_stats(args):
     try:
         print_database_start(args)
         
-        # Initialize processor
-        processor = S3ToDatabaseProcessor()
-        await processor.initialize()
+        # Initialize database with S3 support
+        db_manager = ShitpostDatabase()
+        await db_manager.initialize(init_s3=True)
         
         # Get stats
-        stats = await processor.get_processing_stats()
+        stats = await db_manager.get_s3_processing_stats()
         print_database_complete(stats)
         
         # Cleanup
-        await processor.cleanup()
+        await db_manager.cleanup()
         
     except Exception as e:
         print_database_error(e)
