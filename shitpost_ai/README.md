@@ -5,9 +5,9 @@ This directory contains the AI-powered analysis engine for the Shitpost-Alpha pr
 ## 📁 Contents
 
 ### Core Files
-- **`llm_client.py`** - LLM API interaction layer
-- **`shitpost_analyzer.py`** - Business logic orchestrator
-- **`prompts.py`** - Analysis prompt engineering
+- **`shitpost_analyzer.py`** - Business logic orchestrator (no CLI)
+- **`cli.py`** - Shared CLI utilities
+- **`__main__.py`** - CLI entry point
 - **`README.md`** - This documentation file
 
 ### Generated Files
@@ -19,17 +19,21 @@ The AI engine follows a clean separation of concerns:
 
 ```
 shitpost_ai/
-├── llm_client.py         # Pure LLM API interaction
-├── shitpost_analyzer.py  # Business logic & orchestration
-├── prompts.py           # Prompt engineering & templates
+├── shitpost_analyzer.py  # Business logic & orchestration (no CLI)
+├── cli.py               # Shared CLI utilities
+├── __main__.py          # CLI entry point
 └── __pycache__/         # Python cache (auto-generated)
+
+shit/llm/                # Base LLM utilities (shared across project)
+├── llm_client.py        # Generic LLM API interaction
+└── prompts.py          # Modular prompt templates
 ```
 
 ## 🧠 AI Engine Components
 
-### 1. LLM Client (`llm_client.py`)
+### 1. LLM Client (`shit/llm/llm_client.py`)
 
-The pure API interaction layer that handles communication with LLM providers.
+The generic API interaction layer that handles communication with LLM providers.
 
 #### Class: `LLMClient`
 
@@ -91,7 +95,7 @@ async def get_analysis_summary(analysis: Dict) -> str
 
 ### 2. Shitpost Analyzer (`shitpost_analyzer.py`)
 
-The business logic orchestrator that coordinates analysis workflows.
+The business logic orchestrator that coordinates analysis workflows (no CLI logic).
 
 #### Class: `ShitpostAnalyzer`
 
@@ -154,9 +158,9 @@ async def run_continuous_analysis(interval_seconds: int = 300)
 6. **Result Enhancement** - Adds Truth Social metrics
 7. **Database Storage** - Stores enhanced analysis results or bypass records
 
-### 3. Prompts (`prompts.py`)
+### 3. Prompts (`shit/llm/prompts.py`)
 
-The prompt engineering layer that optimizes LLM interactions.
+The modular prompt engineering layer that optimizes LLM interactions.
 
 #### Core Prompts
 
@@ -231,7 +235,7 @@ await analyzer.initialize()
 
 ### Analyze Single Shitpost
 ```python
-from shitpost_ai.llm_client import LLMClient
+from shit.llm import LLMClient
 
 client = LLMClient()
 await client.initialize()
@@ -246,58 +250,80 @@ analyzed_count = await analyzer.analyze_unprocessed_shitposts(batch_size=10)
 print(f"Analyzed {analyzed_count} shitposts")
 ```
 
-### Continuous Analysis Service
-```python
-# Runs continuously, analyzing new shitposts every 5 minutes
-await analyzer.run_continuous_analysis(interval_seconds=300)
-```
 
 ## 🖥️ Command Line Interface (CLI)
 
-The shitpost analyzer includes a comprehensive CLI for different analysis modes and operational flexibility.
+The shitpost analyzer includes a comprehensive CLI for different analysis modes and operational flexibility, using shared CLI utilities for consistency.
+
+### 4. CLI Utilities (`cli.py`)
+
+Shared CLI utilities that provide consistent argument parsing, validation, and output formatting.
+
+#### Key Functions
+
+**Argument Parsing:**
+```python
+def create_analyzer_parser(description: str, epilog: str = None) -> argparse.ArgumentParser
+def validate_analyzer_args(args) -> None
+```
+
+**Logging and Output:**
+```python
+def setup_analyzer_logging(verbose: bool = False) -> None
+def print_analysis_start(mode: str, limit: Optional[int] = None, batch_size: int = 5) -> None
+def print_analysis_progress(analyzed_count: int, limit: Optional[int] = None) -> None
+def print_analysis_complete(analyzed_count: int, dry_run: bool = False) -> None
+```
+
+**Result Reporting:**
+```python
+def print_analysis_result(shitpost_id: str, analysis: dict, dry_run: bool = False) -> None
+def print_bypass_result(shitpost_id: str, reason: str, dry_run: bool = False) -> None
+def print_analysis_error_result(shitpost_id: str, error: str, dry_run: bool = False) -> None
+```
 
 ### CLI Modes
 
 #### 1. **Incremental Mode** (Default)
 ```bash
 # Analyze only new unprocessed posts
-python -m shitpost_ai.shitpost_analyzer
+python -m shitpost_ai
 
 # With verbose logging
-python -m shitpost_ai.shitpost_analyzer --verbose
+python -m shitpost_ai --verbose
 ```
 
 #### 2. **Backfill Mode**
 ```bash
 # Full historical analysis of all unprocessed posts
-python -m shitpost_ai.shitpost_analyzer --mode backfill
+python -m shitpost_ai --mode backfill
 
 # Limited backfill (e.g., last 100 posts)
-python -m shitpost_ai.shitpost_analyzer --mode backfill --limit 100
+python -m shitpost_ai --mode backfill --limit 100
 
 # With custom batch size
-python -m shitpost_ai.shitpost_analyzer --mode backfill --batch-size 10
+python -m shitpost_ai --mode backfill --batch-size 10
 
 # Dry run to see what would be analyzed
-python -m shitpost_ai.shitpost_analyzer --mode backfill --dry-run --limit 10
+python -m shitpost_ai --mode backfill --dry-run --limit 10
 ```
 
 #### 3. **Date Range Mode**
 ```bash
 # Analyze posts within specific date range
-python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --to 2024-01-31
+python -m shitpost_ai --mode range --from 2024-01-01 --to 2024-01-31
 
 # With limit and custom batch size
-python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --to 2024-01-31 --limit 500 --batch-size 10
+python -m shitpost_ai --mode range --from 2024-01-01 --to 2024-01-31 --limit 500 --batch-size 10
 ```
 
 #### 4. **Date Range Mode (From Date to Today)**
 ```bash
 # Analyze posts from specific date to today
-python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01
+python -m shitpost_ai --mode range --from 2024-01-01
 
 # With limit and batch size
-python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --limit 200 --batch-size 15
+python -m shitpost_ai --mode range --from 2024-01-01 --limit 200 --batch-size 15
 ```
 
 ### CLI Options
@@ -318,21 +344,21 @@ python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --limit 2
 
 ```bash
 # Quick test with 5 posts
-python -m shitpost_ai.shitpost_analyzer --mode backfill --limit 5 --dry-run
+python -m shitpost_ai --mode backfill --limit 5 --dry-run
 
 # Analyze last week's posts with custom batch size
-python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-15 --to 2024-01-22 --batch-size 15
+python -m shitpost_ai --mode range --from 2024-01-15 --to 2024-01-22 --batch-size 15
 
 # Continuous analysis with verbose logging
-python -m shitpost_ai.shitpost_analyzer --verbose
+python -m shitpost_ai --verbose
 
 # Analyze posts from election day onwards
-python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-11-05 --limit 1000 --batch-size 20
+python -m shitpost_ai --mode range --from 2024-11-05 --limit 1000 --batch-size 20
 ```
 
 ### Custom Prompt Usage
 ```python
-from shitpost_ai.prompts import get_sector_analysis_prompt
+from shit.llm import get_sector_analysis_prompt
 
 prompt = get_sector_analysis_prompt("Tech companies are killing our economy!")
 analysis = await client._call_llm(prompt)
@@ -517,19 +543,19 @@ async def test_analyzer():
 ### Manual Testing
 ```bash
 # Test incremental analysis (analyzes new unprocessed posts)
-python -m shitpost_ai.shitpost_analyzer --mode incremental --limit 5
+python -m shitpost_ai --mode incremental --limit 5
 
 # Test with dry run (no database storage)
-python -m shitpost_ai.shitpost_analyzer --mode backfill --limit 5 --dry-run
+python -m shitpost_ai --mode backfill --limit 5 --dry-run
 
 # Test actual analysis
-python -m shitpost_ai.shitpost_analyzer --mode backfill --limit 5
+python -m shitpost_ai --mode backfill --limit 5
 
 # Test date range analysis
-python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --to 2024-01-02 --dry-run
+python -m shitpost_ai --mode range --from 2024-01-01 --to 2024-01-02 --dry-run
 
 # Test "from date to today" functionality
-python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --dry-run
+python -m shitpost_ai --mode range --from 2024-01-01 --dry-run
 ```
 
 ### Prompt Testing
@@ -560,6 +586,13 @@ python -m shitpost_ai.shitpost_analyzer --mode range --from 2024-01-01 --dry-run
 - **Shitpost Collection** - `shitposts/` directory
 
 ## 🚀 Recent Improvements
+
+### Architecture Refactor (v0.8.0)
+- **LLM Utilities Extraction** - Moved LLM client and prompts to `shit/llm/` for reusability
+- **CLI Separation** - Extracted CLI logic to shared utilities in `cli.py`
+- **Business Logic Focus** - `shitpost_analyzer.py` now focuses purely on business logic
+- **Consistent Patterns** - Matches the architecture established in `shitposts/` and `shitvault/`
+- **Modular Design** - LLM utilities are now generic and reusable across the project
 
 ### Mode Consolidation (v0.7.0)
 - **Removed `from-date` Mode** - Functionality consolidated into `range` mode (defaults end date to today)
