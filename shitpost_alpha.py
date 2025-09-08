@@ -120,7 +120,7 @@ async def execute_s3_to_database_cli(args) -> bool:
 async def execute_analysis_cli(args) -> bool:
     """Execute the analysis CLI with appropriate parameters."""
     cmd = [
-        sys.executable, "-m", "shitpost_ai.shitpost_analyzer",
+        sys.executable, "-m", "shitpost_ai",
         "--mode", args.mode
     ]
     
@@ -292,7 +292,7 @@ Examples:
         
         # Show LLM Analysis command
         analysis_cmd = [
-            sys.executable, "-m", "shitpost_ai.shitpost_analyzer",
+            sys.executable, "-m", "shitpost_ai",
             "--mode", args.mode,
             "--batch-size", str(args.batch_size)
         ]

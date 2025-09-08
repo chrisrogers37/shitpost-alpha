@@ -1,29 +1,34 @@
 """
 LLM Client
-Provides LLM API interaction layer for OpenAI and Anthropic services.
+Provides generic LLM API interaction layer for OpenAI and Anthropic services.
 """
 
 import json
 import logging
-from typing import Dict, Optional, List
-import openai
-import anthropic
+from typing import Dict, Optional, List, Any
 import asyncio
+from datetime import datetime
 
 from shit.config.shitpost_settings import settings
-from shitpost_ai.prompts import get_analysis_prompt
 from shit.utils.error_handling import handle_exceptions
 
 logger = logging.getLogger(__name__)
 
 
 class LLMClient:
-    """LLM API client for OpenAI and Anthropic services."""
+    """Generic LLM API client for OpenAI and Anthropic services."""
     
-    def __init__(self):
-        self.provider = settings.LLM_PROVIDER
-        self.model = settings.LLM_MODEL
-        self.api_key = settings.get_llm_api_key()
+    def __init__(self, provider: str = None, model: str = None, api_key: str = None):
+        """Initialize LLM client with optional overrides.
+        
+        Args:
+            provider: LLM provider ('openai' or 'anthropic')
+            model: Model name (e.g., 'gpt-4', 'claude-3-sonnet')
+            api_key: API key (if not provided, uses settings)
+        """
+        self.provider = provider or settings.LLM_PROVIDER
+        self.model = model or settings.LLM_MODEL
+        self.api_key = api_key or settings.get_llm_api_key()
         self.confidence_threshold = settings.CONFIDENCE_THRESHOLD
         
         # Initialize client based on provider
@@ -31,6 +36,7 @@ class LLMClient:
             from openai import AsyncOpenAI
             self.client = AsyncOpenAI(api_key=self.api_key)
         elif self.provider == "anthropic":
+            import anthropic
             self.client = anthropic.Anthropic(api_key=self.api_key)
         else:
             raise ValueError(f"Unsupported LLM provider: {self.provider}")
@@ -61,15 +67,29 @@ class LLMClient:
             logger.error(f"LLM connection test failed: {e}")
             raise
     
-    async def analyze(self, content: str) -> Optional[Dict]:
-        """Analyze content for financial implications."""
+    async def analyze(self, content: str, prompt_func=None, **kwargs) -> Optional[Dict]:
+        """Analyze content using specified prompt function.
+        
+        Args:
+            content: Content to analyze
+            prompt_func: Function to generate prompt (defaults to financial analysis)
+            **kwargs: Additional arguments for prompt function
+            
+        Returns:
+            Analysis result dictionary
+        """
         try:
             if not content or len(content.strip()) < 10:
                 logger.warning("Content too short for meaningful analysis")
                 return None
             
             # Get analysis prompt
-            prompt = get_analysis_prompt(content)
+            if prompt_func:
+                prompt = prompt_func(content, **kwargs)
+            else:
+                # Default to financial analysis
+                from .prompts import get_analysis_prompt
+                prompt = get_analysis_prompt(content)
             
             # Call LLM
             response = await self._call_llm(prompt)
@@ -85,12 +105,10 @@ class LLMClient:
                 logger.warning("Failed to parse LLM response")
                 return None
             
-            # Always save confidence metadata for future RAG enhancement
+            # Add metadata
             confidence = analysis.get('confidence', 0.0)
             analysis['meets_threshold'] = confidence >= self.confidence_threshold
             analysis['analysis_quality'] = self._get_quality_label(confidence)
-            
-            # Add metadata
             analysis['original_content'] = content
             analysis['llm_provider'] = self.provider
             analysis['llm_model'] = self.model
@@ -104,15 +122,23 @@ class LLMClient:
             await handle_exceptions(e)
             return None
     
-    async def _call_llm(self, prompt: str) -> Optional[str]:
-        """Call the LLM with the given prompt."""
+    async def _call_llm(self, prompt: str, system_message: str = None) -> Optional[str]:
+        """Call the LLM with the given prompt.
+        
+        Args:
+            prompt: User prompt
+            system_message: System message (optional)
+            
+        Returns:
+            LLM response text
+        """
         try:
             if self.provider == "openai":
                 response = await asyncio.wait_for(
                     self.client.chat.completions.create(
                         model=self.model,
                         messages=[
-                            {"role": "system", "content": "You are a financial analyst specializing in market sentiment analysis."},
+                            {"role": "system", "content": system_message or "You are a helpful AI assistant."},
                             {"role": "user", "content": prompt}
                         ],
                         max_tokens=1000,
@@ -128,7 +154,7 @@ class LLMClient:
                         model=self.model,
                         max_tokens=1000,
                         temperature=0.3,
-                        system="You are a financial analyst specializing in market sentiment analysis.",
+                        system=system_message or "You are a helpful AI assistant.",
                         messages=[
                             {"role": "user", "content": prompt}
                         ]
@@ -207,7 +233,6 @@ class LLMClient:
     
     def _get_timestamp(self) -> str:
         """Get current timestamp in ISO format."""
-        from datetime import datetime
         return datetime.now().isoformat()
     
     async def get_analysis_summary(self, analysis: Dict) -> str:
