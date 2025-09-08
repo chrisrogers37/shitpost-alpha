@@ -202,7 +202,7 @@ class S3DataLake:
             limit: Maximum number of keys to return (optional)
             
         Returns:
-            List of S3 keys
+            List of S3 keys sorted by date path (newest first)
         """
         try:
             # Build prefix for date range
@@ -221,14 +221,16 @@ class S3DataLake:
                 if 'Contents' in page:
                     for obj in page['Contents']:
                         s3_keys.append(obj['Key'])
-                        
-                        if limit and len(s3_keys) >= limit:
-                            break
-                
-                if limit and len(s3_keys) >= limit:
-                    break
             
-            logger.info(f"Found {len(s3_keys)} raw data files in S3")
+            # Sort by key (lexicographical order gives us chronological order due to YYYY/MM/DD structure)
+            # Reverse to get newest first
+            s3_keys.sort(reverse=True)
+            
+            # Apply limit after sorting
+            if limit:
+                s3_keys = s3_keys[:limit]
+            
+            logger.info(f"Found {len(s3_keys)} raw data files in S3 (sorted by date path, newest first)")
             return s3_keys
             
         except Exception as e:

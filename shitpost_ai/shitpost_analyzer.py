@@ -137,7 +137,13 @@ class ShitpostAnalyzer:
                 filtered_shitposts = []
                 for shitpost in shitposts:
                     try:
-                        post_timestamp = datetime.fromisoformat(shitpost.get('timestamp').replace('Z', '+00:00'))
+                        # Handle both ISO format with 'Z' and standard datetime format
+                        timestamp_str = shitpost.get('timestamp')
+                        if timestamp_str.endswith('Z'):
+                            post_timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        else:
+                            # Handle standard datetime format from database
+                            post_timestamp = datetime.fromisoformat(timestamp_str)
                         
                         if post_timestamp < self.start_datetime:
                             logger.info(f"Reached posts before start date {self.start_date}, stopping")

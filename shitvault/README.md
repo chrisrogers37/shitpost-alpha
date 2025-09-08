@@ -5,9 +5,8 @@ This directory contains the database layer for the Shitpost-Alpha project, respo
 ## 📁 Contents
 
 ### Core Files
-- **`shitpost_db.py`** - Database manager and operations
+- **`shitpost_db.py`** - Database manager and operations (includes S3 → Database processing)
 - **`shitpost_models.py`** - SQLAlchemy models and schema definitions
-- **`s3_to_database_processor.py`** - S3 to Database processor for loading raw data
 - **`cli.py`** - Command-line interface for database operations
 - **`README.md`** - This documentation file
 
@@ -21,9 +20,8 @@ The database layer follows a clean separation of concerns:
 
 ```
 shitvault/
-├── shitpost_db.py                    # Database operations & connection management
+├── shitpost_db.py                    # Database operations & S3 → Database processing
 ├── shitpost_models.py                # Data models & schema definitions
-├── s3_to_database_processor.py       # S3 to Database processor
 ├── cli.py                           # Database CLI operations
 └── shitpost_alpha.db                # SQLite database (runtime generated)
 ```
@@ -166,6 +164,15 @@ async def check_prediction_exists(shitpost_id: str) -> bool
 # Checks if prediction already exists (deduplication)
 ```
 
+**S3 → Database Processing:**
+```python
+async def process_s3_to_database(start_date: Optional[datetime] = None, end_date: Optional[datetime] = None, limit: Optional[int] = None, dry_run: bool = False) -> Dict[str, int]
+# Consolidated S3 to Database processing method
+
+async def get_s3_processing_stats() -> Dict[str, any]
+# Get statistics about S3 and database data
+```
+
 **Query Operations:**
 ```python
 async def get_shitpost_analysis(shitpost_id: str) -> Optional[Dict]
@@ -228,24 +235,25 @@ def market_movement_to_dict(movement: MarketMovement) -> Dict[str, Any]
 
 ### S3 to Database Processing
 
-The `s3_to_database_processor.py` handles loading raw data from S3 into the database:
+The `ShitpostDatabase` class now includes consolidated S3 → Database processing:
 
 ```python
-from shitvault.s3_to_database_processor import S3ToDatabaseProcessor
+from shitvault.shitpost_db import ShitpostDatabase
 
-# Initialize processor
-processor = S3ToDatabaseProcessor()
-await processor.initialize()
+# Initialize database with S3 support
+db_manager = ShitpostDatabase()
+await db_manager.initialize(init_s3=True)
 
 # Process S3 data with date filtering
-stats = await processor.process_s3_stream(
+stats = await db_manager.process_s3_to_database(
     start_date=datetime(2024, 1, 1),
     end_date=datetime(2024, 1, 31),
-    limit=1000
+    limit=1000,
+    dry_run=False
 )
 
 # Get processing statistics
-stats = await processor.get_processing_stats()
+stats = await db_manager.get_s3_processing_stats()
 ```
 
 ### Database CLI Operations
@@ -400,6 +408,21 @@ The database implements a categorical approach to track all harvested posts:
 - **Pending**: Posts awaiting analysis
 
 This ensures comprehensive tracking of all harvested content, not just successfully analyzed posts.
+
+## 🚀 Recent Improvements
+
+### Database Consolidation (v0.7.1)
+- **Unified Database Class** - Merged `S3ToDatabaseProcessor` into `ShitpostDatabase` class
+- **Single Processing Method** - Consolidated `process_s3_data()` and `process_s3_stream()` into `process_s3_to_database()`
+- **Simplified Initialization** - Single `initialize(init_s3=True)` call for both database and S3
+- **Reduced Code Duplication** - Eliminated redundant classes and methods
+- **Cleaner API** - Single class handles all database operations including S3 → Database processing
+
+### Performance Optimizations
+- **Reduced Code Duplication** - Single method handles all processing scenarios
+- **Faster S3 Checks** - Uses metadata-only API calls instead of downloading files
+- **Better Error Handling** - Consistent error management across all modes
+- **Predictable Behavior** - Incremental mode processes once and exits (no infinite loops)
 
 ## 🧪 Testing
 

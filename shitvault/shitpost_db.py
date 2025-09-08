@@ -14,6 +14,7 @@ from sqlalchemy.pool import StaticPool
 
 from shit.config.shitpost_settings import settings
 from shitvault.shitpost_models import Base
+from shit.s3 import S3DataLake, S3Config
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +22,33 @@ logger = logging.getLogger(__name__)
 class ShitpostDatabase:
     """Manages shitpost database connections and operations."""
     
-    def __init__(self):
+    def __init__(self, s3_config: Optional[S3Config] = None):
         self.database_url = settings.DATABASE_URL
         self.engine = None
         self.SessionLocal = None
         self.metadata = MetaData()
         
-    async def initialize(self):
-        """Initialize shitpost database connection and create tables."""
+        # S3 configuration for S3 → Database processing
+        if s3_config:
+            self.s3_config = s3_config
+        else:
+            # Create config from settings
+            self.s3_config = S3Config(
+                bucket_name=settings.S3_BUCKET_NAME,
+                prefix=settings.S3_PREFIX,
+                region=settings.AWS_REGION,
+                access_key_id=settings.AWS_ACCESS_KEY_ID,
+                secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+            )
+        
+        self.s3_data_lake = S3DataLake(self.s3_config)
+        
+    async def initialize(self, init_s3: bool = False):
+        """Initialize shitpost database connection and create tables.
+        
+        Args:
+            init_s3: Whether to initialize S3 Data Lake (for S3 → Database processing)
+        """
         try:
             logger.info(f"Initializing shitpost database: {self.database_url}")
             
@@ -38,7 +58,7 @@ class ShitpostDatabase:
                 async_url = self.database_url.replace('sqlite:///', 'sqlite+aiosqlite:///')
                 self.engine = create_async_engine(
                     async_url,
-                    echo=settings.DEBUG,
+                    echo=False,  # Disable SQL echo for cleaner output
                     poolclass=StaticPool,
                     connect_args={"check_same_thread": False}
                 )
@@ -46,7 +66,7 @@ class ShitpostDatabase:
                 # Use async PostgreSQL
                 self.engine = create_async_engine(
                     self.database_url,
-                    echo=settings.DEBUG
+                    echo=False  # Disable SQL echo for cleaner output
                 )
             
             # Create session factory
@@ -61,6 +81,11 @@ class ShitpostDatabase:
                 await conn.run_sync(Base.metadata.create_all)
             
             logger.info("Shitpost database initialized successfully")
+            
+            # Initialize S3 Data Lake if requested
+            if init_s3:
+                await self.s3_data_lake.initialize()
+                logger.info("S3 Data Lake initialized successfully")
             
         except Exception as e:
             logger.error(f"Failed to initialize shitpost database: {e}")
@@ -82,16 +107,16 @@ class ShitpostDatabase:
             async with self.get_session() as session:
                 # Check if shitpost already exists
                 from sqlalchemy import select
-                stmt = select(TruthSocialShitpost).where(TruthSocialShitpost.shitpost_id == shitpost_data.get('id'))
+                stmt = select(TruthSocialShitpost).where(TruthSocialShitpost.shitpost_id == shitpost_data.get('shitpost_id'))
                 result = await session.execute(stmt)
                 existing_shitpost = result.scalar_one_or_none()
                 
                 if existing_shitpost:
-                    logger.info(f"Shitpost {shitpost_data.get('id')} already exists, skipping")
+                    logger.debug(f"Shitpost {shitpost_data.get('shitpost_id')} already exists, skipping")
                     return str(existing_shitpost.id)
                 
                 shitpost = TruthSocialShitpost(
-                    shitpost_id=shitpost_data.get('id'),
+                    shitpost_id=shitpost_data.get('shitpost_id'),
                     content=shitpost_data.get('content'),
                     text=shitpost_data.get('text'),
                     timestamp=shitpost_data.get('timestamp'),
@@ -165,11 +190,11 @@ class ShitpostDatabase:
                 await session.commit()
                 await session.refresh(shitpost)
                 
-                logger.info(f"Stored new shitpost with ID: {shitpost.id}")
+                logger.debug(f"Stored new shitpost with ID: {shitpost.id}")
                 return str(shitpost.id)
                 
         except IntegrityError:
-            logger.info(f"Shitpost {shitpost_data.get('id')} already exists (integrity constraint)")
+            logger.debug(f"Shitpost {shitpost_data.get('id')} already exists (integrity constraint)")
             return None
         except Exception as e:
             logger.error(f"Error storing shitpost: {e}")
@@ -238,7 +263,7 @@ class ShitpostDatabase:
                 await session.commit()
                 await session.refresh(prediction)
                 
-                logger.info(f"Stored enhanced analysis with ID: {prediction.id}")
+                logger.debug(f"Stored enhanced analysis with ID: {prediction.id}")
                 return str(prediction.id)
                 
         except Exception as e:
@@ -419,11 +444,11 @@ class ShitpostDatabase:
                 # Subquery to check if prediction exists
                 prediction_exists = select(Prediction.id).where(Prediction.shitpost_id == TruthSocialShitpost.shitpost_id)
                 
-                # Main query - TEMPORARILY REMOVED LAUNCH DATE FILTER FOR TESTING
+                # Main query - Get posts that need analysis
                 # Include ALL posts (even those with no text) so they can be bypassed
                 stmt = select(TruthSocialShitpost).where(
                     and_(
-                        # TruthSocialShitpost.timestamp >= launch_datetime,  # TEMPORARILY COMMENTED OUT
+                        TruthSocialShitpost.timestamp >= launch_datetime,
                         not_(exists(prediction_exists))
                         # Removed text filters so posts with no text can be processed and bypassed
                     )
@@ -638,8 +663,236 @@ class ShitpostDatabase:
                 'pending_count': 0
             }
     
+    # S3 → Database Processing Methods (consolidated from S3ToDatabaseProcessor)
+    
+    def _parse_timestamp(self, timestamp_str: str) -> datetime:
+        """Parse timestamp string to datetime object.
+        
+        Args:
+            timestamp_str: ISO format timestamp string
+            
+        Returns:
+            datetime object
+        """
+        try:
+            if not timestamp_str:
+                return datetime.now()
+                
+            # Handle ISO format with 'Z' suffix
+            if timestamp_str.endswith('Z'):
+                timestamp_str = timestamp_str.replace('Z', '+00:00')
+            
+            # Parse and convert to timezone-naive
+            dt = datetime.fromisoformat(timestamp_str)
+            return dt.replace(tzinfo=None)
+            
+        except Exception as e:
+            logger.warning(f"Could not parse timestamp {timestamp_str}: {e}")
+            return datetime.now()
+    
+    def _transform_s3_data_to_shitpost(self, s3_data: Dict) -> Dict:
+        """Transform S3 data to database format.
+        
+        Args:
+            s3_data: Raw data from S3
+            
+        Returns:
+            Transformed data for database storage
+        """
+        try:
+            import json
+            
+            # Extract raw API data
+            raw_api_data = s3_data.get('raw_api_data', {})
+            account_data = raw_api_data.get('account', {})
+            
+            # Transform to database format (matching database field names)
+            transformed_data = {
+                'shitpost_id': raw_api_data.get('id'),  # This is the shitpost_id
+                'content': raw_api_data.get('content', ''),
+                'text': raw_api_data.get('text', ''),
+                'timestamp': self._parse_timestamp(raw_api_data.get('created_at', '')),
+                'username': account_data.get('username', ''),
+                'platform': 'truth_social',
+                
+                # Shitpost metadata
+                'language': raw_api_data.get('language', ''),
+                'visibility': raw_api_data.get('visibility', ''),
+                'sensitive': raw_api_data.get('sensitive', False),
+                'spoiler_text': raw_api_data.get('spoiler_text', ''),
+                'uri': raw_api_data.get('uri', ''),
+                'url': raw_api_data.get('url', ''),
+                
+                # Engagement metrics
+                'replies_count': raw_api_data.get('replies_count', 0),
+                'reblogs_count': raw_api_data.get('reblogs_count', 0),
+                'favourites_count': raw_api_data.get('favourites_count', 0),
+                'upvotes_count': raw_api_data.get('upvotes_count', 0),
+                'downvotes_count': raw_api_data.get('downvotes_count', 0),
+                
+                # Account information
+                'account_id': account_data.get('id'),
+                'account_display_name': account_data.get('display_name', ''),
+                'account_followers_count': account_data.get('followers_count', 0),
+                'account_following_count': account_data.get('following_count', 0),
+                'account_statuses_count': account_data.get('statuses_count', 0),
+                'account_verified': account_data.get('verified', False),
+                'account_website': account_data.get('website', ''),
+                
+                # Media and attachments
+                'has_media': len(raw_api_data.get('media_attachments', [])) > 0,
+                'media_attachments': json.dumps(raw_api_data.get('media_attachments', [])),
+                'mentions': json.dumps(raw_api_data.get('mentions', [])),
+                'tags': json.dumps(raw_api_data.get('tags', [])),
+                
+                # Additional fields
+                'in_reply_to_id': raw_api_data.get('in_reply_to_id'),
+                'quote_id': raw_api_data.get('quote_id'),
+                'in_reply_to_account_id': raw_api_data.get('in_reply_to_account_id'),
+                'card': json.dumps(raw_api_data.get('card')) if raw_api_data.get('card') else None,
+                'group': json.dumps(raw_api_data.get('group')) if raw_api_data.get('group') else None,
+                'quote': json.dumps(raw_api_data.get('quote')) if raw_api_data.get('quote') else None,
+                'in_reply_to': json.dumps(raw_api_data.get('in_reply_to')) if raw_api_data.get('in_reply_to') else None,
+                'reblog': json.dumps(raw_api_data.get('reblog')) if raw_api_data.get('reblog') else None,
+                'sponsored': raw_api_data.get('sponsored', False),
+                'reaction': json.dumps(raw_api_data.get('reaction')) if raw_api_data.get('reaction') else None,
+                'favourited': raw_api_data.get('favourited', False),
+                'reblogged': raw_api_data.get('reblogged', False),
+                'muted': raw_api_data.get('muted', False),
+                'pinned': raw_api_data.get('pinned', False),
+                'bookmarked': raw_api_data.get('bookmarked', False),
+                'poll': json.dumps(raw_api_data.get('poll')) if raw_api_data.get('poll') else None,
+                'emojis': json.dumps(raw_api_data.get('emojis', [])),
+                'votable': raw_api_data.get('votable', False),
+                'edited_at': self._parse_timestamp(raw_api_data.get('edited_at', '')) if raw_api_data.get('edited_at') else None,
+                'version': raw_api_data.get('version', ''),
+                'editable': raw_api_data.get('editable', False),
+                'title': raw_api_data.get('title', ''),
+                'raw_api_data': json.dumps(raw_api_data),
+                'created_at': self._parse_timestamp(raw_api_data.get('created_at', '')),
+                'updated_at': self._parse_timestamp(raw_api_data.get('edited_at', '')) if raw_api_data.get('edited_at') else self._parse_timestamp(raw_api_data.get('created_at', ''))
+            }
+            
+            return transformed_data
+            
+        except Exception as e:
+            logger.error(f"Error transforming S3 data to shitpost format: {e}")
+            raise
+    
+    async def process_s3_to_database(self, start_date: Optional[datetime] = None,
+                                   end_date: Optional[datetime] = None,
+                                   limit: Optional[int] = None,
+                                   dry_run: bool = False) -> Dict[str, int]:
+        """Process S3 data and load into database (consolidated method).
+        
+        Args:
+            start_date: Start date for filtering (optional)
+            end_date: End date for filtering (optional)
+            limit: Maximum number of records to process (optional)
+            dry_run: If True, don't actually store to database
+            
+        Returns:
+            Dictionary with processing statistics
+        """
+        try:
+            if dry_run:
+                logger.info(f"Starting S3 to Database processing (DRY RUN - no database writes)...")
+            else:
+                logger.info(f"Starting S3 to Database processing...")
+            logger.info(f"Date range: {start_date} to {end_date}")
+            logger.info(f"Limit: {limit}")
+            
+            stats = {
+                'total_processed': 0,
+                'successful': 0,
+                'failed': 0,
+                'skipped': 0
+            }
+            
+            # Stream data from S3
+            async for s3_data in self.s3_data_lake.stream_raw_data(start_date, end_date, limit):
+                stats['total_processed'] += 1
+                
+                try:
+                    if dry_run:
+                        # In dry run, just count what would be processed
+                        stats['successful'] += 1
+                    else:
+                        # Transform S3 data to database format
+                        transformed_data = self._transform_s3_data_to_shitpost(s3_data)
+                        
+                        # Store in database (deduplication handled by store_shitpost)
+                        result = await self.store_shitpost(transformed_data)
+                        
+                        if result:
+                            stats['successful'] += 1
+                        else:
+                            stats['skipped'] += 1  # Already exists
+                            
+                except Exception as e:
+                    logger.error(f"Error processing S3 data: {e}")
+                    stats['failed'] += 1
+                
+                # Log progress (less frequently)
+                if stats['total_processed'] % 500 == 0:
+                    logger.info(f"Processed {stats['total_processed']} records...")
+            
+            if dry_run:
+                logger.info(f"S3 to Database processing completed (DRY RUN):")
+                logger.info(f"  Total processed: {stats['total_processed']}")
+                logger.info(f"  Would be successful: {stats['successful']}")
+                logger.info(f"  Would fail: {stats['failed']}")
+                logger.info(f"  Would be skipped: {stats['skipped']}")
+            else:
+                logger.info(f"S3 to Database processing completed:")
+                logger.info(f"  Total processed: {stats['total_processed']}")
+                logger.info(f"  Successful: {stats['successful']}")
+                logger.info(f"  Failed: {stats['failed']}")
+                logger.info(f"  Skipped: {stats['skipped']}")
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"Error in S3 to Database processing: {e}")
+            raise
+    
+    async def get_s3_processing_stats(self) -> Dict[str, any]:
+        """Get statistics about S3 and database data.
+        
+        Returns:
+            Dictionary with processing statistics
+        """
+        try:
+            # Get S3 stats
+            s3_stats = await self.s3_data_lake.get_data_stats()
+            
+            # Get database stats
+            db_stats = await self.get_database_stats()
+            
+            return {
+                's3_stats': s3_stats.__dict__,
+                'db_stats': db_stats,
+                'processing_summary': {
+                    's3_files': s3_stats.total_files,
+                    'db_records': db_stats.get('total_shitposts', 0),
+                    'processing_ratio': round(
+                        db_stats.get('total_shitposts', 0) / max(s3_stats.total_files, 1) * 100, 2
+                    )
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting S3 processing stats: {e}")
+            return {
+                's3_stats': {},
+                'db_stats': {},
+                'processing_summary': {}
+            }
+    
     async def cleanup(self):
         """Cleanup shitpost database resources."""
         if self.engine:
             await self.engine.dispose()
+        if hasattr(self, 's3_data_lake'):
+            await self.s3_data_lake.cleanup()
         logger.info("Shitpost database cleanup completed")
