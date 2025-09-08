@@ -21,6 +21,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.3] - 2025-01-15
+
+### 🧹 **Vestigial Code Cleanup and Database Schema Optimization**
+
+#### Removed
+- **Vestigial methods** - Deleted 3 unused methods (`get_shitpost_analysis`, `get_recent_shitposts`, `get_last_shitpost_id`) totaling ~150 lines
+- **Legacy database fields** - Removed `original_length`, `cleaned_length`, and `hashtags` columns from database schema
+- **Vestigial code references** - Cleaned up legacy field handling in `store_shitpost()` method
+- **Outdated documentation** - Removed references to deleted methods from README
+
+#### Fixed
+- **Field naming consistency** - Standardized to use `tags` instead of inconsistent `hashtags`/`tags` usage
+- **Database schema alignment** - Live database now matches current model definitions
+- **Code maintainability** - Eliminated unused code paths and deprecated SQL syntax
+
+#### Technical Improvements
+- **Database migration** - Safely dropped legacy columns from existing database with 28,574 posts intact
+- **Model cleanup** - Removed vestigial fields from SQLAlchemy models
+- **Documentation accuracy** - Updated README to reflect actual functionality
+
+#### Files Modified
+- `shitvault/shitpost_db.py` - Removed vestigial methods and legacy field handling
+- `shitvault/shitpost_models.py` - Removed legacy fields from model definitions
+- `shitvault/README.md` - Updated documentation to remove references to deleted methods
+- Database schema - Dropped legacy columns via SQL ALTER TABLE statements
+
+#### Benefits
+- **Reduced maintenance burden** - ~150 lines of unused code eliminated
+- **Improved code clarity** - No more confusion about which methods/fields are actually used
+- **Database optimization** - Cleaner schema with only actively used fields
+- **Future-ready** - Clean codebase ready for planned refactoring efforts
+
+---
+
 ## [0.7.2] - 2025-01-15
 
 ### 🔧 **Final Consolidation and Performance Refinements**

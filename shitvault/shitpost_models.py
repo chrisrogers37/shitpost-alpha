@@ -56,10 +56,6 @@ class TruthSocialShitpost(Base):
     mentions = Column(JSON, default=list)  # List of @mentions
     tags = Column(JSON, default=list)  # List of hashtags/tags
     
-    # Content metadata (legacy fields)
-    original_length = Column(Integer, default=0)
-    cleaned_length = Column(Integer, default=0)
-    hashtags = Column(JSON, default=list)  # Legacy field for backward compatibility
     
     # Additional API fields (keeping original names)
     in_reply_to_id = Column(String(255), nullable=True)
@@ -247,11 +243,9 @@ def shitpost_to_dict(shitpost: TruthSocialShitpost) -> Dict[str, Any]:
         'timestamp': shitpost.timestamp.isoformat() if shitpost.timestamp else None,
         'username': shitpost.username,
         'platform': shitpost.platform,
-        'original_length': shitpost.original_length,
-        'cleaned_length': shitpost.cleaned_length,
         'has_media': shitpost.has_media,
         'mentions': shitpost.mentions,
-        'hashtags': shitpost.hashtags,
+        'tags': shitpost.tags,
         'created_at': shitpost.created_at.isoformat() if shitpost.created_at else None
     }
 

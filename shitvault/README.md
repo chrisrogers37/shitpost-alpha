@@ -141,12 +141,6 @@ async def initialize(self)
 ```python
 async def store_shitpost(shitpost_data: Dict[str, Any]) -> Optional[str]
 # Stores a new shitpost, returns database ID
-
-async def get_recent_shitposts(limit: int = 10) -> list
-# Retrieves recent shitposts
-
-async def get_last_shitpost_id() -> Optional[str]
-# Gets the most recent shitpost ID for restart resilience
 ```
 
 **Analysis Operations:**
@@ -175,9 +169,6 @@ async def get_s3_processing_stats() -> Dict[str, any]
 
 **Query Operations:**
 ```python
-async def get_shitpost_analysis(shitpost_id: str) -> Optional[Dict]
-# Gets analysis for a specific shitpost
-
 async def get_analysis_stats() -> Dict[str, Any]
 # Gets basic statistics about stored data
 

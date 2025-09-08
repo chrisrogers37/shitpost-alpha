@@ -24,14 +24,14 @@ def create_database_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Process all S3 data to database
-  python -m shitvault.cli process-s3
+  # Load all S3 data to database
+  python -m shitvault.cli load-database-from-s3
 
-  # Process S3 data with date range
-  python -m shitvault.cli process-s3 --start-date 2024-01-01 --end-date 2024-01-31
+  # Load S3 data with date range
+  python -m shitvault.cli load-database-from-s3 --start-date 2024-01-01 --end-date 2024-01-31
 
-  # Process S3 data with limit
-  python -m shitvault.cli process-s3 --limit 1000
+  # Load S3 data with limit
+  python -m shitvault.cli load-database-from-s3 --limit 1000
 
   # Get database statistics
   python -m shitvault.cli stats
@@ -44,7 +44,7 @@ Examples:
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
     # Process S3 data command
-    process_parser = subparsers.add_parser('process-s3', help='Process S3 data to database')
+    process_parser = subparsers.add_parser('load-database-from-s3', help='Load S3 data into database')
     process_parser.add_argument('--start-date', type=str, help='Start date (YYYY-MM-DD)')
     process_parser.add_argument('--end-date', type=str, help='End date (YYYY-MM-DD)')
     process_parser.add_argument('--limit', type=int, help='Maximum number of records to process')
@@ -221,7 +221,7 @@ async def main():
     
     try:
         # Execute command
-        if args.command == 'process-s3':
+        if args.command == 'load-database-from-s3':
             await process_s3_data(args)
         elif args.command == 'stats':
             await get_database_stats(args)
