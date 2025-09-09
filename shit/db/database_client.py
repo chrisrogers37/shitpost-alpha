@@ -25,7 +25,9 @@ class DatabaseClient:
     
     async def initialize(self):
         """Initialize database connection and create tables."""
-        logger.info(f"Initializing database connection: {self.config.database_url}")
+        # Hide sensitive information in logs
+        safe_url = self._mask_database_url(self.config.database_url)
+        logger.info(f"Initializing database connection: {safe_url}")
         
         if self.config.is_sqlite:
             async_url = self.config.database_url.replace('sqlite:///', 'sqlite+aiosqlite:///')
@@ -36,8 +38,14 @@ class DatabaseClient:
                 connect_args={"check_same_thread": False}
             )
         else:
+            # For PostgreSQL, ensure we use the async psycopg driver
+            postgres_url = self.config.database_url
+            if postgres_url.startswith('postgresql://'):
+                # Replace postgresql:// with postgresql+psycopg:// for async support
+                postgres_url = postgres_url.replace('postgresql://', 'postgresql+psycopg://')
+            
             self.engine = create_async_engine(
-                self.config.database_url,
+                postgres_url,
                 echo=self.config.echo,
                 pool_size=self.config.pool_size,
                 max_overflow=self.config.max_overflow,
@@ -62,6 +70,43 @@ class DatabaseClient:
         if not self.SessionLocal:
             raise RuntimeError("Database client not initialized. Call initialize() first.")
         return self.SessionLocal()
+    
+    def _mask_database_url(self, url: str) -> str:
+        """Mask sensitive information in database URL for logging."""
+        if not url:
+            return "None"
+        
+        # For SQLite, just show the path
+        if url.startswith('sqlite'):
+            return f"sqlite:///{url.split('/')[-1]}" if '/' in url else url
+        
+        # For PostgreSQL, mask password and sensitive parts
+        if url.startswith('postgresql'):
+            try:
+                # Parse the URL to extract components
+                if '@' in url:
+                    # Extract the part before @ (contains user:password)
+                    auth_part = url.split('@')[0]
+                    if '://' in auth_part:
+                        protocol = auth_part.split('://')[0] + '://'
+                        user_pass = auth_part.split('://')[1]
+                        if ':' in user_pass:
+                            user = user_pass.split(':')[0]
+                            masked_auth = f"{user}:***"
+                        else:
+                            masked_auth = user_pass
+                        
+                        # Reconstruct with masked password
+                        rest_of_url = url.split('@')[1]
+                        return f"{protocol}{masked_auth}@{rest_of_url}"
+                
+                return url
+            except Exception:
+                # If parsing fails, return a generic masked version
+                return "postgresql://***:***@***"
+        
+        # For other URLs, just return as-is
+        return url
     
     async def cleanup(self):
         """Cleanup database resources."""
