@@ -10,7 +10,9 @@ from datetime import datetime
 
 from shit.config.shitpost_settings import settings
 from shit.llm import LLMClient, get_analysis_prompt
-from shitvault.shitpost_db import ShitpostDatabase
+from shit.db import DatabaseConfig, DatabaseClient, DatabaseOperations
+from shitvault.shitpost_operations import ShitpostOperations
+from shitvault.prediction_operations import PredictionOperations
 from shit.utils.error_handling import handle_exceptions
 
 logger = logging.getLogger(__name__)
@@ -29,7 +31,13 @@ class ShitpostAnalyzer:
             limit: Maximum number of posts to analyze (optional)
             batch_size: Number of posts to process in each batch
         """
-        self.db_manager = ShitpostDatabase()
+        # Initialize database components
+        self.db_config = DatabaseConfig(database_url=settings.DATABASE_URL)
+        self.db_client = DatabaseClient(self.db_config)
+        self.db_ops = None  # Will be initialized in initialize()
+        self.shitpost_ops = None  # Will be initialized in initialize()
+        self.prediction_ops = None  # Will be initialized in initialize()
+        
         self.llm_client = LLMClient()
         self.launch_date = settings.SYSTEM_LAUNCH_DATE
         
@@ -54,7 +62,15 @@ class ShitpostAnalyzer:
         """Initialize the shitpost analyzer."""
         logger.info("Initializing Shitpost Analyzer...")
         
-        await self.db_manager.initialize()
+        # Initialize database client
+        await self.db_client.initialize()
+        
+        # Create database operations
+        self.db_ops = DatabaseOperations(self.db_client.get_session())
+        self.shitpost_ops = ShitpostOperations(self.db_ops)
+        self.prediction_ops = PredictionOperations(self.db_ops)
+        
+        # Initialize LLM client
         await self.llm_client.initialize()
         
         logger.info(f"Shitpost Analyzer initialized with launch date: {self.launch_date}")
@@ -91,7 +107,7 @@ class ShitpostAnalyzer:
                 print(f"🔄 Batch {batch_number}: Fetching {self.batch_size} unprocessed shitposts...")
                 
                 # Get batch of unprocessed shitposts
-                shitposts = await self.db_manager.get_unprocessed_shitposts(
+                shitposts = await self.shitpost_ops.get_unprocessed_shitposts(
                     launch_date=self.launch_date,
                     limit=self.batch_size
                 )
@@ -145,7 +161,7 @@ class ShitpostAnalyzer:
                 logger.info(f"🔄 Batch {batch_number}: Fetching {self.batch_size} unprocessed shitposts...")
                 
                 # Get batch of unprocessed shitposts
-                shitposts = await self.db_manager.get_unprocessed_shitposts(
+                shitposts = await self.shitpost_ops.get_unprocessed_shitposts(
                     launch_date=self.launch_date,
                     limit=self.batch_size
                 )
@@ -213,7 +229,7 @@ class ShitpostAnalyzer:
         
         try:
             # Get batch of unprocessed shitposts
-            shitposts = await self.db_manager.get_unprocessed_shitposts(
+            shitposts = await self.shitpost_ops.get_unprocessed_shitposts(
                 launch_date=self.launch_date,
                 limit=self.batch_size
             )
@@ -260,7 +276,7 @@ class ShitpostAnalyzer:
                     skipped_count += 1
                     continue
                 
-                if await self.db_manager.check_prediction_exists(shitpost_id):
+                if await self.prediction_ops.check_prediction_exists(shitpost_id):
                     print(f"⏭️  Post {i}/{len(shitposts)}: {shitpost_id} already analyzed, skipping")
                     skipped_count += 1
                     continue
@@ -320,7 +336,7 @@ class ShitpostAnalyzer:
                 
                 if not dry_run:
                     # Create bypassed prediction record
-                    await self.db_manager.handle_no_text_prediction(shitpost_id, shitpost)
+                    await self.prediction_ops.handle_no_text_prediction(shitpost_id, shitpost)
                 
                 return {
                     'shitpost_id': shitpost_id,
@@ -343,7 +359,7 @@ class ShitpostAnalyzer:
             
             if not dry_run:
                 # Store analysis in database
-                analysis_id = await self.db_manager.store_analysis(
+                analysis_id = await self.prediction_ops.store_analysis(
                     shitpost_id, 
                     enhanced_analysis, 
                     shitpost
@@ -487,6 +503,6 @@ class ShitpostAnalyzer:
     
     async def cleanup(self):
         """Cleanup analyzer resources."""
-        if self.db_manager:
-            await self.db_manager.cleanup()
+        if self.db_client:
+            await self.db_client.cleanup()
         logger.info("Shitpost Analyzer cleanup completed")
