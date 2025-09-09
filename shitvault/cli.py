@@ -143,20 +143,22 @@ async def process_s3_data(args):
             region=settings.AWS_REGION
         )
         s3_data_lake = S3DataLake(s3_config)
+        await s3_data_lake.initialize()
         
-        # Create operations
-        db_ops = DatabaseOperations(db_client.get_session())
-        s3_processor = S3Processor(db_ops, s3_data_lake)
-        
-        # Process S3 data
-        stats = await s3_processor.process_s3_to_database(
-            start_date=start_date,
-            end_date=end_date,
-            limit=args.limit,
-            dry_run=args.dry_run
-        )
-        
-        print_database_complete(stats)
+        # Create operations with proper session management
+        async with db_client.get_session() as session:
+            db_ops = DatabaseOperations(session)
+            s3_processor = S3Processor(db_ops, s3_data_lake)
+            
+            # Process S3 data
+            stats = await s3_processor.process_s3_to_database(
+                start_date=start_date,
+                end_date=end_date,
+                limit=args.limit,
+                dry_run=args.dry_run
+            )
+            
+            print_database_complete(stats)
         
         # Cleanup
         await db_client.cleanup()
@@ -176,13 +178,14 @@ async def get_database_stats(args):
         db_client = DatabaseClient(db_config)
         await db_client.initialize()
         
-        # Create operations
-        db_ops = DatabaseOperations(db_client.get_session())
-        stats_ops = Statistics(db_ops)
-        
-        # Get stats
-        stats = await stats_ops.get_database_stats()
-        print_database_complete(stats)
+        # Create operations with proper session management
+        async with db_client.get_session() as session:
+            db_ops = DatabaseOperations(session)
+            stats_ops = Statistics(db_ops)
+            
+            # Get stats
+            stats = await stats_ops.get_database_stats()
+            print_database_complete(stats)
         
         # Cleanup
         await db_client.cleanup()
@@ -209,14 +212,16 @@ async def get_processing_stats(args):
             region=settings.AWS_REGION
         )
         s3_data_lake = S3DataLake(s3_config)
+        await s3_data_lake.initialize()
         
-        # Create operations
-        db_ops = DatabaseOperations(db_client.get_session())
-        s3_processor = S3Processor(db_ops, s3_data_lake)
-        
-        # Get processing stats
-        stats = await s3_processor.get_s3_processing_stats()
-        print_database_complete(stats)
+        # Create operations with proper session management
+        async with db_client.get_session() as session:
+            db_ops = DatabaseOperations(session)
+            s3_processor = S3Processor(db_ops, s3_data_lake)
+            
+            # Get processing stats
+            stats = await s3_processor.get_s3_processing_stats()
+            print_database_complete(stats)
         
         # Cleanup
         await db_client.cleanup()

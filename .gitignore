@@ -122,6 +122,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+railway.env.template
 env/
 venv/
 ENV/
@@ -252,3 +253,4 @@ config/secrets.json
 .Trashes
 ehthumbs.db
 Thumbs.db
+
