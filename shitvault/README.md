@@ -5,10 +5,14 @@ This directory contains the database layer for the Shitpost-Alpha project, respo
 ## 📁 Contents
 
 ### Core Files
-- **`shitpost_db.py`** - Database manager and operations (includes S3 → Database processing)
-- **`shitpost_models.py`** - SQLAlchemy models and schema definitions
+- **`shitpost_models.py`** - Domain-specific SQLAlchemy models and schema definitions
+- **`shitpost_operations.py`** - Shitpost-specific database operations
+- **`prediction_operations.py`** - Prediction-specific database operations
+- **`s3_processor.py`** - S3 to database processing operations
+- **`statistics.py`** - Statistics generation operations
 - **`cli.py`** - Command-line interface for database operations
 - **`README.md`** - This documentation file
+
 
 ### Generated Files
 - **`__pycache__/`** - Python bytecode cache (auto-generated)
@@ -16,15 +20,33 @@ This directory contains the database layer for the Shitpost-Alpha project, respo
 
 ## 🏗️ Architecture
 
-The database layer follows a clean separation of concerns:
+The database layer follows a modular architecture with clear separation of concerns:
 
 ```
-shitvault/
-├── shitpost_db.py                    # Database operations & S3 → Database processing
-├── shitpost_models.py                # Data models & schema definitions
-├── cli.py                           # Database CLI operations
+shitvault/                           # Domain-specific operations
+├── shitpost_operations.py           # Shitpost CRUD operations
+├── prediction_operations.py         # Prediction CRUD operations
+├── s3_processor.py                  # S3 → Database processing
+├── statistics.py                    # Statistics generation
+├── shitpost_models.py               # Domain-specific models
+├── cli.py                           # CLI interface
 └── shitpost_alpha.db                # SQLite database (runtime generated)
+
+shit/db/                             # Generic database infrastructure
+├── database_client.py               # Connection management
+├── database_config.py               # Database configuration
+├── database_operations.py           # Generic CRUD operations
+├── database_utils.py                # Database utilities
+└── data_models.py                   # Generic Base class and mixins
 ```
+
+### Key Benefits of Modular Architecture
+
+1. **Separation of Concerns**: Infrastructure vs. domain logic
+2. **Reusability**: Generic database components can be used by other modules
+3. **Maintainability**: Clear boundaries and reduced coupling
+4. **Testability**: Individual components can be tested in isolation
+5. **Extensibility**: Easy to add new domain-specific operations
 
 ## 📊 Database Schema
 
@@ -123,27 +145,28 @@ Stores feedback on LLM prediction accuracy.
 - `feedback_notes` - Human feedback notes
 - `feedback_source` - "system", "human", "automated"
 
-## 🔧 Database Manager (`shitpost_db.py`)
+## 🔧 Modular Operations
 
-### Class: `ShitpostDatabase`
+The new modular architecture provides focused operation classes for different domains:
 
-The main database manager class that handles all database operations.
+### `ShitpostOperations` (`shitpost_operations.py`)
+
+Handles all shitpost-related database operations.
 
 #### Key Methods
-
-**Initialization:**
-```python
-async def initialize(self)
-# Creates database connection and tables
-```
-
-**Shitpost Operations:**
 ```python
 async def store_shitpost(shitpost_data: Dict[str, Any]) -> Optional[str]
 # Stores a new shitpost, returns database ID
+
+async def get_unprocessed_shitposts(launch_date: str, limit: int = 10) -> List[Dict]
+# Gets shitposts that need LLM analysis
 ```
 
-**Analysis Operations:**
+### `PredictionOperations` (`prediction_operations.py`)
+
+Handles all prediction-related database operations.
+
+#### Key Methods
 ```python
 async def store_analysis(shitpost_id: str, analysis_data: Dict[str, Any], shitpost_data: Dict[str, Any] = None) -> Optional[str]
 # Stores LLM analysis results with enhanced shitpost data
@@ -151,14 +174,15 @@ async def store_analysis(shitpost_id: str, analysis_data: Dict[str, Any], shitpo
 async def handle_no_text_prediction(shitpost_id: str, shitpost_data: Dict[str, Any]) -> Optional[str]
 # Creates bypassed prediction records for unanalyzable posts
 
-async def get_unprocessed_shitposts(launch_date: str, limit: int = 10) -> List[Dict]
-# Gets shitposts that need LLM analysis
-
 async def check_prediction_exists(shitpost_id: str) -> bool
 # Checks if prediction already exists (deduplication)
 ```
 
-**S3 → Database Processing:**
+### `S3Processor` (`s3_processor.py`)
+
+Handles S3 to database processing operations.
+
+#### Key Methods
 ```python
 async def process_s3_to_database(start_date: Optional[datetime] = None, end_date: Optional[datetime] = None, limit: Optional[int] = None, dry_run: bool = False) -> Dict[str, int]
 # Consolidated S3 to Database processing method
@@ -167,19 +191,17 @@ async def get_s3_processing_stats() -> Dict[str, any]
 # Get statistics about S3 and database data
 ```
 
-**Query Operations:**
+### `Statistics` (`statistics.py`)
+
+Handles statistics generation operations.
+
+#### Key Methods
 ```python
 async def get_analysis_stats() -> Dict[str, Any]
 # Gets basic statistics about stored data
 
 async def get_database_stats() -> Dict[str, Any]
 # Gets comprehensive database statistics including analysis status counts
-```
-
-**Resource Management:**
-```python
-async def cleanup(self)
-# Properly closes database connections
 ```
 
 ## 🗃️ Data Models (`shitpost_models.py`)
@@ -224,19 +246,35 @@ def market_movement_to_dict(movement: MarketMovement) -> Dict[str, Any]
 
 ## 🚀 Usage Examples
 
-### S3 to Database Processing
+### Modular Architecture Usage
 
-The `ShitpostDatabase` class now includes consolidated S3 → Database processing:
+The new modular architecture provides clean separation between infrastructure and domain logic:
 
 ```python
-from shitvault.shitpost_db import ShitpostDatabase
+from shit.db import DatabaseConfig, DatabaseClient, DatabaseOperations
+from shit.s3 import S3Config, S3DataLake
+from shitvault.s3_processor import S3Processor
+from shitvault.statistics import Statistics
 
-# Initialize database with S3 support
-db_manager = ShitpostDatabase()
-await db_manager.initialize(init_s3=True)
+# Initialize database and S3 components
+db_config = DatabaseConfig(database_url=settings.DATABASE_URL)
+db_client = DatabaseClient(db_config)
+await db_client.initialize()
+
+s3_config = S3Config(
+    bucket_name=settings.S3_BUCKET_NAME,
+    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+    aws_region=settings.AWS_REGION
+)
+s3_data_lake = S3DataLake(s3_config)
+
+# Create operations
+db_ops = DatabaseOperations(db_client.get_session())
+s3_processor = S3Processor(db_ops, s3_data_lake)
 
 # Process S3 data with date filtering
-stats = await db_manager.process_s3_to_database(
+stats = await s3_processor.process_s3_to_database(
     start_date=datetime(2024, 1, 1),
     end_date=datetime(2024, 1, 31),
     limit=1000,
@@ -244,7 +282,7 @@ stats = await db_manager.process_s3_to_database(
 )
 
 # Get processing statistics
-stats = await db_manager.get_s3_processing_stats()
+stats = await s3_processor.get_s3_processing_stats()
 ```
 
 ### Database CLI Operations
@@ -265,31 +303,42 @@ python -m shitvault stats
 python -m shitvault processing-stats
 ```
 
-### Initialize Database
+### Initialize Database (Modular)
 ```python
-from shitvault.shitpost_db import ShitpostDatabase
+from shit.db import DatabaseConfig, DatabaseClient, DatabaseOperations
+from shitvault.shitpost_operations import ShitpostOperations
+from shitvault.prediction_operations import PredictionOperations
+from shitvault.statistics import Statistics
 
-db_manager = ShitpostDatabase()
-await db_manager.initialize()
+# Initialize database
+db_config = DatabaseConfig(database_url=settings.DATABASE_URL)
+db_client = DatabaseClient(db_config)
+await db_client.initialize()
+
+# Create operations
+db_ops = DatabaseOperations(db_client.get_session())
+shitpost_ops = ShitpostOperations(db_ops)
+prediction_ops = PredictionOperations(db_ops)
+stats_ops = Statistics(db_ops)
 ```
 
-### Store a Shitpost
+### Store a Shitpost (Modular)
 ```python
 shitpost_data = {
-    'id': '123456789',
+    'shitpost_id': '123456789',
     'content': '<p>Tesla is destroying American jobs!</p>',
     'text': 'Tesla is destroying American jobs!',
-    'timestamp': '2024-01-01T12:00:00Z',
+    'timestamp': datetime.fromisoformat('2024-01-01T12:00:00Z'),
     'username': 'realDonaldTrump',
     'replies_count': 100,
     'favourites_count': 500,
     # ... other fields
 }
 
-shitpost_id = await db_manager.store_shitpost(shitpost_data)
+shitpost_id = await shitpost_ops.store_shitpost(shitpost_data)
 ```
 
-### Store Analysis
+### Store Analysis (Modular)
 ```python
 analysis_data = {
     'assets': ['TSLA'],
@@ -301,26 +350,36 @@ analysis_data = {
 }
 
 # Enhanced analysis with shitpost data for engagement metrics
-analysis_id = await db_manager.store_analysis(shitpost_id, analysis_data, shitpost_data)
+analysis_id = await prediction_ops.store_analysis(shitpost_id, analysis_data, shitpost_data)
 ```
 
-### Get Unprocessed Shitposts
+### Get Unprocessed Shitposts (Modular)
 ```python
-unprocessed = await db_manager.get_unprocessed_shitposts(
+unprocessed = await shitpost_ops.get_unprocessed_shitposts(
     launch_date="2024-01-01T00:00:00Z",
     limit=10
 )
 ```
 
-### Get Statistics
+### Get Statistics (Modular)
 ```python
 # Basic statistics
-stats = await db_manager.get_analysis_stats()
+stats = await stats_ops.get_analysis_stats()
 # Returns: {'total_shitposts': 100, 'total_analyses': 85, ...}
 
 # Comprehensive database statistics
-db_stats = await db_manager.get_database_stats()
-# Returns: {'total_shitposts': 100, 'total_analyses': 85, 'analyzed_count': 80, 'bypassed_count': 5, ...}
+db_stats = await stats_ops.get_database_stats()
+# Returns: {
+#   'total_shitposts': 100, 
+#   'total_analyses': 85, 
+#   'earliest_post': '2022-02-14T15:54:32.528000',        # Earliest Truth Social post
+#   'latest_post': '2025-09-07T18:27:17.004000',          # Latest Truth Social post
+#   'earliest_analyzed_post': '2025-07-30T22:16:41.475000', # Earliest post that was analyzed
+#   'latest_analyzed_post': '2025-09-07T18:27:17.004000',   # Latest post that was analyzed
+#   'completed_count': 80, 
+#   'bypassed_count': 5, 
+#   ...
+# }
 ```
 
 ## 🔒 Data Integrity
@@ -401,6 +460,14 @@ The database implements a categorical approach to track all harvested posts:
 This ensures comprehensive tracking of all harvested content, not just successfully analyzed posts.
 
 ## 🚀 Recent Improvements
+
+### Modular Architecture Refactor (v0.10.0)
+- **Infrastructure Separation** - Extracted generic database infrastructure to `shit/db/`
+- **Domain-Specific Operations** - Created focused operation classes for each domain
+- **Hybrid Model Approach** - Generic Base class and mixins in `shit/db/`, domain models in `shitvault/`
+- **Improved Reusability** - Generic components can be used by other modules
+- **Better Testability** - Individual components can be tested in isolation
+- **Cleaner Dependencies** - Clear separation between infrastructure and business logic
 
 ### Database Consolidation (v0.7.1)
 - **Unified Database Class** - Merged `S3ToDatabaseProcessor` into `ShitpostDatabase` class

@@ -1,24 +1,22 @@
 """
-Shitpost Database Models
+Domain-Specific Database Models
 SQLAlchemy models for shitposts, predictions, and related data.
+Uses generic Base class from shit/db/data_models.
 Note: Field names match Truth Social API structure for direct mapping.
 """
 
 from datetime import datetime
 from typing import List, Dict, Any
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, JSON, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
-Base = declarative_base()
+from shit.db.data_models import Base, TimestampMixin, IDMixin, model_to_dict
 
 
-class TruthSocialShitpost(Base):
+class TruthSocialShitpost(Base, IDMixin, TimestampMixin):
     """Model for Truth Social shitposts. Field names match API structure."""
     
     __tablename__ = "truth_social_shitposts"
-    
-    id = Column(Integer, primary_key=True, index=True)
     shitpost_id = Column(String(255), unique=True, index=True)  # Original Truth Social post ID
     content = Column(Text, nullable=False)
     timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -84,10 +82,6 @@ class TruthSocialShitpost(Base):
     # Raw API data for debugging/analysis
     raw_api_data = Column(JSON, nullable=True)  # Store complete API response
     
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
     # Relationships
     predictions = relationship("Prediction", back_populates="shitpost")
     
@@ -95,12 +89,10 @@ class TruthSocialShitpost(Base):
         return f"<TruthSocialShitpost(id={self.id}, username='{self.username}', content='{self.content[:50]}...')>"
 
 
-class Prediction(Base):
+class Prediction(Base, IDMixin, TimestampMixin):
     """Model for LLM predictions/analysis of shitposts."""
     
     __tablename__ = "predictions"
-    
-    id = Column(Integer, primary_key=True, index=True)
     shitpost_id = Column(String(255), ForeignKey("truth_social_shitposts.shitpost_id"), nullable=False)  # Foreign key to TruthSocialShitpost.shitpost_id
     
     # Analysis results
@@ -136,10 +128,6 @@ class Prediction(Base):
     llm_model = Column(String(100), nullable=True)  # gpt-4, claude-3, etc.
     analysis_timestamp = Column(DateTime, nullable=True)
     
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
     # Relationships
     shitpost = relationship("TruthSocialShitpost", back_populates="predictions")
     market_movements = relationship("MarketMovement", back_populates="prediction")
@@ -148,12 +136,10 @@ class Prediction(Base):
         return f"<Prediction(id={self.id}, confidence={self.confidence}, assets={self.assets})>"
 
 
-class MarketMovement(Base):
+class MarketMovement(Base, IDMixin, TimestampMixin):
     """Model for tracking actual market movements after shitpost predictions."""
     
     __tablename__ = "market_movements"
-    
-    id = Column(Integer, primary_key=True, index=True)
     prediction_id = Column(Integer, ForeignKey("predictions.id"), nullable=False)  # Foreign key to Prediction
     
     # Market data
@@ -170,10 +156,6 @@ class MarketMovement(Base):
     prediction_correct_24h = Column(Boolean, nullable=True)  # Was prediction correct?
     prediction_correct_72h = Column(Boolean, nullable=True)  # Was prediction correct?
     
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
     # Relationships
     prediction = relationship("Prediction", back_populates="market_movements")
     
@@ -181,12 +163,10 @@ class MarketMovement(Base):
         return f"<MarketMovement(id={self.id}, asset='{self.asset}', movement_24h={self.movement_24h}%)>"
 
 
-class Subscriber(Base):
+class Subscriber(Base, IDMixin, TimestampMixin):
     """Model for SMS alert subscribers."""
     
     __tablename__ = "subscribers"
-    
-    id = Column(Integer, primary_key=True, index=True)
     phone_number = Column(String(20), unique=True, nullable=False)
     name = Column(String(100), nullable=True)
     email = Column(String(255), nullable=True)
@@ -200,20 +180,14 @@ class Subscriber(Base):
     last_alert_sent = Column(DateTime, nullable=True)
     alerts_sent_today = Column(Integer, default=0)
     
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
     def __repr__(self):
         return f"<Subscriber(id={self.id}, phone='{self.phone_number}', active={self.is_active})>"
 
 
-class LLMFeedback(Base):
+class LLMFeedback(Base, IDMixin, TimestampMixin):
     """Model for storing LLM performance feedback on shitpost analysis."""
     
     __tablename__ = "llm_feedback"
-    
-    id = Column(Integer, primary_key=True, index=True)
     prediction_id = Column(Integer, ForeignKey("predictions.id"), nullable=False)  # Foreign key to Prediction
     
     # Feedback data
@@ -225,61 +199,21 @@ class LLMFeedback(Base):
     feedback_source = Column(String(50), default="system")  # system, human, automated
     feedback_timestamp = Column(DateTime, default=datetime.utcnow)
     
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
     def __repr__(self):
         return f"<LLMFeedback(id={self.id}, type='{self.feedback_type}', score={self.feedback_score})>"
 
 
-# Utility functions for working with models
+# Domain-specific utility functions (using generic model_to_dict)
 def shitpost_to_dict(shitpost: TruthSocialShitpost) -> Dict[str, Any]:
     """Convert TruthSocialShitpost to dictionary."""
-    return {
-        'id': shitpost.id,
-        'shitpost_id': shitpost.shitpost_id,
-        'content': shitpost.content,
-        'timestamp': shitpost.timestamp.isoformat() if shitpost.timestamp else None,
-        'username': shitpost.username,
-        'platform': shitpost.platform,
-        'has_media': shitpost.has_media,
-        'mentions': shitpost.mentions,
-        'tags': shitpost.tags,
-        'created_at': shitpost.created_at.isoformat() if shitpost.created_at else None
-    }
+    return model_to_dict(shitpost)
 
 
 def prediction_to_dict(prediction: Prediction) -> Dict[str, Any]:
     """Convert Prediction to dictionary."""
-    return {
-        'id': prediction.id,
-        'shitpost_id': prediction.shitpost_id,
-        'assets': prediction.assets,
-        'market_impact': prediction.market_impact,
-        'confidence': prediction.confidence,
-        'analysis_status': prediction.analysis_status,
-        'analysis_comment': prediction.analysis_comment,
-        'thesis': prediction.thesis,
-        'llm_provider': prediction.llm_provider,
-        'llm_model': prediction.llm_model,
-        'analysis_timestamp': prediction.analysis_timestamp.isoformat() if prediction.analysis_timestamp else None,
-        'created_at': prediction.created_at.isoformat() if prediction.created_at else None
-    }
+    return model_to_dict(prediction)
 
 
 def market_movement_to_dict(movement: MarketMovement) -> Dict[str, Any]:
     """Convert MarketMovement to dictionary."""
-    return {
-        'id': movement.id,
-        'prediction_id': movement.prediction_id,
-        'asset': movement.asset,
-        'price_at_prediction': movement.price_at_prediction,
-        'price_after_24h': movement.price_after_24h,
-        'price_after_72h': movement.price_after_72h,
-        'movement_24h': movement.movement_24h,
-        'movement_72h': movement.movement_72h,
-        'prediction_correct_24h': movement.prediction_correct_24h,
-        'prediction_correct_72h': movement.prediction_correct_72h,
-        'created_at': movement.created_at.isoformat() if movement.created_at else None
-    }
+    return model_to_dict(movement)

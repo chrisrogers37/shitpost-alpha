@@ -1,6 +1,6 @@
 """
-Database CLI
-Command-line interface for database operations.
+Database CLI (Refactored)
+Command-line interface for database operations using modular architecture.
 """
 
 import argparse
@@ -12,7 +12,12 @@ from typing import Optional
 
 from shit.config.shitpost_settings import settings
 from shit.utils.error_handling import handle_exceptions
-from .shitpost_db import ShitpostDatabase
+from shit.db import DatabaseConfig, DatabaseClient, DatabaseOperations
+from shit.s3 import S3Config, S3DataLake
+from .shitpost_operations import ShitpostOperations
+from .prediction_operations import PredictionOperations
+from .s3_processor import S3Processor
+from .statistics import Statistics
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +25,7 @@ logger = logging.getLogger(__name__)
 def create_database_parser() -> argparse.ArgumentParser:
     """Create argument parser for database operations."""
     parser = argparse.ArgumentParser(
-        description="Database operations for Shitpost-Alpha",
+        description="Database operations for Shitpost-Alpha (Refactored)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -48,29 +53,22 @@ Examples:
     process_parser.add_argument('--start-date', type=str, help='Start date (YYYY-MM-DD)')
     process_parser.add_argument('--end-date', type=str, help='End date (YYYY-MM-DD)')
     process_parser.add_argument('--limit', type=int, help='Maximum number of records to process')
-    process_parser.add_argument('--dry-run', action='store_true', help='Dry run mode (no database writes)')
-    process_parser.add_argument('--verbose', '-v', action='store_true', help='Verbose logging')
-    process_parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], 
-                               default='WARNING', help='Log level (default: WARNING)')
+    process_parser.add_argument('--dry-run', action='store_true', help='Show what would be processed without making changes')
     
-    # Database stats command
+    # Statistics command
     stats_parser = subparsers.add_parser('stats', help='Get database statistics')
-    stats_parser.add_argument('--verbose', '-v', action='store_true', help='Verbose logging')
-    stats_parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], 
-                             default='WARNING', help='Log level (default: WARNING)')
     
-    # Processing stats command
-    processing_stats_parser = subparsers.add_parser('processing-stats', help='Get S3 to database processing statistics')
-    processing_stats_parser.add_argument('--verbose', '-v', action='store_true', help='Verbose logging')
-    processing_stats_parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], 
-                                        default='WARNING', help='Log level (default: WARNING)')
+    # Processing statistics command
+    processing_stats_parser = subparsers.add_parser('processing-stats', help='Get S3 and database processing statistics')
     
     return parser
 
 
 def setup_database_logging(args):
     """Setup logging for database operations."""
-    log_level = getattr(logging, args.log_level.upper())
+    log_level = logging.INFO
+    if hasattr(args, 'verbose') and args.verbose:
+        log_level = logging.DEBUG
     
     logging.basicConfig(
         level=log_level,
@@ -79,58 +77,47 @@ def setup_database_logging(args):
             logging.StreamHandler(sys.stdout)
         ]
     )
-    
-    # Reduce third-party library logging verbosity
-    logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)
-    logging.getLogger('sqlalchemy.pool').setLevel(logging.ERROR)
-    logging.getLogger('sqlalchemy.dialects').setLevel(logging.ERROR)
-    logging.getLogger('sqlalchemy.orm').setLevel(logging.ERROR)
-    logging.getLogger('sqlalchemy').setLevel(logging.ERROR)
-    
-    # Reduce AWS SDK logging verbosity
-    logging.getLogger('botocore').setLevel(logging.WARNING)
-    logging.getLogger('boto3').setLevel(logging.WARNING)
-    logging.getLogger('urllib3').setLevel(logging.WARNING)
-    
-    # Reduce aiosqlite logging verbosity
-    logging.getLogger('aiosqlite').setLevel(logging.WARNING)
-    
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
 
 
 def print_database_start(args):
     """Print database operation start message."""
-    print(f"\n🚀 Starting Database Operation: {args.command}")
-    print(f"📊 Log Level: {args.log_level}")
-    if args.verbose:
-        print(f"🔍 Verbose Mode: Enabled")
-    print("-" * 50)
+    print(f"\n🚀 Starting database operation: {args.command}")
+    if hasattr(args, 'start_date') and args.start_date:
+        print(f"   Start date: {args.start_date}")
+    if hasattr(args, 'end_date') and args.end_date:
+        print(f"   End date: {args.end_date}")
+    if hasattr(args, 'limit') and args.limit:
+        print(f"   Limit: {args.limit}")
+    if hasattr(args, 'dry_run') and args.dry_run:
+        print(f"   Mode: DRY RUN (no changes will be made)")
+    print()
 
 
-def print_database_complete(stats: dict):
+def print_database_complete(result):
     """Print database operation completion message."""
-    print("\n✅ Database Operation Completed Successfully!")
-    print(f"📈 Statistics:")
-    for key, value in stats.items():
-        print(f"  {key}: {value}")
-    print("-" * 50)
+    print(f"\n✅ Database operation completed successfully!")
+    if isinstance(result, dict):
+        for key, value in result.items():
+            print(f"   {key}: {value}")
+    else:
+        print(f"   Result: {result}")
+    print()
 
 
-def print_database_error(error: Exception):
+def print_database_error(error):
     """Print database operation error message."""
-    print(f"\n❌ Database Operation Failed: {error}")
-    print("-" * 50)
+    print(f"\n❌ Database operation failed: {error}")
+    print()
 
 
 def print_database_interrupted():
-    """Print database operation interruption message."""
-    print("\n⚠️  Database Operation Interrupted")
-    print("-" * 50)
+    """Print database operation interrupted message."""
+    print(f"\n⏹️  Database operation interrupted by user")
+    print()
 
 
 async def process_s3_data(args):
-    """Process S3 data to database."""
+    """Process S3 data to database using modular architecture."""
     try:
         print_database_start(args)
         
@@ -144,21 +131,35 @@ async def process_s3_data(args):
         if args.end_date:
             end_date = datetime.strptime(args.end_date, '%Y-%m-%d')
         
-        # Initialize database with S3 support
-        db_manager = ShitpostDatabase()
-        await db_manager.initialize(init_s3=True)
+        # Initialize database and S3 components
+        db_config = DatabaseConfig(database_url=settings.DATABASE_URL)
+        db_client = DatabaseClient(db_config)
+        await db_client.initialize()
         
-        # Process S3 data using consolidated method (dry_run parameter controls actual processing)
-        stats = await db_manager.process_s3_to_database(
+        s3_config = S3Config(
+            bucket_name=settings.S3_BUCKET_NAME,
+            access_key_id=settings.AWS_ACCESS_KEY_ID,
+            secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region=settings.AWS_REGION
+        )
+        s3_data_lake = S3DataLake(s3_config)
+        
+        # Create operations
+        db_ops = DatabaseOperations(db_client.get_session())
+        s3_processor = S3Processor(db_ops, s3_data_lake)
+        
+        # Process S3 data
+        stats = await s3_processor.process_s3_to_database(
             start_date=start_date,
             end_date=end_date,
             limit=args.limit,
             dry_run=args.dry_run
         )
+        
         print_database_complete(stats)
         
         # Cleanup
-        await db_manager.cleanup()
+        await db_client.cleanup()
         
     except Exception as e:
         print_database_error(e)
@@ -166,20 +167,25 @@ async def process_s3_data(args):
 
 
 async def get_database_stats(args):
-    """Get database statistics."""
+    """Get database statistics using modular architecture."""
     try:
         print_database_start(args)
         
         # Initialize database
-        db_manager = ShitpostDatabase()
-        await db_manager.initialize()
+        db_config = DatabaseConfig(database_url=settings.DATABASE_URL)
+        db_client = DatabaseClient(db_config)
+        await db_client.initialize()
+        
+        # Create operations
+        db_ops = DatabaseOperations(db_client.get_session())
+        stats_ops = Statistics(db_ops)
         
         # Get stats
-        stats = await db_manager.get_database_stats()
+        stats = await stats_ops.get_database_stats()
         print_database_complete(stats)
         
         # Cleanup
-        await db_manager.cleanup()
+        await db_client.cleanup()
         
     except Exception as e:
         print_database_error(e)
@@ -187,20 +193,33 @@ async def get_database_stats(args):
 
 
 async def get_processing_stats(args):
-    """Get S3 to database processing statistics."""
+    """Get processing statistics using modular architecture."""
     try:
         print_database_start(args)
         
-        # Initialize database with S3 support
-        db_manager = ShitpostDatabase()
-        await db_manager.initialize(init_s3=True)
+        # Initialize database and S3 components
+        db_config = DatabaseConfig(database_url=settings.DATABASE_URL)
+        db_client = DatabaseClient(db_config)
+        await db_client.initialize()
         
-        # Get stats
-        stats = await db_manager.get_s3_processing_stats()
+        s3_config = S3Config(
+            bucket_name=settings.S3_BUCKET_NAME,
+            access_key_id=settings.AWS_ACCESS_KEY_ID,
+            secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region=settings.AWS_REGION
+        )
+        s3_data_lake = S3DataLake(s3_config)
+        
+        # Create operations
+        db_ops = DatabaseOperations(db_client.get_session())
+        s3_processor = S3Processor(db_ops, s3_data_lake)
+        
+        # Get processing stats
+        stats = await s3_processor.get_s3_processing_stats()
         print_database_complete(stats)
         
         # Cleanup
-        await db_manager.cleanup()
+        await db_client.cleanup()
         
     except Exception as e:
         print_database_error(e)
@@ -238,4 +257,5 @@ async def main():
         sys.exit(1)
 
 
-# CLI entry point removed - use 'python -m shitvault' instead
+if __name__ == "__main__":
+    asyncio.run(main())

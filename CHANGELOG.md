@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enhanced Statistics**: Improved database statistics with temporal analysis tracking
+  - Added `earliest_analyzed_post` and `latest_analyzed_post` fields to show actual Truth Social post timestamps for analyzed content
+  - Statistics now distinguish between all posts vs. analyzed posts date ranges
+  - Provides visibility into analysis coverage and temporal gaps in processing
 - **CLI Standardization**: Standardized CLI entry points across all packages
   - All packages now use `python -m package` execution pattern
   - Created `__main__.py` files for `shitposts` and `shitvault` packages
@@ -15,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed documentation inconsistencies across all README files
 
 ### Changed
+- **Statistics Output**: Updated `shitvault stats` command to show more informative date ranges
+  - Now displays both post date ranges and analyzed post date ranges
+  - Fixed date calculations to use actual Truth Social post timestamps instead of database metadata
 - **CLI Commands**: Updated all CLI examples to use standardized commands
   - `python -m shitposts` (instead of `python -m shitposts.truth_social_s3_harvester`)
   - `python -m shitvault` (instead of `python -m shitvault.cli`)
