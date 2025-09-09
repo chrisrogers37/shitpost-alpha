@@ -18,6 +18,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Batch processing optimizations
 - Real-time streaming analysis
 
+## [0.13.0] - 2025-01-09
+
+### Added
+- **Retruth Detection and Bypass** - Automatically detects and bypasses retruths (RT @ and RT: patterns) to focus LLM analysis on original content
+- **Enhanced Bypass Logic** - Added `"retruth"` as a new bypass reason in analysis pipeline
+- **Comprehensive Documentation Updates** - Updated all README files to reflect retruth bypass functionality and CLI standardization
+
+### Changed
+- **Analysis Pipeline** - Enhanced content filtering to automatically bypass retruths before LLM analysis
+- **Bypass Reasons** - Extended bypass reasons to include `"no_text"`, `"retruth"`, and `"unanalyzable_content"`
+- **Documentation** - Updated shitpost_ai, shitvault, and main README files with latest functionality
+
+### Fixed
+- **Signal Quality** - Improved analysis signal quality by filtering out non-original retruth content
+- **Documentation Accuracy** - Ensured all README files accurately reflect current CLI standardization and retruth bypass functionality
+
+### Technical Details
+- Modified `shitpost_ai/shitpost_analyzer.py` to detect retruth patterns in `_should_bypass_post()` and `_get_bypass_reason()` methods
+- Retruths are harvested and stored in database but bypassed for LLM analysis with `analysis_comment: "retruth"`
+- All README files updated to document retruth bypass functionality and consistent CLI usage patterns
+
 ## [v0.12.0] - 2025-09-09
 
 ### Added

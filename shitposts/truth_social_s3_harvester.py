@@ -276,16 +276,34 @@ class TruthSocialS3Harvester:
                             expected_s3_key = self.s3_data_lake._generate_s3_key(shitpost.get('id'), post_timestamp)
                             
                             print(f"🔍 Checking if post {shitpost.get('id')} already exists in S3...")
+                            print(f"🔍 S3 key: {expected_s3_key}")
                             
-                            # Check if post already exists in S3
-                            if await self.s3_data_lake.check_object_exists(expected_s3_key):
-                                print(f"✅ Found existing post {shitpost.get('id')} in S3")
-                                print(f"🔄 Incremental mode: Stopping harvest (no new posts to process)")
-                                print(f"📈 Total new posts harvested: {total_harvested}")
-                                logger.info(f"Incremental harvest completed - found existing post {shitpost.get('id')}")
-                                return
-                            else:
-                                print(f"📝 Post {shitpost.get('id')} is new - will process")
+                            try:
+                                # Check if post already exists in S3 with timeout
+                                print(f"⏱️  Starting S3 existence check...")
+                                exists = await asyncio.wait_for(
+                                    self.s3_data_lake.check_object_exists(expected_s3_key),
+                                    timeout=15  # 15 second timeout
+                                )
+                                print(f"✅ S3 existence check completed: {exists}")
+                                
+                                if exists:
+                                    print(f"✅ Found existing post {shitpost.get('id')} in S3")
+                                    print(f"🔄 Incremental mode: Stopping harvest (no new posts to process)")
+                                    print(f"📈 Total new posts harvested: {total_harvested}")
+                                    logger.info(f"Incremental harvest completed - found existing post {shitpost.get('id')}")
+                                    return
+                                else:
+                                    print(f"📝 Post {shitpost.get('id')} is new - will process")
+                                    
+                            except asyncio.TimeoutError:
+                                print(f"⏰ S3 existence check timed out for post {shitpost.get('id')}")
+                                print(f"🔄 Assuming post is new and continuing...")
+                                # Continue processing as if it's a new post
+                            except Exception as e:
+                                print(f"❌ Error checking S3 existence: {e}")
+                                print(f"🔄 Assuming post is new and continuing...")
+                                # Continue processing as if it's a new post
                         
                         # Post passed date filtering and incremental checks - process it
                         if dry_run:

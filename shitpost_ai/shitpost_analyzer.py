@@ -391,6 +391,10 @@ class ShitpostAnalyzer:
         if not text_content:
             return True
         
+        # Check if it's a retruth (retweet) - starts with "RT" or "RT:"
+        if text_content.startswith('RT ') or text_content.startswith('RT:'):
+            return True
+        
         # Check if it's just a URL with no context
         if text_content.startswith('http') and len(text_content.split()) <= 2:
             return True
@@ -418,6 +422,8 @@ class ShitpostAnalyzer:
         
         if not text_content:
             return 'no_text'
+        elif text_content.startswith('RT ') or text_content.startswith('RT:'):
+            return 'retruth'
         elif text_content.startswith('http') and len(text_content.split()) <= 2:
             return 'url_only'
         elif all(ord(char) < 128 for char in text_content) and len(text_content.strip()) < 3:

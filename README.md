@@ -278,7 +278,7 @@ Test individual components directly:
 python -m shitposts --mode backfill --limit 5 --dry-run
 
 # Test S3 to Database processing
-python -m shitvault load-database-from-s3 --limit 5
+python -m shitvault load-database-from-s3 --mode backfill --limit 5
 
 # Test LLM analysis
 python -m shitpost_ai --mode backfill --limit 5 --dry-run
@@ -326,12 +326,14 @@ For detailed schema information, see [shitvault/README.md](shitvault/README.md).
 
 ### Enhanced Analysis Pipeline
 - **Pre-LLM Filtering** - Bypasses posts with no analyzable content
+- **Retruth Detection** - Automatically bypasses retruths (RT @ and RT: patterns) to focus on original content
 - **Categorical Tracking** - Tracks all posts including those bypassed by analysis
 - **Improved Logging** - Clear feedback about processing decisions
 
 ### Architecture Improvements
 - **S3 Shared Utilities** - Centralized S3 operations in `shit/s3/`
 - **Database CLI** - Comprehensive database management tools
+- **CLI Standardization** - All packages now use consistent `--mode` parameter
 - **Unified Orchestration** - Single entry point for complete pipeline
 
 ## 🔄 Development Phases

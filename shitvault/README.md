@@ -290,11 +290,14 @@ stats = await s3_processor.get_s3_processing_stats()
 The `cli.py` provides command-line access to database operations:
 
 ```bash
-# Process S3 data to database
+# Process S3 data to database (incremental mode - default)
 python -m shitvault load-database-from-s3 --limit 100
 
 # Process with date range
-python -m shitvault load-database-from-s3 --start-date 2024-01-01 --end-date 2024-01-31
+python -m shitvault load-database-from-s3 --mode range --start-date 2024-01-01 --end-date 2024-01-31
+
+# Full backfill processing
+python -m shitvault load-database-from-s3 --mode backfill --limit 1000
 
 # Get database statistics
 python -m shitvault stats

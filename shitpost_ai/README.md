@@ -152,7 +152,7 @@ async def run_continuous_analysis(interval_seconds: int = 300)
 
 1. **Fetch Unprocessed Shitposts** - Gets shitposts needing analysis
 2. **Deduplication Check** - Ensures no duplicate analysis
-3. **Content Filtering** - Bypasses posts with no analyzable content (URLs only, emojis, etc.)
+3. **Content Filtering** - Bypasses posts with no analyzable content (URLs only, emojis, retruths, etc.)
 4. **Content Enhancement** - Adds engagement and context data
 5. **LLM Analysis** - Calls AI for financial analysis
 6. **Result Enhancement** - Adds Truth Social metrics
@@ -399,13 +399,18 @@ For posts with no analyzable content, the system creates a bypass record:
 ```json
 {
     "analysis_status": "bypassed",
-    "analysis_comment": "No analyzable text content",
+    "analysis_comment": "retruth",
     "confidence": null,
     "assets": [],
     "market_impact": {},
     "thesis": null
 }
 ```
+
+**Bypass Reasons:**
+- `"no_text"` - Posts with no text content
+- `"retruth"` - Retruths (RT @ or RT: patterns)
+- `"unanalyzable_content"` - Other unanalyzable content (URLs only, symbols, etc.)
 
 ### Enhanced Analysis Features
 
@@ -422,7 +427,7 @@ For posts with no analyzable content, the system creates a bypass record:
 
 **Categorical Analysis Tracking:**
 - **Analysis Status** - Tracks whether posts were analyzed, bypassed, or failed
-- **Bypass Reasons** - Records why posts were skipped (no text, URL-only, etc.)
+- **Bypass Reasons** - Records why posts were skipped (no text, URL-only, retruth, etc.)
 - **Complete Coverage** - Ensures all harvested posts are tracked in the database
 - **Quality Metrics** - Monitors analysis success rates and bypass patterns
 
