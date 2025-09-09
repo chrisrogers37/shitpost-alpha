@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Planned
+- Enhanced error handling and resilience
+- Performance optimizations
+- Additional LLM provider support
+- Real-time alerting system
+- Dashboard and monitoring interface
+- RAG enhancement system for combining multiple analyses
+- Advanced confidence scoring and quality metrics
+- Batch processing optimizations
+- Real-time streaming analysis
+
+## [v0.11.0] - 2025-09-08
+
 ### Added
 - **Enhanced Statistics**: Improved database statistics with temporal analysis tracking
   - Added `earliest_analyzed_post` and `latest_analyzed_post` fields to show actual Truth Social post timestamps for analyzed content
@@ -38,18 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `python -m shitposts.truth_social_s3_harvester` → Use `python -m shitposts`
   - `python -m shitvault.cli` → Use `python -m shitvault`
   - Old commands now produce no output and are effectively disabled
-
-### Planned
-- Enhanced error handling and resilience
-- Performance optimizations
-- Additional LLM provider support
-- Real-time alerting system
-- Dashboard and monitoring interface
-- RAG enhancement system for combining multiple analyses
-- Advanced confidence scoring and quality metrics
-- Batch processing optimizations
-- Real-time streaming analysis
-- Database infrastructure refactor (see `reference_docs/shitvault_refactor_plan.md`)
 
 ## [v0.8.0] - 2025-09-08
 
