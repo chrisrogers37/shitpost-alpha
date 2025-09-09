@@ -76,6 +76,10 @@ async def execute_s3_to_database_cli(args) -> bool:
         "load-database-from-s3"
     ]
     
+    # Add mode parameter (incremental is default, so only add if not incremental)
+    if args.mode != "incremental":
+        cmd.extend(["--mode", args.mode])
+    
     # Add date parameters (use same names as sub-CLI)
     if args.from_date:
         cmd.extend(["--start-date", args.from_date])
@@ -282,6 +286,8 @@ Examples:
             sys.executable, "-m", "shitvault",
             "load-database-from-s3"
         ]
+        if args.mode != "incremental":
+            s3_cmd.extend(["--mode", args.mode])
         if args.from_date:
             s3_cmd.extend(["--start-date", args.from_date])
         if args.to_date:

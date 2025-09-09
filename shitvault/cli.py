@@ -29,11 +29,14 @@ def create_database_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Load all S3 data to database
+  # Incremental processing (default) - only new S3 files
   python -m shitvault load-database-from-s3
 
-  # Load S3 data with date range
-  python -m shitvault load-database-from-s3 --start-date 2024-01-01 --end-date 2024-01-31
+  # Full backfill processing - all S3 files
+  python -m shitvault load-database-from-s3 --mode backfill
+
+  # Date range processing
+  python -m shitvault load-database-from-s3 --mode range --start-date 2024-01-01 --end-date 2024-01-31
 
   # Load S3 data with limit
   python -m shitvault load-database-from-s3 --limit 1000
@@ -50,6 +53,7 @@ Examples:
     
     # Process S3 data command
     process_parser = subparsers.add_parser('load-database-from-s3', help='Load S3 data into database')
+    process_parser.add_argument('--mode', choices=['incremental', 'backfill', 'range'], default='incremental', help='Processing mode (default: incremental)')
     process_parser.add_argument('--start-date', type=str, help='Start date (YYYY-MM-DD)')
     process_parser.add_argument('--end-date', type=str, help='End date (YYYY-MM-DD)')
     process_parser.add_argument('--limit', type=int, help='Maximum number of records to process')
@@ -155,6 +159,7 @@ async def process_s3_data(args):
                 start_date=start_date,
                 end_date=end_date,
                 limit=args.limit,
+                incremental=(args.mode == 'incremental'),
                 dry_run=args.dry_run
             )
             

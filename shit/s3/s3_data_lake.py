@@ -150,16 +150,17 @@ class S3DataLake:
             logger.debug(f"Object exists in S3: {s3_key}")
             return True
             
-        except ClientError as e:
-            if e.response['Error']['Code'] == 'NoSuchKey':
+        except Exception as e:
+            # Check if it's a ClientError with NoSuchKey (404)
+            if hasattr(e, 'response') and e.response.get('Error', {}).get('Code') == 'NoSuchKey':
+                logger.debug(f"Object does not exist in S3: {s3_key}")
+                return False
+            elif '404' in str(e) or 'Not Found' in str(e):
                 logger.debug(f"Object does not exist in S3: {s3_key}")
                 return False
             else:
                 logger.error(f"Error checking object existence in S3: {e}")
                 raise
-        except Exception as e:
-            logger.error(f"Error checking object existence in S3: {e}")
-            raise
 
     async def get_raw_data(self, s3_key: str) -> Optional[Dict]:
         """Retrieve raw shitpost data from S3.
@@ -222,9 +223,18 @@ class S3DataLake:
                     for obj in page['Contents']:
                         s3_keys.append(obj['Key'])
             
-            # Sort by key (lexicographical order gives us chronological order due to YYYY/MM/DD structure)
-            # Reverse to get newest first
-            s3_keys.sort(reverse=True)
+            # Sort by post ID (extracted from filename) to get true chronological order
+            # This ensures posts are processed in reverse chronological order by post ID
+            def extract_post_id(key):
+                # Extract post ID from key like "truth-social/raw/2025/09/09/115174504752942494.json"
+                try:
+                    filename = key.split('/')[-1]  # Get filename
+                    post_id = filename.replace('.json', '')  # Remove .json extension
+                    return int(post_id)  # Convert to int for proper sorting
+                except (ValueError, IndexError):
+                    return 0  # Fallback for malformed keys
+            
+            s3_keys.sort(key=extract_post_id, reverse=True)  # Sort by post ID, newest first
             
             # Apply limit after sorting
             if limit:
