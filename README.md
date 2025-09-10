@@ -6,11 +6,15 @@
 
 Shitpost-Alpha is a comprehensive data pipeline that monitors Donald Trump's Truth Social account, harvests posts to S3, processes them into a database, and analyzes them using advanced LLMs to extract financial market implications. The system provides actionable trading signals and tracks prediction accuracy to continuously improve analysis quality.
 
+**Production Deployment:** The system is deployed on Railway and runs every 5 minutes, updating a Neon PostgreSQL database with real-time analysis results.
+
 **Main Entry Point:** `python shitpost_alpha.py` - Orchestrates the complete pipeline from API to analyzed predictions.
 
 ## 🚀 Key Features
 
 - **Complete Data Pipeline** - API → S3 → Database → LLM → Database
+- **Production Deployment** - Deployed on Railway with automated 5-minute cron scheduling
+- **Neon PostgreSQL Database** - Serverless PostgreSQL with real-time data updates
 - **S3 Data Lake** - Scalable raw data storage with organized structure
 - **LLM-Powered Analysis** - GPT-4/Claude financial sentiment analysis
 - **Market Sentiment Detection** - Identifies bullish/bearish signals for specific assets
@@ -26,6 +30,23 @@ The system follows a **complete data pipeline architecture** with three main pha
 ```
 API → S3 → Database → LLM → Database
 ```
+
+### 🚀 **Production Deployment Architecture**
+
+```
+Railway (Cron: Every 5 minutes)
+    ↓
+Truth Social API → S3 Data Lake → Neon PostgreSQL → LLM Analysis
+    ↓                    ↓              ↓              ↓
+Raw Posts         Organized Storage   Real-time DB   Market Signals
+```
+
+**Deployment Stack:**
+- **Platform**: Railway (serverless cron execution)
+- **Database**: Neon PostgreSQL (serverless, auto-scaling)
+- **Storage**: AWS S3 (scalable data lake)
+- **Scheduling**: Automated 5-minute intervals
+- **Monitoring**: Railway dashboard with execution logs
 
 ### 📁 Directory Structure
 
@@ -203,6 +224,40 @@ AWS_ACCESS_KEY_ID=your_aws_access_key
 AWS_SECRET_ACCESS_KEY=your_aws_secret_key
 ```
 
+## 🚀 Production Deployment
+
+### Railway Deployment
+
+The system is currently deployed on Railway with the following configuration:
+
+**Deployment Details:**
+- **Platform**: Railway (serverless platform)
+- **Schedule**: Automated cron job every 5 minutes
+- **Database**: Neon PostgreSQL (serverless)
+- **Storage**: AWS S3 data lake
+- **Monitoring**: Railway dashboard with execution logs
+
+**Deployment Command:**
+```bash
+python -m shitpost_alpha --mode incremental
+```
+
+**Environment Variables (Railway):**
+All environment variables are configured in the Railway dashboard:
+- `OPENAI_API_KEY` - OpenAI API access
+- `SCRAPECREATORS_API_KEY` - Truth Social API access
+- `DATABASE_URL` - Neon PostgreSQL connection string
+- `S3_BUCKET_NAME` - AWS S3 bucket name
+- `AWS_ACCESS_KEY_ID` - AWS credentials
+- `AWS_SECRET_ACCESS_KEY` - AWS credentials
+- `SYSTEM_LAUNCH_DATE` - Analysis start date
+
+**Monitoring:**
+- **Execution Logs**: Available in Railway dashboard
+- **Success/Failure Status**: Tracked for each cron run
+- **Performance Metrics**: Execution time and resource usage
+- **Error Handling**: Automatic retry and error logging
+
 ## 📚 Detailed Documentation
 
 For comprehensive information about each component, see the detailed README files:
@@ -335,6 +390,12 @@ For detailed schema information, see [shitvault/README.md](shitvault/README.md).
 - **Database CLI** - Comprehensive database management tools
 - **CLI Standardization** - All packages now use consistent `--mode` parameter
 - **Unified Orchestration** - Single entry point for complete pipeline
+
+### Production Deployment
+- **Railway Deployment** - Live production deployment with automated cron scheduling
+- **Neon PostgreSQL** - Serverless database with real-time updates
+- **Automated Pipeline** - Runs every 5 minutes with incremental processing
+- **Production Monitoring** - Railway dashboard with execution logs and error tracking
 
 ## 🔄 Development Phases
 
