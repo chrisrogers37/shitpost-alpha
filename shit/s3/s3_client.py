@@ -41,7 +41,7 @@ class S3Client:
     async def initialize(self) -> None:
         """Initialize S3 client and verify connection."""
         try:
-            logger.info(f"Initializing S3 client for bucket: {self.config.bucket_name}")
+            logger.debug(f"Initializing S3 client for bucket: {self.config.bucket_name}")
             
             # Create S3 client
             self._client = boto3.client(
@@ -62,7 +62,7 @@ class S3Client:
             # Verify connection
             await self._verify_connection()
             
-            logger.info("S3 client initialized successfully")
+            logger.debug("S3 client initialized successfully")
             
         except Exception as e:
             logger.error(f"Failed to initialize S3 client: {e}")
@@ -73,7 +73,7 @@ class S3Client:
         try:
             # Test bucket access
             self._client.head_bucket(Bucket=self.config.bucket_name)
-            logger.info(f"S3 bucket {self.config.bucket_name} is accessible")
+            logger.debug(f"S3 bucket {self.config.bucket_name} is accessible")
             
         except ClientError as e:
             error_code = e.response['Error']['Code']
@@ -108,4 +108,4 @@ class S3Client:
     async def cleanup(self) -> None:
         """Cleanup S3 client resources."""
         # S3 clients don't need explicit cleanup
-        logger.info("S3 client cleanup completed")
+        logger.debug("S3 client cleanup completed")
