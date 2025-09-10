@@ -65,17 +65,18 @@ class TruthSocialS3Harvester:
         # Session and state
         self.session: Optional[aiohttp.ClientSession] = None
         self.s3_data_lake: Optional[S3DataLake] = None
+        self.api_call_count = 0  # Track API calls per execution
         
     async def initialize(self, dry_run: bool = False):
         """Initialize the Truth Social S3 harvester."""
-        logger.info(f"Initializing Truth Social S3 harvester for @{self.username}")
-        logger.info(f"🔧 Initialize method called with dry_run: {dry_run}")
+        logger.debug(f"Initializing Truth Social S3 harvester for @{self.username}")
+        logger.debug(f"🔧 Initialize method called with dry_run: {dry_run}")
         
         if not self.api_key:
             raise ValueError("SCRAPECREATORS_API_KEY not configured. Please add it to your .env file.")
         
         try:
-            logger.info("🌐 Creating aiohttp session...")
+            logger.debug("🌐 Creating aiohttp session...")
             # Create aiohttp session
             self.session = aiohttp.ClientSession(
                 headers={
@@ -86,13 +87,13 @@ class TruthSocialS3Harvester:
             )
             
             # Test API connection
-            logger.info("🔗 Testing API connection...")
+            logger.debug("🔗 Testing API connection...")
             await self._test_connection()
-            logger.info("✅ API connection test completed")
+            logger.debug("✅ API connection test completed")
             
             # Initialize S3 Data Lake only if not in dry run mode
             if not dry_run:
-                logger.info("☁️ Initializing S3 Data Lake...")
+                logger.debug("☁️ Initializing S3 Data Lake...")
                 # Create S3 config from settings
                 s3_config = S3Config(
                     bucket_name=settings.S3_BUCKET_NAME,
@@ -103,11 +104,11 @@ class TruthSocialS3Harvester:
                 )
                 self.s3_data_lake = S3DataLake(s3_config)
                 await self.s3_data_lake.initialize()
-                logger.info("✅ S3 Data Lake initialized")
+                logger.debug("✅ S3 Data Lake initialized")
             else:
-                logger.info("🔍 Dry run mode - skipping S3 initialization")
+                logger.debug("🔍 Dry run mode - skipping S3 initialization")
             
-            logger.info("Truth Social S3 harvester initialized successfully")
+            logger.debug("Truth Social S3 harvester initialized successfully")
             
         except Exception as e:
             logger.error(f"Failed to initialize Truth Social S3 harvester: {e}")
@@ -119,19 +120,19 @@ class TruthSocialS3Harvester:
         try:
             # Test with a simple API call
             url = f"{self.base_url}/truthsocial/user/posts?user_id={self.user_id}&limit=1"
-            logger.info(f"Testing API connection to: {url}")
+            logger.debug(f"Testing API connection to: {url}")
             timeout = aiohttp.ClientTimeout(total=10)  # 10 second timeout for test
             async with self.session.get(url, timeout=timeout) as response:
-                logger.info(f"API test response status: {response.status}")
+                logger.debug(f"API test response status: {response.status}")
                 if response.status != 200:
                     raise Exception(f"API connection test failed: {response.status}")
                 
                 data = await response.json()
-                logger.info(f"API test response data: {data}")
+                logger.debug(f"API test response data: {data}")
                 if not data.get('success'):
                     raise Exception(f"API returned error: {data}")
                 
-                logger.info("ScrapeCreators API connection test successful")
+                logger.debug("ScrapeCreators API connection test successful")
                         
         except Exception as e:
             logger.error(f"ScrapeCreators API connection test failed: {e}")
@@ -150,25 +151,26 @@ class TruthSocialS3Harvester:
             if next_max_id:
                 params['next_max_id'] = next_max_id
             
-            logger.info(f"🌐 Making API request to: {url} with params: {params}")
-            logger.info(f"⏱️  Starting API call with 30 second timeout...")
+            self.api_call_count += 1
+            print(f"🌐 Making API call #{self.api_call_count} to: {url}")
+            logger.debug(f"⏱️  Starting API call with 30 second timeout...")
+            logger.debug(f"🔍 DEBUG: About to make API call #{self.api_call_count}")
             timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout
             async with self.session.get(url, params=params, timeout=timeout) as response:
-                logger.info(f"📡 API response received, status: {response.status}")
-                logger.info(f"API response status: {response.status}")
+                logger.debug(f"📡 API response received, status: {response.status}")
                 if response.status != 200:
                     logger.error(f"API request failed: {response.status}")
                     return []
                 
                 data = await response.json()
-                logger.info(f"API response data: {data}")
+                logger.debug(f"API response data: {data}")
                 
                 if not data.get('success'):
                     logger.error(f"API returned error: {data}")
                     return []
                 
                 shitposts = data.get('posts', [])  # API returns 'posts' not 'data'
-                logger.info(f"Fetched {len(shitposts)} shitposts from Truth Social")
+                logger.debug(f"Fetched {len(shitposts)} shitposts from Truth Social")
                 
                 return shitposts
                 
@@ -181,23 +183,23 @@ class TruthSocialS3Harvester:
     
     async def harvest_shitposts(self, dry_run: bool = False) -> AsyncGenerator[Dict, None]:
         """Harvest shitposts based on configured mode."""
-        logger.info(f"Starting shitpost harvest in {self.mode} mode...")
-        logger.info(f"🔍 About to enter mode-specific harvest logic for: {self.mode}")
+        logger.debug(f"Starting shitpost harvest in {self.mode} mode...")
+        logger.debug(f"🔍 About to enter mode-specific harvest logic for: {self.mode}")
         
         if self.mode == "backfill":
-            logger.info("🔄 Entering backfill mode")
+            logger.debug("🔄 Entering backfill mode")
             async for result in self._harvest_backfill(dry_run):
                 yield result
         elif self.mode == "range":
-            logger.info("📅 Entering range mode")
+            logger.debug("📅 Entering range mode")
             async for result in self._harvest_backfill(dry_run, self.start_datetime, self.end_datetime):
                 yield result
         elif self.mode == "from_date":
-            logger.info("📆 Entering from_date mode (using range with end_date=today)")
+            logger.debug("📆 Entering from_date mode (using range with end_date=today)")
             async for result in self._harvest_backfill(dry_run, self.start_datetime, self.end_datetime):
                 yield result
         else:  # incremental (default)
-            logger.info("🔄 Entering incremental mode")
+            logger.debug("🔄 Entering incremental mode")
             async for result in self._harvest_backfill(dry_run, incremental_mode=True):
                 yield result
     
@@ -211,13 +213,13 @@ class TruthSocialS3Harvester:
             incremental_mode: If True, stop when encountering existing posts in S3
         """
         if incremental_mode:
-            logger.info("Starting incremental harvest - will stop when encountering existing posts in S3")
+            logger.debug("Starting incremental harvest - will stop when encountering existing posts in S3")
             print("🔄 Incremental mode: Will stop when finding posts that already exist in S3")
         elif start_date and end_date:
-            logger.info(f"Starting date range harvest from {start_date.date()} to {end_date.date()}")
-            logger.info("🔄 Note: API doesn't support date filtering - crawling backwards through all posts")
+            logger.debug(f"Starting date range harvest from {start_date.date()} to {end_date.date()}")
+            logger.debug("🔄 Note: API doesn't support date filtering - crawling backwards through all posts")
         else:
-            logger.info("Starting full backfill of Truth Social posts to S3...")
+            logger.debug("Starting full backfill of Truth Social posts to S3...")
         
         # Use provided max_id or start from most recent
         max_id = self.max_id
@@ -225,20 +227,20 @@ class TruthSocialS3Harvester:
         posts_processed = 0
         
         if max_id:
-            logger.info(f"Resuming backfill from post ID: {max_id}")
+            logger.debug(f"Resuming backfill from post ID: {max_id}")
         else:
-            logger.info("Starting backfill from most recent posts")
+            logger.debug("Starting backfill from most recent posts")
         
         while True:
             try:
-                logger.info(f"Fetching batch of posts with max_id: {max_id}")
+                logger.debug(f"Fetching batch of posts with max_id: {max_id}")
                 # Fetch batch of posts from API (start with most recent, no max_id)
                 shitposts = await self._fetch_recent_shitposts(max_id)
                 
-                logger.info(f"API returned {len(shitposts) if shitposts else 0} posts")
+                logger.debug(f"API returned {len(shitposts) if shitposts else 0} posts")
                 
                 if not shitposts:
-                    logger.info("No more posts to harvest in backfill")
+                    logger.debug("No more posts to harvest in backfill")
                     break
                 
                 if incremental_mode:
@@ -246,7 +248,7 @@ class TruthSocialS3Harvester:
                 
                 # Check if we've reached the limit before processing
                 if self.limit and total_harvested >= self.limit:
-                    logger.info(f"Reached harvest limit of {self.limit} posts")
+                    logger.debug(f"Reached harvest limit of {self.limit} posts")
                     break
                 
                 # Process and store each shitpost to S3
@@ -260,8 +262,8 @@ class TruthSocialS3Harvester:
                             
                             # Check if post is before start date (stop crawling)
                             if start_date and post_timestamp < start_date:
-                                logger.info(f"📅 Reached posts before start date {start_date.date()}, stopping crawl")
-                                logger.info(f"📈 Total posts processed: {posts_processed}, Found {total_harvested} in target range")
+                                logger.debug(f"📅 Reached posts before start date {start_date.date()}, stopping crawl")
+                                logger.debug(f"📈 Total posts processed: {posts_processed}, Found {total_harvested} in target range")
                                 return
                             
                             # Check if post is after end date (skip this post)
@@ -291,7 +293,7 @@ class TruthSocialS3Harvester:
                                     print(f"✅ Found existing post {shitpost.get('id')} in S3")
                                     print(f"🔄 Incremental mode: Stopping harvest (no new posts to process)")
                                     print(f"📈 Total new posts harvested: {total_harvested}")
-                                    logger.info(f"Incremental harvest completed - found existing post {shitpost.get('id')}")
+                                    logger.debug(f"Incremental harvest completed - found existing post {shitpost.get('id')}")
                                     return
                                 else:
                                     print(f"📝 Post {shitpost.get('id')} is new - will process")
@@ -327,7 +329,7 @@ class TruthSocialS3Harvester:
                         
                         # Check if we've reached the limit
                         if self.limit and total_harvested >= self.limit:
-                            logger.info(f"Reached harvest limit of {self.limit} posts")
+                            logger.debug(f"Reached harvest limit of {self.limit} posts")
                             return
                         
                         # Update max_id for next batch (use the last post's ID for pagination)
@@ -337,7 +339,7 @@ class TruthSocialS3Harvester:
                         logger.error(f"Error processing shitpost {shitpost.get('id')}: {e}")
                         continue
                 
-                logger.info(f"Backfill progress: {total_harvested} posts harvested and stored to S3")
+                logger.debug(f"Backfill progress: {total_harvested} posts harvested and stored to S3")
                 
                 # Small delay to be respectful to API
                 await asyncio.sleep(1)
@@ -349,7 +351,8 @@ class TruthSocialS3Harvester:
                 await handle_exceptions(e)
                 break
         
-        logger.info(f"Backfill completed. Total posts harvested and stored to S3: {total_harvested}")
+        logger.debug(f"Backfill completed. Total posts harvested and stored to S3: {total_harvested}")
+        print(f"📊 API Call Summary: Made {self.api_call_count} API calls in this execution")
     
     
     async def get_s3_stats(self) -> Dict[str, any]:
@@ -365,7 +368,7 @@ class TruthSocialS3Harvester:
             await self.session.close()
         if self.s3_data_lake:
             await self.s3_data_lake.cleanup()
-        logger.info("Truth Social S3 harvester cleaned up")
+        logger.debug("Truth Social S3 harvester cleaned up")
 
 
 async def main():
@@ -382,6 +385,10 @@ async def main():
     
     # Setup logging
     setup_harvester_logging(args.verbose)
+    
+    # Test verbose logging
+    if args.verbose:
+        print("🔍 VERBOSE MODE ENABLED - Debug logs will be shown")
     
     # Print start message
     print_harvest_start(args.mode, args.limit)

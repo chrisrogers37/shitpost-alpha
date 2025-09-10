@@ -89,10 +89,31 @@ def setup_harvester_logging(verbose: bool = False) -> None:
     Args:
         verbose: Enable verbose logging
     """
+    # Configure root logger
+    root_logger = logging.getLogger()
     if verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
+        root_logger.setLevel(logging.DEBUG)
     else:
-        logging.getLogger().setLevel(logging.INFO)
+        root_logger.setLevel(logging.INFO)
+    
+    # Also configure the shitposts module logger specifically
+    shitposts_logger = logging.getLogger('shitposts')
+    if verbose:
+        shitposts_logger.setLevel(logging.DEBUG)
+    else:
+        shitposts_logger.setLevel(logging.INFO)
+    
+    # Add console handler if none exists
+    if not any(isinstance(handler, logging.StreamHandler) for handler in root_logger.handlers):
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG if verbose else logging.INFO)
+        
+        # Create formatter
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        console_handler.setFormatter(formatter)
+        
+        # Add handler to root logger
+        root_logger.addHandler(console_handler)
 
 
 def print_harvest_start(mode: str, limit: Optional[int] = None) -> None:

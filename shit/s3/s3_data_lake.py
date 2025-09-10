@@ -36,7 +36,7 @@ class S3DataLake:
         """Initialize S3 client and verify bucket access."""
         try:
             await self.s3_client.initialize()
-            logger.info(f"S3 Data Lake initialized successfully. Bucket: {self.config.bucket_name}")
+            logger.debug(f"S3 Data Lake initialized successfully. Bucket: {self.config.bucket_name}")
             
         except Exception as e:
             logger.error(f"Failed to initialize S3 Data Lake: {e}")
@@ -311,4 +311,4 @@ class S3DataLake:
     async def cleanup(self):
         """Cleanup S3 resources."""
         await self.s3_client.cleanup()
-        logger.info("S3 Data Lake cleanup completed")
+        logger.debug("S3 Data Lake cleanup completed")

@@ -18,6 +18,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Batch processing optimizations
 - Real-time streaming analysis
 
+## [v0.14.0] - 2025-09-10
+
+### Added
+- **Enhanced Logging System**: Clean default output with verbose debug mode
+- **API Call Tracking**: Always-visible API call count regardless of logging level
+- **Debug-Level Infrastructure Logs**: S3 operations moved to debug level for cleaner output
+
+### Changed
+- **Logging Philosophy**: Infrastructure details (S3 client, Data Lake) now use DEBUG level
+- **Verbose Mode**: Full debugging information available with `--verbose` flag
+- **Default Output**: Clean, focused output (~15 lines) for normal operation
+- **Debug Output**: Comprehensive debugging information (~1000+ lines) when needed
+
+### Fixed
+- **Logging Verbosity**: Resolved overly verbose output in default mode
+- **API Call Visibility**: API call tracking now consistently visible
+- **Infrastructure Noise**: S3 initialization and cleanup messages moved to debug level
+
+### Technical Details
+- Modified `shitposts/truth_social_s3_harvester.py`: Changed verbose `logger.info()` to `logger.debug()`
+- Updated `shit/s3/s3_client.py`: S3 client messages moved to DEBUG level
+- Updated `shit/s3/s3_data_lake.py`: S3 Data Lake messages moved to DEBUG level
+- Maintained essential `print()` statements for API call tracking and key progress indicators
+
 ## [0.13.0] - 2025-01-09
 
 ### Added
