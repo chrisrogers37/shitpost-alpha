@@ -16,5 +16,16 @@
     },
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
-  }
+  },
+  "services": [
+    {
+      "name": "main-pipeline",
+      "startCommand": "python shitpost_alpha.py --mode incremental"
+    },
+    {
+      "name": "dashboard",
+      "startCommand": "cd shitty_ui && python app.py",
+      "port": 8050
+    }
+  ]
 }
