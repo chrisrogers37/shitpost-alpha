@@ -6,7 +6,6 @@
   "deploy": {
     "runtime": "V2",
     "numReplicas": 1,
-    "startCommand": "python shitpost_alpha.py --mode incremental",
     "sleepApplication": false,
     "useLegacyStacker": false,
     "multiRegionConfig": {
@@ -17,15 +16,15 @@
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   },
-  "services": [
-    {
-      "name": "main-pipeline",
+  "services": {
+    "shitpost-alpha": {
+      "source": ".",
       "startCommand": "python shitpost_alpha.py --mode incremental"
     },
-    {
-      "name": "dashboard",
+    "shitpost-alpha-dash": {
+      "source": ".",
       "startCommand": "cd shitty_ui && python app.py",
       "port": 8050
     }
-  ]
+  }
 }
