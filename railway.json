@@ -23,8 +23,7 @@
     },
     "shitpost-alpha-dash": {
       "source": ".",
-      "startCommand": "cd shitty_ui && python app.py",
-      "port": 8050
+      "startCommand": "cd shitty_ui && python app.py"
     }
   }
 }
