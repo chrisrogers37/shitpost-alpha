@@ -1,0 +1,7 @@
+dash
+plotly
+pandas
+sqlalchemy[asyncio]
+asyncpg
+python-dotenv
+dash-bootstrap-components
