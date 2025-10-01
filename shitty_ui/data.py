@@ -39,9 +39,22 @@ else:
     sync_url = sync_url.replace("?sslmode=require&channel_binding=require", "")
     print(f"🔍 Using PostgreSQL sync URL: {sync_url[:50]}...")
     
-    # Create synchronous engine for dashboard
-    engine = create_engine(sync_url, echo=False, future=True)
-    SessionLocal = sessionmaker(engine, expire_on_commit=False)
+    # Create synchronous engine for dashboard with explicit driver
+    try:
+        # Try psycopg2 first (more common)
+        engine = create_engine(sync_url, echo=False, future=True)
+        SessionLocal = sessionmaker(engine, expire_on_commit=False)
+    except Exception as e:
+        print(f"⚠️ Failed to create engine with default driver: {e}")
+        # Fallback: try to use psycopg2 explicitly
+        try:
+            sync_url_with_driver = sync_url.replace("postgresql://", "postgresql+psycopg2://")
+            engine = create_engine(sync_url_with_driver, echo=False, future=True)
+            SessionLocal = sessionmaker(engine, expire_on_commit=False)
+            print("✅ Successfully created engine with psycopg2 driver")
+        except Exception as e2:
+            print(f"❌ Failed to create engine with psycopg2: {e2}")
+            raise
 
 def execute_query(query, params=None):
     """Execute query using appropriate session type."""
