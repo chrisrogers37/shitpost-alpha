@@ -18,9 +18,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 try:
     from shit.config.shitpost_settings import settings
     DATABASE_URL = settings.DATABASE_URL
+    print(f"🔍 Dashboard using settings DATABASE_URL: {DATABASE_URL[:50]}...")
 except ImportError as e:
     # Fallback to environment variable if settings can't be imported
     DATABASE_URL = os.environ.get("DATABASE_URL")
+    print(f"🔍 Dashboard using environment DATABASE_URL: {DATABASE_URL[:50] if DATABASE_URL else 'None'}...")
     if not DATABASE_URL:
         raise ValueError(f"Could not load database URL from settings: {e}. Please set DATABASE_URL environment variable.")
 
@@ -30,34 +32,27 @@ if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, echo=False, future=True)
     SessionLocal = sessionmaker(engine, expire_on_commit=False)
 else:
-    # PostgreSQL - convert to async URL and use async SQLAlchemy
-    async_url = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
-    # Remove SSL parameters that asyncpg doesn't like
-    async_url = async_url.replace("?sslmode=require&channel_binding=require", "")
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-    engine = create_async_engine(async_url, echo=False, future=True)
-    SessionLocal = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    # PostgreSQL - use synchronous engine for dashboard
+    # Convert async URL to sync for dashboard use
+    sync_url = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+    # Remove SSL parameters that might cause issues
+    sync_url = sync_url.replace("?sslmode=require&channel_binding=require", "")
+    print(f"🔍 Using PostgreSQL sync URL: {sync_url[:50]}...")
+    
+    # Create synchronous engine for dashboard
+    engine = create_engine(sync_url, echo=False, future=True)
+    SessionLocal = sessionmaker(engine, expire_on_commit=False)
 
 def execute_query(query, params=None):
     """Execute query using appropriate session type."""
-    if DATABASE_URL.startswith("sqlite"):
-        # SQLite - synchronous
+    try:
         with SessionLocal() as session:
             result = session.execute(query, params or {})
             return result.fetchall(), result.keys()
-    else:
-        # PostgreSQL - use synchronous approach for dashboard
-        # Convert async engine to sync for dashboard use
-        sync_url = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker as sync_sessionmaker
-        
-        sync_engine = create_engine(sync_url, echo=False, future=True)
-        SyncSessionLocal = sync_sessionmaker(sync_engine, expire_on_commit=False)
-        
-        with SyncSessionLocal() as session:
-            result = session.execute(query, params or {})
-            return result.fetchall(), result.keys()
+    except Exception as e:
+        print(f"❌ Database query error: {e}")
+        print(f"🔍 DATABASE_URL: {DATABASE_URL[:50]}...")
+        raise
 
 def load_recent_posts(limit: int = 100) -> pd.DataFrame:
     """
