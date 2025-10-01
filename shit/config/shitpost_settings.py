@@ -8,6 +8,14 @@ from typing import Optional
 from pydantic_settings import BaseSettings
 from pydantic import Field
 
+# Load .env file from project root
+from dotenv import load_dotenv
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))  # Go up two levels from shit/config/
+env_file_path = os.path.join(project_root, ".env")
+if os.path.exists(env_file_path):
+    load_dotenv(env_file_path)
+
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""

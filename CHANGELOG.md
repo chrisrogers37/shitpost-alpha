@@ -12,11 +12,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Performance optimizations
 - Additional LLM provider support
 - Real-time alerting system
-- Dashboard and monitoring interface
 - RAG enhancement system for combining multiple analyses
 - Advanced confidence scoring and quality metrics
 - Batch processing optimizations
 - Real-time streaming analysis
+
+## [v0.15.0] - 2025-01-30
+
+### Added
+- **Interactive Dashboard**: Complete Plotly Dash-based web interface for viewing Truth Social posts and trading signals
+  - Real-time feed displaying posts with asset implications, sentiment direction, and LLM prediction theses
+  - Advanced filtering capabilities: "Has Prediction" toggle, multi-select asset filtering, date range selection, confidence thresholds
+  - Statistics dashboard showing system KPIs (total posts, analyzed posts, high confidence predictions, average confidence)
+  - Obnoxiously American theme with patriotic styling and satirical branding
+  - Auto-refresh functionality with 5-minute intervals for live data updates
+  - Responsive design with pagination, sorting, and native filtering on data tables
+- **Enhanced Configuration Management**: Improved environment variable loading for better reliability
+  - Manual `.env` file loading from project root regardless of working directory
+  - Consistent configuration access across all modules and deployment scenarios
+  - Enhanced reliability for dashboard and all application components
+
+### Changed
+- **Dashboard Integration**: Seamless integration with existing database and settings infrastructure
+  - Dashboard uses global `shitpost_settings.py` for database connectivity
+  - Supports both SQLite (local development) and PostgreSQL (production) databases
+  - Automatic detection and handling of different database types
+  - Real-time connection to Neon PostgreSQL database for live data
+
+### Technical Details
+- **Dashboard Architecture**: 
+  - `shitty_ui/` directory with modular structure (app.py, layout.py, data.py, requirements.txt)
+  - Plotly Dash framework with Bootstrap components for responsive design
+  - SQLAlchemy integration with both synchronous and asynchronous database support
+  - Custom styling with American flag colors (#B22234, #3C3B6E, #FFFFFF) and patriotic icons
+- **Configuration Improvements**:
+  - Enhanced `shit/config/shitpost_settings.py` with manual `.env` loading
+  - Improved cross-platform compatibility and deployment reliability
+  - No breaking changes to existing API or functionality
+
+### Files Added
+- `shitty_ui/app.py` - Main Dash application entry point
+- `shitty_ui/layout.py` - Dashboard layout and interactive components
+- `shitty_ui/data.py` - Database connection and data retrieval functions
+- `shitty_ui/requirements.txt` - Dashboard-specific dependencies
+- `shitty_ui/README.md` - Dashboard setup and usage documentation
+
+### Files Modified
+- `shit/config/shitpost_settings.py` - Enhanced environment variable loading
+- `CHANGELOG.md` - This entry documenting dashboard and configuration improvements
+
+### Benefits
+- **Real-time Monitoring**: Live dashboard for tracking Truth Social posts and trading signals
+- **Enhanced User Experience**: Interactive filtering and visualization of analysis results
+- **Improved Reliability**: More robust configuration management across all deployment scenarios
+- **Professional Presentation**: Polished dashboard suitable for portfolio demonstration
+- **Scalable Architecture**: Dashboard designed to handle growing datasets and user traffic
 
 ## [v0.14.0] - 2025-09-10
 
