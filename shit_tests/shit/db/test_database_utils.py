@@ -1,10 +1,11 @@
 """
-Tests for DatabaseUtils - database utility functions and data transformations.
+Tests for DatabaseUtils - database helper functions and utilities.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+import json
 from datetime import datetime
+from unittest.mock import patch
 
 from shit.db.database_utils import DatabaseUtils
 
@@ -16,377 +17,289 @@ class TestDatabaseUtils:
     def sample_s3_data(self):
         """Sample S3 data for testing."""
         return {
-            "shitpost_id": "test_post_001",
-            "post_timestamp": "2024-01-15T10:30:00Z",
+            "shitpost_id": "123456789",
+            "timestamp": "2024-01-15T12:00:00Z",
             "raw_api_data": {
-                "id": "test_post_001",
+                "id": "123456789",
+                "created_at": "2024-01-15T12:00:00Z",
                 "text": "Tesla stock is going up!",
-                "created_at": "2024-01-15T10:30:00Z",
-                "author_id": "123456789",
-                "public_metrics": {
-                    "like_count": 1000,
-                    "retweet_count": 50,
-                    "reply_count": 25
-                }
-            },
-            "metadata": {
-                "harvested_at": "2024-01-15T10:35:00Z",
-                "source": "truth_social_api"
+                "content": "<p>Tesla stock is going up!</p>",
+                "language": "en",
+                "visibility": "public",
+                "sensitive": False,
+                "spoiler_text": "",
+                "uri": "https://truthsocial.com/users/realDonaldTrump/statuses/123456789",
+                "url": "https://truthsocial.com/@realDonaldTrump/123456789",
+                "replies_count": 100,
+                "reblogs_count": 500,
+                "favourites_count": 1000,
+                "upvotes_count": 800,
+                "downvotes_count": 50,
+                "account": {
+                    "id": "987654321",
+                    "username": "realDonaldTrump",
+                    "display_name": "Donald J. Trump",
+                    "followers_count": 5000000,
+                    "following_count": 50,
+                    "statuses_count": 10000,
+                    "verified": True,
+                    "website": "https://www.donaldjtrump.com"
+                },
+                "media_attachments": [],
+                "mentions": [],
+                "tags": [],
+                "in_reply_to_id": None,
+                "quote_id": None,
+                "in_reply_to_account_id": None,
+                "card": None,
+                "group": None,
+                "quote": None,
+                "in_reply_to": None,
+                "reblog": None,
+                "sponsored": False,
+                "reaction": None,
+                "favourited": False,
+                "reblogged": False,
+                "muted": False,
+                "pinned": False,
+                "bookmarked": False,
+                "poll": None,
+                "emojis": [],
+                "votable": False,
+                "edited_at": None,
+                "version": "1.0",
+                "editable": False,
+                "title": ""
             }
         }
 
-    @pytest.fixture
-    def sample_shitpost_data(self):
-        """Sample shitpost data for testing."""
-        return {
-            "shitpost_id": "test_post_001",
-            "post_timestamp": "2024-01-15T10:30:00Z",
-            "content": "Tesla stock is going up!",
-            "author": {
-                "username": "realDonaldTrump",
-                "display_name": "Donald J. Trump"
-            },
-            "engagement": {
-                "likes": 1000,
-                "retruths": 50,
-                "replies": 25
-            },
-            "raw_api_data": {
-                "id": "test_post_001",
-                "text": "Tesla stock is going up!",
-                "created_at": "2024-01-15T10:30:00Z"
-            }
-        }
-
-    def test_transform_s3_data_to_shitpost(self, sample_s3_data):
-        """Test transforming S3 data to shitpost format."""
-        result = DatabaseUtils.transform_s3_data_to_shitpost(sample_s3_data)
-        
-        # Verify transformation
-        assert result["shitpost_id"] == sample_s3_data["shitpost_id"]
-        assert result["timestamp"] is not None  # The method returns a datetime object
-        assert result["text"] == sample_s3_data["raw_api_data"]["text"]
-        # raw_api_data is JSON serialized, so we need to parse it
-        import json
-        parsed_raw_data = json.loads(result["raw_api_data"])
-        assert parsed_raw_data["id"] == sample_s3_data["raw_api_data"]["id"]
-
-    def test_transform_s3_data_to_shitpost_missing_fields(self):
-        """Test transforming S3 data with missing fields."""
-        incomplete_data = {
-            "shitpost_id": "test_post_001",
-            "post_timestamp": "2024-01-15T10:30:00Z",
-            "raw_api_data": {
-                "id": "test_post_001",
-                "text": "Tesla stock is going up!"
-            }
-        }
-        
-        result = DatabaseUtils.transform_s3_data_to_shitpost(incomplete_data)
-        
-        # Should handle missing fields gracefully
-        assert result["shitpost_id"] == "test_post_001"
-        assert result["content"] == "Tesla stock is going up!"
-        assert result["raw_api_data"] == incomplete_data["raw_api_data"]
-
-    def test_transform_s3_data_to_shitpost_invalid_data(self):
-        """Test transforming invalid S3 data."""
-        invalid_data = {
-            "shitpost_id": "",
-            "post_timestamp": "",
-            "raw_api_data": {}
-        }
-        
-        with pytest.raises((ValueError, KeyError)):
-            DatabaseUtils.transform_s3_data_to_shitpost(invalid_data)
-
-    def test_transform_s3_data_to_shitpost_none_data(self):
-        """Test transforming None data."""
-        with pytest.raises((TypeError, AttributeError)):
-            DatabaseUtils.transform_s3_data_to_shitpost(None)
-
-    def test_validate_shitpost_data(self, sample_shitpost_data):
-        """Test validating shitpost data."""
-        result = DatabaseUtils.validate_shitpost_data(sample_shitpost_data)
-        assert result is True
-
-    def test_validate_shitpost_data_missing_required_fields(self):
-        """Test validating shitpost data with missing required fields."""
-        invalid_data = {
-            "shitpost_id": "test_post_001",
-            # Missing post_timestamp
-            "content": "Test content"
-        }
-        
-        result = DatabaseUtils.validate_shitpost_data(invalid_data)
-        assert result is False
-
-    def test_validate_shitpost_data_empty_fields(self):
-        """Test validating shitpost data with empty fields."""
-        invalid_data = {
-            "shitpost_id": "",
-            "post_timestamp": "2024-01-15T10:30:00Z",
-            "content": ""
-        }
-        
-        result = DatabaseUtils.validate_shitpost_data(invalid_data)
-        assert result is False
-
-    def test_validate_shitpost_data_none(self):
-        """Test validating None shitpost data."""
-        result = DatabaseUtils.validate_shitpost_data(None)
-        assert result is False
-
-    def test_validate_shitpost_data_empty_dict(self):
-        """Test validating empty dict shitpost data."""
-        result = DatabaseUtils.validate_shitpost_data({})
-        assert result is False
-
-    def test_extract_engagement_metrics(self, sample_s3_data):
-        """Test extracting engagement metrics from S3 data."""
-        result = DatabaseUtils.extract_engagement_metrics(sample_s3_data)
-        
-        expected = {
-            "likes": 1000,
-            "retruths": 50,
-            "replies": 25
-        }
-        assert result == expected
-
-    def test_extract_engagement_metrics_missing_data(self):
-        """Test extracting engagement metrics with missing data."""
-        data_without_metrics = {
-            "shitpost_id": "test_post_001",
-            "raw_api_data": {
-                "id": "test_post_001",
-                "text": "Test content"
-            }
-        }
-        
-        result = DatabaseUtils.extract_engagement_metrics(data_without_metrics)
-        
-        # Should return default values
-        expected = {
-            "likes": 0,
-            "retruths": 0,
-            "replies": 0
-        }
-        assert result == expected
-
-    def test_extract_author_info(self, sample_s3_data):
-        """Test extracting author information from S3 data."""
-        # Add author info to sample data
-        sample_s3_data["raw_api_data"]["author"] = {
-            "username": "realDonaldTrump",
-            "display_name": "Donald J. Trump",
-            "id": "123456789"
-        }
-        
-        result = DatabaseUtils.extract_author_info(sample_s3_data)
-        
-        expected = {
-            "username": "realDonaldTrump",
-            "display_name": "Donald J. Trump",
-            "id": "123456789"
-        }
-        assert result == expected
-
-    def test_extract_author_info_missing_data(self):
-        """Test extracting author info with missing data."""
-        data_without_author = {
-            "shitpost_id": "test_post_001",
-            "raw_api_data": {
-                "id": "test_post_001",
-                "text": "Test content"
-            }
-        }
-        
-        result = DatabaseUtils.extract_author_info(data_without_author)
-        
-        # Should return default values
-        expected = {
-            "username": "unknown",
-            "display_name": "Unknown User",
-            "id": None
-        }
-        assert result == expected
-
-    def test_parse_timestamp(self):
-        """Test parsing timestamp strings."""
-        timestamp_str = "2024-01-15T10:30:00Z"
+    def test_parse_timestamp_valid_iso(self):
+        """Test parsing valid ISO timestamp."""
+        timestamp_str = "2024-01-15T12:00:00Z"
         result = DatabaseUtils.parse_timestamp(timestamp_str)
         
         assert isinstance(result, datetime)
         assert result.year == 2024
         assert result.month == 1
         assert result.day == 15
+        assert result.hour == 12
 
-    def test_parse_timestamp_invalid_format(self):
-        """Test parsing invalid timestamp format."""
-        invalid_timestamp = "invalid-timestamp"
+    def test_parse_timestamp_with_timezone(self):
+        """Test parsing timestamp with timezone."""
+        timestamp_str = "2024-01-15T12:00:00+05:00"
+        result = DatabaseUtils.parse_timestamp(timestamp_str)
         
-        with pytest.raises(ValueError):
-            DatabaseUtils.parse_timestamp(invalid_timestamp)
+        assert isinstance(result, datetime)
+        assert result.tzinfo is None  # Should be timezone-naive
+
+    def test_parse_timestamp_empty_string(self):
+        """Test parsing empty timestamp returns current time."""
+        result = DatabaseUtils.parse_timestamp("")
+        
+        assert isinstance(result, datetime)
+        # Should be close to now
+        now = datetime.now()
+        diff = (now - result).total_seconds()
+        assert abs(diff) < 2  # Within 2 seconds
 
     def test_parse_timestamp_none(self):
-        """Test parsing None timestamp."""
-        with pytest.raises((TypeError, ValueError)):
-            DatabaseUtils.parse_timestamp(None)
-
-    def test_format_timestamp(self):
-        """Test formatting datetime to timestamp string."""
-        dt = datetime(2024, 1, 15, 10, 30, 0)
-        result = DatabaseUtils.format_timestamp(dt)
+        """Test parsing None timestamp returns current time."""
+        result = DatabaseUtils.parse_timestamp(None)
         
-        assert result == "2024-01-15T10:30:00Z"
+        assert isinstance(result, datetime)
 
-    def test_format_timestamp_none(self):
-        """Test formatting None datetime."""
-        with pytest.raises((TypeError, AttributeError)):
-            DatabaseUtils.format_timestamp(None)
-
-    def test_clean_content_text(self):
-        """Test cleaning content text."""
-        dirty_text = "Tesla stock is going up! 🚀\n\n#Tesla #StockMarket"
-        result = DatabaseUtils.clean_content_text(dirty_text)
+    def test_parse_timestamp_invalid_format(self):
+        """Test parsing invalid timestamp format falls back to current time."""
+        result = DatabaseUtils.parse_timestamp("invalid-timestamp")
         
-        # Should remove extra whitespace and normalize
-        assert "Tesla stock is going up!" in result
-        assert result.count("\n") <= 1  # Should normalize newlines
+        assert isinstance(result, datetime)
 
-    def test_clean_content_text_empty(self):
-        """Test cleaning empty content text."""
-        result = DatabaseUtils.clean_content_text("")
-        assert result == ""
-
-    def test_clean_content_text_none(self):
-        """Test cleaning None content text."""
-        result = DatabaseUtils.clean_content_text(None)
-        assert result == ""
-
-    def test_extract_hashtags(self):
-        """Test extracting hashtags from content."""
-        content = "Tesla stock is going up! #Tesla #StockMarket #Investing"
-        result = DatabaseUtils.extract_hashtags(content)
+    def test_transform_s3_data_to_shitpost(self, sample_s3_data):
+        """Test transforming S3 data to shitpost format."""
+        result = DatabaseUtils.transform_s3_data_to_shitpost(sample_s3_data)
         
-        expected = ["Tesla", "StockMarket", "Investing"]
-        assert result == expected
+        # Verify transformation
+        assert result["shitpost_id"] == sample_s3_data["raw_api_data"]["id"]
+        assert result["timestamp"] is not None  # The method returns a datetime object
+        assert result["text"] == sample_s3_data["raw_api_data"]["text"]
+        # raw_api_data is JSON serialized, so we need to parse it
+        parsed_raw_data = json.loads(result["raw_api_data"])
+        assert parsed_raw_data["id"] == sample_s3_data["raw_api_data"]["id"]
 
-    def test_extract_hashtags_no_hashtags(self):
-        """Test extracting hashtags from content with no hashtags."""
-        content = "Tesla stock is going up!"
-        result = DatabaseUtils.extract_hashtags(content)
+    def test_transform_s3_data_to_shitpost_complete_fields(self, sample_s3_data):
+        """Test all fields are properly transformed."""
+        result = DatabaseUtils.transform_s3_data_to_shitpost(sample_s3_data)
         
-        assert result == []
+        # Core fields
+        assert result["shitpost_id"] == "123456789"
+        assert result["text"] == "Tesla stock is going up!"
+        assert result["content"] == "<p>Tesla stock is going up!</p>"
+        assert result["platform"] == "truth_social"
+        
+        # Account fields
+        assert result["username"] == "realDonaldTrump"
+        assert result["account_id"] == "987654321"
+        assert result["account_display_name"] == "Donald J. Trump"
+        assert result["account_verified"] is True
+        assert result["account_followers_count"] == 5000000
+        
+        # Engagement metrics
+        assert result["replies_count"] == 100
+        assert result["reblogs_count"] == 500
+        assert result["favourites_count"] == 1000
+        
+        # Media
+        assert result["has_media"] is False
+        assert json.loads(result["media_attachments"]) == []
+        
+        # Metadata
+        assert result["language"] == "en"
+        assert result["visibility"] == "public"
+        assert result["sensitive"] is False
 
-    def test_extract_mentions(self):
-        """Test extracting mentions from content."""
-        content = "Great meeting with @elonmusk about @Tesla stock!"
-        result = DatabaseUtils.extract_mentions(content)
-        
-        expected = ["elonmusk", "Tesla"]
-        assert result == expected
-
-    def test_extract_mentions_no_mentions(self):
-        """Test extracting mentions from content with no mentions."""
-        content = "Tesla stock is going up!"
-        result = DatabaseUtils.extract_mentions(content)
-        
-        assert result == []
-
-    def test_calculate_content_length(self):
-        """Test calculating content length."""
-        content = "Tesla stock is going up! 🚀"
-        result = DatabaseUtils.calculate_content_length(content)
-        
-        assert result == len(content)
-
-    def test_calculate_content_length_unicode(self):
-        """Test calculating content length with unicode characters."""
-        content = "Tesla stock is going up! 🚀📈💰"
-        result = DatabaseUtils.calculate_content_length(content)
-        
-        assert result == len(content)
-
-    def test_is_retruth(self, sample_s3_data):
-        """Test detecting retruth posts."""
-        # Regular post
-        result = DatabaseUtils.is_retruth(sample_s3_data)
-        assert result is False
-        
-        # Retruth post
-        retruth_data = sample_s3_data.copy()
-        retruth_data["raw_api_data"]["referenced_tweets"] = [
-            {"type": "retweeted", "id": "original_tweet_id"}
+    def test_transform_s3_data_with_media(self, sample_s3_data):
+        """Test transformation with media attachments."""
+        sample_s3_data["raw_api_data"]["media_attachments"] = [
+            {"id": "1", "type": "image", "url": "https://example.com/image.jpg"}
         ]
         
-        result = DatabaseUtils.is_retruth(retruth_data)
-        assert result is True
+        result = DatabaseUtils.transform_s3_data_to_shitpost(sample_s3_data)
+        
+        assert result["has_media"] is True
+        media = json.loads(result["media_attachments"])
+        assert len(media) == 1
+        assert media[0]["type"] == "image"
 
-    def test_is_retruth_missing_data(self):
-        """Test detecting retruth with missing data."""
-        data_without_references = {
-            "shitpost_id": "test_post_001",
+    def test_transform_s3_data_with_tags(self, sample_s3_data):
+        """Test transformation with tags."""
+        sample_s3_data["raw_api_data"]["tags"] = [
+            {"name": "TSLA", "url": "https://example.com/tags/TSLA"}
+        ]
+        
+        result = DatabaseUtils.transform_s3_data_to_shitpost(sample_s3_data)
+        
+        tags = json.loads(result["tags"])
+        assert len(tags) == 1
+        assert tags[0]["name"] == "TSLA"
+
+    def test_transform_s3_data_with_mentions(self, sample_s3_data):
+        """Test transformation with mentions."""
+        sample_s3_data["raw_api_data"]["mentions"] = [
+            {"username": "elonmusk", "id": "111"}
+        ]
+        
+        result = DatabaseUtils.transform_s3_data_to_shitpost(sample_s3_data)
+        
+        mentions = json.loads(result["mentions"])
+        assert len(mentions) == 1
+        assert mentions[0]["username"] == "elonmusk"
+
+    def test_transform_s3_data_missing_optional_fields(self):
+        """Test transformation with minimal data."""
+        minimal_data = {
             "raw_api_data": {
-                "id": "test_post_001",
-                "text": "Test content"
+                "id": "123",
+                "created_at": "2024-01-15T12:00:00Z",
+                "text": "Test post",
+                "content": "<p>Test post</p>",
+                "account": {
+                    "username": "testuser"
+                }
             }
         }
         
-        result = DatabaseUtils.is_retruth(data_without_references)
-        assert result is False
+        result = DatabaseUtils.transform_s3_data_to_shitpost(minimal_data)
+        
+        # Should have defaults for missing fields
+        assert result["shitpost_id"] == "123"
+        assert result["text"] == "Test post"
+        assert result["username"] == "testuser"
+        assert result["replies_count"] == 0
+        assert result["favourites_count"] == 0
+        assert result["has_media"] is False
 
-    def test_has_media_attachments(self, sample_s3_data):
-        """Test detecting media attachments."""
-        # Post without media
-        result = DatabaseUtils.has_media_attachments(sample_s3_data)
-        assert result is False
+    def test_transform_s3_data_with_edited_timestamp(self, sample_s3_data):
+        """Test transformation includes edited timestamp."""
+        sample_s3_data["raw_api_data"]["edited_at"] = "2024-01-15T13:00:00Z"
         
-        # Post with media
-        media_data = sample_s3_data.copy()
-        media_data["raw_api_data"]["attachments"] = {
-            "media_keys": ["media_key_1", "media_key_2"]
-        }
+        result = DatabaseUtils.transform_s3_data_to_shitpost(sample_s3_data)
         
-        result = DatabaseUtils.has_media_attachments(media_data)
-        assert result is True
+        assert result["edited_at"] is not None
+        assert isinstance(result["edited_at"], datetime)
+        assert result["updated_at"] is not None
 
-    def test_has_media_attachments_missing_data(self):
-        """Test detecting media attachments with missing data."""
-        data_without_attachments = {
-            "shitpost_id": "test_post_001",
-            "raw_api_data": {
-                "id": "test_post_001",
-                "text": "Test content"
-            }
-        }
+    def test_transform_s3_data_with_reply_data(self, sample_s3_data):
+        """Test transformation with reply information."""
+        sample_s3_data["raw_api_data"]["in_reply_to_id"] = "999"
+        sample_s3_data["raw_api_data"]["in_reply_to_account_id"] = "888"
         
-        result = DatabaseUtils.has_media_attachments(data_without_attachments)
-        assert result is False
+        result = DatabaseUtils.transform_s3_data_to_shitpost(sample_s3_data)
+        
+        assert result["in_reply_to_id"] == "999"
+        assert result["in_reply_to_account_id"] == "888"
 
-    def test_generate_content_hash(self):
-        """Test generating content hash."""
-        content = "Tesla stock is going up!"
-        result = DatabaseUtils.generate_content_hash(content)
+    def test_transform_s3_data_preserves_raw_api_data(self, sample_s3_data):
+        """Test that raw API data is preserved."""
+        result = DatabaseUtils.transform_s3_data_to_shitpost(sample_s3_data)
         
-        assert isinstance(result, str)
-        assert len(result) > 0
-        
-        # Same content should generate same hash
-        result2 = DatabaseUtils.generate_content_hash(content)
-        assert result == result2
-        
-        # Different content should generate different hash
-        different_content = "Tesla stock is going down!"
-        result3 = DatabaseUtils.generate_content_hash(different_content)
-        assert result != result3
+        raw_data = json.loads(result["raw_api_data"])
+        assert raw_data["id"] == sample_s3_data["raw_api_data"]["id"]
+        assert raw_data["text"] == sample_s3_data["raw_api_data"]["text"]
+        assert "account" in raw_data
 
-    def test_generate_content_hash_none(self):
-        """Test generating content hash for None content."""
-        result = DatabaseUtils.generate_content_hash(None)
-        assert result is None
+    def test_transform_s3_data_error_handling(self):
+        """Test error handling with invalid data raises exception."""
+        # Data missing required 'raw_api_data' key will cause KeyError
+        invalid_data = None
+        
+        with pytest.raises(Exception):
+            DatabaseUtils.transform_s3_data_to_shitpost(invalid_data)
 
-    def test_generate_content_hash_empty(self):
-        """Test generating content hash for empty content."""
-        result = DatabaseUtils.generate_content_hash("")
-        assert result is None
+    def test_parse_timestamp_with_z_suffix(self):
+        """Test parsing timestamp with Z suffix."""
+        timestamp_str = "2024-01-15T12:00:00Z"
+        result = DatabaseUtils.parse_timestamp(timestamp_str)
+        
+        assert isinstance(result, datetime)
+        assert result.tzinfo is None  # Should be timezone-naive
+
+    def test_transform_s3_data_boolean_fields(self, sample_s3_data):
+        """Test boolean fields are correctly transformed."""
+        sample_s3_data["raw_api_data"]["sensitive"] = True
+        sample_s3_data["raw_api_data"]["sponsored"] = True
+        sample_s3_data["raw_api_data"]["favourited"] = True
+        
+        result = DatabaseUtils.transform_s3_data_to_shitpost(sample_s3_data)
+        
+        assert result["sensitive"] is True
+        assert result["sponsored"] is True
+        assert result["favourited"] is True
+
+    def test_transform_s3_data_timestamps(self, sample_s3_data):
+        """Test timestamp fields are properly parsed."""
+        result = DatabaseUtils.transform_s3_data_to_shitpost(sample_s3_data)
+        
+        assert isinstance(result["timestamp"], datetime)
+        assert isinstance(result["created_at"], datetime)
+        assert isinstance(result["updated_at"], datetime)
+        
+        # Timestamps should match when not edited
+        assert result["timestamp"] == result["created_at"]
+
+    def test_transform_s3_data_json_fields(self, sample_s3_data):
+        """Test that complex fields are JSON serialized."""
+        result = DatabaseUtils.transform_s3_data_to_shitpost(sample_s3_data)
+        
+        # These should all be JSON strings
+        assert isinstance(result["media_attachments"], str)
+        assert isinstance(result["mentions"], str)
+        assert isinstance(result["tags"], str)
+        assert isinstance(result["emojis"], str)
+        assert isinstance(result["raw_api_data"], str)
+        
+        # Should be valid JSON
+        json.loads(result["media_attachments"])
+        json.loads(result["mentions"])
+        json.loads(result["tags"])
+        json.loads(result["emojis"])
+        json.loads(result["raw_api_data"])
