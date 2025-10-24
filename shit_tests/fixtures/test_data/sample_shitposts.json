@@ -1,0 +1,162 @@
+[
+  {
+    "shitpost_id": "test_post_001",
+    "post_timestamp": "2024-01-15T10:30:00Z",
+    "content": "Tesla is doing great! The stock is going to the moon! 🚀",
+    "author": {
+      "username": "realDonaldTrump",
+      "display_name": "Donald J. Trump",
+      "id": "123456789",
+      "verified": true
+    },
+    "engagement": {
+      "likes": 15000,
+      "retruths": 2500,
+      "replies": 800
+    },
+    "raw_api_data": {
+      "id": "test_post_001",
+      "text": "Tesla is doing great! The stock is going to the moon! 🚀",
+      "created_at": "2024-01-15T10:30:00Z",
+      "author_id": "123456789",
+      "public_metrics": {
+        "like_count": 15000,
+        "retweet_count": 2500,
+        "reply_count": 800
+      }
+    },
+    "metadata": {
+      "harvested_at": "2024-01-15T10:35:00Z",
+      "source": "truth_social_api",
+      "api_version": "v1"
+    }
+  },
+  {
+    "shitpost_id": "test_post_002",
+    "post_timestamp": "2024-01-15T12:15:00Z",
+    "content": "The economy is terrible under Biden. Stocks are crashing!",
+    "author": {
+      "username": "realDonaldTrump",
+      "display_name": "Donald J. Trump",
+      "id": "123456789",
+      "verified": true
+    },
+    "engagement": {
+      "likes": 12000,
+      "retruths": 1800,
+      "replies": 600
+    },
+    "raw_api_data": {
+      "id": "test_post_002",
+      "text": "The economy is terrible under Biden. Stocks are crashing!",
+      "created_at": "2024-01-15T12:15:00Z",
+      "author_id": "123456789",
+      "public_metrics": {
+        "like_count": 12000,
+        "retweet_count": 1800,
+        "reply_count": 600
+      }
+    },
+    "metadata": {
+      "harvested_at": "2024-01-15T12:20:00Z",
+      "source": "truth_social_api",
+      "api_version": "v1"
+    }
+  },
+  {
+    "shitpost_id": "test_post_003",
+    "post_timestamp": "2024-01-15T14:45:00Z",
+    "content": "Bitcoin is the future! Crypto will replace the dollar!",
+    "author": {
+      "username": "realDonaldTrump",
+      "display_name": "Donald J. Trump",
+      "id": "123456789",
+      "verified": true
+    },
+    "engagement": {
+      "likes": 8000,
+      "retruths": 1200,
+      "replies": 400
+    },
+    "raw_api_data": {
+      "id": "test_post_003",
+      "text": "Bitcoin is the future! Crypto will replace the dollar!",
+      "created_at": "2024-01-15T14:45:00Z",
+      "author_id": "123456789",
+      "public_metrics": {
+        "like_count": 8000,
+        "retweet_count": 1200,
+        "reply_count": 400
+      }
+    },
+    "metadata": {
+      "harvested_at": "2024-01-15T14:50:00Z",
+      "source": "truth_social_api",
+      "api_version": "v1"
+    }
+  },
+  {
+    "shitpost_id": "test_post_004",
+    "post_timestamp": "2024-01-15T16:20:00Z",
+    "content": "Just had a great meeting with Apple executives. Tim Cook is a genius!",
+    "author": {
+      "username": "realDonaldTrump",
+      "display_name": "Donald J. Trump",
+      "id": "123456789",
+      "verified": true
+    },
+    "engagement": {
+      "likes": 9000,
+      "retruths": 1500,
+      "replies": 500
+    },
+    "raw_api_data": {
+      "id": "test_post_004",
+      "text": "Just had a great meeting with Apple executives. Tim Cook is a genius!",
+      "created_at": "2024-01-15T16:20:00Z",
+      "author_id": "123456789",
+      "public_metrics": {
+        "like_count": 9000,
+        "retweet_count": 1500,
+        "reply_count": 500
+      }
+    },
+    "metadata": {
+      "harvested_at": "2024-01-15T16:25:00Z",
+      "source": "truth_social_api",
+      "api_version": "v1"
+    }
+  },
+  {
+    "shitpost_id": "test_post_005",
+    "post_timestamp": "2024-01-15T18:00:00Z",
+    "content": "Gold is the only safe investment. Buy gold!",
+    "author": {
+      "username": "realDonaldTrump",
+      "display_name": "Donald J. Trump",
+      "id": "123456789",
+      "verified": true
+    },
+    "engagement": {
+      "likes": 6000,
+      "retruths": 900,
+      "replies": 300
+    },
+    "raw_api_data": {
+      "id": "test_post_005",
+      "text": "Gold is the only safe investment. Buy gold!",
+      "created_at": "2024-01-15T18:00:00Z",
+      "author_id": "123456789",
+      "public_metrics": {
+        "like_count": 6000,
+        "retweet_count": 900,
+        "reply_count": 300
+      }
+    },
+    "metadata": {
+      "harvested_at": "2024-01-15T18:05:00Z",
+      "source": "truth_social_api",
+      "api_version": "v1"
+    }
+  }
+]

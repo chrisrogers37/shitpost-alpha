@@ -1,0 +1,113 @@
+{
+  "mock_llm_responses": {
+    "openai_responses": {
+      "successful_analysis": {
+        "id": "chatcmpl-123",
+        "object": "chat.completion",
+        "created": 1705320000,
+        "model": "gpt-4",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "{\"assets\": [\"TSLA\"], \"market_impact\": {\"TSLA\": \"bullish\"}, \"confidence\": 0.95, \"thesis\": \"Direct positive mention of Tesla stock with bullish sentiment and rocket emoji indicating strong confidence in stock performance\"}"
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 150,
+          "completion_tokens": 75,
+          "total_tokens": 225
+        }
+      },
+      "error_responses": {
+        "rate_limit": {
+          "error": {
+            "message": "Rate limit reached for requests",
+            "type": "rate_limit_exceeded",
+            "code": "rate_limit_exceeded"
+          }
+        },
+        "invalid_api_key": {
+          "error": {
+            "message": "Incorrect API key provided",
+            "type": "invalid_request_error",
+            "code": "invalid_api_key"
+          }
+        },
+        "context_length_exceeded": {
+          "error": {
+            "message": "This model's maximum context length is 4097 tokens",
+            "type": "invalid_request_error",
+            "code": "context_length_exceeded"
+          }
+        }
+      }
+    },
+    "anthropic_responses": {
+      "successful_analysis": {
+        "id": "msg_123",
+        "type": "message",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"assets\": [\"TSLA\"], \"market_impact\": {\"TSLA\": \"bullish\"}, \"confidence\": 0.95, \"thesis\": \"Direct positive mention of Tesla stock with bullish sentiment and rocket emoji indicating strong confidence in stock performance\"}"
+          }
+        ],
+        "model": "claude-3-sonnet-20240229",
+        "stop_reason": "end_turn",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 150,
+          "output_tokens": 75
+        }
+      },
+      "error_responses": {
+        "rate_limit": {
+          "error": {
+            "type": "rate_limit_error",
+            "message": "Rate limit exceeded"
+          }
+        },
+        "invalid_api_key": {
+          "error": {
+            "type": "authentication_error",
+            "message": "Invalid API key"
+          }
+        }
+      }
+    },
+    "malformed_responses": {
+      "invalid_json": {
+        "choices": [
+          {
+            "message": {
+              "content": "This is not valid JSON but contains analysis: Tesla stock looks bullish based on the positive sentiment"
+            }
+          }
+        ]
+      },
+      "missing_fields": {
+        "choices": [
+          {
+            "message": {
+              "content": "{\"assets\": [\"TSLA\"], \"confidence\": 0.95}"
+            }
+          }
+        ]
+      },
+      "empty_response": {
+        "choices": [
+          {
+            "message": {
+              "content": ""
+            }
+          }
+        ]
+      }
+    }
+  }
+}

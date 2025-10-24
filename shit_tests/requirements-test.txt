@@ -1,0 +1,53 @@
+# Test-specific dependencies for Shitpost Alpha
+
+# Core testing framework
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+pytest-xdist>=3.0.0  # For parallel test execution
+
+# Test utilities
+factory-boy>=3.2.0  # For test data generation
+faker>=18.0.0  # For generating fake data
+freezegun>=1.2.0  # For mocking datetime
+responses>=0.23.0  # For mocking HTTP requests
+vcrpy>=6.0.0  # For recording HTTP interactions
+
+# Database testing
+pytest-postgresql>=5.0.0  # For PostgreSQL testing (if needed)
+pytest-mysql>=2.0.0  # For MySQL testing (if needed)
+
+# Mock and fixture utilities
+httpx>=0.24.0  # For async HTTP testing
+aioresponses>=0.7.4  # For mocking async HTTP requests
+
+# Performance testing
+pytest-benchmark>=4.0.0  # For performance benchmarks
+memory-profiler>=0.60.0  # For memory usage testing
+
+# Test reporting
+pytest-html>=3.1.0  # For HTML test reports
+pytest-json-report>=1.5.0  # For JSON test reports
+allure-pytest>=2.10.0  # For Allure test reporting
+
+# Code quality
+pytest-flake8>=1.1.0  # For code style checking
+pytest-mypy>=0.10.0  # For type checking
+pytest-black>=0.3.0  # For code formatting
+
+# Security testing
+safety>=2.3.0  # For security vulnerability scanning
+bandit>=1.7.0  # For security issue detection
+
+# Test data management
+pytest-datadir>=1.4.0  # For test data files
+pytest-tmpdir>=1.0.0  # For temporary directories
+
+# Async testing utilities
+pytest-asyncio>=0.21.0
+asyncio-mqtt>=0.16.0
+
+# Mock external services
+moto>=4.0.0  # For mocking AWS services
+localstack>=2.0.0  # For local AWS services (alternative to moto)
