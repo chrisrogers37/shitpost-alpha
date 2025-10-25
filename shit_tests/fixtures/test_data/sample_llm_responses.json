@@ -1,0 +1,114 @@
+[
+  {
+    "analysis_id": "analysis_001",
+    "shitpost_id": "test_post_001",
+    "assets": ["TSLA"],
+    "market_impact": {
+      "TSLA": "bullish"
+    },
+    "confidence": 0.95,
+    "thesis": "Direct positive mention of Tesla stock with bullish sentiment and rocket emoji indicating strong confidence in stock performance",
+    "analysis_timestamp": "2024-01-15T10:40:00Z",
+    "llm_model": "gpt-4",
+    "raw_llm_response": {
+      "assets": ["TSLA"],
+      "market_impact": {
+        "TSLA": "bullish"
+      },
+      "confidence": 0.95,
+      "thesis": "Direct positive mention of Tesla stock with bullish sentiment and rocket emoji indicating strong confidence in stock performance"
+    }
+  },
+  {
+    "analysis_id": "analysis_002",
+    "shitpost_id": "test_post_002",
+    "assets": ["SPY", "QQQ", "DIA"],
+    "market_impact": {
+      "SPY": "bearish",
+      "QQQ": "bearish",
+      "DIA": "bearish"
+    },
+    "confidence": 0.75,
+    "thesis": "Negative economic sentiment could impact broad market indices, particularly tech-heavy QQQ and overall market SPY",
+    "analysis_timestamp": "2024-01-15T12:25:00Z",
+    "llm_model": "gpt-4",
+    "raw_llm_response": {
+      "assets": ["SPY", "QQQ", "DIA"],
+      "market_impact": {
+        "SPY": "bearish",
+        "QQQ": "bearish",
+        "DIA": "bearish"
+      },
+      "confidence": 0.75,
+      "thesis": "Negative economic sentiment could impact broad market indices, particularly tech-heavy QQQ and overall market SPY"
+    }
+  },
+  {
+    "analysis_id": "analysis_003",
+    "shitpost_id": "test_post_003",
+    "assets": ["BTC", "ETH", "COIN"],
+    "market_impact": {
+      "BTC": "bullish",
+      "ETH": "bullish",
+      "COIN": "bullish"
+    },
+    "confidence": 0.85,
+    "thesis": "Strong positive sentiment about cryptocurrency adoption, particularly Bitcoin, with potential impact on crypto-related stocks like Coinbase",
+    "analysis_timestamp": "2024-01-15T14:55:00Z",
+    "llm_model": "gpt-4",
+    "raw_llm_response": {
+      "assets": ["BTC", "ETH", "COIN"],
+      "market_impact": {
+        "BTC": "bullish",
+        "ETH": "bullish",
+        "COIN": "bullish"
+      },
+      "confidence": 0.85,
+      "thesis": "Strong positive sentiment about cryptocurrency adoption, particularly Bitcoin, with potential impact on crypto-related stocks like Coinbase"
+    }
+  },
+  {
+    "analysis_id": "analysis_004",
+    "shitpost_id": "test_post_004",
+    "assets": ["AAPL"],
+    "market_impact": {
+      "AAPL": "bullish"
+    },
+    "confidence": 0.90,
+    "thesis": "Direct positive mention of Apple and Tim Cook, indicating potential positive sentiment for Apple stock",
+    "analysis_timestamp": "2024-01-15T16:30:00Z",
+    "llm_model": "gpt-4",
+    "raw_llm_response": {
+      "assets": ["AAPL"],
+      "market_impact": {
+        "AAPL": "bullish"
+      },
+      "confidence": 0.90,
+      "thesis": "Direct positive mention of Apple and Tim Cook, indicating potential positive sentiment for Apple stock"
+    }
+  },
+  {
+    "analysis_id": "analysis_005",
+    "shitpost_id": "test_post_005",
+    "assets": ["GLD", "IAU", "GDX"],
+    "market_impact": {
+      "GLD": "bullish",
+      "IAU": "bullish",
+      "GDX": "bullish"
+    },
+    "confidence": 0.80,
+    "thesis": "Direct recommendation to buy gold, indicating bullish sentiment for gold-related investments and ETFs",
+    "analysis_timestamp": "2024-01-15T18:10:00Z",
+    "llm_model": "gpt-4",
+    "raw_llm_response": {
+      "assets": ["GLD", "IAU", "GDX"],
+      "market_impact": {
+        "GLD": "bullish",
+        "IAU": "bullish",
+        "GDX": "bullish"
+      },
+      "confidence": 0.80,
+      "thesis": "Direct recommendation to buy gold, indicating bullish sentiment for gold-related investments and ETFs"
+    }
+  }
+]
