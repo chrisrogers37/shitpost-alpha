@@ -17,6 +17,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Batch processing optimizations
 - Real-time streaming analysis
 
+## [v0.17.0] - 2025-01-30
+
+### Added
+- **Centralized Logging System**: Comprehensive logging infrastructure with beautiful output
+  - Color-coded log levels with emoji icons for visual clarity
+  - Service-specific loggers for S3, Database, LLM, and CLI operations
+  - Real-time progress tracking for long-running operations
+  - Centralized configuration with verbose/quiet modes
+  - Beautiful console output with automatic color detection
+  - Multiple output formats: Beautiful, Structured, JSON
+  - Service filtering: Enable/disable logging for specific services
+- **Progress Tracking**: Real-time operation progress with percentage display
+  - Visual progress bars with elapsed time tracking
+  - Status updates during long operations
+  - Beautiful completion messages with timing information
+- **CLI Integration**: Unified logging setup for all CLI modules
+  - Module-specific logging functions for harvesters, analyzers, and database operations
+  - Third-party library noise suppression (SQLAlchemy, boto3, etc.)
+  - Backward compatibility with existing print statements
+
+### Changed
+- **CLI Modules**: Updated to use centralized logging system
+  - `shitposts/cli.py`: Now uses centralized harvester logging
+  - `shitpost_ai/cli.py`: Now uses centralized analyzer logging
+  - Maintained backward compatibility with existing functionality
+- **Logging Architecture**: Complete overhaul of logging infrastructure
+  - Moved from scattered print statements to centralized system
+  - Consistent formatting across all modules
+  - Enhanced visibility into system operations
+
+### Technical Details
+- **Logging Architecture**:
+  - `shit/logging/` directory with modular structure
+  - Configuration module (`config.py`) for centralized settings
+  - Beautiful formatters (`formatters.py`) with color and emoji support
+  - Service-specific loggers (`service_loggers.py`) for different components
+  - CLI integration (`cli_logging.py`) for unified setup
+  - Progress tracking (`progress_tracker.py`) for long operations
+- **Output Features**:
+  - Color coding: Green (success), Red (errors), Blue (info), Yellow (warnings)
+  - Service icons: ☁️ S3, 🗄️ Database, 🤖 LLM, 📊 Progress
+  - Operation icons: 📁 Upload, ✅ Success, 🔍 Check, 💾 Insert
+  - Timestamps and context information
+- **Testing**: Comprehensive test suite for all logging components
+  - Unit tests for configuration, formatters, and service loggers
+  - Integration tests for CLI modules
+  - Functional tests for output formatting and progress tracking
+
+### Documentation
+- **Development Guide**: Complete guide for centralized logging system
+- **Phase Documentation**: Detailed summaries for each implementation phase
+- **Test Coverage**: Comprehensive testing documentation and examples
+
 ## [v0.15.0] - 2025-01-30
 
 ### Added

@@ -6,6 +6,14 @@ import argparse
 import logging
 from typing import Optional
 
+from shit.logging import (
+    setup_harvester_logging as setup_centralized_harvester_logging,
+    print_success,
+    print_error,
+    print_info,
+    print_warning
+)
+
 
 def create_harvester_parser(description: str, epilog: str = None) -> argparse.ArgumentParser:
     """Create a standardized argument parser for Truth Social S3 harvesters.
@@ -89,31 +97,8 @@ def setup_harvester_logging(verbose: bool = False) -> None:
     Args:
         verbose: Enable verbose logging
     """
-    # Configure root logger
-    root_logger = logging.getLogger()
-    if verbose:
-        root_logger.setLevel(logging.DEBUG)
-    else:
-        root_logger.setLevel(logging.INFO)
-    
-    # Also configure the shitposts module logger specifically
-    shitposts_logger = logging.getLogger('shitposts')
-    if verbose:
-        shitposts_logger.setLevel(logging.DEBUG)
-    else:
-        shitposts_logger.setLevel(logging.INFO)
-    
-    # Add console handler if none exists
-    if not any(isinstance(handler, logging.StreamHandler) for handler in root_logger.handlers):
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.DEBUG if verbose else logging.INFO)
-        
-        # Create formatter
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        console_handler.setFormatter(formatter)
-        
-        # Add handler to root logger
-        root_logger.addHandler(console_handler)
+    # Use centralized logging system
+    setup_centralized_harvester_logging(verbose=verbose)
 
 
 def print_harvest_start(mode: str, limit: Optional[int] = None) -> None:
@@ -162,7 +147,7 @@ def print_harvest_error(error: Exception, verbose: bool = False) -> None:
         error: Exception that occurred
         verbose: Whether to show full traceback
     """
-    print(f"\n❌ Harvesting failed: {error}")
+    print_error(f"Harvesting failed: {error}")
     
     if verbose:
         import traceback

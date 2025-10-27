@@ -6,6 +6,14 @@ import argparse
 import logging
 from typing import Optional
 
+from shit.logging import (
+    setup_analyzer_logging as setup_centralized_analyzer_logging,
+    print_success,
+    print_error,
+    print_info,
+    print_warning
+)
+
 
 def create_analyzer_parser(description: str, epilog: str = None) -> argparse.ArgumentParser:
     """Create a standardized argument parser for Truth Social analyzers.
@@ -90,10 +98,8 @@ def setup_analyzer_logging(verbose: bool = False) -> None:
     Args:
         verbose: Enable verbose logging
     """
-    if verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-    else:
-        logging.getLogger().setLevel(logging.INFO)
+    # Use centralized logging system
+    setup_centralized_analyzer_logging(verbose=verbose)
 
 
 def print_analysis_start(mode: str, limit: Optional[int] = None, batch_size: int = 5) -> None:
