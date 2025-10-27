@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Batch processing optimizations
 - Real-time streaming analysis
 
-## [v0.16.0] - 2025-01-30
+## [v0.17.0] - 2025-01-30
 
 ### Added
 - **Centralized Logging System**: Comprehensive logging infrastructure with beautiful output
