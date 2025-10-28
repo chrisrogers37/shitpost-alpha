@@ -22,7 +22,7 @@ class TestShitpostsCLI:
             def __init__(self):
                 self.mode = "incremental"
                 self.start_date = None
-                self.to_date = None
+                self.end_date = None
                 self.limit = None
                 self.max_id = None
                 self.verbose = False
@@ -68,38 +68,20 @@ class TestShitpostsCLI:
             validate_harvester_args(args)
 
     def test_validate_harvester_args_invalid_mode(self):
-        """Test validating invalid mode."""
-        class InvalidArgs:
-            def __init__(self):
-                self.mode = "invalid_mode"
-                self.start_date = None
-                self.to_date = None
-                self.limit = None
-                self.max_id = None
-                self.verbose = False
-                self.dry_run = False
+        """Test validating invalid mode through argument parsing."""
+        parser = create_harvester_parser("Test harvester description")
         
-        args = InvalidArgs()
-        
+        # Test invalid mode through argument parsing (this should raise SystemExit)
         with pytest.raises(SystemExit):
-            validate_harvester_args(args)
+            parser.parse_args(["--mode", "invalid_mode"])
 
     def test_validate_harvester_args_invalid_limit(self):
-        """Test validating invalid limit."""
-        class InvalidArgs:
-            def __init__(self):
-                self.mode = "incremental"
-                self.start_date = None
-                self.to_date = None
-                self.limit = 0  # Invalid limit
-                self.max_id = None
-                self.verbose = False
-                self.dry_run = False
+        """Test validating invalid limit through argument parsing."""
+        parser = create_harvester_parser("Test harvester description")
         
-        args = InvalidArgs()
-        
+        # Test invalid limit through argument parsing (this should raise SystemExit)
         with pytest.raises(SystemExit):
-            validate_harvester_args(args)
+            parser.parse_args(["--limit", "invalid"])
 
     @pytest.mark.asyncio
     async def test_main_success(self, sample_args):
