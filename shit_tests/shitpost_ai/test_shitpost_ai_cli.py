@@ -149,7 +149,7 @@ class TestShitpostAICLI:
         class CustomArgs:
             def __init__(self):
                 self.mode = "range"
-                self.from_date = "2024-01-01"
+                self.start_date = "2024-01-01"
                 self.end_date = "2024-01-31"
                 self.limit = 100
                 self.batch_size = 10
@@ -268,8 +268,8 @@ class TestShitpostAICLI:
         ])
         
         assert range_args.mode == "range"
-        assert range_args.from_date == "2024-01-01"
-        assert range_args.to_date == "2024-01-31"
+        assert range_args.start_date == "2024-01-01"
+        assert range_args.end_date == "2024-01-31"
         assert range_args.limit == 100
 
     def test_parser_backfill_mode_validation(self):

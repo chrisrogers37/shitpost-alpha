@@ -22,8 +22,8 @@ class TestShitpostAlphaOrchestrator:
         class MockArgs:
             def __init__(self):
                 self.mode = "incremental"
-                self.from_date = None
-                self.to_date = None
+                self.start_date = None
+                self.end_date = None
                 self.limit = None
                 self.batch_size = 5
                 self.verbose = False
@@ -248,8 +248,8 @@ class TestShitpostAlphaOrchestrator:
             # Mock invalid arguments
             mock_args = MagicMock()
             mock_args.mode = "range"
-            mock_args.from_date = None  # Missing required date
-            mock_args.to_date = None
+            mock_args.start_date = None  # Missing required date
+            mock_args.end_date = None
             mock_args.limit = None
             mock_args.batch_size = 5
             mock_args.verbose = False
@@ -274,7 +274,7 @@ class TestShitpostAlphaOrchestrator:
             # Mock parsed arguments
             mock_args = MagicMock()
             mock_args.mode = "backfill"
-            mock_args.from_date = "2024-01-01"
+            mock_args.start_date = "2024-01-01"
             mock_args.to_date = "2024-01-31"
             mock_args.limit = 100
             mock_args.batch_size = 10
@@ -294,7 +294,7 @@ class TestShitpostAlphaOrchestrator:
     async def test_subprocess_command_construction(self, sample_args):
         """Test subprocess command construction."""
         sample_args.mode = "backfill"
-        sample_args.from_date = "2024-01-01"
+        sample_args.start_date = "2024-01-01"
         sample_args.to_date = "2024-01-31"
         sample_args.limit = 50
         sample_args.verbose = True
@@ -328,7 +328,7 @@ class TestShitpostAlphaOrchestrator:
     async def test_s3_to_database_command_construction(self, sample_args):
         """Test S3 to database command construction."""
         sample_args.mode = "incremental"
-        sample_args.from_date = "2024-01-01"
+        sample_args.start_date = "2024-01-01"
         sample_args.to_date = "2024-01-31"
         sample_args.limit = 25
         
@@ -361,7 +361,7 @@ class TestShitpostAlphaOrchestrator:
     async def test_analysis_command_construction(self, sample_args):
         """Test analysis command construction."""
         sample_args.mode = "range"
-        sample_args.from_date = "2024-01-01"
+        sample_args.start_date = "2024-01-01"
         sample_args.to_date = "2024-01-31"
         sample_args.limit = 100
         sample_args.batch_size = 15
