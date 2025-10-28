@@ -21,7 +21,7 @@ class TestShitpostAICLI:
         class MockArgs:
             def __init__(self):
                 self.mode = "incremental"
-                self.from_date = None
+                self.start_date = None
                 self.to_date = None
                 self.limit = None
                 self.batch_size = 5
@@ -55,8 +55,8 @@ class TestShitpostAICLI:
         class InvalidArgs:
             def __init__(self):
                 self.mode = "range"
-                self.from_date = None
-                self.to_date = "2024-01-31"
+                self.start_date = None
+                self.end_date = "2024-01-31"
                 self.limit = None
                 self.batch_size = 5
                 self.verbose = False
@@ -72,7 +72,7 @@ class TestShitpostAICLI:
         class InvalidArgs:
             def __init__(self):
                 self.mode = "invalid_mode"
-                self.from_date = None
+                self.start_date = None
                 self.to_date = None
                 self.limit = None
                 self.batch_size = 5
@@ -89,7 +89,7 @@ class TestShitpostAICLI:
         class InvalidArgs:
             def __init__(self):
                 self.mode = "incremental"
-                self.from_date = None
+                self.start_date = None
                 self.to_date = None
                 self.limit = None
                 self.batch_size = 0  # Invalid batch size
@@ -168,7 +168,7 @@ class TestShitpostAICLI:
             def __init__(self):
                 self.mode = "range"
                 self.from_date = "2024-01-01"
-                self.to_date = "2024-01-31"
+                self.end_date = "2024-01-31"
                 self.limit = 100
                 self.batch_size = 10
                 self.verbose = True
@@ -313,8 +313,8 @@ class TestShitpostAICLI:
         default_args = parser.parse_args([])
         
         assert default_args.mode == "incremental"
-        assert default_args.from_date is None
-        assert default_args.to_date is None
+        assert default_args.start_date is None
+        assert default_args.end_date is None
         assert default_args.limit is None
         assert default_args.batch_size == 5
         assert default_args.verbose is False
