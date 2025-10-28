@@ -260,7 +260,7 @@ class TestShitpostAICLI:
 
     def test_parser_argument_validation(self):
         """Test argument parser validation."""
-        parser = create_analyzer_parser()
+        parser = create_analyzer_parser("Test analyzer description")
         
         # Test valid arguments
         valid_args = parser.parse_args([
@@ -275,7 +275,7 @@ class TestShitpostAICLI:
 
     def test_parser_range_mode_validation(self):
         """Test parser validation for range mode."""
-        parser = create_analyzer_parser()
+        parser = create_analyzer_parser("Test analyzer description")
         
         # Test range mode with dates
         range_args = parser.parse_args([
@@ -292,7 +292,7 @@ class TestShitpostAICLI:
 
     def test_parser_backfill_mode_validation(self):
         """Test parser validation for backfill mode."""
-        parser = create_analyzer_parser()
+        parser = create_analyzer_parser("Test analyzer description")
         
         # Test backfill mode
         backfill_args = parser.parse_args([
@@ -307,7 +307,7 @@ class TestShitpostAICLI:
 
     def test_parser_default_values(self):
         """Test parser default values."""
-        parser = create_analyzer_parser()
+        parser = create_analyzer_parser("Test analyzer description")
         
         # Test with no arguments (should use defaults)
         default_args = parser.parse_args([])

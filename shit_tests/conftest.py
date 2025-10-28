@@ -5,9 +5,13 @@ Global test configuration and fixtures for Shitpost Alpha tests.
 import pytest
 import asyncio
 import os
+import sys
 import tempfile
 from typing import AsyncGenerator, Dict, Any
 from datetime import datetime, timedelta
+
+# Add the parent directory to the Python path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker

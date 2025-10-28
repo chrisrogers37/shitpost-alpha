@@ -1,31 +1,28 @@
 """
-Centralized Logging System
-Provides beautiful, informative logging for the Shitpost-Alpha project.
+Logging Package
+Centralized logging system with beautiful output formatting.
 """
 
+# Import all public interfaces
 from .config import (
     LoggingConfig,
     LogLevel,
     OutputFormat,
     get_config,
-    set_config,
-    configure_logging,
-    configure_from_verbose,
-    detect_color_support
+    configure_from_verbose
 )
 
 from .formatters import (
     BeautifulFormatter,
     StructuredFormatter,
     JSONFormatter,
-    create_formatter,
     Colors,
     Icons,
-    colorize,
+    create_formatter,
     print_success,
     print_error,
-    print_warning,
-    print_info
+    print_info,
+    print_warning
 )
 
 from .service_loggers import (
@@ -33,10 +30,7 @@ from .service_loggers import (
     S3Logger,
     DatabaseLogger,
     LLMLogger,
-    CLILogger,
-    get_s3_logger,
-    get_database_logger,
-    get_llm_logger
+    CLILogger
 )
 
 from .cli_logging import (
@@ -47,34 +41,29 @@ from .cli_logging import (
 )
 
 from .progress_tracker import (
-    ProgressTracker,
-    track_progress,
-    simple_progress
+    ProgressTracker
 )
 
+# Export all public interfaces
 __all__ = [
-    # Configuration
+    # Config
     'LoggingConfig',
-    'LogLevel',
+    'LogLevel', 
     'OutputFormat',
     'get_config',
-    'set_config',
-    'configure_logging',
     'configure_from_verbose',
-    'detect_color_support',
     
     # Formatters
     'BeautifulFormatter',
     'StructuredFormatter',
     'JSONFormatter',
-    'create_formatter',
     'Colors',
     'Icons',
-    'colorize',
+    'create_formatter',
     'print_success',
     'print_error',
-    'print_warning',
     'print_info',
+    'print_warning',
     
     # Service Loggers
     'get_service_logger',
@@ -82,10 +71,6 @@ __all__ = [
     'DatabaseLogger',
     'LLMLogger',
     'CLILogger',
-    'get_s3_logger',
-    'get_database_logger',
-    'get_llm_logger',
-    'get_cli_logger',
     
     # CLI Logging
     'setup_cli_logging',
@@ -93,8 +78,6 @@ __all__ = [
     'setup_analyzer_logging',
     'setup_database_logging',
     
-    # Progress Tracking
-    'ProgressTracker',
-    'track_progress',
-    'simple_progress',
+    # Progress Tracker
+    'ProgressTracker'
 ]

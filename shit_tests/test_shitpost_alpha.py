@@ -309,9 +309,9 @@ class TestShitpostAlphaOrchestrator:
             
             # Verify command was constructed correctly
             call_args = mock_subprocess.call_args[0]
-            command = call_args[0]
+            command = call_args  # The command is passed as individual arguments, not as a list
             
-            assert "python" in command[0]
+            assert "python" in command[0] or command[0].endswith("python")
             assert "-m" in command
             assert "shitposts" in command
             assert "--mode" in command
@@ -342,9 +342,9 @@ class TestShitpostAlphaOrchestrator:
             
             # Verify command was constructed correctly
             call_args = mock_subprocess.call_args[0]
-            command = call_args[0]
+            command = call_args  # The command is passed as individual arguments, not as a list
             
-            assert "python" in command[0]
+            assert "python" in command[0] or command[0].endswith("python")
             assert "-m" in command
             assert "shitvault" in command
             assert "load-database-from-s3" in command
@@ -377,9 +377,9 @@ class TestShitpostAlphaOrchestrator:
             
             # Verify command was constructed correctly
             call_args = mock_subprocess.call_args[0]
-            command = call_args[0]
+            command = call_args  # The command is passed as individual arguments, not as a list
             
-            assert "python" in command[0]
+            assert "python" in command[0] or command[0].endswith("python")
             assert "-m" in command
             assert "shitpost_ai" in command
             assert "--mode" in command
