@@ -22,7 +22,7 @@ class TestShitpostAICLI:
             def __init__(self):
                 self.mode = "incremental"
                 self.start_date = None
-                self.to_date = None
+                self.end_date = None
                 self.limit = None
                 self.batch_size = 5
                 self.verbose = False
@@ -87,13 +87,13 @@ class TestShitpostAICLI:
     async def test_main_success(self, sample_args):
         """Test successful main execution."""
         with patch('shitpost_ai.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitpost_ai.cli.ShitpostAnalyzer') as mock_analyzer_class:
+             patch('shitpost_ai.__main__.ShitpostAnalyzer') as mock_analyzer_class:
             
             # Mock analyzer instance
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
             mock_analyzer.initialize = AsyncMock()
-            mock_analyzer.analyze_unprocessed_shitposts = AsyncMock(return_value=5)
+            mock_analyzer.analyze_shitposts = AsyncMock(return_value=5)
             mock_analyzer.cleanup = AsyncMock()
             
             await main()
@@ -101,7 +101,7 @@ class TestShitpostAICLI:
             # Verify analyzer was created and used
             mock_analyzer_class.assert_called_once()
             mock_analyzer.initialize.assert_called_once()
-            mock_analyzer.analyze_unprocessed_shitposts.assert_called_once()
+            mock_analyzer.analyze_shitposts.assert_called_once()
             mock_analyzer.cleanup.assert_called_once()
 
     @pytest.mark.asyncio
@@ -130,7 +130,7 @@ class TestShitpostAICLI:
         sample_args.dry_run = True
         
         with patch('shitpost_ai.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitpost_ai.cli.ShitpostAnalyzer') as mock_analyzer_class:
+             patch('shitpost_ai.__main__.ShitpostAnalyzer') as mock_analyzer_class:
             
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
@@ -159,7 +159,7 @@ class TestShitpostAICLI:
         custom_args = CustomArgs()
         
         with patch('shitpost_ai.cli.argparse.ArgumentParser.parse_args', return_value=custom_args), \
-             patch('shitpost_ai.cli.ShitpostAnalyzer') as mock_analyzer_class:
+             patch('shitpost_ai.__main__.ShitpostAnalyzer') as mock_analyzer_class:
             
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
@@ -182,7 +182,7 @@ class TestShitpostAICLI:
     async def test_main_analyzer_initialization_error(self, sample_args):
         """Test main execution with analyzer initialization error."""
         with patch('shitpost_ai.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitpost_ai.cli.ShitpostAnalyzer') as mock_analyzer_class:
+             patch('shitpost_ai.__main__.ShitpostAnalyzer') as mock_analyzer_class:
             
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
@@ -196,7 +196,7 @@ class TestShitpostAICLI:
     async def test_main_analysis_error(self, sample_args):
         """Test main execution with analysis error."""
         with patch('shitpost_ai.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitpost_ai.cli.ShitpostAnalyzer') as mock_analyzer_class:
+             patch('shitpost_ai.__main__.ShitpostAnalyzer') as mock_analyzer_class:
             
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
@@ -211,7 +211,7 @@ class TestShitpostAICLI:
     async def test_main_keyboard_interrupt(self, sample_args):
         """Test main execution with keyboard interrupt."""
         with patch('shitpost_ai.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitpost_ai.cli.ShitpostAnalyzer') as mock_analyzer_class:
+             patch('shitpost_ai.__main__.ShitpostAnalyzer') as mock_analyzer_class:
             
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
@@ -226,7 +226,7 @@ class TestShitpostAICLI:
     async def test_main_cleanup_on_error(self, sample_args):
         """Test that cleanup is called even on error."""
         with patch('shitpost_ai.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitpost_ai.cli.ShitpostAnalyzer') as mock_analyzer_class:
+             patch('shitpost_ai.__main__.ShitpostAnalyzer') as mock_analyzer_class:
             
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
@@ -345,7 +345,7 @@ class TestShitpostAICLI:
     async def test_main_with_analysis_errors(self, sample_args):
         """Test main execution with some analysis errors."""
         with patch('shitpost_ai.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitpost_ai.cli.ShitpostAnalyzer') as mock_analyzer_class:
+             patch('shitpost_ai.__main__.ShitpostAnalyzer') as mock_analyzer_class:
             
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
