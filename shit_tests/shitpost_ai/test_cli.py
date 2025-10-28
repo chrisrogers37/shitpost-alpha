@@ -110,19 +110,19 @@ class TestShitpostAICLI:
         sample_args.verbose = True
         
         with patch('shitpost_ai.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitpost_ai.cli.ShitpostAnalyzer') as mock_analyzer_class, \
-             patch('shitpost_ai.cli.logging') as mock_logging:
+             patch('shitpost_ai.__main__.ShitpostAnalyzer') as mock_analyzer_class, \
+             patch('shitpost_ai.__main__.setup_analyzer_logging') as mock_setup_logging:
             
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
             mock_analyzer.initialize = AsyncMock()
-            mock_analyzer.analyze_unprocessed_shitposts = AsyncMock(return_value=3)
+            mock_analyzer.analyze_shitposts = AsyncMock(return_value=3)
             mock_analyzer.cleanup = AsyncMock()
             
             await main()
             
             # Verify verbose logging was set
-            mock_logging.getLogger.return_value.setLevel.assert_called()
+            mock_setup_logging.assert_called_once_with(True)
 
     @pytest.mark.asyncio
     async def test_main_with_dry_run(self, sample_args):
@@ -130,18 +130,26 @@ class TestShitpostAICLI:
         sample_args.dry_run = True
         
         with patch('shitpost_ai.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitpost_ai.__main__.ShitpostAnalyzer') as mock_analyzer_class:
+             patch('shitpost_ai.__main__.ShitpostAnalyzer') as mock_analyzer_class, \
+             patch('sys.stdout', new_callable=StringIO) as mock_stdout:
             
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
             mock_analyzer.initialize = AsyncMock()
-            mock_analyzer.analyze_unprocessed_shitposts = AsyncMock(return_value=0)
+            mock_analyzer.analyze_shitposts = AsyncMock(return_value=0)
             mock_analyzer.cleanup = AsyncMock()
             
             await main()
             
-            # Verify dry run was passed to analyzer
-            mock_analyzer.analyze_unprocessed_shitposts.assert_called_once_with(dry_run=True)
+            # Verify dry run messages were printed
+            output = mock_stdout.getvalue()
+            assert "DRY RUN MODE" in output
+            assert "Would analyze unprocessed shitposts" in output
+            assert "Mode: incremental" in output
+            assert "Batch Size: 5" in output
+            
+            # Verify analyzer was not called in dry run mode
+            mock_analyzer.analyze_shitposts.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_main_with_custom_parameters(self):
@@ -164,7 +172,7 @@ class TestShitpostAICLI:
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
             mock_analyzer.initialize = AsyncMock()
-            mock_analyzer.analyze_unprocessed_shitposts = AsyncMock(return_value=15)
+            mock_analyzer.analyze_shitposts = AsyncMock(return_value=15)
             mock_analyzer.cleanup = AsyncMock()
             
             await main()
@@ -201,7 +209,7 @@ class TestShitpostAICLI:
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
             mock_analyzer.initialize = AsyncMock()
-            mock_analyzer.analyze_unprocessed_shitposts = AsyncMock(side_effect=Exception("Analysis failed"))
+            mock_analyzer.analyze_shitposts = AsyncMock(side_effect=Exception("Analysis failed"))
             mock_analyzer.cleanup = AsyncMock()
             
             with pytest.raises(Exception, match="Analysis failed"):
@@ -216,7 +224,7 @@ class TestShitpostAICLI:
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
             mock_analyzer.initialize = AsyncMock()
-            mock_analyzer.analyze_unprocessed_shitposts = AsyncMock(side_effect=KeyboardInterrupt())
+            mock_analyzer.analyze_shitposts = AsyncMock(side_effect=KeyboardInterrupt())
             mock_analyzer.cleanup = AsyncMock()
             
             with pytest.raises(KeyboardInterrupt):
@@ -231,7 +239,7 @@ class TestShitpostAICLI:
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
             mock_analyzer.initialize = AsyncMock()
-            mock_analyzer.analyze_unprocessed_shitposts = AsyncMock(side_effect=Exception("Error"))
+            mock_analyzer.analyze_shitposts = AsyncMock(side_effect=Exception("Error"))
             mock_analyzer.cleanup = AsyncMock()
             
             with pytest.raises(Exception):
@@ -306,13 +314,13 @@ class TestShitpostAICLI:
     async def test_main_output_formatting(self, sample_args):
         """Test main execution output formatting."""
         with patch('shitpost_ai.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitpost_ai.cli.ShitpostAnalyzer') as mock_analyzer_class, \
+             patch('shitpost_ai.__main__.ShitpostAnalyzer') as mock_analyzer_class, \
              patch('sys.stdout', new_callable=StringIO) as mock_stdout:
             
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
             mock_analyzer.initialize = AsyncMock()
-            mock_analyzer.analyze_unprocessed_shitposts = AsyncMock(return_value=7)
+            mock_analyzer.analyze_shitposts = AsyncMock(return_value=7)
             mock_analyzer.cleanup = AsyncMock()
             
             await main()
@@ -326,13 +334,13 @@ class TestShitpostAICLI:
     async def test_main_no_posts_to_analyze(self, sample_args):
         """Test main execution when no posts need analysis."""
         with patch('shitpost_ai.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitpost_ai.cli.ShitpostAnalyzer') as mock_analyzer_class, \
+             patch('shitpost_ai.__main__.ShitpostAnalyzer') as mock_analyzer_class, \
              patch('sys.stdout', new_callable=StringIO) as mock_stdout:
             
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
             mock_analyzer.initialize = AsyncMock()
-            mock_analyzer.analyze_unprocessed_shitposts = AsyncMock(return_value=0)
+            mock_analyzer.analyze_shitposts = AsyncMock(return_value=0)
             mock_analyzer.cleanup = AsyncMock()
             
             await main()
@@ -350,7 +358,7 @@ class TestShitpostAICLI:
             mock_analyzer = AsyncMock()
             mock_analyzer_class.return_value = mock_analyzer
             mock_analyzer.initialize = AsyncMock()
-            mock_analyzer.analyze_unprocessed_shitposts = AsyncMock(return_value=3)  # Some successful
+            mock_analyzer.analyze_shitposts = AsyncMock(return_value=3)  # Some successful
             mock_analyzer.cleanup = AsyncMock()
             
             await main()
