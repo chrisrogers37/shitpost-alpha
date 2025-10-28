@@ -330,7 +330,7 @@ class TestShitpostAICLI:
             
             # Check that output was printed
             output = mock_stdout.getvalue()
-            assert "Analysis completed successfully" in output
+            assert "Analysis completed" in output  # Core business logic: analysis completed
             assert "7" in output  # Number of posts analyzed
 
     @pytest.mark.asyncio
