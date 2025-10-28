@@ -19,7 +19,7 @@ class TestShitpostAnalyzer:
         return {
             "shitpost_id": "test_post_001",
             "post_timestamp": "2024-01-15T10:30:00Z",
-            "content": "Tesla stock is going to the moon! 🚀",
+            "text": "Tesla stock is going to the moon! 🚀",
             "author": {
                 "username": "realDonaldTrump",
                 "display_name": "Donald J. Trump"
@@ -84,7 +84,7 @@ class TestShitpostAnalyzer:
         assert analyzer.batch_size == 10
 
     @pytest.mark.asyncio
-    async def test_analyze_unprocessed_shitposts(self, analyzer, sample_shitpost_data):
+    async def test_analyze_shitposts(self, analyzer, sample_shitpost_data):
         """Test analyzing unprocessed shitposts."""
         with patch.object(analyzer, 'initialize') as mock_init, \
              patch.object(analyzer, 'shitpost_ops') as mock_shitpost_ops, \
@@ -92,22 +92,23 @@ class TestShitpostAnalyzer:
              patch.object(analyzer, 'llm_client') as mock_llm_client:
             
             # Mock database operations
-            mock_shitpost_ops.get_unprocessed_shitposts.return_value = [sample_shitpost_data]
-            mock_prediction_ops.check_prediction_exists.return_value = False
+            mock_shitpost_ops.get_unprocessed_shitposts = AsyncMock(return_value=[sample_shitpost_data])
+            mock_prediction_ops.check_prediction_exists = AsyncMock(return_value=False)
             
             # Mock LLM analysis
-            mock_llm_client.analyze.return_value = {
+            mock_llm_client.analyze = AsyncMock(return_value={
                 "assets": ["TSLA"],
                 "market_impact": {"TSLA": "bullish"},
                 "confidence": 0.95,
                 "thesis": "Positive Tesla sentiment"
-            }
+            })
             
             # Mock database storage
-            mock_prediction_ops.store_analysis.return_value = "analysis_001"
+            mock_prediction_ops.store_analysis = AsyncMock(return_value="analysis_001")
+            mock_prediction_ops.handle_no_text_prediction = AsyncMock(return_value="bypass_001")
             
             await analyzer.initialize()
-            result = await analyzer.analyze_unprocessed_shitposts(batch_size=1)
+            result = await analyzer.analyze_shitposts(dry_run=False)
             
             assert result == 1  # One post analyzed
             mock_shitpost_ops.get_unprocessed_shitposts.assert_called_once()
@@ -303,7 +304,7 @@ class TestShitpostAnalyzer:
     @pytest.mark.asyncio
     async def test_run_continuous_analysis(self, analyzer):
         """Test continuous analysis mode."""
-        with patch.object(analyzer, 'analyze_unprocessed_shitposts', return_value=0) as mock_analyze, \
+        with patch.object(analyzer, 'analyze_shitposts', return_value=0) as mock_analyze, \
              patch('asyncio.sleep') as mock_sleep:
             
             # Mock KeyboardInterrupt to stop the loop
