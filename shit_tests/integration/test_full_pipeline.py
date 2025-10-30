@@ -4,13 +4,15 @@ Tests the full workflow: API → S3 → Database → LLM → Database
 """
 
 import pytest
+import pytest_asyncio
 import asyncio
 import json
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from shit.db.database_config import DatabaseConfig
-from shit.db.database_client import DatabaseClient
+# Database client comes from conftest.py fixture
+# from shit.db.database_config import DatabaseConfig
+# from shit.db.database_client import DatabaseClient
 from shit.s3.s3_config import S3Config
 from shit.s3.s3_data_lake import S3DataLake
 from shit.llm.llm_client import LLMClient
@@ -21,15 +23,11 @@ from shit.llm.llm_client import LLMClient
 class TestFullPipeline:
     """End-to-end tests for the complete pipeline."""
 
-    @pytest.fixture
-    async def test_infrastructure(self):
+    @pytest_asyncio.fixture
+    async def test_infrastructure(self, test_db_client):
         """Set up test infrastructure for integration tests."""
-        # Database setup
-        db_config = DatabaseConfig(
-            database_url="sqlite+aiosqlite:///./test_pipeline.db"
-        )
-        db_client = DatabaseClient(db_config)
-        await db_client.initialize()
+        # Use shared test database client from conftest.py
+        db_client = test_db_client
         
         # S3 setup (mocked for integration tests)
         s3_config = S3Config(
@@ -51,8 +49,8 @@ class TestFullPipeline:
             "llm_client": llm_client
         }
         
-        # Cleanup
-        await db_client.cleanup()
+        # Note: Database cleanup is handled by the shared test_db_client fixture
+        # No need to cleanup here as it's session-scoped and shared
 
     @pytest.mark.asyncio
     async def test_complete_pipeline_workflow(self, test_infrastructure):

@@ -217,6 +217,10 @@ $RECYCLE.BIN/
 *.sqlite
 *.sqlite3
 shitpost_alpha.db
+# Test database files
+test.db
+test_*.db
+*_test.db
 
 # Log files
 *.log

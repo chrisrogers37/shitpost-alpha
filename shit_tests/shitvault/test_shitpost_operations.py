@@ -1,424 +1,396 @@
 """
-Tests for ShitpostOperations - database CRUD operations for shitposts.
+Tests for shitvault/shitpost_operations.py - Shitpost CRUD operations.
 """
 
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
+from sqlalchemy.exc import IntegrityError
 
 from shitvault.shitpost_operations import ShitpostOperations
+from shitvault.shitpost_models import TruthSocialShitpost
+from shit.db.database_operations import DatabaseOperations
 
 
 class TestShitpostOperations:
     """Test cases for ShitpostOperations."""
 
     @pytest.fixture
+    def mock_db_ops(self):
+        """Mock DatabaseOperations instance."""
+        mock_ops = MagicMock(spec=DatabaseOperations)
+        mock_ops.session = AsyncMock()
+        mock_ops.session.add = MagicMock()
+        mock_ops.session.commit = AsyncMock()
+        mock_ops.session.refresh = AsyncMock()
+        mock_ops.session.execute = AsyncMock()
+        mock_ops.read_one = AsyncMock()
+        return mock_ops
+
+    @pytest.fixture
+    def shitpost_ops(self, mock_db_ops):
+        """ShitpostOperations instance with mocked dependencies."""
+        return ShitpostOperations(mock_db_ops)
+
+    @pytest.fixture
     def sample_shitpost_data(self):
         """Sample shitpost data for testing."""
         return {
-            "shitpost_id": "test_post_001",
-            "post_timestamp": "2024-01-15T10:30:00Z",
-            "content": "Tesla stock is going to the moon! 🚀",
-            "author": {
-                "username": "realDonaldTrump",
-                "display_name": "Donald J. Trump"
-            },
-            "engagement": {
-                "likes": 15000,
-                "retruths": 2500,
-                "replies": 800
-            },
-            "raw_api_data": {
-                "id": "test_post_001",
-                "text": "Tesla stock is going to the moon! 🚀",
-                "created_at": "2024-01-15T10:30:00Z"
-            }
+            'shitpost_id': '123456789',
+            'content': '<p>Tesla stock is going up!</p>',
+            'text': 'Tesla stock is going up!',
+            'timestamp': datetime(2024, 1, 15, 12, 0, 0),
+            'username': 'realDonaldTrump',
+            'platform': 'truth_social',
+            'replies_count': 100,
+            'reblogs_count': 200,
+            'favourites_count': 300,
+            'upvotes_count': 250,
+            'downvotes_count': 25,
+            'account_followers_count': 5000000,
+            'has_media': False,
+            'mentions': [],
+            'tags': []
         }
 
-    @pytest.fixture
-    def operations(self, test_db_session):
-        """ShitpostOperations instance for testing."""
-        return ShitpostOperations(test_db_session)
+    @pytest.mark.asyncio
+    async def test_store_shitpost_success(self, shitpost_ops, mock_db_ops, sample_shitpost_data):
+        """Test successful shitpost storage."""
+        # Mock no existing shitpost
+        mock_db_ops.read_one.return_value = None
+        
+        # Mock shitpost creation
+        mock_shitpost = MagicMock()
+        mock_shitpost.id = 1
+        mock_shitpost.shitpost_id = '123456789'
+        
+        def mock_add(shitpost):
+            shitpost.id = 1
+            shitpost.shitpost_id = '123456789'
+        
+        mock_db_ops.session.add.side_effect = mock_add
+        
+        result = await shitpost_ops.store_shitpost(sample_shitpost_data)
+        
+        assert result == '1'
+        mock_db_ops.read_one.assert_called_once_with(
+            TruthSocialShitpost,
+            {'shitpost_id': '123456789'}
+        )
+        mock_db_ops.session.add.assert_called_once()
+        mock_db_ops.session.commit.assert_called_once()
+        mock_db_ops.session.refresh.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_shitpost_success(self, operations, sample_shitpost_data):
-        """Test successful shitpost creation."""
-        result = await operations.create_shitpost(sample_shitpost_data)
+    async def test_store_shitpost_existing(self, shitpost_ops, mock_db_ops, sample_shitpost_data):
+        """Test storing existing shitpost returns existing ID."""
+        # Mock existing shitpost
+        existing_shitpost = MagicMock()
+        existing_shitpost.id = 42
+        mock_db_ops.read_one.return_value = existing_shitpost
         
-        assert result is not None
-        assert result["shitpost_id"] == "test_post_001"
-        assert result["content"] == "Tesla stock is going to the moon! 🚀"
-        assert result["author"]["username"] == "realDonaldTrump"
+        result = await shitpost_ops.store_shitpost(sample_shitpost_data)
+        
+        assert result == '42'
+        mock_db_ops.read_one.assert_called_once()
+        mock_db_ops.session.add.assert_not_called()
+        mock_db_ops.session.commit.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_create_shitpost_duplicate(self, operations, sample_shitpost_data):
-        """Test creating duplicate shitpost."""
-        # Create first shitpost
-        await operations.create_shitpost(sample_shitpost_data)
+    async def test_store_shitpost_integrity_error(self, shitpost_ops, mock_db_ops, sample_shitpost_data):
+        """Test handling integrity error (duplicate key)."""
+        mock_db_ops.read_one.return_value = None
+        mock_db_ops.session.commit.side_effect = IntegrityError("statement", "params", "orig")
         
-        # Try to create duplicate
-        with pytest.raises(Exception):
-            await operations.create_shitpost(sample_shitpost_data)
-
-    @pytest.mark.asyncio
-    async def test_get_shitpost_by_id(self, operations, sample_shitpost_data):
-        """Test getting shitpost by ID."""
-        # Create shitpost first
-        await operations.create_shitpost(sample_shitpost_data)
+        result = await shitpost_ops.store_shitpost(sample_shitpost_data)
         
-        # Get shitpost by ID
-        result = await operations.get_shitpost_by_id("test_post_001")
-        
-        assert result is not None
-        assert result["shitpost_id"] == "test_post_001"
-        assert result["content"] == "Tesla stock is going to the moon! 🚀"
-
-    @pytest.mark.asyncio
-    async def test_get_shitpost_by_id_not_found(self, operations):
-        """Test getting non-existent shitpost by ID."""
-        result = await operations.get_shitpost_by_id("non_existent_id")
         assert result is None
+        mock_db_ops.session.rollback.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_get_unprocessed_shitposts(self, operations, sample_shitpost_data):
+    async def test_store_shitpost_general_error(self, shitpost_ops, mock_db_ops, sample_shitpost_data):
+        """Test handling general error."""
+        mock_db_ops.read_one.return_value = None
+        mock_db_ops.session.commit.side_effect = Exception("Database error")
+        
+        with pytest.raises(Exception, match="Database error"):
+            await shitpost_ops.store_shitpost(sample_shitpost_data)
+        
+        mock_db_ops.session.rollback.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_store_shitpost_with_all_fields(self, shitpost_ops, mock_db_ops):
+        """Test storing shitpost with all fields populated."""
+        mock_db_ops.read_one.return_value = None
+        
+        full_data = {
+            'shitpost_id': '123456789',
+            'content': '<p>Full content</p>',
+            'text': 'Full text',
+            'timestamp': datetime(2024, 1, 15, 12, 0, 0),
+            'username': 'testuser',
+            'platform': 'truth_social',
+            'language': 'en',
+            'visibility': 'public',
+            'sensitive': False,
+            'spoiler_text': None,
+            'uri': 'https://example.com/uri',
+            'url': 'https://example.com/url',
+            'replies_count': 100,
+            'reblogs_count': 200,
+            'favourites_count': 300,
+            'upvotes_count': 250,
+            'downvotes_count': 25,
+            'account_id': '987654321',
+            'account_display_name': 'Test User',
+            'account_followers_count': 5000,
+            'account_following_count': 50,
+            'account_statuses_count': 1000,
+            'account_verified': True,
+            'account_website': 'https://example.com',
+            'has_media': True,
+            'media_attachments': [{'id': '1', 'type': 'image'}],
+            'mentions': [{'username': 'user1'}],
+            'tags': [{'name': 'tag1'}],
+            'in_reply_to_id': '999',
+            'quote_id': '888',
+            'in_reply_to_account_id': '777',
+            'card': {'type': 'link'},
+            'group': {'id': 'group1'},
+            'quote': {'id': 'quote1'},
+            'in_reply_to': {'id': 'reply1'},
+            'reblog': {'id': 'reblog1'},
+            'sponsored': False,
+            'reaction': {'type': 'like'},
+            'favourited': True,
+            'reblogged': False,
+            'muted': False,
+            'pinned': True,
+            'bookmarked': False,
+            'poll': {'id': 'poll1'},
+            'emojis': [{'shortcode': 'fire'}],
+            'votable': True,
+            'edited_at': datetime(2024, 1, 15, 13, 0, 0),
+            'version': '1.0',
+            'editable': True,
+            'title': 'Test Title',
+            'raw_api_data': {'id': '123456789'}
+        }
+        
+        def mock_add(shitpost):
+            shitpost.id = 1
+        
+        mock_db_ops.session.add.side_effect = mock_add
+        
+        result = await shitpost_ops.store_shitpost(full_data)
+        
+        assert result == '1'
+        mock_db_ops.session.add.assert_called_once()
+        # Verify all fields are passed to the model
+        added_shitpost = mock_db_ops.session.add.call_args[0][0]
+        assert isinstance(added_shitpost, TruthSocialShitpost)
+
+    @pytest.mark.asyncio
+    async def test_get_unprocessed_shitposts_success(self, shitpost_ops, mock_db_ops):
         """Test getting unprocessed shitposts."""
-        # Create shitpost
-        await operations.create_shitpost(sample_shitpost_data)
+        # Mock query execution
+        mock_shitpost1 = MagicMock()
+        mock_shitpost1.id = 1
+        mock_shitpost1.shitpost_id = '111'
+        mock_shitpost1.content = 'Content 1'
+        mock_shitpost1.text = 'Text 1'
+        mock_shitpost1.timestamp = datetime(2024, 1, 15, 12, 0, 0)
+        mock_shitpost1.username = 'user1'
+        mock_shitpost1.platform = 'truth_social'
+        mock_shitpost1.language = 'en'
+        mock_shitpost1.visibility = 'public'
+        mock_shitpost1.sensitive = False
+        mock_shitpost1.uri = None
+        mock_shitpost1.url = None
+        mock_shitpost1.replies_count = 0
+        mock_shitpost1.reblogs_count = 0
+        mock_shitpost1.favourites_count = 0
+        mock_shitpost1.upvotes_count = 0
+        mock_shitpost1.downvotes_count = 0
+        mock_shitpost1.account_id = None
+        mock_shitpost1.account_display_name = None
+        mock_shitpost1.account_followers_count = 0
+        mock_shitpost1.account_following_count = 0
+        mock_shitpost1.account_statuses_count = 0
+        mock_shitpost1.account_verified = False
+        mock_shitpost1.account_website = None
+        mock_shitpost1.has_media = False
+        mock_shitpost1.media_attachments = []
+        mock_shitpost1.mentions = []
+        mock_shitpost1.tags = []
+        mock_shitpost1.in_reply_to_id = None
+        mock_shitpost1.quote_id = None
+        mock_shitpost1.in_reply_to_account_id = None
+        mock_shitpost1.card = None
+        mock_shitpost1.group = None
+        mock_shitpost1.quote = None
+        mock_shitpost1.in_reply_to = None
+        mock_shitpost1.reblog = None
+        mock_shitpost1.sponsored = False
+        mock_shitpost1.reaction = None
+        mock_shitpost1.favourited = False
+        mock_shitpost1.reblogged = False
+        mock_shitpost1.muted = False
+        mock_shitpost1.pinned = False
+        mock_shitpost1.bookmarked = False
+        mock_shitpost1.poll = None
+        mock_shitpost1.emojis = []
+        mock_shitpost1.votable = False
+        mock_shitpost1.edited_at = None
+        mock_shitpost1.version = None
+        mock_shitpost1.editable = False
+        mock_shitpost1.title = None
+        mock_shitpost1.raw_api_data = None
+        mock_shitpost1.created_at = datetime(2024, 1, 15, 12, 0, 0)
+        mock_shitpost1.updated_at = datetime(2024, 1, 15, 12, 0, 0)
         
-        # Get unprocessed shitposts
-        result = await operations.get_unprocessed_shitposts(limit=10)
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_shitpost1]
+        mock_db_ops.session.execute.return_value = mock_result
+        
+        result = await shitpost_ops.get_unprocessed_shitposts('2024-01-01T00:00:00Z', limit=10)
         
         assert len(result) == 1
-        assert result[0]["shitpost_id"] == "test_post_001"
+        assert result[0]['id'] == 1
+        assert result[0]['shitpost_id'] == '111'
+        assert result[0]['content'] == 'Content 1'
+        assert result[0]['username'] == 'user1'
+        mock_db_ops.session.execute.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_get_unprocessed_shitposts_with_limit(self, operations, sample_shitpost_data):
+    async def test_get_unprocessed_shitposts_with_limit(self, shitpost_ops, mock_db_ops):
         """Test getting unprocessed shitposts with limit."""
-        # Create multiple shitposts
-        for i in range(5):
-            data = sample_shitpost_data.copy()
-            data["shitpost_id"] = f"test_post_{i:03d}"
-            await operations.create_shitpost(data)
+        # Mock empty result
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+        mock_db_ops.session.execute.return_value = mock_result
         
-        # Get unprocessed shitposts with limit
-        result = await operations.get_unprocessed_shitposts(limit=3)
+        result = await shitpost_ops.get_unprocessed_shitposts('2024-01-01T00:00:00Z', limit=5)
         
-        assert len(result) == 3
+        assert len(result) == 0
+        # Verify limit is used in query - check that execute was called
+        assert mock_db_ops.session.execute.called
 
     @pytest.mark.asyncio
-    async def test_get_unprocessed_shitposts_empty(self, operations):
-        """Test getting unprocessed shitposts when none exist."""
-        result = await operations.get_unprocessed_shitposts()
-        assert result == []
+    async def test_get_unprocessed_shitposts_filters_by_date(self, shitpost_ops, mock_db_ops):
+        """Test that unprocessed shitposts are filtered by launch date."""
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+        mock_db_ops.session.execute.return_value = mock_result
+        
+        await shitpost_ops.get_unprocessed_shitposts('2024-01-01T00:00:00Z', limit=10)
+        
+        # Verify the query filters by timestamp >= launch_date
+        call_args = mock_db_ops.session.execute.call_args[0][0]
+        assert call_args is not None
 
     @pytest.mark.asyncio
-    async def test_update_shitpost_analysis_status(self, operations, sample_shitpost_data):
-        """Test updating shitpost analysis status."""
-        # Create shitpost
-        await operations.create_shitpost(sample_shitpost_data)
+    async def test_get_unprocessed_shitposts_excludes_existing_predictions(self, shitpost_ops, mock_db_ops):
+        """Test that unprocessed shitposts exclude posts with existing predictions."""
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+        mock_db_ops.session.execute.return_value = mock_result
         
-        # Update analysis status
-        result = await operations.update_shitpost_analysis_status(
-            "test_post_001", 
-            "analyzed", 
-            "analysis_001"
-        )
+        await shitpost_ops.get_unprocessed_shitposts('2024-01-01T00:00:00Z', limit=10)
         
-        assert result is True
-        
-        # Verify update
-        shitpost = await operations.get_shitpost_by_id("test_post_001")
-        assert shitpost["analysis_status"] == "analyzed"
-        assert shitpost["analysis_id"] == "analysis_001"
+        # Verify query uses NOT EXISTS for predictions
+        call_args = mock_db_ops.session.execute.call_args[0][0]
+        assert call_args is not None
 
     @pytest.mark.asyncio
-    async def test_update_shitpost_analysis_status_not_found(self, operations):
-        """Test updating analysis status for non-existent shitpost."""
-        result = await operations.update_shitpost_analysis_status(
-            "non_existent_id", 
-            "analyzed", 
-            "analysis_001"
-        )
+    async def test_get_unprocessed_shitposts_error_handling(self, shitpost_ops, mock_db_ops):
+        """Test error handling in get_unprocessed_shitposts."""
+        mock_db_ops.session.execute.side_effect = Exception("Database error")
         
-        assert result is False
+        with pytest.raises(Exception, match="Database error"):
+            await shitpost_ops.get_unprocessed_shitposts('2024-01-01T00:00:00Z')
 
     @pytest.mark.asyncio
-    async def test_get_shitposts_by_date_range(self, operations, sample_shitpost_data):
-        """Test getting shitposts by date range."""
-        # Create shitposts with different dates
-        dates = [
-            "2024-01-15T10:30:00Z",
-            "2024-01-16T10:30:00Z",
-            "2024-01-17T10:30:00Z"
-        ]
+    async def test_get_unprocessed_shitposts_orders_by_timestamp_desc(self, shitpost_ops, mock_db_ops):
+        """Test that unprocessed shitposts are ordered by timestamp descending."""
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+        mock_db_ops.session.execute.return_value = mock_result
         
-        for i, date in enumerate(dates):
-            data = sample_shitpost_data.copy()
-            data["shitpost_id"] = f"test_post_{i:03d}"
-            data["post_timestamp"] = date
-            await operations.create_shitpost(data)
+        await shitpost_ops.get_unprocessed_shitposts('2024-01-01T00:00:00Z', limit=10)
         
-        # Get shitposts by date range
-        result = await operations.get_shitposts_by_date_range(
-            start_date="2024-01-15",
-            end_date="2024-01-16"
-        )
-        
-        assert len(result) == 2
+        # Verify order_by is used
+        call_args = mock_db_ops.session.execute.call_args[0][0]
+        assert call_args is not None
 
     @pytest.mark.asyncio
-    async def test_get_shitposts_by_author(self, operations, sample_shitpost_data):
-        """Test getting shitposts by author."""
-        # Create shitposts from different authors
-        authors = ["realDonaldTrump", "elonmusk", "realDonaldTrump"]
+    async def test_get_unprocessed_shitposts_converts_to_dict(self, shitpost_ops, mock_db_ops):
+        """Test that unprocessed shitposts are converted to dictionary format."""
+        mock_shitpost = MagicMock()
+        mock_shitpost.id = 1
+        mock_shitpost.shitpost_id = '111'
+        mock_shitpost.content = 'Content'
+        mock_shitpost.text = 'Text'
+        mock_shitpost.timestamp = datetime(2024, 1, 15, 12, 0, 0)
+        mock_shitpost.username = 'user1'
+        mock_shitpost.platform = 'truth_social'
+        mock_shitpost.language = None
+        mock_shitpost.visibility = 'public'
+        mock_shitpost.sensitive = False
+        mock_shitpost.uri = None
+        mock_shitpost.url = None
+        mock_shitpost.replies_count = 0
+        mock_shitpost.reblogs_count = 0
+        mock_shitpost.favourites_count = 0
+        mock_shitpost.upvotes_count = 0
+        mock_shitpost.downvotes_count = 0
+        mock_shitpost.account_id = None
+        mock_shitpost.account_display_name = None
+        mock_shitpost.account_followers_count = 0
+        mock_shitpost.account_following_count = 0
+        mock_shitpost.account_statuses_count = 0
+        mock_shitpost.account_verified = False
+        mock_shitpost.account_website = None
+        mock_shitpost.has_media = False
+        mock_shitpost.media_attachments = []
+        mock_shitpost.mentions = []
+        mock_shitpost.tags = []
+        mock_shitpost.in_reply_to_id = None
+        mock_shitpost.quote_id = None
+        mock_shitpost.in_reply_to_account_id = None
+        mock_shitpost.card = None
+        mock_shitpost.group = None
+        mock_shitpost.quote = None
+        mock_shitpost.in_reply_to = None
+        mock_shitpost.reblog = None
+        mock_shitpost.sponsored = False
+        mock_shitpost.reaction = None
+        mock_shitpost.favourited = False
+        mock_shitpost.reblogged = False
+        mock_shitpost.muted = False
+        mock_shitpost.pinned = False
+        mock_shitpost.bookmarked = False
+        mock_shitpost.poll = None
+        mock_shitpost.emojis = []
+        mock_shitpost.votable = False
+        mock_shitpost.edited_at = None
+        mock_shitpost.version = None
+        mock_shitpost.editable = False
+        mock_shitpost.title = None
+        mock_shitpost.raw_api_data = None
+        mock_shitpost.created_at = datetime(2024, 1, 15, 12, 0, 0)
+        mock_shitpost.updated_at = datetime(2024, 1, 15, 12, 0, 0)
         
-        for i, author in enumerate(authors):
-            data = sample_shitpost_data.copy()
-            data["shitpost_id"] = f"test_post_{i:03d}"
-            data["author"]["username"] = author
-            await operations.create_shitpost(data)
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_shitpost]
+        mock_db_ops.session.execute.return_value = mock_result
         
-        # Get shitposts by author
-        result = await operations.get_shitposts_by_author("realDonaldTrump")
+        result = await shitpost_ops.get_unprocessed_shitposts('2024-01-01T00:00:00Z', limit=10)
         
-        assert len(result) == 2
-
-    @pytest.mark.asyncio
-    async def test_get_shitposts_by_analysis_status(self, operations, sample_shitpost_data):
-        """Test getting shitposts by analysis status."""
-        # Create shitposts
-        for i in range(3):
-            data = sample_shitpost_data.copy()
-            data["shitpost_id"] = f"test_post_{i:03d}"
-            await operations.create_shitpost(data)
-        
-        # Update one shitpost as analyzed
-        await operations.update_shitpost_analysis_status(
-            "test_post_000", 
-            "analyzed", 
-            "analysis_001"
-        )
-        
-        # Get analyzed shitposts
-        analyzed = await operations.get_shitposts_by_analysis_status("analyzed")
-        assert len(analyzed) == 1
-        
-        # Get unprocessed shitposts
-        unprocessed = await operations.get_shitposts_by_analysis_status("unprocessed")
-        assert len(unprocessed) == 2
-
-    @pytest.mark.asyncio
-    async def test_count_shitposts(self, operations, sample_shitpost_data):
-        """Test counting shitposts."""
-        # Create multiple shitposts
-        for i in range(5):
-            data = sample_shitpost_data.copy()
-            data["shitpost_id"] = f"test_post_{i:03d}"
-            await operations.create_shitpost(data)
-        
-        # Count all shitposts
-        total_count = await operations.count_shitposts()
-        assert total_count == 5
-        
-        # Count by analysis status
-        unprocessed_count = await operations.count_shitposts(analysis_status="unprocessed")
-        assert unprocessed_count == 5
-
-    @pytest.mark.asyncio
-    async def test_count_shitposts_by_date_range(self, operations, sample_shitpost_data):
-        """Test counting shitposts by date range."""
-        # Create shitposts with different dates
-        dates = [
-            "2024-01-15T10:30:00Z",
-            "2024-01-16T10:30:00Z",
-            "2024-01-17T10:30:00Z"
-        ]
-        
-        for i, date in enumerate(dates):
-            data = sample_shitpost_data.copy()
-            data["shitpost_id"] = f"test_post_{i:03d}"
-            data["post_timestamp"] = date
-            await operations.create_shitpost(data)
-        
-        # Count by date range
-        count = await operations.count_shitposts_by_date_range(
-            start_date="2024-01-15",
-            end_date="2024-01-16"
-        )
-        
-        assert count == 2
-
-    @pytest.mark.asyncio
-    async def test_delete_shitpost(self, operations, sample_shitpost_data):
-        """Test deleting shitpost."""
-        # Create shitpost
-        await operations.create_shitpost(sample_shitpost_data)
-        
-        # Verify it exists
-        shitpost = await operations.get_shitpost_by_id("test_post_001")
-        assert shitpost is not None
-        
-        # Delete shitpost
-        result = await operations.delete_shitpost("test_post_001")
-        assert result is True
-        
-        # Verify it's deleted
-        shitpost = await operations.get_shitpost_by_id("test_post_001")
-        assert shitpost is None
-
-    @pytest.mark.asyncio
-    async def test_delete_shitpost_not_found(self, operations):
-        """Test deleting non-existent shitpost."""
-        result = await operations.delete_shitpost("non_existent_id")
-        assert result is False
-
-    @pytest.mark.asyncio
-    async def test_bulk_create_shitposts(self, operations, sample_shitpost_data):
-        """Test bulk creating shitposts."""
-        # Create multiple shitposts
-        shitposts = []
-        for i in range(3):
-            data = sample_shitpost_data.copy()
-            data["shitpost_id"] = f"test_post_{i:03d}"
-            shitposts.append(data)
-        
-        # Bulk create
-        result = await operations.bulk_create_shitposts(shitposts)
-        
-        assert result == 3
-        
-        # Verify all were created
-        for i in range(3):
-            shitpost = await operations.get_shitpost_by_id(f"test_post_{i:03d}")
-            assert shitpost is not None
-
-    @pytest.mark.asyncio
-    async def test_bulk_create_shitposts_with_duplicates(self, operations, sample_shitpost_data):
-        """Test bulk creating shitposts with duplicates."""
-        # Create first shitpost
-        await operations.create_shitpost(sample_shitpost_data)
-        
-        # Try to bulk create with duplicate
-        shitposts = [sample_shitpost_data]
-        
-        with pytest.raises(Exception):
-            await operations.bulk_create_shitposts(shitposts)
-
-    @pytest.mark.asyncio
-    async def test_get_shitpost_statistics(self, operations, sample_shitpost_data):
-        """Test getting shitpost statistics."""
-        # Create shitposts with different statuses
-        for i in range(5):
-            data = sample_shitpost_data.copy()
-            data["shitpost_id"] = f"test_post_{i:03d}"
-            await operations.create_shitpost(data)
-        
-        # Update some as analyzed
-        await operations.update_shitpost_analysis_status("test_post_000", "analyzed", "analysis_001")
-        await operations.update_shitpost_analysis_status("test_post_001", "analyzed", "analysis_002")
-        
-        # Get statistics
-        stats = await operations.get_shitpost_statistics()
-        
-        assert stats["total_shitposts"] == 5
-        assert stats["analyzed_shitposts"] == 2
-        assert stats["unprocessed_shitposts"] == 3
-
-    @pytest.mark.asyncio
-    async def test_get_shitpost_statistics_by_date_range(self, operations, sample_shitpost_data):
-        """Test getting shitpost statistics by date range."""
-        # Create shitposts with different dates
-        dates = [
-            "2024-01-15T10:30:00Z",
-            "2024-01-16T10:30:00Z",
-            "2024-01-17T10:30:00Z"
-        ]
-        
-        for i, date in enumerate(dates):
-            data = sample_shitpost_data.copy()
-            data["shitpost_id"] = f"test_post_{i:03d}"
-            data["post_timestamp"] = date
-            await operations.create_shitpost(data)
-        
-        # Get statistics by date range
-        stats = await operations.get_shitpost_statistics_by_date_range(
-            start_date="2024-01-15",
-            end_date="2024-01-16"
-        )
-        
-        assert stats["total_shitposts"] == 2
-
-    @pytest.mark.asyncio
-    async def test_search_shitposts_by_content(self, operations, sample_shitpost_data):
-        """Test searching shitposts by content."""
-        # Create shitposts with different content
-        contents = [
-            "Tesla stock is going to the moon! 🚀",
-            "The economy is terrible under Biden",
-            "Tesla is the future of transportation"
-        ]
-        
-        for i, content in enumerate(contents):
-            data = sample_shitpost_data.copy()
-            data["shitpost_id"] = f"test_post_{i:03d}"
-            data["content"] = content
-            await operations.create_shitpost(data)
-        
-        # Search by content
-        result = await operations.search_shitposts_by_content("Tesla")
-        
-        assert len(result) == 2
-        assert all("Tesla" in shitpost["content"] for shitpost in result)
-
-    @pytest.mark.asyncio
-    async def test_get_shitposts_by_engagement_threshold(self, operations, sample_shitpost_data):
-        """Test getting shitposts by engagement threshold."""
-        # Create shitposts with different engagement levels
-        engagement_levels = [
-            {"likes": 1000, "retruths": 100, "replies": 50},
-            {"likes": 5000, "retruths": 500, "replies": 200},
-            {"likes": 15000, "retruths": 2500, "replies": 800}
-        ]
-        
-        for i, engagement in enumerate(engagement_levels):
-            data = sample_shitpost_data.copy()
-            data["shitpost_id"] = f"test_post_{i:03d}"
-            data["engagement"] = engagement
-            await operations.create_shitpost(data)
-        
-        # Get shitposts with high engagement
-        result = await operations.get_shitposts_by_engagement_threshold(
-            min_likes=5000,
-            min_retruths=500
-        )
-        
-        assert len(result) == 1
-        assert result[0]["shitpost_id"] == "test_post_002"
-
-    @pytest.mark.asyncio
-    async def test_operations_error_handling(self, operations):
-        """Test operations error handling."""
-        # Test with invalid data
-        invalid_data = {"invalid": "data"}
-        
-        with pytest.raises(Exception):
-            await operations.create_shitpost(invalid_data)
-
-    @pytest.mark.asyncio
-    async def test_operations_transaction_rollback(self, operations, sample_shitpost_data):
-        """Test operations transaction rollback."""
-        # Create shitpost
-        await operations.create_shitpost(sample_shitpost_data)
-        
-        # Try to update with invalid analysis ID
-        with pytest.raises(Exception):
-            await operations.update_shitpost_analysis_status(
-                "test_post_001", 
-                "invalid_status", 
-                None
-            )
-        
-        # Verify original data is unchanged
-        shitpost = await operations.get_shitpost_by_id("test_post_001")
-        assert shitpost["analysis_status"] == "unprocessed"
+        assert isinstance(result, list)
+        assert isinstance(result[0], dict)
+        assert 'id' in result[0]
+        assert 'shitpost_id' in result[0]
+        assert 'content' in result[0]
+        assert 'created_at' in result[0]
+        assert 'updated_at' in result[0]

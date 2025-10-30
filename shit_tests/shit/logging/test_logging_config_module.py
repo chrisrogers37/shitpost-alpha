@@ -4,7 +4,13 @@ Tests for logging configuration module.
 
 import pytest
 import logging
+
+# Add project root to Python path
 import sys
+import os
+project_root = os.path.join(os.path.dirname(__file__), '../../..')
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from shit.logging.config import (
     LoggingConfig,

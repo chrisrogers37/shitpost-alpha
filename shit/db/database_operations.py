@@ -27,7 +27,12 @@ class DatabaseOperations:
             logger.debug(f"Created {model_class.__name__} with ID: {instance.id}")
             return instance
         except Exception as e:
-            await self.session.rollback()
+            try:
+                if self.session.in_transaction():
+                    await self.session.rollback()
+            except Exception:
+                # Ignore rollback errors - session might already be committed
+                pass
             logger.error(f"Error creating {model_class.__name__}: {e}")
             raise
     
@@ -44,10 +49,10 @@ class DatabaseOperations:
                     if hasattr(model_class, key):
                         stmt = stmt.where(getattr(model_class, key) == value)
             
-            if offset:
+            if offset is not None:
                 stmt = stmt.offset(offset)
             
-            if limit:
+            if limit is not None:
                 stmt = stmt.limit(limit)
             
             result = await self.session.execute(stmt)
@@ -85,7 +90,12 @@ class DatabaseOperations:
                 return True
             return False
         except Exception as e:
-            await self.session.rollback()
+            try:
+                if self.session.in_transaction():
+                    await self.session.rollback()
+            except Exception:
+                # Ignore rollback errors - session might already be committed
+                pass
             logger.error(f"Error updating {model_class.__name__}: {e}")
             raise
     
@@ -101,7 +111,12 @@ class DatabaseOperations:
                 return True
             return False
         except Exception as e:
-            await self.session.rollback()
+            try:
+                if self.session.in_transaction():
+                    await self.session.rollback()
+            except Exception:
+                # Ignore rollback errors - session might already be committed
+                pass
             logger.error(f"Error deleting {model_class.__name__}: {e}")
             raise
     

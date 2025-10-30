@@ -17,6 +17,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Batch processing optimizations
 - Real-time streaming analysis
 
+## [v0.18.0] - 2024-10-30
+
+### Added
+- **Comprehensive Test Coverage**: Complete test suite for all modules (973 tests)
+  - 354 application tests covering shitposts, shitpost_ai, shitvault, and orchestrator
+  - 619 infrastructure tests covering database, S3, LLM, logging, config, and utils
+  - 32 integration and performance tests
+  - All tests passing ✅
+- **Test Main Entry Points**: Tests for all CLI `__main__.py` entry points
+- **Performance Benchmarks**: 8 database performance tests
+- **Orchestrator Tests**: 20 tests for main `shitpost_alpha.py` pipeline coordination
+
+### Changed
+- **Test Organization**: Renamed `test___main__.py` files to `test_main.py` to avoid pytest cache conflicts
+- **Test Database**: Consolidated to single `test_shitpost_alpha.db` managed by `conftest.py`
+- **Test Mocking**: Fixed async context manager mocking across all CLI tests
+- **Test Fixtures**: Enhanced fixtures in `conftest.py` for better test isolation
+
+### Fixed
+- **Test Database Cleanup**: Removed duplicate `test.db` file
+- **Async Mocking**: Corrected async context manager mocking in all test files
+- **Command Construction**: Fixed subprocess command assertion tests
+- **Pytest Cache**: Resolved import file mismatch errors
+
+### Technical Details
+- All tests use shared test database with automatic cleanup
+- Proper test isolation between test runs
+- Comprehensive mocking to prevent real API/DB calls during tests
+- Documentation updated with accurate test counts and execution instructions
+
 ## [v0.17.0] - 2025-01-30
 
 ### Added

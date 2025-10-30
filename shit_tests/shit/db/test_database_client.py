@@ -16,8 +16,9 @@ class TestDatabaseClient:
     @pytest.fixture
     def test_config(self):
         """Test database configuration."""
+        # Use in-memory database for config-only tests (all tests are mocked)
         return DatabaseConfig(
-            database_url="sqlite+aiosqlite:///./test.db"
+            database_url="sqlite+aiosqlite:///:memory:"
         )
 
     @pytest.fixture

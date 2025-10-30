@@ -1,415 +1,424 @@
 """
-Tests for Shitposts CLI - command line interface and argument parsing.
+Tests for CLI Module - Shared CLI functionality for Truth Social harvesters.
+Tests that will break if CLI functionality changes.
 """
 
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, patch, MagicMock
-import sys
+import argparse
+from unittest.mock import patch, MagicMock
 from io import StringIO
 
-from shitposts.cli import create_harvester_parser, validate_harvester_args
-from shitposts.truth_social_s3_harvester import main
+from shitposts.cli import (
+    create_harvester_parser,
+    validate_harvester_args,
+    setup_harvester_logging,
+    print_harvest_start,
+    print_harvest_progress,
+    print_harvest_complete,
+    print_harvest_error,
+    print_harvest_interrupted,
+    print_s3_stats,
+    print_database_stats,
+    HARVESTER_EXAMPLES
+)
 
 
-class TestShitpostsCLI:
-    """Test cases for Shitposts CLI."""
+class TestCreateHarvesterParser:
+    """Test cases for create_harvester_parser function."""
 
-    @pytest.fixture
-    def sample_args(self):
-        """Sample command line arguments."""
-        class MockArgs:
-            def __init__(self):
-                self.mode = "incremental"
-                self.from_date = None
-                self.to_date = None
-                self.limit = None
-                self.max_id = None
-                self.verbose = False
-                self.dry_run = False
-        
-        return MockArgs()
-
-    def test_create_harvester_parser(self):
-        """Test creating harvester argument parser."""
+    def test_create_parser_with_description(self):
+        """Test creating parser with description."""
         parser = create_harvester_parser("Test harvester description")
         
         assert parser is not None
+        assert isinstance(parser, argparse.ArgumentParser)
         assert parser.description == "Test harvester description"
+
+    def test_create_parser_with_epilog(self):
+        """Test creating parser with epilog."""
+        epilog = "Additional help text"
+        parser = create_harvester_parser("Test harvester", epilog=epilog)
         
-        # Test that parser has required arguments
+        assert parser.epilog == epilog
+
+    def test_parser_has_mode_argument(self):
+        """Test parser has mode argument."""
+        parser = create_harvester_parser("Test harvester")
         help_text = parser.format_help()
+        
         assert "--mode" in help_text
+        assert "incremental" in help_text
+        assert "backfill" in help_text
+        assert "range" in help_text
+
+    def test_parser_has_date_arguments(self):
+        """Test parser has date range arguments."""
+        parser = create_harvester_parser("Test harvester")
+        help_text = parser.format_help()
+        
         assert "--from" in help_text
         assert "--to" in help_text
+
+    def test_parser_has_limit_argument(self):
+        """Test parser has limit argument."""
+        parser = create_harvester_parser("Test harvester")
+        help_text = parser.format_help()
+        
         assert "--limit" in help_text
+
+    def test_parser_has_max_id_argument(self):
+        """Test parser has max-id argument."""
+        parser = create_harvester_parser("Test harvester")
+        help_text = parser.format_help()
+        
         assert "--max-id" in help_text
 
-    def test_validate_harvester_args_valid(self, sample_args):
-        """Test validating valid harvester arguments."""
-        # Should not raise any exceptions
-        validate_harvester_args(sample_args)
-
-    def test_validate_harvester_args_range_mode_missing_from_date(self):
-        """Test validating range mode without from date."""
-        class InvalidArgs:
-            def __init__(self):
-                self.mode = "range"
-                self.from_date = None
-                self.to_date = "2024-01-31"
-                self.limit = None
-                self.max_id = None
-                self.verbose = False
-                self.dry_run = False
+    def test_parser_has_dry_run_argument(self):
+        """Test parser has dry-run argument."""
+        parser = create_harvester_parser("Test harvester")
+        help_text = parser.format_help()
         
-        args = InvalidArgs()
-        
-        with pytest.raises(SystemExit):
-            validate_harvester_args(args)
+        assert "--dry-run" in help_text
 
-    def test_validate_harvester_args_invalid_mode(self):
-        """Test validating invalid mode."""
-        class InvalidArgs:
-            def __init__(self):
-                self.mode = "invalid_mode"
-                self.from_date = None
-                self.to_date = None
-                self.limit = None
-                self.max_id = None
-                self.verbose = False
-                self.dry_run = False
+    def test_parser_has_verbose_argument(self):
+        """Test parser has verbose argument."""
+        parser = create_harvester_parser("Test harvester")
+        help_text = parser.format_help()
         
-        args = InvalidArgs()
+        assert "--verbose" in help_text
+        assert "-v" in help_text
+
+    def test_parser_mode_default_value(self):
+        """Test parser mode default value."""
+        parser = create_harvester_parser("Test harvester")
+        args = parser.parse_args([])
         
-        with pytest.raises(SystemExit):
-            validate_harvester_args(args)
+        assert args.mode == "incremental"
 
-    def test_validate_harvester_args_invalid_limit(self):
-        """Test validating invalid limit."""
-        class InvalidArgs:
-            def __init__(self):
-                self.mode = "incremental"
-                self.from_date = None
-                self.to_date = None
-                self.limit = 0  # Invalid limit
-                self.max_id = None
-                self.verbose = False
-                self.dry_run = False
+    def test_parser_mode_choices(self):
+        """Test parser mode choices."""
+        parser = create_harvester_parser("Test harvester")
         
-        args = InvalidArgs()
+        # Test valid choices
+        for mode in ["incremental", "backfill", "range"]:
+            args = parser.parse_args(["--mode", mode])
+            assert args.mode == mode
+
+    def test_parser_dry_run_flag(self):
+        """Test parser dry-run flag."""
+        parser = create_harvester_parser("Test harvester")
+        args = parser.parse_args(["--dry-run"])
         
-        with pytest.raises(SystemExit):
-            validate_harvester_args(args)
+        assert args.dry_run is True
 
-    @pytest.mark.asyncio
-    async def test_main_success(self, sample_args):
-        """Test successful main execution."""
-        with patch('shitposts.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitposts.cli.TruthSocialS3Harvester') as mock_harvester_class:
-            
-            # Mock harvester instance
-            mock_harvester = AsyncMock()
-            mock_harvester_class.return_value = mock_harvester
-            mock_harvester.initialize = AsyncMock()
-            mock_harvester.harvest_shitposts = AsyncMock()
-            mock_harvester.harvest_shitposts.return_value.__aiter__.return_value = [
-                {"shitpost_id": "test_001", "content": "Test content"}
-            ]
-            mock_harvester.cleanup = AsyncMock()
-            
-            await main()
-            
-            # Verify harvester was created and used
-            mock_harvester_class.assert_called_once()
-            mock_harvester.initialize.assert_called_once()
-            mock_harvester.harvest_shitposts.assert_called_once()
-            mock_harvester.cleanup.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_main_with_verbose(self, sample_args):
-        """Test main execution with verbose logging."""
-        sample_args.verbose = True
+    def test_parser_verbose_flag(self):
+        """Test parser verbose flag."""
+        parser = create_harvester_parser("Test harvester")
+        args = parser.parse_args(["--verbose"])
         
-        with patch('shitposts.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitposts.cli.TruthSocialS3Harvester') as mock_harvester_class, \
-             patch('shitposts.cli.logging') as mock_logging:
-            
-            mock_harvester = AsyncMock()
-            mock_harvester_class.return_value = mock_harvester
-            mock_harvester.initialize = AsyncMock()
-            mock_harvester.harvest_shitposts = AsyncMock()
-            mock_harvester.harvest_shitposts.return_value.__aiter__.return_value = []
-            mock_harvester.cleanup = AsyncMock()
-            
-            await main()
-            
-            # Verify verbose logging was set
-            mock_logging.getLogger.return_value.setLevel.assert_called()
+        assert args.verbose is True
 
-    @pytest.mark.asyncio
-    async def test_main_with_dry_run(self, sample_args):
-        """Test main execution with dry run mode."""
-        sample_args.dry_run = True
+    def test_parser_verbose_short_flag(self):
+        """Test parser verbose short flag."""
+        parser = create_harvester_parser("Test harvester")
+        args = parser.parse_args(["-v"])
         
-        with patch('shitposts.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitposts.cli.TruthSocialS3Harvester') as mock_harvester_class:
-            
-            mock_harvester = AsyncMock()
-            mock_harvester_class.return_value = mock_harvester
-            mock_harvester.initialize = AsyncMock()
-            mock_harvester.harvest_shitposts = AsyncMock()
-            mock_harvester.harvest_shitposts.return_value.__aiter__.return_value = []
-            mock_harvester.cleanup = AsyncMock()
-            
-            await main()
-            
-            # Verify dry run was passed to harvester
-            mock_harvester.harvest_shitposts.assert_called_once_with(dry_run=True)
+        assert args.verbose is True
 
-    @pytest.mark.asyncio
-    async def test_main_with_custom_parameters(self):
-        """Test main execution with custom parameters."""
-        class CustomArgs:
-            def __init__(self):
-                self.mode = "range"
-                self.from_date = "2024-01-01"
-                self.to_date = "2024-01-31"
-                self.limit = 100
-                self.max_id = "test_max_id"
-                self.verbose = True
-                self.dry_run = False
+    def test_parser_limit_argument(self):
+        """Test parser limit argument."""
+        parser = create_harvester_parser("Test harvester")
+        args = parser.parse_args(["--limit", "100"])
         
-        custom_args = CustomArgs()
+        assert args.limit == 100
+
+    def test_parser_start_date_argument(self):
+        """Test parser start_date argument."""
+        parser = create_harvester_parser("Test harvester")
+        args = parser.parse_args(["--from", "2024-01-01"])
         
-        with patch('shitposts.cli.argparse.ArgumentParser.parse_args', return_value=custom_args), \
-             patch('shitposts.cli.TruthSocialS3Harvester') as mock_harvester_class:
-            
-            mock_harvester = AsyncMock()
-            mock_harvester_class.return_value = mock_harvester
-            mock_harvester.initialize = AsyncMock()
-            mock_harvester.harvest_shitposts = AsyncMock()
-            mock_harvester.harvest_shitposts.return_value.__aiter__.return_value = []
-            mock_harvester.cleanup = AsyncMock()
-            
-            await main()
-            
-            # Verify harvester was created with custom parameters
-            mock_harvester_class.assert_called_once_with(
-                mode="range",
-                start_date="2024-01-01",
-                end_date="2024-01-31",
-                limit=100,
-                max_id="test_max_id"
-            )
+        assert args.start_date == "2024-01-01"
 
-    @pytest.mark.asyncio
-    async def test_main_harvester_initialization_error(self, sample_args):
-        """Test main execution with harvester initialization error."""
-        with patch('shitposts.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitposts.cli.TruthSocialS3Harvester') as mock_harvester_class:
-            
-            mock_harvester = AsyncMock()
-            mock_harvester_class.return_value = mock_harvester
-            mock_harvester.initialize = AsyncMock(side_effect=Exception("Initialization failed"))
-            mock_harvester.cleanup = AsyncMock()
-            
-            with pytest.raises(Exception, match="Initialization failed"):
-                await main()
-
-    @pytest.mark.asyncio
-    async def test_main_harvesting_error(self, sample_args):
-        """Test main execution with harvesting error."""
-        with patch('shitposts.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitposts.cli.TruthSocialS3Harvester') as mock_harvester_class:
-            
-            mock_harvester = AsyncMock()
-            mock_harvester_class.return_value = mock_harvester
-            mock_harvester.initialize = AsyncMock()
-            mock_harvester.harvest_shitposts = AsyncMock(side_effect=Exception("Harvesting failed"))
-            mock_harvester.cleanup = AsyncMock()
-            
-            with pytest.raises(Exception, match="Harvesting failed"):
-                await main()
-
-    @pytest.mark.asyncio
-    async def test_main_keyboard_interrupt(self, sample_args):
-        """Test main execution with keyboard interrupt."""
-        with patch('shitposts.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitposts.cli.TruthSocialS3Harvester') as mock_harvester_class:
-            
-            mock_harvester = AsyncMock()
-            mock_harvester_class.return_value = mock_harvester
-            mock_harvester.initialize = AsyncMock()
-            mock_harvester.harvest_shitposts = AsyncMock(side_effect=KeyboardInterrupt())
-            mock_harvester.cleanup = AsyncMock()
-            
-            with pytest.raises(KeyboardInterrupt):
-                await main()
-
-    @pytest.mark.asyncio
-    async def test_main_cleanup_on_error(self, sample_args):
-        """Test that cleanup is called even on error."""
-        with patch('shitposts.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitposts.cli.TruthSocialS3Harvester') as mock_harvester_class:
-            
-            mock_harvester = AsyncMock()
-            mock_harvester_class.return_value = mock_harvester
-            mock_harvester.initialize = AsyncMock()
-            mock_harvester.harvest_shitposts = AsyncMock(side_effect=Exception("Error"))
-            mock_harvester.cleanup = AsyncMock()
-            
-            with pytest.raises(Exception):
-                await main()
-            
-            # Verify cleanup was called
-            mock_harvester.cleanup.assert_called_once()
-
-    def test_parser_argument_validation(self):
-        """Test argument parser validation."""
-        parser = create_harvester_parser()
+    def test_parser_end_date_argument(self):
+        """Test parser end_date argument."""
+        parser = create_harvester_parser("Test harvester")
+        args = parser.parse_args(["--to", "2024-01-31"])
         
-        # Test valid arguments
-        valid_args = parser.parse_args([
-            "--mode", "incremental",
-            "--limit", "50",
-            "--verbose"
-        ])
-        
-        assert valid_args.mode == "incremental"
-        assert valid_args.limit == 50
-        assert valid_args.verbose is True
+        assert args.end_date == "2024-01-31"
 
-    def test_parser_range_mode_validation(self):
-        """Test parser validation for range mode."""
-        parser = create_harvester_parser()
+    def test_parser_max_id_argument(self):
+        """Test parser max-id argument."""
+        parser = create_harvester_parser("Test harvester")
+        args = parser.parse_args(["--max-id", "114858915682735686"])
         
-        # Test range mode with dates
-        range_args = parser.parse_args([
+        assert args.max_id == "114858915682735686"
+
+    def test_parser_all_arguments(self):
+        """Test parser with all arguments."""
+        parser = create_harvester_parser("Test harvester")
+        args = parser.parse_args([
             "--mode", "range",
             "--from", "2024-01-01",
             "--to", "2024-01-31",
-            "--limit", "100"
+            "--limit", "100",
+            "--max-id", "114858915682735686",
+            "--dry-run",
+            "--verbose"
         ])
         
-        assert range_args.mode == "range"
-        assert range_args.from_date == "2024-01-01"
-        assert range_args.to_date == "2024-01-31"
-        assert range_args.limit == 100
+        assert args.mode == "range"
+        assert args.start_date == "2024-01-01"
+        assert args.end_date == "2024-01-31"
+        assert args.limit == 100
+        assert args.max_id == "114858915682735686"
+        assert args.dry_run is True
+        assert args.verbose is True
 
-    def test_parser_backfill_mode_validation(self):
-        """Test parser validation for backfill mode."""
-        parser = create_harvester_parser()
+
+class TestValidateHarvesterArgs:
+    """Test cases for validate_harvester_args function."""
+
+    def test_validate_incremental_mode(self):
+        """Test validating incremental mode."""
+        class Args:
+            mode = "incremental"
+            start_date = None
         
-        # Test backfill mode
-        backfill_args = parser.parse_args([
-            "--mode", "backfill",
-            "--limit", "1000",
-            "--max-id", "resume_from_here"
-        ])
+        args = Args()
+        # Should not raise any exceptions
+        validate_harvester_args(args)
+
+    def test_validate_backfill_mode(self):
+        """Test validating backfill mode."""
+        class Args:
+            mode = "backfill"
+            start_date = None
         
-        assert backfill_args.mode == "backfill"
-        assert backfill_args.limit == 1000
-        assert backfill_args.max_id == "resume_from_here"
+        args = Args()
+        # Should not raise any exceptions
+        validate_harvester_args(args)
 
-    def test_parser_default_values(self):
-        """Test parser default values."""
-        parser = create_harvester_parser()
+    def test_validate_range_mode_with_start_date(self):
+        """Test validating range mode with start_date."""
+        class Args:
+            mode = "range"
+            start_date = "2024-01-01"
         
-        # Test with no arguments (should use defaults)
-        default_args = parser.parse_args([])
+        args = Args()
+        # Should not raise any exceptions
+        validate_harvester_args(args)
+
+    def test_validate_range_mode_without_start_date(self):
+        """Test validating range mode without start_date."""
+        class Args:
+            mode = "range"
+            start_date = None
         
-        assert default_args.mode == "incremental"
-        assert default_args.from_date is None
-        assert default_args.to_date is None
-        assert default_args.limit is None
-        assert default_args.max_id is None
-        assert default_args.verbose is False
-        assert default_args.dry_run is False
+        args = Args()
+        
+        with pytest.raises(SystemExit, match="--from date is required for range mode"):
+            validate_harvester_args(args)
 
-    @pytest.mark.asyncio
-    async def test_main_output_formatting(self, sample_args):
-        """Test main execution output formatting."""
-        with patch('shitposts.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitposts.cli.TruthSocialS3Harvester') as mock_harvester_class, \
-             patch('sys.stdout', new_callable=StringIO) as mock_stdout:
-            
-            mock_harvester = AsyncMock()
-            mock_harvester_class.return_value = mock_harvester
-            mock_harvester.initialize = AsyncMock()
-            mock_harvester.harvest_shitposts = AsyncMock()
-            mock_harvester.harvest_shitposts.return_value.__aiter__.return_value = [
-                {"shitpost_id": "test_001", "content": "Test content", "s3_key": "test-key"}
-            ]
-            mock_harvester.cleanup = AsyncMock()
-            
-            await main()
-            
-            # Check that output was printed
-            output = mock_stdout.getvalue()
-            assert "Harvesting completed successfully" in output
-            assert "test_001" in output
+    def test_validate_range_mode_end_date_optional(self):
+        """Test that end_date is optional for range mode."""
+        class Args:
+            mode = "range"
+            start_date = "2024-01-01"
+            end_date = None
+        
+        args = Args()
+        # Should not raise any exceptions
+        validate_harvester_args(args)
 
-    @pytest.mark.asyncio
-    async def test_main_no_posts_to_harvest(self, sample_args):
-        """Test main execution when no posts are harvested."""
-        with patch('shitposts.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitposts.cli.TruthSocialS3Harvester') as mock_harvester_class, \
-             patch('sys.stdout', new_callable=StringIO) as mock_stdout:
-            
-            mock_harvester = AsyncMock()
-            mock_harvester_class.return_value = mock_harvester
-            mock_harvester.initialize = AsyncMock()
-            mock_harvester.harvest_shitposts = AsyncMock()
-            mock_harvester.harvest_shitposts.return_value.__aiter__.return_value = []
-            mock_harvester.cleanup = AsyncMock()
-            
-            await main()
-            
-            # Check that appropriate message was printed
-            output = mock_stdout.getvalue()
-            assert "No posts" in output or "0" in output
 
-    @pytest.mark.asyncio
-    async def test_main_with_harvesting_errors(self, sample_args):
-        """Test main execution with some harvesting errors."""
-        with patch('shitposts.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitposts.cli.TruthSocialS3Harvester') as mock_harvester_class:
-            
-            mock_harvester = AsyncMock()
-            mock_harvester_class.return_value = mock_harvester
-            mock_harvester.initialize = AsyncMock()
-            mock_harvester.harvest_shitposts = AsyncMock()
-            mock_harvester.harvest_shitposts.return_value.__aiter__.return_value = [
-                {"shitpost_id": "test_001", "content": "Test content", "s3_key": "test-key"}
-            ]
-            mock_harvester.cleanup = AsyncMock()
-            
-            await main()
-            
-            # Should complete successfully even with some errors
-            mock_harvester.cleanup.assert_called_once()
+class TestSetupHarvesterLogging:
+    """Test cases for setup_harvester_logging function."""
 
-    @pytest.mark.asyncio
-    async def test_main_with_s3_stats(self, sample_args):
-        """Test main execution with S3 statistics display."""
-        with patch('shitposts.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitposts.cli.TruthSocialS3Harvester') as mock_harvester_class, \
-             patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+    def test_setup_logging_non_verbose(self):
+        """Test setting up logging without verbose."""
+        with patch('shitposts.cli.setup_centralized_harvester_logging') as mock_setup:
+            setup_harvester_logging(verbose=False)
             
-            mock_harvester = AsyncMock()
-            mock_harvester_class.return_value = mock_harvester
-            mock_harvester.initialize = AsyncMock()
-            mock_harvester.harvest_shitposts = AsyncMock()
-            mock_harvester.harvest_shitposts.return_value.__aiter__.return_value = []
-            mock_harvester.get_s3_stats = AsyncMock(return_value={
-                "total_files": 100,
-                "total_size_mb": 50.5
-            })
-            mock_harvester.cleanup = AsyncMock()
+            mock_setup.assert_called_once_with(verbose=False)
+
+    def test_setup_logging_verbose(self):
+        """Test setting up logging with verbose."""
+        with patch('shitposts.cli.setup_centralized_harvester_logging') as mock_setup:
+            setup_harvester_logging(verbose=True)
             
-            await main()
+            mock_setup.assert_called_once_with(verbose=True)
+
+
+class TestPrintFunctions:
+    """Test cases for print utility functions."""
+
+    def test_print_harvest_start(self):
+        """Test print_harvest_start function."""
+        with patch('builtins.print') as mock_print:
+            print_harvest_start("incremental", limit=None)
             
-            # Check that S3 stats were displayed
-            output = mock_stdout.getvalue()
-            assert "100" in output  # Total files
-            assert "50.5" in output  # Total size
+            mock_print.assert_called_once_with("🚀 Starting Truth Social S3 harvesting in incremental mode...")
+
+    def test_print_harvest_start_with_limit(self):
+        """Test print_harvest_start with limit."""
+        with patch('builtins.print') as mock_print:
+            print_harvest_start("backfill", limit=100)
+            
+            mock_print.assert_called_once_with("🚀 Starting Truth Social S3 harvesting in backfill mode (limit: 100)...")
+
+    def test_print_harvest_progress(self):
+        """Test print_harvest_progress function."""
+        with patch('builtins.print') as mock_print:
+            print_harvest_progress(10, limit=None)
+            
+            mock_print.assert_called_once_with("📊 Progress: 10 posts harvested")
+
+    def test_print_harvest_progress_with_limit(self):
+        """Test print_harvest_progress with limit."""
+        with patch('builtins.print') as mock_print:
+            print_harvest_progress(10, limit=100)
+            
+            mock_print.assert_called_once_with("📊 Progress: 10/100 posts harvested")
+
+    def test_print_harvest_complete(self):
+        """Test print_harvest_complete function."""
+        with patch('builtins.print') as mock_print:
+            print_harvest_complete(25, dry_run=False)
+            
+            assert mock_print.call_count == 2
+            calls = [call[0][0] for call in mock_print.call_args_list]
+            assert any("🎉 S3 harvesting completed! Total posts: 25" in call for call in calls)
+            assert any("✅ All data stored to S3 successfully" in call for call in calls)
+
+    def test_print_harvest_complete_dry_run(self):
+        """Test print_harvest_complete with dry run."""
+        with patch('builtins.print') as mock_print:
+            print_harvest_complete(25, dry_run=True)
+            
+            calls = [call[0][0] for call in mock_print.call_args_list]
+            assert any("🎉 S3 harvesting completed! Total posts: 25" in call for call in calls)
+            assert any("🔍 This was a dry run" in call for call in calls)
+
+    def test_print_harvest_error(self):
+        """Test print_harvest_error function."""
+        with patch('shitposts.cli.print_error') as mock_print_error, \
+             patch('traceback.print_exc') as mock_traceback:
+            error = ValueError("Test error")
+            print_harvest_error(error, verbose=False)
+            
+            mock_print_error.assert_called_once_with("Harvesting failed: Test error")
+            mock_traceback.assert_not_called()
+
+    def test_print_harvest_error_verbose(self):
+        """Test print_harvest_error with verbose."""
+        with patch('shitposts.cli.print_error') as mock_print_error, \
+             patch('traceback.print_exc') as mock_traceback:
+            error = ValueError("Test error")
+            print_harvest_error(error, verbose=True)
+            
+            mock_print_error.assert_called_once()
+            mock_traceback.assert_called_once()
+
+    def test_print_harvest_interrupted(self):
+        """Test print_harvest_interrupted function."""
+        with patch('builtins.print') as mock_print:
+            print_harvest_interrupted()
+            
+            mock_print.assert_called_once_with("\n⏹️  Harvesting stopped by user")
+
+    def test_print_s3_stats_with_object(self):
+        """Test print_s3_stats with S3Stats object."""
+        from shit.s3.s3_models import S3Stats
+        
+        stats = S3Stats(
+            total_files=100,
+            total_size_bytes=53000000,  # ~50.5 MB
+            total_size_mb=50.5,
+            bucket="test-bucket",
+            prefix="test-prefix"
+        )
+        
+        with patch('builtins.print') as mock_print:
+            print_s3_stats(stats)
+            
+            assert mock_print.call_count == 5  # Header + 4 stats
+            calls = [call[0][0] for call in mock_print.call_args_list]
+            assert any("📊 S3 Storage Statistics:" in call for call in calls)
+            assert any("Total files: 100" in call for call in calls)
+            assert any("Total size:" in call and "MB" in call for call in calls)
+            assert any("Bucket: test-bucket" in call for call in calls)
+            assert any("Prefix: test-prefix" in call for call in calls)
+
+    def test_print_s3_stats_with_dict(self):
+        """Test print_s3_stats with dictionary."""
+        stats = {
+            'total_files': 100,
+            'total_size_mb': 50.5,
+            'bucket': 'test-bucket',
+            'prefix': 'test-prefix'
+        }
+        
+        with patch('builtins.print') as mock_print:
+            print_s3_stats(stats)
+            
+            calls = [call[0][0] for call in mock_print.call_args_list]
+            assert any("Total files: 100" in call for call in calls)
+            assert any("Total size: 50.5 MB" in call for call in calls)
+
+    def test_print_s3_stats_partial_dict(self):
+        """Test print_s3_stats with partial dictionary."""
+        stats = {'total_files': 100}
+        
+        with patch('builtins.print') as mock_print:
+            print_s3_stats(stats)
+            
+            calls = [call[0][0] for call in mock_print.call_args_list]
+            assert any("Total files: 100" in call for call in calls)
+            assert any("Total size: 0 MB" in call for call in calls)
+
+    def test_print_database_stats(self):
+        """Test print_database_stats function."""
+        with patch('builtins.print') as mock_print:
+            stats = {
+                'total_shitposts': 100,
+                'total_analyses': 75,
+                'average_confidence': 0.85,
+                'analysis_rate': 0.75
+            }
+            print_database_stats(stats)
+            
+            assert mock_print.call_count == 5  # Header + 4 stats
+            calls = [call[0][0] for call in mock_print.call_args_list]
+            assert any("📊 Database Statistics:" in call for call in calls)
+            assert any("Total shitposts: 100" in call for call in calls)
+            assert any("Total analyses: 75" in call for call in calls)
+            assert any("Average confidence: 0.85" in call for call in calls)
+            assert any("Analysis rate: 0.75" in call for call in calls)
+
+    def test_print_database_stats_partial(self):
+        """Test print_database_stats with partial stats."""
+        with patch('builtins.print') as mock_print:
+            stats = {'total_shitposts': 100}
+            print_database_stats(stats)
+            
+            calls = [call[0][0] for call in mock_print.call_args_list]
+            assert any("Total shitposts: 100" in call for call in calls)
+            assert any("Total analyses: 0" in call for call in calls)
+
+
+class TestHarvesterExamples:
+    """Test cases for HARVESTER_EXAMPLES constant."""
+
+    def test_harvester_examples_constant(self):
+        """Test HARVESTER_EXAMPLES constant."""
+        assert isinstance(HARVESTER_EXAMPLES, str)
+        assert len(HARVESTER_EXAMPLES) > 0
+        assert "Examples:" in HARVESTER_EXAMPLES
+        assert "python -m shitposts" in HARVESTER_EXAMPLES
+        assert "--mode" in HARVESTER_EXAMPLES
+        assert "--from" in HARVESTER_EXAMPLES
+        assert "--to" in HARVESTER_EXAMPLES
+        assert "--limit" in HARVESTER_EXAMPLES
+        assert "--max-id" in HARVESTER_EXAMPLES
+        assert "--dry-run" in HARVESTER_EXAMPLES
+        assert "--verbose" in HARVESTER_EXAMPLES

@@ -518,3 +518,290 @@ class TestLLMClient:
                 assert client.provider == "openai"  # From settings
                 assert client.model == "gpt-3.5-turbo"  # Overridden
                 assert client.api_key == "settings-key"  # From settings
+
+    @pytest.mark.asyncio
+    async def test_analyze_short_content(self):
+        """Test analysis with content that's too short."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_openai.return_value = AsyncMock()
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            
+            # Content too short (less than 10 characters)
+            result = await client.analyze("Hi")
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_analyze_empty_content(self):
+        """Test analysis with empty content."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_openai.return_value = AsyncMock()
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            
+            result = await client.analyze("")
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_analyze_whitespace_content(self):
+        """Test analysis with whitespace-only content."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_openai.return_value = AsyncMock()
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            
+            result = await client.analyze("   \n\t   ")
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_analyze_none_content(self):
+        """Test analysis with None content."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_openai.return_value = AsyncMock()
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            
+            result = await client.analyze(None)
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_analyze_with_metadata(self, sample_analysis_response):
+        """Test analysis includes proper metadata."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_client = AsyncMock()
+            mock_openai.return_value = mock_client
+            
+            # Mock successful init and analysis
+            mock_init_response = MagicMock()
+            mock_init_response.choices = [MagicMock(message=MagicMock(content="OK"))]
+            
+            mock_analysis_response = MagicMock()
+            mock_analysis_response.choices = [MagicMock(message=MagicMock(
+                content=json.dumps(sample_analysis_response)
+            ))]
+            
+            mock_client.chat.completions.create = AsyncMock(
+                side_effect=[mock_init_response, mock_analysis_response]
+            )
+            
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            await client.initialize()
+            
+            result = await client.analyze("Tesla stock is going up!")
+            
+            # Verify metadata is included
+            assert result is not None
+            assert 'meets_threshold' in result
+            assert 'analysis_quality' in result
+            assert 'original_content' in result
+            assert 'llm_provider' in result
+            assert 'llm_model' in result
+            assert 'analysis_timestamp' in result
+            
+            # Verify metadata values
+            assert result['original_content'] == "Tesla stock is going up!"
+            assert result['llm_provider'] == "openai"
+            assert result['llm_model'] == "gpt-3.5-turbo"
+            assert isinstance(result['analysis_timestamp'], str)
+
+    @pytest.mark.asyncio
+    async def test_quality_label_high_confidence(self):
+        """Test quality label for high confidence."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_openai.return_value = AsyncMock()
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            
+            # Test high confidence (>= 0.8)
+            quality = client._get_quality_label(0.9)
+            assert quality == "high"
+            
+            quality = client._get_quality_label(0.8)
+            assert quality == "high"
+
+    @pytest.mark.asyncio
+    async def test_quality_label_medium_confidence(self):
+        """Test quality label for medium confidence."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_openai.return_value = AsyncMock()
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            
+            # Test medium confidence (0.6-0.79)
+            quality = client._get_quality_label(0.7)
+            assert quality == "medium"
+            
+            quality = client._get_quality_label(0.6)
+            assert quality == "medium"
+
+    @pytest.mark.asyncio
+    async def test_quality_label_low_confidence(self):
+        """Test quality label for low confidence."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_openai.return_value = AsyncMock()
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            
+            # Test low confidence (< 0.6)
+            quality = client._get_quality_label(0.5)
+            assert quality == "low"
+            
+            quality = client._get_quality_label(0.0)
+            assert quality == "low"
+
+    @pytest.mark.asyncio
+    async def test_confidence_threshold_check(self, sample_analysis_response):
+        """Test that meets_threshold is calculated correctly."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_client = AsyncMock()
+            mock_openai.return_value = mock_client
+            
+            # Mock responses
+            mock_init_response = MagicMock()
+            mock_init_response.choices = [MagicMock(message=MagicMock(content="OK"))]
+            
+            # Test with confidence above threshold (0.7)
+            high_confidence_response = sample_analysis_response.copy()
+            high_confidence_response['confidence'] = 0.85
+            
+            mock_analysis_response = MagicMock()
+            mock_analysis_response.choices = [MagicMock(message=MagicMock(
+                content=json.dumps(high_confidence_response)
+            ))]
+            
+            mock_client.chat.completions.create = AsyncMock(
+                side_effect=[mock_init_response, mock_analysis_response]
+            )
+            
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            await client.initialize()
+            
+            result = await client.analyze("Test content")
+            
+            assert result is not None
+            assert result['meets_threshold'] is True
+            assert result['analysis_quality'] == "high"
+
+    @pytest.mark.asyncio
+    async def test_confidence_threshold_below(self, sample_analysis_response):
+        """Test that meets_threshold is False when confidence is below threshold."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_client = AsyncMock()
+            mock_openai.return_value = mock_client
+            
+            # Mock responses
+            mock_init_response = MagicMock()
+            mock_init_response.choices = [MagicMock(message=MagicMock(content="OK"))]
+            
+            # Test with confidence below threshold (0.7)
+            low_confidence_response = sample_analysis_response.copy()
+            low_confidence_response['confidence'] = 0.5
+            
+            mock_analysis_response = MagicMock()
+            mock_analysis_response.choices = [MagicMock(message=MagicMock(
+                content=json.dumps(low_confidence_response)
+            ))]
+            
+            mock_client.chat.completions.create = AsyncMock(
+                side_effect=[mock_init_response, mock_analysis_response]
+            )
+            
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            await client.initialize()
+            
+            result = await client.analyze("Test content")
+            
+            assert result is not None
+            assert result['meets_threshold'] is False
+            assert result['analysis_quality'] == "low"
+
+    @pytest.mark.asyncio
+    async def test_parse_manual_response_with_asset_keywords(self):
+        """Test manual parsing extracts assets from keywords."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_openai.return_value = AsyncMock()
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            
+            response = "Tesla stock looks great! The company is doing well. Apple corporation is also strong."
+            result = await client._parse_manual_response(response)
+            
+            assert result is not None
+            assert isinstance(result, dict)
+            assert 'assets' in result
+            assert isinstance(result['assets'], list)
+            # Should extract some assets from keywords
+            assert len(result['assets']) > 0
+
+    @pytest.mark.asyncio
+    async def test_parse_manual_response_empty_string(self):
+        """Test manual parsing with empty string."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_openai.return_value = AsyncMock()
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            
+            result = await client._parse_manual_response("")
+            
+            assert result is not None
+            assert isinstance(result, dict)
+            assert 'assets' in result
+            assert 'confidence' in result
+            assert result['assets'] == []  # Should be empty list
+
+    @pytest.mark.asyncio
+    async def test_get_timestamp_format(self):
+        """Test timestamp format is ISO format."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_openai.return_value = AsyncMock()
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            
+            timestamp = client._get_timestamp()
+            
+            assert isinstance(timestamp, str)
+            assert len(timestamp) > 10  # Should be substantial
+            # Should contain ISO format indicators
+            assert "T" in timestamp or "-" in timestamp
+
+    @pytest.mark.asyncio
+    async def test_analyze_with_error_handling(self):
+        """Test analyze method with error handling."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_client = AsyncMock()
+            mock_openai.return_value = mock_client
+            
+            # Mock successful init but error in analyze
+            mock_init_response = MagicMock()
+            mock_init_response.choices = [MagicMock(message=MagicMock(content="OK"))]
+            
+            mock_client.chat.completions.create = AsyncMock(
+                side_effect=[mock_init_response, Exception("Test error")]
+            )
+            
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            await client.initialize()
+            
+            result = await client.analyze("Test content")
+            
+            # The error is caught in _call_llm and returns None, which causes analyze to return None
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_analyze_with_parse_error(self):
+        """Test analyze method when response parsing fails."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_client = AsyncMock()
+            mock_openai.return_value = mock_client
+            
+            # Mock successful init and call but parsing fails
+            mock_init_response = MagicMock()
+            mock_init_response.choices = [MagicMock(message=MagicMock(content="OK"))]
+            
+            mock_analysis_response = MagicMock()
+            mock_analysis_response.choices = [MagicMock(message=MagicMock(content="Invalid response"))]
+            
+            mock_client.chat.completions.create = AsyncMock(
+                side_effect=[mock_init_response, mock_analysis_response]
+            )
+            
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            await client.initialize()
+            
+            result = await client.analyze("Test content")
+            
+            # When JSON parsing fails, it falls back to manual parsing which returns a dict
+            assert result is not None
+            assert isinstance(result, dict)
+            assert 'assets' in result
+            assert 'confidence' in result

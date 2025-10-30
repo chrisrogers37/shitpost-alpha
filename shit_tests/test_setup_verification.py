@@ -41,9 +41,9 @@ def test_test_configuration():
     from shit.db.database_config import DatabaseConfig
     from shit.s3.s3_config import S3Config
     
-    # Test database config
-    db_config = DatabaseConfig(database_url="sqlite+aiosqlite:///./test.db")
-    assert db_config.database_url == "sqlite+aiosqlite:///./test.db"
+    # Test database config (using in-memory database for config testing)
+    db_config = DatabaseConfig(database_url="sqlite+aiosqlite:///:memory:")
+    assert db_config.database_url == "sqlite+aiosqlite:///:memory:"
     assert db_config.is_sqlite is True
     
     # Test S3 config

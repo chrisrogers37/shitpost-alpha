@@ -1,387 +1,542 @@
 """
-Tests for Shitvault CLI - command line interface and argument parsing.
+Tests for shitvault/cli.py - CLI interface for database operations.
 """
 
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, patch, MagicMock
 import sys
+from unittest.mock import AsyncMock, MagicMock, patch
 from io import StringIO
+from datetime import datetime
 
-from shitvault.cli import main, create_database_parser
+from shitvault.cli import (
+    create_database_parser,
+    setup_database_logging,
+    print_database_start,
+    print_database_complete,
+    print_database_error,
+    print_database_interrupted,
+    process_s3_data,
+    get_database_stats,
+    get_processing_stats,
+    main
+)
 
 
-class TestShitvaultCLI:
-    """Test cases for Shitvault CLI."""
-
-    @pytest.fixture
-    def sample_args(self):
-        """Sample command line arguments."""
-        class MockArgs:
-            def __init__(self):
-                self.mode = "incremental"
-                self.start_date = "2024-01-01"
-                self.end_date = "2024-01-31"
-                self.limit = None
-                self.verbose = False
-                self.dry_run = False
-        
-        return MockArgs()
+class TestCLIParser:
+    """Test cases for CLI parser creation."""
 
     def test_create_database_parser(self):
         """Test creating database argument parser."""
         parser = create_database_parser()
         
         assert parser is not None
-        assert parser.prog == "shitvault"
-        
-        # Test that parser has required arguments
-        help_text = parser.format_help()
-        assert "--mode" in help_text
-        assert "--start-date" in help_text
-        assert "--end-date" in help_text
-        assert "--limit" in help_text
+        assert parser.description is not None
+        assert "load-database-from-s3" in parser.format_help()
+        assert "stats" in parser.format_help()
+        assert "processing-stats" in parser.format_help()
 
-    @pytest.mark.asyncio
-    async def test_main_success(self, sample_args):
-        """Test successful main execution."""
-        with patch('shitvault.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class:
-            
-            # Mock processor instance
-            mock_processor = AsyncMock()
-            mock_processor_class.return_value = mock_processor
-            mock_processor.process_s3_data = AsyncMock(return_value={
-                "processed_count": 5,
-                "skipped_count": 0,
-                "error_count": 0
-            })
-            mock_processor.cleanup = AsyncMock()
-            
-            await main()
-            
-            # Verify processor was created and used
-            mock_processor_class.assert_called_once()
-            mock_processor.process_s3_data.assert_called_once()
-            mock_processor.cleanup.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_main_with_verbose(self, sample_args):
-        """Test main execution with verbose logging."""
-        sample_args.verbose = True
-        
-        with patch('shitvault.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class, \
-             patch('shitvault.cli.logging') as mock_logging:
-            
-            mock_processor = AsyncMock()
-            mock_processor_class.return_value = mock_processor
-            mock_processor.process_s3_data = AsyncMock(return_value={
-                "processed_count": 3,
-                "skipped_count": 0,
-                "error_count": 0
-            })
-            mock_processor.cleanup = AsyncMock()
-            
-            await main()
-            
-            # Verify verbose logging was set
-            mock_logging.getLogger.return_value.setLevel.assert_called()
-
-    @pytest.mark.asyncio
-    async def test_main_with_dry_run(self, sample_args):
-        """Test main execution with dry run mode."""
-        sample_args.dry_run = True
-        
-        with patch('shitvault.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class:
-            
-            mock_processor = AsyncMock()
-            mock_processor_class.return_value = mock_processor
-            mock_processor.process_s3_data = AsyncMock(return_value={
-                "processed_count": 0,
-                "skipped_count": 0,
-                "error_count": 0
-            })
-            mock_processor.cleanup = AsyncMock()
-            
-            await main()
-            
-            # Verify dry run was passed to processor
-            mock_processor.process_s3_data.assert_called_once_with(
-                start_date="2024-01-01",
-                end_date="2024-01-31",
-                limit=None,
-                incremental=True,
-                dry_run=True
-            )
-
-    @pytest.mark.asyncio
-    async def test_main_with_custom_parameters(self):
-        """Test main execution with custom parameters."""
-        class CustomArgs:
-            def __init__(self):
-                self.mode = "backfill"
-                self.start_date = "2024-01-01"
-                self.end_date = "2024-01-31"
-                self.limit = 100
-                self.verbose = True
-                self.dry_run = False
-        
-        custom_args = CustomArgs()
-        
-        with patch('shitvault.cli.argparse.ArgumentParser.parse_args', return_value=custom_args), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class:
-            
-            mock_processor = AsyncMock()
-            mock_processor_class.return_value = mock_processor
-            mock_processor.process_s3_data = AsyncMock(return_value={
-                "processed_count": 15,
-                "skipped_count": 0,
-                "error_count": 0
-            })
-            mock_processor.cleanup = AsyncMock()
-            
-            await main()
-            
-            # Verify processor was created with custom parameters
-            mock_processor.process_s3_data.assert_called_once_with(
-                start_date="2024-01-01",
-                end_date="2024-01-31",
-                limit=100,
-                incremental=False,  # backfill mode
-                dry_run=False
-            )
-
-    @pytest.mark.asyncio
-    async def test_main_processor_initialization_error(self, sample_args):
-        """Test main execution with processor initialization error."""
-        with patch('shitvault.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class:
-            
-            mock_processor = AsyncMock()
-            mock_processor_class.return_value = mock_processor
-            mock_processor.process_s3_data = AsyncMock(side_effect=Exception("Initialization failed"))
-            mock_processor.cleanup = AsyncMock()
-            
-            with pytest.raises(Exception, match="Initialization failed"):
-                await main()
-
-    @pytest.mark.asyncio
-    async def test_main_processing_error(self, sample_args):
-        """Test main execution with processing error."""
-        with patch('shitvault.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class:
-            
-            mock_processor = AsyncMock()
-            mock_processor_class.return_value = mock_processor
-            mock_processor.process_s3_data = AsyncMock(side_effect=Exception("Processing failed"))
-            mock_processor.cleanup = AsyncMock()
-            
-            with pytest.raises(Exception, match="Processing failed"):
-                await main()
-
-    @pytest.mark.asyncio
-    async def test_main_keyboard_interrupt(self, sample_args):
-        """Test main execution with keyboard interrupt."""
-        with patch('shitvault.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class:
-            
-            mock_processor = AsyncMock()
-            mock_processor_class.return_value = mock_processor
-            mock_processor.process_s3_data = AsyncMock(side_effect=KeyboardInterrupt())
-            mock_processor.cleanup = AsyncMock()
-            
-            with pytest.raises(KeyboardInterrupt):
-                await main()
-
-    @pytest.mark.asyncio
-    async def test_main_cleanup_on_error(self, sample_args):
-        """Test that cleanup is called even on error."""
-        with patch('shitvault.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class:
-            
-            mock_processor = AsyncMock()
-            mock_processor_class.return_value = mock_processor
-            mock_processor.process_s3_data = AsyncMock(side_effect=Exception("Error"))
-            mock_processor.cleanup = AsyncMock()
-            
-            with pytest.raises(Exception):
-                await main()
-            
-            # Verify cleanup was called
-            mock_processor.cleanup.assert_called_once()
-
-    def test_parser_argument_validation(self):
-        """Test argument parser validation."""
+    def test_parser_load_database_from_s3_subcommand(self):
+        """Test load-database-from-s3 subcommand arguments."""
         parser = create_database_parser()
         
-        # Test valid arguments
-        valid_args = parser.parse_args([
-            "load-database-from-s3",
-            "--mode", "incremental",
-            "--start-date", "2024-01-01",
-            "--end-date", "2024-01-31",
-            "--limit", "50",
-            "--verbose"
+        args = parser.parse_args([
+            'load-database-from-s3',
+            '--mode', 'backfill',
+            '--start-date', '2024-01-01',
+            '--end-date', '2024-01-31',
+            '--limit', '100',
+            '--dry-run'
         ])
         
-        assert valid_args.command == "load-database-from-s3"
-        assert valid_args.mode == "incremental"
-        assert valid_args.start_date == "2024-01-01"
-        assert valid_args.end_date == "2024-01-31"
-        assert valid_args.limit == 50
-        assert valid_args.verbose is True
+        assert args.command == 'load-database-from-s3'
+        assert args.mode == 'backfill'
+        assert args.start_date == '2024-01-01'
+        assert args.end_date == '2024-01-31'
+        assert args.limit == 100
+        assert args.dry_run is True
 
-    def test_parser_backfill_mode_validation(self):
-        """Test parser validation for backfill mode."""
+    def test_parser_stats_subcommand(self):
+        """Test stats subcommand."""
         parser = create_database_parser()
         
-        # Test backfill mode
-        backfill_args = parser.parse_args([
-            "load-database-from-s3",
-            "--mode", "backfill",
-            "--start-date", "2024-01-01",
-            "--end-date", "2024-01-31",
-            "--limit", "1000"
-        ])
+        args = parser.parse_args(['stats'])
         
-        assert backfill_args.command == "load-database-from-s3"
-        assert backfill_args.mode == "backfill"
-        assert backfill_args.start_date == "2024-01-01"
-        assert backfill_args.end_date == "2024-01-31"
-        assert backfill_args.limit == 1000
+        assert args.command == 'stats'
 
-    def test_parser_default_values(self):
-        """Test parser default values."""
+    def test_parser_processing_stats_subcommand(self):
+        """Test processing-stats subcommand."""
         parser = create_database_parser()
         
-        # Test with no arguments (should use defaults)
-        default_args = parser.parse_args([])
+        args = parser.parse_args(['processing-stats'])
         
-        assert default_args.command is None
-        assert default_args.mode == "incremental"
-        assert default_args.start_date is None
-        assert default_args.end_date is None
-        assert default_args.limit is None
-        assert default_args.verbose is False
-        assert default_args.dry_run is False
+        assert args.command == 'processing-stats'
+
+    def test_parser_default_mode(self):
+        """Test default mode is incremental."""
+        parser = create_database_parser()
+        
+        args = parser.parse_args(['load-database-from-s3'])
+        
+        assert args.mode == 'incremental'
+
+    def test_parser_mode_choices(self):
+        """Test mode choices validation."""
+        parser = create_database_parser()
+        
+        # Valid choices
+        for mode in ['incremental', 'backfill', 'range']:
+            args = parser.parse_args(['load-database-from-s3', '--mode', mode])
+            assert args.mode == mode
+
+
+class TestCLIUtilities:
+    """Test cases for CLI utility functions."""
+
+    def test_setup_database_logging_normal(self):
+        """Test setting up logging in normal mode."""
+        args = MagicMock()
+        args.verbose = False
+        
+        with patch('shitvault.cli.logging.basicConfig') as mock_config:
+            setup_database_logging(args)
+            
+            mock_config.assert_called_once()
+            call_kwargs = mock_config.call_args[1]
+            assert call_kwargs['level'] == 20  # logging.INFO
+
+    def test_setup_database_logging_verbose(self):
+        """Test setting up logging in verbose mode."""
+        args = MagicMock()
+        args.verbose = True
+        
+        with patch('shitvault.cli.logging.basicConfig') as mock_config:
+            setup_database_logging(args)
+            
+            call_kwargs = mock_config.call_args[1]
+            assert call_kwargs['level'] == 10  # logging.DEBUG
+
+    def test_print_database_start(self):
+        """Test printing database operation start message."""
+        args = MagicMock()
+        args.command = 'load-database-from-s3'
+        args.start_date = '2024-01-01'
+        args.end_date = '2024-01-31'
+        args.limit = 100
+        args.dry_run = False
+        
+        with patch('builtins.print') as mock_print:
+            print_database_start(args)
+            
+            assert mock_print.call_count >= 1
+            # Extract all printed strings
+            calls = []
+            for call in mock_print.call_args_list:
+                if call[0]:  # positional args exist
+                    calls.append(' '.join(str(arg) for arg in call[0]))
+                elif call[1]:  # keyword args exist
+                    calls.append(str(call[1]))
+            
+            output = ' '.join(calls)
+            assert "🚀 Starting database operation" in output or any("🚀 Starting database operation" in call for call in calls)
+            assert "Start date: 2024-01-01" in output or any("Start date: 2024-01-01" in call for call in calls)
+            assert "Limit: 100" in output or any("Limit: 100" in call for call in calls)
+
+    def test_print_database_start_dry_run(self):
+        """Test printing database operation start with dry run."""
+        args = MagicMock()
+        args.command = 'load-database-from-s3'
+        args.dry_run = True
+        
+        with patch('builtins.print') as mock_print:
+            print_database_start(args)
+            
+            calls = []
+            for call in mock_print.call_args_list:
+                if call[0]:
+                    calls.append(' '.join(str(arg) for arg in call[0]))
+            output = ' '.join(calls)
+            assert "DRY RUN" in output or any("DRY RUN" in call for call in calls)
+
+    def test_print_database_complete_with_dict(self):
+        """Test printing database completion with dictionary result."""
+        result = {'total_processed': 10, 'successful': 8, 'failed': 2}
+        
+        with patch('builtins.print') as mock_print:
+            print_database_complete(result)
+            
+            calls = []
+            for call in mock_print.call_args_list:
+                if call[0]:
+                    calls.append(' '.join(str(arg) for arg in call[0]))
+            output = ' '.join(calls)
+            assert "✅ Database operation completed" in output or any("✅ Database operation completed" in call for call in calls)
+            assert "total_processed: 10" in output or any("total_processed: 10" in call for call in calls)
+
+    def test_print_database_complete_with_string(self):
+        """Test printing database completion with string result."""
+        result = "Operation successful"
+        
+        with patch('builtins.print') as mock_print:
+            print_database_complete(result)
+            
+            calls = []
+            for call in mock_print.call_args_list:
+                if call[0]:
+                    calls.append(' '.join(str(arg) for arg in call[0]))
+            output = ' '.join(calls)
+            assert "✅ Database operation completed" in output or any("✅ Database operation completed" in call for call in calls)
+            assert "Result: Operation successful" in output or any("Result: Operation successful" in call for call in calls)
+
+    def test_print_database_error(self):
+        """Test printing database error message."""
+        error = Exception("Test error")
+        
+        with patch('builtins.print') as mock_print:
+            print_database_error(error)
+            
+            calls = []
+            for call in mock_print.call_args_list:
+                if call[0]:
+                    calls.append(' '.join(str(arg) for arg in call[0]))
+            output = ' '.join(calls)
+            assert "❌ Database operation failed" in output or any("❌ Database operation failed" in call for call in calls)
+
+    def test_print_database_interrupted(self):
+        """Test printing database interrupted message."""
+        with patch('builtins.print') as mock_print:
+            print_database_interrupted()
+            
+            calls = []
+            for call in mock_print.call_args_list:
+                if call[0]:
+                    calls.append(' '.join(str(arg) for arg in call[0]))
+            output = ' '.join(calls)
+            assert "⏹️  Database operation interrupted" in output or any("⏹️  Database operation interrupted" in call for call in calls)
+
+
+class TestCLICommands:
+    """Test cases for CLI command functions."""
+
+    @pytest.fixture
+    def mock_args(self):
+        """Mock command line arguments."""
+        args = MagicMock()
+        args.command = 'load-database-from-s3'
+        args.mode = 'incremental'
+        args.start_date = None
+        args.end_date = None
+        args.limit = None
+        args.dry_run = False
+        return args
 
     @pytest.mark.asyncio
-    async def test_main_output_formatting(self, sample_args):
-        """Test main execution output formatting."""
-        with patch('shitvault.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class, \
-             patch('sys.stdout', new_callable=StringIO) as mock_stdout:
-            
-            mock_processor = AsyncMock()
-            mock_processor_class.return_value = mock_processor
-            mock_processor.process_s3_data = AsyncMock(return_value={
-                "processed_count": 7,
-                "skipped_count": 2,
-                "error_count": 1
-            })
-            mock_processor.cleanup = AsyncMock()
-            
-            await main()
-            
-            # Check that output was printed
-            output = mock_stdout.getvalue()
-            assert "Processing completed successfully" in output
-            assert "7" in output  # Processed count
-            assert "2" in output  # Skipped count
-            assert "1" in output  # Error count
-
-    @pytest.mark.asyncio
-    async def test_main_no_data_to_process(self, sample_args):
-        """Test main execution when no data to process."""
-        with patch('shitvault.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class, \
-             patch('sys.stdout', new_callable=StringIO) as mock_stdout:
-            
-            mock_processor = AsyncMock()
-            mock_processor_class.return_value = mock_processor
-            mock_processor.process_s3_data = AsyncMock(return_value={
-                "processed_count": 0,
-                "skipped_count": 0,
-                "error_count": 0
-            })
-            mock_processor.cleanup = AsyncMock()
-            
-            await main()
-            
-            # Check that appropriate message was printed
-            output = mock_stdout.getvalue()
-            assert "No data" in output or "0" in output
-
-    @pytest.mark.asyncio
-    async def test_main_with_processing_errors(self, sample_args):
-        """Test main execution with some processing errors."""
-        with patch('shitvault.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
+    async def test_process_s3_data_success(self, mock_args):
+        """Test successful S3 data processing."""
+        with patch('shitvault.cli.print_database_start'), \
+             patch('shitvault.cli.print_database_complete'), \
+             patch('shitvault.cli.settings') as mock_settings, \
+             patch('shitvault.cli.DatabaseConfig'), \
+             patch('shitvault.cli.DatabaseClient') as mock_db_client_class, \
+             patch('shitvault.cli.S3Config'), \
+             patch('shitvault.cli.S3DataLake') as mock_s3_class, \
+             patch('shitvault.cli.DatabaseOperations'), \
              patch('shitvault.cli.S3Processor') as mock_processor_class:
             
+            # Setup mocks
+            mock_db_client = AsyncMock()
+            mock_session = AsyncMock()
+            # Make get_session return a mock context manager
+            mock_session_cm = MagicMock()
+            mock_session_cm.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+            # get_session is a regular method that returns an async context manager
+            mock_db_client.get_session = MagicMock(return_value=mock_session_cm)
+            mock_db_client_class.return_value = mock_db_client
+            
+            mock_s3 = AsyncMock()
+            mock_s3_class.return_value = mock_s3
+            
             mock_processor = AsyncMock()
+            mock_processor.process_s3_to_database.return_value = {
+                'total_processed': 10,
+                'successful': 8,
+                'failed': 2
+            }
             mock_processor_class.return_value = mock_processor
-            mock_processor.process_s3_data = AsyncMock(return_value={
-                "processed_count": 3,
-                "skipped_count": 1,
-                "error_count": 2
-            })
-            mock_processor.cleanup = AsyncMock()
+            
+            await process_s3_data(mock_args)
+            
+            mock_db_client.initialize.assert_called_once()
+            mock_s3.initialize.assert_called_once()
+            mock_processor.process_s3_to_database.assert_called_once()
+            mock_db_client.cleanup.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_process_s3_data_with_dates(self, mock_args):
+        """Test processing S3 data with date range."""
+        mock_args.start_date = '2024-01-01'
+        mock_args.end_date = '2024-01-31'
+        mock_args.mode = 'range'
+        
+        with patch('shitvault.cli.print_database_start'), \
+             patch('shitvault.cli.print_database_complete'), \
+             patch('shitvault.cli.settings'), \
+             patch('shitvault.cli.DatabaseConfig'), \
+             patch('shitvault.cli.DatabaseClient') as mock_db_client_class, \
+             patch('shitvault.cli.S3Config'), \
+             patch('shitvault.cli.S3DataLake') as mock_s3_class, \
+             patch('shitvault.cli.DatabaseOperations'), \
+             patch('shitvault.cli.S3Processor') as mock_processor_class:
+            
+            mock_db_client = AsyncMock()
+            mock_session = AsyncMock()
+            # Make get_session return a mock context manager
+            mock_session_cm = MagicMock()
+            mock_session_cm.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+            # get_session is a regular method that returns an async context manager
+            mock_db_client.get_session = MagicMock(return_value=mock_session_cm)
+            mock_db_client_class.return_value = mock_db_client
+            
+            mock_s3 = AsyncMock()
+            mock_s3_class.return_value = mock_s3
+            
+            mock_processor = AsyncMock()
+            mock_processor.process_s3_to_database.return_value = {'total_processed': 5}
+            mock_processor_class.return_value = mock_processor
+            
+            await process_s3_data(mock_args)
+            
+            # Verify incremental parameter is False for range mode
+            call_kwargs = mock_processor.process_s3_to_database.call_args[1]
+            assert call_kwargs['incremental'] is False
+
+    @pytest.mark.asyncio
+    async def test_process_s3_data_error(self, mock_args):
+        """Test error handling in process_s3_data."""
+        with patch('shitvault.cli.print_database_start'), \
+             patch('shitvault.cli.print_database_error'), \
+             patch('shitvault.cli.settings'), \
+             patch('shitvault.cli.DatabaseConfig'), \
+             patch('shitvault.cli.DatabaseClient') as mock_db_client_class, \
+             patch('shitvault.cli.S3Config'), \
+             patch('shitvault.cli.S3DataLake') as mock_s3_class:
+            
+            mock_db_client = AsyncMock()
+            mock_db_client.initialize.side_effect = Exception("Database error")
+            mock_db_client_class.return_value = mock_db_client
+            
+            mock_s3 = AsyncMock()
+            mock_s3_class.return_value = mock_s3
+            
+            with pytest.raises(Exception, match="Database error"):
+                await process_s3_data(mock_args)
+
+    @pytest.mark.asyncio
+    async def test_get_database_stats_success(self):
+        """Test getting database statistics."""
+        args = MagicMock()
+        args.command = 'stats'
+        
+        with patch('shitvault.cli.print_database_start'), \
+             patch('shitvault.cli.print_database_complete'), \
+             patch('shitvault.cli.settings'), \
+             patch('shitvault.cli.DatabaseConfig'), \
+             patch('shitvault.cli.DatabaseClient') as mock_db_client_class, \
+             patch('shitvault.cli.DatabaseOperations'), \
+             patch('shitvault.cli.Statistics') as mock_stats_class:
+            
+            mock_db_client = AsyncMock()
+            mock_session = AsyncMock()
+            # Make get_session return a mock context manager
+            mock_session_cm = MagicMock()
+            mock_session_cm.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+            # get_session is a regular method that returns an async context manager
+            mock_db_client.get_session = MagicMock(return_value=mock_session_cm)
+            mock_db_client_class.return_value = mock_db_client
+            
+            mock_stats = AsyncMock()
+            mock_stats.get_database_stats.return_value = {
+                'total_shitposts': 100,
+                'total_analyses': 75
+            }
+            mock_stats_class.return_value = mock_stats
+            
+            await get_database_stats(args)
+            
+            mock_db_client.initialize.assert_called_once()
+            mock_stats.get_database_stats.assert_called_once()
+            mock_db_client.cleanup.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_processing_stats_success(self):
+        """Test getting processing statistics."""
+        args = MagicMock()
+        args.command = 'processing-stats'
+        
+        with patch('shitvault.cli.print_database_start'), \
+             patch('shitvault.cli.print_database_complete'), \
+             patch('shitvault.cli.settings'), \
+             patch('shitvault.cli.DatabaseConfig'), \
+             patch('shitvault.cli.DatabaseClient') as mock_db_client_class, \
+             patch('shitvault.cli.S3Config'), \
+             patch('shitvault.cli.S3DataLake') as mock_s3_class, \
+             patch('shitvault.cli.DatabaseOperations'), \
+             patch('shitvault.cli.S3Processor') as mock_processor_class:
+            
+            mock_db_client = AsyncMock()
+            mock_session = AsyncMock()
+            # Make get_session return a mock context manager
+            mock_session_cm = MagicMock()
+            mock_session_cm.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+            # get_session is a regular method that returns an async context manager
+            mock_db_client.get_session = MagicMock(return_value=mock_session_cm)
+            mock_db_client_class.return_value = mock_db_client
+            
+            mock_s3 = AsyncMock()
+            mock_s3_class.return_value = mock_s3
+            
+            mock_processor = AsyncMock()
+            mock_processor.get_s3_processing_stats.return_value = {
+                's3_stats': {},
+                'db_stats': {}
+            }
+            mock_processor_class.return_value = mock_processor
+            
+            await get_processing_stats(args)
+            
+            mock_db_client.initialize.assert_called_once()
+            mock_s3.initialize.assert_called_once()
+            mock_processor.get_s3_processing_stats.assert_called_once()
+            mock_db_client.cleanup.assert_called_once()
+
+
+class TestMainFunction:
+    """Test cases for main CLI function."""
+
+    @pytest.mark.asyncio
+    async def test_main_no_command(self):
+        """Test main with no command."""
+        with patch('shitvault.cli.create_database_parser') as mock_parser_class:
+            mock_parser = MagicMock()
+            mock_args = MagicMock()
+            mock_args.command = None
+            mock_parser.parse_args.return_value = mock_args
+            mock_parser_class.return_value = mock_parser
             
             await main()
             
-            # Should complete successfully even with some errors
-            mock_processor.cleanup.assert_called_once()
+            mock_parser.print_help.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_main_with_database_connection_error(self, sample_args):
-        """Test main execution with database connection error."""
-        with patch('shitvault.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class:
+    async def test_main_load_database_from_s3(self):
+        """Test main with load-database-from-s3 command."""
+        with patch('shitvault.cli.create_database_parser') as mock_parser_class, \
+             patch('shitvault.cli.setup_database_logging'), \
+             patch('shitvault.cli.process_s3_data') as mock_process:
             
-            mock_processor = AsyncMock()
-            mock_processor_class.return_value = mock_processor
-            mock_processor.process_s3_data = AsyncMock(side_effect=Exception("Database connection error"))
-            mock_processor.cleanup = AsyncMock()
-            
-            with pytest.raises(Exception, match="Database connection error"):
-                await main()
-
-    @pytest.mark.asyncio
-    async def test_main_with_s3_connection_error(self, sample_args):
-        """Test main execution with S3 connection error."""
-        with patch('shitvault.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class:
-            
-            mock_processor = AsyncMock()
-            mock_processor_class.return_value = mock_processor
-            mock_processor.process_s3_data = AsyncMock(side_effect=Exception("S3 connection error"))
-            mock_processor.cleanup = AsyncMock()
-            
-            with pytest.raises(Exception, match="S3 connection error"):
-                await main()
-
-    @pytest.mark.asyncio
-    async def test_main_with_large_dataset(self, sample_args):
-        """Test main execution with large dataset."""
-        with patch('shitvault.cli.argparse.ArgumentParser.parse_args', return_value=sample_args), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class, \
-             patch('sys.stdout', new_callable=StringIO) as mock_stdout:
-            
-            mock_processor = AsyncMock()
-            mock_processor_class.return_value = mock_processor
-            mock_processor.process_s3_data = AsyncMock(return_value={
-                "processed_count": 1000,
-                "skipped_count": 50,
-                "error_count": 10
-            })
-            mock_processor.cleanup = AsyncMock()
+            mock_parser = MagicMock()
+            mock_args = MagicMock()
+            mock_args.command = 'load-database-from-s3'
+            mock_parser.parse_args.return_value = mock_args
+            mock_parser_class.return_value = mock_parser
             
             await main()
             
-            # Check that large dataset was processed
-            output = mock_stdout.getvalue()
-            assert "1000" in output  # Processed count
-            assert "50" in output   # Skipped count
-            assert "10" in output   # Error count
+            mock_process.assert_called_once_with(mock_args)
+
+    @pytest.mark.asyncio
+    async def test_main_stats(self):
+        """Test main with stats command."""
+        with patch('shitvault.cli.create_database_parser') as mock_parser_class, \
+             patch('shitvault.cli.setup_database_logging'), \
+             patch('shitvault.cli.get_database_stats') as mock_get_stats:
+            
+            mock_parser = MagicMock()
+            mock_args = MagicMock()
+            mock_args.command = 'stats'
+            mock_parser.parse_args.return_value = mock_args
+            mock_parser_class.return_value = mock_parser
+            
+            await main()
+            
+            mock_get_stats.assert_called_once_with(mock_args)
+
+    @pytest.mark.asyncio
+    async def test_main_processing_stats(self):
+        """Test main with processing-stats command."""
+        with patch('shitvault.cli.create_database_parser') as mock_parser_class, \
+             patch('shitvault.cli.setup_database_logging'), \
+             patch('shitvault.cli.get_processing_stats') as mock_get_stats:
+            
+            mock_parser = MagicMock()
+            mock_args = MagicMock()
+            mock_args.command = 'processing-stats'
+            mock_parser.parse_args.return_value = mock_args
+            mock_parser_class.return_value = mock_parser
+            
+            await main()
+            
+            mock_get_stats.assert_called_once_with(mock_args)
+
+    @pytest.mark.asyncio
+    async def test_main_unknown_command(self):
+        """Test main with unknown command."""
+        with patch('shitvault.cli.create_database_parser') as mock_parser_class, \
+             patch('shitvault.cli.setup_database_logging'), \
+             patch('builtins.print') as mock_print:
+            
+            mock_parser = MagicMock()
+            mock_args = MagicMock()
+            mock_args.command = 'unknown'
+            mock_parser.parse_args.return_value = mock_args
+            mock_parser_class.return_value = mock_parser
+            
+            await main()
+            
+            mock_print.assert_called_once()
+            mock_parser.print_help.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_main_keyboard_interrupt(self):
+        """Test main with keyboard interrupt."""
+        with patch('shitvault.cli.create_database_parser') as mock_parser_class, \
+             patch('shitvault.cli.setup_database_logging'), \
+             patch('shitvault.cli.print_database_interrupted') as mock_interrupted, \
+             patch('shitvault.cli.process_s3_data') as mock_process:
+            
+            mock_parser = MagicMock()
+            mock_args = MagicMock()
+            mock_args.command = 'load-database-from-s3'
+            mock_parser.parse_args.return_value = mock_args
+            mock_parser_class.return_value = mock_parser
+            
+            mock_process.side_effect = KeyboardInterrupt()
+            
+            await main()
+            
+            mock_interrupted.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_main_exception(self):
+        """Test main with exception."""
+        with patch('shitvault.cli.create_database_parser') as mock_parser_class, \
+             patch('shitvault.cli.setup_database_logging'), \
+             patch('shitvault.cli.print_database_error') as mock_error, \
+             patch('shitvault.cli.process_s3_data') as mock_process, \
+             patch('sys.exit') as mock_exit:
+            
+            mock_parser = MagicMock()
+            mock_args = MagicMock()
+            mock_args.command = 'load-database-from-s3'
+            mock_parser.parse_args.return_value = mock_args
+            mock_parser_class.return_value = mock_parser
+            
+            mock_process.side_effect = Exception("Test error")
+            
+            await main()
+            
+            mock_error.assert_called_once()
+            mock_exit.assert_called_once_with(1)
