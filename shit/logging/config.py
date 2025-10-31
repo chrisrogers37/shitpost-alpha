@@ -177,4 +177,15 @@ def configure_from_verbose(verbose: bool = False) -> LoggingConfig:
     # Auto-detect color support
     config.enable_colors = detect_color_support()
     
+    # Load file logging settings from environment if available
+    try:
+        from shit.config.shitpost_settings import settings
+        if hasattr(settings, 'FILE_LOGGING'):
+            config.file_logging = settings.FILE_LOGGING
+        if hasattr(settings, 'LOG_FILE_PATH') and settings.LOG_FILE_PATH:
+            config.log_file_path = settings.LOG_FILE_PATH
+    except (ImportError, AttributeError):
+        # Settings not available or doesn't have logging config
+        pass
+    
     return config
