@@ -5,7 +5,10 @@ Provides unified logging setup for all CLI modules.
 
 import logging
 import sys
+import os
+from pathlib import Path
 from typing import Optional
+from datetime import datetime
 
 from .config import configure_from_verbose, get_config
 from .formatters import create_formatter
@@ -64,9 +67,51 @@ def setup_cli_logging(
     # Add handler to root logger
     root_logger.addHandler(console_handler)
     
+    # Setup file logging if enabled
+    if config.file_logging:
+        _setup_file_handler(root_logger, config, level)
+    
     # Suppress verbose logging from third-party libraries
     if not verbose:
         _suppress_third_party_logging()
+
+
+def _setup_file_handler(root_logger: logging.Logger, config, level: int) -> None:
+    """Setup file handler for logging.
+    
+    Args:
+        root_logger: Root logger to add handler to
+        config: Logging configuration
+        level: Log level to use
+    """
+    # Determine log file path
+    if config.log_file_path:
+        log_file_path = Path(config.log_file_path)
+    else:
+        # Default to timestamped session file in logs directory
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file_path = Path(__file__).parent.parent.parent / "logs" / f"shitpost_alpha_{timestamp}.log"
+    
+    # Create logs directory if it doesn't exist
+    log_file_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Create file handler with rotation
+    # Use a simple file handler (could upgrade to RotatingFileHandler later)
+    file_handler = logging.FileHandler(log_file_path)
+    file_handler.setLevel(level)
+    
+    # Use structured formatter for file (no colors)
+    file_formatter = create_formatter(
+        format_type='structured',
+        enable_colors=False
+    )
+    file_handler.setFormatter(file_formatter)
+    
+    # Add handler to root logger
+    root_logger.addHandler(file_handler)
+    
+    # Log that file logging is enabled
+    logging.info(f"File logging enabled: {log_file_path}")
 
 
 def _suppress_third_party_logging() -> None:

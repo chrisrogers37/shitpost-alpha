@@ -32,6 +32,7 @@ class TestSetupCLILogging:
             mock_config = MagicMock()
             mock_config.format = "beautiful"
             mock_config.enable_colors = True
+            mock_config.file_logging = False  # Disable file logging for tests
             mock_configure.return_value = mock_config
             
             mock_formatter = MagicMock()
@@ -72,6 +73,7 @@ class TestSetupCLILogging:
             mock_config = MagicMock()
             mock_config.format = "beautiful"
             mock_config.enable_colors = True
+            mock_config.file_logging = False  # Disable file logging for tests
             mock_configure.return_value = mock_config
             
             mock_formatter = MagicMock()
@@ -102,6 +104,7 @@ class TestSetupCLILogging:
             mock_config = MagicMock()
             mock_config.format = "beautiful"
             mock_config.enable_colors = True
+            mock_config.file_logging = False  # Disable file logging for tests
             mock_configure.return_value = mock_config
             
             mock_formatter = MagicMock()
@@ -133,6 +136,7 @@ class TestSetupCLILogging:
             mock_config = MagicMock()
             mock_config.format = "beautiful"
             mock_config.enable_colors = True
+            mock_config.file_logging = False  # Disable file logging for tests
             mock_configure.return_value = mock_config
             
             mock_formatter = MagicMock()
@@ -165,6 +169,7 @@ class TestSetupCLILogging:
             mock_config = MagicMock()
             mock_config.format = "beautiful"
             mock_config.enable_colors = True
+            mock_config.file_logging = False  # Disable file logging for tests
             mock_configure.return_value = mock_config
             
             mock_formatter = MagicMock()
@@ -194,6 +199,7 @@ class TestSetupCLILogging:
             mock_config = MagicMock()
             mock_config.format = "beautiful"
             mock_config.enable_colors = True
+            mock_config.file_logging = False  # Disable file logging for tests
             mock_configure.return_value = mock_config
             
             mock_formatter = MagicMock()
@@ -406,6 +412,7 @@ class TestCLILoggingEdgeCases:
             mock_config = MagicMock()
             mock_config.format = "beautiful"
             mock_config.enable_colors = True
+            mock_config.file_logging = False  # Disable file logging for tests
             mock_configure.return_value = mock_config
             
             mock_formatter = MagicMock()
@@ -437,6 +444,7 @@ class TestCLILoggingEdgeCases:
             mock_config = MagicMock()
             mock_config.format = "beautiful"
             mock_config.enable_colors = True
+            mock_config.file_logging = False  # Disable file logging for tests
             mock_configure.return_value = mock_config
             
             mock_formatter = MagicMock()
@@ -515,6 +523,7 @@ class TestCLILoggingEdgeCases:
             mock_config = MagicMock()
             mock_config.format = "beautiful"
             mock_config.enable_colors = True
+            mock_config.file_logging = False  # Disable file logging for tests
             mock_configure.return_value = mock_config
             
             mock_formatter = MagicMock()
@@ -545,6 +554,7 @@ class TestCLILoggingEdgeCases:
             mock_config = MagicMock()
             mock_config.format = "beautiful"
             mock_config.enable_colors = True
+            mock_config.file_logging = False  # Disable file logging for tests
             mock_configure.return_value = mock_config
             
             mock_formatter = MagicMock()

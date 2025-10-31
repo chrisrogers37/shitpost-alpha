@@ -79,6 +79,8 @@ class Settings(BaseSettings):
     
     # Logging
     LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
+    FILE_LOGGING: bool = Field(default=False, env="FILE_LOGGING")
+    LOG_FILE_PATH: Optional[str] = Field(default=None, env="LOG_FILE_PATH")
     
     class Config:
         env_file = ".env"
