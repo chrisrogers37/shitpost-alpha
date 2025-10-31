@@ -8,6 +8,7 @@ import sys
 import os
 from pathlib import Path
 from typing import Optional
+from datetime import datetime
 
 from .config import configure_from_verbose, get_config
 from .formatters import create_formatter
@@ -87,8 +88,9 @@ def _setup_file_handler(root_logger: logging.Logger, config, level: int) -> None
     if config.log_file_path:
         log_file_path = Path(config.log_file_path)
     else:
-        # Default to logs directory in project root
-        log_file_path = Path(__file__).parent.parent.parent / "logs" / "shitpost_alpha.log"
+        # Default to timestamped session file in logs directory
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file_path = Path(__file__).parent.parent.parent / "logs" / f"shitpost_alpha_{timestamp}.log"
     
     # Create logs directory if it doesn't exist
     log_file_path.parent.mkdir(parents=True, exist_ok=True)
