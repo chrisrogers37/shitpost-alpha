@@ -13,7 +13,12 @@ from sqlalchemy.exc import IntegrityError
 from shit.db.database_operations import DatabaseOperations
 from shitvault.shitpost_models import TruthSocialShitpost, Prediction
 
-logger = logging.getLogger(__name__)
+# Use centralized DatabaseLogger for beautiful logging
+from shit.logging.service_loggers import DatabaseLogger
+
+# Create DatabaseLogger instance
+db_logger = DatabaseLogger("shitpost_operations")
+logger = db_logger.logger
 
 class ShitpostOperations:
     """Operations for managing shitposts."""

@@ -14,7 +14,12 @@ from .s3_client import S3Client
 from .s3_config import S3Config
 from .s3_models import S3StorageData, S3Stats, S3KeyInfo
 
-logger = logging.getLogger(__name__)
+# Use centralized S3Logger for beautiful logging
+from shit.logging.service_loggers import S3Logger
+
+# Create S3Logger instance
+s3_logger = S3Logger("s3_data_lake")
+logger = s3_logger.logger
 
 
 class S3DataLake:

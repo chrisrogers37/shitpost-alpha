@@ -13,7 +13,12 @@ from shit.db.database_operations import DatabaseOperations
 from shit.db.database_utils import DatabaseUtils
 from shitvault.shitpost_models import Prediction
 
-logger = logging.getLogger(__name__)
+# Use centralized DatabaseLogger for beautiful logging
+from shit.logging.service_loggers import DatabaseLogger
+
+# Create DatabaseLogger instance
+db_logger = DatabaseLogger("prediction_operations")
+logger = db_logger.logger
 
 class PredictionOperations:
     """Operations for managing predictions."""

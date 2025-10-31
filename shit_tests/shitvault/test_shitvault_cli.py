@@ -97,25 +97,22 @@ class TestCLIUtilities:
         args = MagicMock()
         args.verbose = False
         
-        with patch('shitvault.cli.logging.basicConfig') as mock_config:
+        with patch('shitvault.cli.setup_centralized_database_logging') as mock_setup:
             setup_database_logging(args)
             
-            mock_config.assert_called_once()
-            call_kwargs = mock_config.call_args[1]
-            assert call_kwargs['level'] == 20  # logging.INFO
+            mock_setup.assert_called_once_with(verbose=False)
 
     def test_setup_database_logging_verbose(self):
         """Test setting up logging in verbose mode."""
         args = MagicMock()
         args.verbose = True
         
-        with patch('shitvault.cli.logging.basicConfig') as mock_config:
+        with patch('shitvault.cli.setup_centralized_database_logging') as mock_setup:
             setup_database_logging(args)
             
-            call_kwargs = mock_config.call_args[1]
-            assert call_kwargs['level'] == 10  # logging.DEBUG
+            mock_setup.assert_called_once_with(verbose=True)
 
-    def test_print_database_start(self):
+    def test_print_database_start(self, capsys):
         """Test printing database operation start message."""
         args = MagicMock()
         args.command = 'load-database-from-s3'
@@ -124,94 +121,76 @@ class TestCLIUtilities:
         args.limit = 100
         args.dry_run = False
         
-        with patch('builtins.print') as mock_print:
-            print_database_start(args)
-            
-            assert mock_print.call_count >= 1
-            # Extract all printed strings
-            calls = []
-            for call in mock_print.call_args_list:
-                if call[0]:  # positional args exist
-                    calls.append(' '.join(str(arg) for arg in call[0]))
-                elif call[1]:  # keyword args exist
-                    calls.append(str(call[1]))
-            
-            output = ' '.join(calls)
-            assert "🚀 Starting database operation" in output or any("🚀 Starting database operation" in call for call in calls)
-            assert "Start date: 2024-01-01" in output or any("Start date: 2024-01-01" in call for call in calls)
-            assert "Limit: 100" in output or any("Limit: 100" in call for call in calls)
+        print_database_start(args)
+        captured = capsys.readouterr()
+        
+        output = captured.out
+        assert "🚀 Starting database operation" in output
+        assert "load-database-from-s3" in output
+        assert "Start date: 2024-01-01" in output
+        assert "Limit: 100" in output
 
-    def test_print_database_start_dry_run(self):
+    def test_print_database_start_dry_run(self, capsys):
         """Test printing database operation start with dry run."""
         args = MagicMock()
         args.command = 'load-database-from-s3'
+        # Add attributes that print_database_start checks
+        args.start_date = None
+        args.end_date = None
+        args.limit = None
         args.dry_run = True
         
-        with patch('builtins.print') as mock_print:
-            print_database_start(args)
-            
-            calls = []
-            for call in mock_print.call_args_list:
-                if call[0]:
-                    calls.append(' '.join(str(arg) for arg in call[0]))
-            output = ' '.join(calls)
-            assert "DRY RUN" in output or any("DRY RUN" in call for call in calls)
+        print_database_start(args)
+        captured = capsys.readouterr()
+        output = captured.out
+        
+        assert "DRY RUN" in output
 
-    def test_print_database_complete_with_dict(self):
+    def test_print_database_complete_with_dict(self, capsys):
         """Test printing database completion with dictionary result."""
         result = {'total_processed': 10, 'successful': 8, 'failed': 2}
         
-        with patch('builtins.print') as mock_print:
-            print_database_complete(result)
-            
-            calls = []
-            for call in mock_print.call_args_list:
-                if call[0]:
-                    calls.append(' '.join(str(arg) for arg in call[0]))
-            output = ' '.join(calls)
-            assert "✅ Database operation completed" in output or any("✅ Database operation completed" in call for call in calls)
-            assert "total_processed: 10" in output or any("total_processed: 10" in call for call in calls)
+        print_database_complete(result)
+        captured = capsys.readouterr()
+        output = captured.out
+        
+        assert "✅" in output
+        assert "Database operation completed successfully" in output
+        assert "total_processed: 10" in output
 
-    def test_print_database_complete_with_string(self):
+    def test_print_database_complete_with_string(self, capsys):
         """Test printing database completion with string result."""
         result = "Operation successful"
         
-        with patch('builtins.print') as mock_print:
-            print_database_complete(result)
-            
-            calls = []
-            for call in mock_print.call_args_list:
-                if call[0]:
-                    calls.append(' '.join(str(arg) for arg in call[0]))
-            output = ' '.join(calls)
-            assert "✅ Database operation completed" in output or any("✅ Database operation completed" in call for call in calls)
-            assert "Result: Operation successful" in output or any("Result: Operation successful" in call for call in calls)
+        print_database_complete(result)
+        captured = capsys.readouterr()
+        output = captured.out
+        
+        assert "✅" in output
+        assert "Database operation completed successfully" in output
+        assert "Result: Operation successful" in output
 
-    def test_print_database_error(self):
+    def test_print_database_error(self, capsys):
         """Test printing database error message."""
         error = Exception("Test error")
         
-        with patch('builtins.print') as mock_print:
-            print_database_error(error)
-            
-            calls = []
-            for call in mock_print.call_args_list:
-                if call[0]:
-                    calls.append(' '.join(str(arg) for arg in call[0]))
-            output = ' '.join(calls)
-            assert "❌ Database operation failed" in output or any("❌ Database operation failed" in call for call in calls)
+        print_database_error(error)
+        captured = capsys.readouterr()
+        output = captured.out
+        
+        assert "❌" in output
+        assert "Database operation failed" in output
+        assert "Test error" in output
 
-    def test_print_database_interrupted(self):
+    def test_print_database_interrupted(self, capsys):
         """Test printing database interrupted message."""
-        with patch('builtins.print') as mock_print:
-            print_database_interrupted()
-            
-            calls = []
-            for call in mock_print.call_args_list:
-                if call[0]:
-                    calls.append(' '.join(str(arg) for arg in call[0]))
-            output = ' '.join(calls)
-            assert "⏹️  Database operation interrupted" in output or any("⏹️  Database operation interrupted" in call for call in calls)
+        print_database_interrupted()
+        captured = capsys.readouterr()
+        output = captured.out
+        
+        assert "⚠️" in output
+        assert "Database operation interrupted" in output
+        assert "by user" in output
 
 
 class TestCLICommands:

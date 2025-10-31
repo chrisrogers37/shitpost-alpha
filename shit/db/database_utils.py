@@ -9,7 +9,12 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 import json
 
-logger = logging.getLogger(__name__)
+# Use centralized DatabaseLogger for beautiful logging
+from shit.logging.service_loggers import DatabaseLogger
+
+# Create DatabaseLogger instance
+db_logger = DatabaseLogger("database_utils")
+logger = db_logger.logger
 
 class DatabaseUtils:
     """Utility functions for database operations."""

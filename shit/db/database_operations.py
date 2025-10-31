@@ -9,7 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 from sqlalchemy.orm import DeclarativeBase
 
-logger = logging.getLogger(__name__)
+# Use centralized DatabaseLogger for beautiful logging
+from shit.logging.service_loggers import DatabaseLogger
+
+# Create DatabaseLogger instance
+db_logger = DatabaseLogger("database_operations")
+logger = db_logger.logger
 
 class DatabaseOperations:
     """Generic database operations for any SQLAlchemy model."""

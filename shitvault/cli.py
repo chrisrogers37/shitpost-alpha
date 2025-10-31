@@ -14,6 +14,13 @@ from shit.config.shitpost_settings import settings
 from shit.utils.error_handling import handle_exceptions
 from shit.db import DatabaseConfig, DatabaseClient, DatabaseOperations
 from shit.s3 import S3Config, S3DataLake
+from shit.logging import (
+    setup_database_logging as setup_centralized_database_logging,
+    print_success,
+    print_error,
+    print_info,
+    print_warning
+)
 from .shitpost_operations import ShitpostOperations
 from .prediction_operations import PredictionOperations
 from .s3_processor import S3Processor
@@ -69,55 +76,42 @@ Examples:
 
 
 def setup_database_logging(args):
-    """Setup logging for database operations."""
-    log_level = logging.INFO
-    if hasattr(args, 'verbose') and args.verbose:
-        log_level = logging.DEBUG
-    
-    logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
+    """Setup logging for database operations using centralized logging."""
+    verbose = hasattr(args, 'verbose') and args.verbose
+    setup_centralized_database_logging(verbose=verbose)
 
 
 def print_database_start(args):
     """Print database operation start message."""
-    print(f"\n🚀 Starting database operation: {args.command}")
+    print_info(f"🚀 Starting database operation: {args.command}")
     if hasattr(args, 'start_date') and args.start_date:
-        print(f"   Start date: {args.start_date}")
+        print_info(f"   Start date: {args.start_date}")
     if hasattr(args, 'end_date') and args.end_date:
-        print(f"   End date: {args.end_date}")
+        print_info(f"   End date: {args.end_date}")
     if hasattr(args, 'limit') and args.limit:
-        print(f"   Limit: {args.limit}")
+        print_info(f"   Limit: {args.limit}")
     if hasattr(args, 'dry_run') and args.dry_run:
-        print(f"   Mode: DRY RUN (no changes will be made)")
-    print()
+        print_info(f"   Mode: DRY RUN (no changes will be made)")
 
 
 def print_database_complete(result):
     """Print database operation completion message."""
-    print(f"\n✅ Database operation completed successfully!")
+    print_success("Database operation completed successfully!")
     if isinstance(result, dict):
         for key, value in result.items():
-            print(f"   {key}: {value}")
+            print_info(f"   {key}: {value}")
     else:
-        print(f"   Result: {result}")
-    print()
+        print_info(f"   Result: {result}")
 
 
 def print_database_error(error):
     """Print database operation error message."""
-    print(f"\n❌ Database operation failed: {error}")
-    print()
+    print_error(f"Database operation failed: {error}")
 
 
 def print_database_interrupted():
     """Print database operation interrupted message."""
-    print(f"\n⏹️  Database operation interrupted by user")
-    print()
+    print_warning("Database operation interrupted by user")
 
 
 async def process_s3_data(args):
@@ -257,7 +251,7 @@ async def main():
         elif args.command == 'processing-stats':
             await get_processing_stats(args)
         else:
-            print(f"Unknown command: {args.command}")
+            print_error(f"Unknown command: {args.command}")
             parser.print_help()
             
     except KeyboardInterrupt:

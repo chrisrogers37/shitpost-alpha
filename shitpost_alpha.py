@@ -10,11 +10,10 @@ import sys
 import argparse
 from typing import List, Optional
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Use centralized logging for beautiful output
+from shit.logging import setup_cli_logging, print_success, print_error, print_info, print_warning
+
+# Configure logging will be set up in main() based on args
 logger = logging.getLogger(__name__)
 
 
@@ -247,9 +246,8 @@ Examples:
     
     args = parser.parse_args()
     
-    # Set logging level
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
+    # Setup centralized logging
+    setup_cli_logging(verbose=args.verbose)
     
     # Validate arguments
     if args.mode in ["range", "from-date"]:
@@ -259,11 +257,11 @@ Examples:
     # Note: --to date is optional for range mode (defaults to today)
     
     if args.dry_run:
-        print("🔍 DRY RUN MODE - No commands will be executed")
-        print(f"Processing Mode: {args.mode}")
-        print(f"Shared Settings: from={args.from_date}, to={args.to_date}, limit={args.limit}")
-        print(f"Analysis Parameters: batch_size={args.batch_size}")
-        print("\n📋 Commands that would be executed:")
+        print_info("🔍 DRY RUN MODE - No commands will be executed")
+        print_info(f"Processing Mode: {args.mode}")
+        print_info(f"Shared Settings: from={args.from_date}, to={args.to_date}, limit={args.limit}")
+        print_info(f"Analysis Parameters: batch_size={args.batch_size}")
+        print_info("\n📋 Commands that would be executed:")
         
         # Show harvesting command
         harvest_cmd = [
@@ -278,7 +276,7 @@ Examples:
             harvest_cmd.extend(["--limit", str(args.limit)])
         if args.verbose:
             harvest_cmd.append("--verbose")
-        print(f"  1. Harvesting: {' '.join(harvest_cmd)}")
+        print_info(f"  1. Harvesting: {' '.join(harvest_cmd)}")
         
         # Show S3 to Database command
         s3_cmd = [
@@ -292,7 +290,7 @@ Examples:
             s3_cmd.extend(["--end-date", args.to_date])
         if args.limit:
             s3_cmd.extend(["--limit", str(args.limit)])
-        print(f"  2. S3 to Database: {' '.join(s3_cmd)}")
+        print_info(f"  2. S3 to Database: {' '.join(s3_cmd)}")
         
         # Show LLM Analysis command
         analysis_cmd = [
@@ -308,45 +306,45 @@ Examples:
             analysis_cmd.extend(["--limit", str(args.limit)])
         if args.verbose:
             analysis_cmd.append("--verbose")
-        print(f"  3. LLM Analysis: {' '.join(analysis_cmd)}")
+        print_info(f"  3. LLM Analysis: {' '.join(analysis_cmd)}")
         
         return
     
-    print(f"🎯 Starting Shitpost-Alpha pipeline in {args.mode} mode...")
+    print_info(f"🎯 Starting Shitpost-Alpha pipeline in {args.mode} mode...")
     
     try:
-        print("🚀 Phase 1: Truth Social Harvesting (API → S3)")
+        print_info("🚀 Phase 1: Truth Social Harvesting (API → S3)")
         harvest_success = await execute_harvesting_cli(args)
         
         if not harvest_success:
-            print("❌ Harvesting failed! Stopping pipeline.")
+            print_error("Harvesting failed! Stopping pipeline.")
             sys.exit(1)
         
-        print("💾 Phase 2: S3 to Database Processing")
+        print_info("💾 Phase 2: S3 to Database Processing")
         s3_to_db_success = await execute_s3_to_database_cli(args)
         
         if not s3_to_db_success:
-            print("❌ S3 to Database processing failed! Stopping pipeline.")
+            print_error("S3 to Database processing failed! Stopping pipeline.")
             sys.exit(1)
         
-        print("🧠 Phase 3: LLM Analysis")
+        print_info("🧠 Phase 3: LLM Analysis")
         analysis_success = await execute_analysis_cli(args)
         
         if analysis_success:
-            print("🎉 Full pipeline completed successfully!")
-            print("📊 Pipeline Summary:")
-            print("  ✅ API → S3: Raw data harvested")
-            print("  ✅ S3 → Database: Data loaded")
-            print("  ✅ Database → LLM → Database: Analysis complete")
+            print_success("Full pipeline completed successfully!")
+            print_info("📊 Pipeline Summary:")
+            print_success("  API → S3: Raw data harvested")
+            print_success("  S3 → Database: Data loaded")
+            print_success("  Database → LLM → Database: Analysis complete")
         else:
-            print("❌ Analysis failed! Pipeline incomplete.")
+            print_error("Analysis failed! Pipeline incomplete.")
             sys.exit(1)
         
     except KeyboardInterrupt:
-        print("\n⏹️  Pipeline stopped by user")
+        print_warning("\nPipeline stopped by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Pipeline failed: {e}")
+        print_error(f"Pipeline failed: {e}")
         if args.verbose:
             import traceback
             traceback.print_exc()

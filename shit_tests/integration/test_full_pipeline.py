@@ -61,7 +61,7 @@ class TestFullPipeline:
         
         # Mock S3 operations
         with patch.object(s3_data_lake, 'store_raw_data') as mock_store, \
-             patch.object(s3_data_lake, 'retrieve_raw_data') as mock_retrieve:
+             patch.object(s3_data_lake, 'get_raw_data') as mock_retrieve:
             
             # Mock LLM operations
             with patch.object(llm_client, 'analyze') as mock_analyze:
@@ -97,7 +97,7 @@ class TestFullPipeline:
                 assert s3_key == "test-s3-key"
                 
                 # Step 2: Retrieve from S3
-                retrieved_data = await s3_data_lake.retrieve_raw_data(s3_key)
+                retrieved_data = await s3_data_lake.get_raw_data(s3_key)
                 assert retrieved_data == sample_post
                 
                 # Step 3: Analyze with LLM
@@ -160,7 +160,7 @@ class TestFullPipeline:
         ]
         
         with patch.object(s3_data_lake, 'store_raw_data') as mock_store, \
-             patch.object(s3_data_lake, 'retrieve_raw_data') as mock_retrieve, \
+             patch.object(s3_data_lake, 'get_raw_data') as mock_retrieve, \
              patch.object(llm_client, 'analyze') as mock_analyze:
             
             # Mock responses
@@ -176,7 +176,7 @@ class TestFullPipeline:
             # Process each post
             for post in posts:
                 s3_key = await s3_data_lake.store_raw_data(post)
-                retrieved_data = await s3_data_lake.retrieve_raw_data(s3_key)
+                retrieved_data = await s3_data_lake.get_raw_data(s3_key)
                 analysis = await llm_client.analyze(retrieved_data["content"])
                 
                 assert s3_key == "test-s3-key"
@@ -196,7 +196,7 @@ class TestFullPipeline:
         }
         
         with patch.object(s3_data_lake, 'store_raw_data') as mock_store, \
-             patch.object(s3_data_lake, 'retrieve_raw_data') as mock_retrieve, \
+             patch.object(s3_data_lake, 'get_raw_data') as mock_retrieve, \
              patch.object(llm_client, 'analyze') as mock_analyze:
             
             # Mock fast responses
@@ -208,7 +208,7 @@ class TestFullPipeline:
             
             # Run pipeline
             s3_key = await s3_data_lake.store_raw_data(sample_post)
-            retrieved_data = await s3_data_lake.retrieve_raw_data(s3_key)
+            retrieved_data = await s3_data_lake.get_raw_data(s3_key)
             analysis = await llm_client.analyze(retrieved_data["content"])
             
             end_time = datetime.now()
@@ -240,7 +240,7 @@ class TestFullPipeline:
         }
         
         with patch.object(s3_data_lake, 'store_raw_data') as mock_store, \
-             patch.object(s3_data_lake, 'retrieve_raw_data') as mock_retrieve, \
+             patch.object(s3_data_lake, 'get_raw_data') as mock_retrieve, \
              patch.object(llm_client, 'analyze') as mock_analyze:
             
             # Mock S3 operations to preserve data
@@ -257,7 +257,7 @@ class TestFullPipeline:
             
             # Run pipeline
             s3_key = await s3_data_lake.store_raw_data(original_post)
-            retrieved_data = await s3_data_lake.retrieve_raw_data(s3_key)
+            retrieved_data = await s3_data_lake.get_raw_data(s3_key)
             analysis = await llm_client.analyze(retrieved_data["content"])
             
             # Verify data consistency
@@ -323,7 +323,7 @@ class TestFullPipeline:
         ]
         
         with patch.object(s3_data_lake, 'store_raw_data') as mock_store, \
-             patch.object(s3_data_lake, 'retrieve_raw_data') as mock_retrieve, \
+             patch.object(s3_data_lake, 'get_raw_data') as mock_retrieve, \
              patch.object(llm_client, 'analyze') as mock_analyze:
             
             # Mock responses
@@ -339,7 +339,7 @@ class TestFullPipeline:
             # Process posts concurrently
             async def process_post(post):
                 s3_key = await s3_data_lake.store_raw_data(post)
-                retrieved_data = await s3_data_lake.retrieve_raw_data(s3_key)
+                retrieved_data = await s3_data_lake.get_raw_data(s3_key)
                 analysis = await llm_client.analyze(retrieved_data["content"])
                 return analysis
             

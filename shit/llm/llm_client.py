@@ -12,7 +12,12 @@ from datetime import datetime
 from shit.config.shitpost_settings import settings
 from shit.utils.error_handling import handle_exceptions
 
-logger = logging.getLogger(__name__)
+# Use centralized LLMLogger for beautiful logging
+from shit.logging.service_loggers import LLMLogger
+
+# Create LLMLogger instance
+llm_logger = LLMLogger("llm_client")
+logger = llm_logger.logger
 
 
 class LLMClient:

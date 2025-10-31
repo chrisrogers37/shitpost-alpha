@@ -14,7 +14,12 @@ from shit.s3 import S3DataLake
 from shitvault.shitpost_operations import ShitpostOperations
 from shitvault.shitpost_models import TruthSocialShitpost
 
-logger = logging.getLogger(__name__)
+# Use centralized DatabaseLogger for beautiful logging
+from shit.logging.service_loggers import DatabaseLogger
+
+# Create DatabaseLogger instance
+db_logger = DatabaseLogger("s3_processor")
+logger = db_logger.logger
 
 class S3Processor:
     """Operations for processing S3 data to database."""

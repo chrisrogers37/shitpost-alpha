@@ -47,7 +47,7 @@ class TestShitpostAnalyzer:
     def analyzer(self):
         """ShitpostAnalyzer instance for testing."""
         with patch('shitpost_ai.shitpost_analyzer.settings') as mock_settings:
-            mock_settings.DATABASE_URL = "sqlite:///test.db"
+            mock_settings.DATABASE_URL = "sqlite:///:memory:"
             mock_settings.SYSTEM_LAUNCH_DATE = "2024-01-01"
             return ShitpostAnalyzer(
                 mode="incremental",
@@ -60,7 +60,7 @@ class TestShitpostAnalyzer:
     def test_initialization_defaults(self):
         """Test analyzer initialization with default values."""
         with patch('shitpost_ai.shitpost_analyzer.settings') as mock_settings:
-            mock_settings.DATABASE_URL = "sqlite:///test.db"
+            mock_settings.DATABASE_URL = "sqlite:///:memory:"
             mock_settings.SYSTEM_LAUNCH_DATE = "2024-01-01"
             
             analyzer = ShitpostAnalyzer()
@@ -74,7 +74,7 @@ class TestShitpostAnalyzer:
     def test_initialization_with_parameters(self):
         """Test analyzer initialization with all parameters."""
         with patch('shitpost_ai.shitpost_analyzer.settings') as mock_settings:
-            mock_settings.DATABASE_URL = "sqlite:///test.db"
+            mock_settings.DATABASE_URL = "sqlite:///:memory:"
             mock_settings.SYSTEM_LAUNCH_DATE = "2024-01-01"
             
             analyzer = ShitpostAnalyzer(
@@ -97,7 +97,7 @@ class TestShitpostAnalyzer:
         """Test analyzer initialization with range mode defaults end_date to today."""
         with patch('shitpost_ai.shitpost_analyzer.settings') as mock_settings, \
              patch('shitpost_ai.shitpost_analyzer.datetime') as mock_datetime:
-            mock_settings.DATABASE_URL = "sqlite:///test.db"
+            mock_settings.DATABASE_URL = "sqlite:///:memory:"
             mock_settings.SYSTEM_LAUNCH_DATE = "2024-01-01"
             mock_now = datetime(2024, 1, 15, 12, 0, 0)
             mock_datetime.now.return_value = mock_now

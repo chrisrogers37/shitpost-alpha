@@ -109,7 +109,7 @@ def print_harvest_start(mode: str, limit: Optional[int] = None) -> None:
         limit: Harvest limit (optional)
     """
     limit_text = f" (limit: {limit})" if limit else ""
-    print(f"🚀 Starting Truth Social S3 harvesting in {mode} mode{limit_text}...")
+    print_info(f"🚀 Starting Truth Social S3 harvesting in {mode} mode{limit_text}...")
 
 
 def print_harvest_progress(harvested_count: int, limit: Optional[int] = None) -> None:
@@ -120,9 +120,9 @@ def print_harvest_progress(harvested_count: int, limit: Optional[int] = None) ->
         limit: Harvest limit (optional)
     """
     if limit:
-        print(f"📊 Progress: {harvested_count}/{limit} posts harvested")
+        print_info(f"📊 Progress: {harvested_count}/{limit} posts harvested")
     else:
-        print(f"📊 Progress: {harvested_count} posts harvested")
+        print_info(f"📊 Progress: {harvested_count} posts harvested")
 
 
 def print_harvest_complete(harvested_count: int, dry_run: bool = False) -> None:
@@ -132,12 +132,12 @@ def print_harvest_complete(harvested_count: int, dry_run: bool = False) -> None:
         harvested_count: Total number of posts harvested
         dry_run: Whether this was a dry run
     """
-    print(f"\n🎉 S3 harvesting completed! Total posts: {harvested_count}")
+    print_success(f"S3 harvesting completed! Total posts: {harvested_count}")
     
     if dry_run:
-        print("🔍 This was a dry run - no data was stored to S3")
+        print_info("This was a dry run - no data was stored to S3")
     else:
-        print("✅ All data stored to S3 successfully")
+        print_success("All data stored to S3 successfully")
 
 
 def print_harvest_error(error: Exception, verbose: bool = False) -> None:
@@ -156,7 +156,7 @@ def print_harvest_error(error: Exception, verbose: bool = False) -> None:
 
 def print_harvest_interrupted() -> None:
     """Print harvester interruption message."""
-    print("\n⏹️  Harvesting stopped by user")
+    print_warning("Harvesting stopped by user")
 
 
 def print_s3_stats(stats) -> None:
@@ -165,21 +165,21 @@ def print_s3_stats(stats) -> None:
     Args:
         stats: S3 statistics (dict or S3Stats object)
     """
-    print(f"\n📊 S3 Storage Statistics:")
+    print_info("📊 S3 Storage Statistics:")
     
     # Handle both dict and S3Stats object
     if hasattr(stats, 'total_files'):
         # S3Stats object
-        print(f"   Total files: {stats.total_files}")
-        print(f"   Total size: {stats.total_size_mb} MB")
-        print(f"   Bucket: {stats.bucket}")
-        print(f"   Prefix: {stats.prefix}")
+        print_info(f"   Total files: {stats.total_files}")
+        print_info(f"   Total size: {stats.total_size_mb} MB")
+        print_info(f"   Bucket: {stats.bucket}")
+        print_info(f"   Prefix: {stats.prefix}")
     else:
         # Dictionary
-        print(f"   Total files: {stats.get('total_files', 0)}")
-        print(f"   Total size: {stats.get('total_size_mb', 0)} MB")
-        print(f"   Bucket: {stats.get('bucket', 'N/A')}")
-        print(f"   Prefix: {stats.get('prefix', 'N/A')}")
+        print_info(f"   Total files: {stats.get('total_files', 0)}")
+        print_info(f"   Total size: {stats.get('total_size_mb', 0)} MB")
+        print_info(f"   Bucket: {stats.get('bucket', 'N/A')}")
+        print_info(f"   Prefix: {stats.get('prefix', 'N/A')}")
 
 
 def print_database_stats(stats: dict) -> None:
@@ -188,11 +188,11 @@ def print_database_stats(stats: dict) -> None:
     Args:
         stats: Database statistics dictionary
     """
-    print(f"\n📊 Database Statistics:")
-    print(f"   Total shitposts: {stats.get('total_shitposts', 0)}")
-    print(f"   Total analyses: {stats.get('total_analyses', 0)}")
-    print(f"   Average confidence: {stats.get('average_confidence', 0.0)}")
-    print(f"   Analysis rate: {stats.get('analysis_rate', 0.0)}")
+    print_info("📊 Database Statistics:")
+    print_info(f"   Total shitposts: {stats.get('total_shitposts', 0)}")
+    print_info(f"   Total analyses: {stats.get('total_analyses', 0)}")
+    print_info(f"   Average confidence: {stats.get('average_confidence', 0.0)}")
+    print_info(f"   Analysis rate: {stats.get('analysis_rate', 0.0)}")
 
 
 # Common CLI examples for help text

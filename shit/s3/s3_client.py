@@ -11,7 +11,12 @@ from botocore.exceptions import ClientError
 from shit.config.shitpost_settings import settings
 from .s3_config import S3Config
 
-logger = logging.getLogger(__name__)
+# Use centralized S3Logger for beautiful logging
+from shit.logging.service_loggers import S3Logger
+
+# Create S3Logger instance
+s3_logger = S3Logger("s3_client")
+logger = s3_logger.logger
 
 
 class S3Client:

@@ -252,52 +252,49 @@ class TestSetupHarvesterLogging:
 class TestPrintFunctions:
     """Test cases for print utility functions."""
 
-    def test_print_harvest_start(self):
+    def test_print_harvest_start(self, capsys):
         """Test print_harvest_start function."""
-        with patch('builtins.print') as mock_print:
-            print_harvest_start("incremental", limit=None)
-            
-            mock_print.assert_called_once_with("🚀 Starting Truth Social S3 harvesting in incremental mode...")
+        print_harvest_start("incremental", limit=None)
+        
+        captured = capsys.readouterr()
+        assert "🚀 Starting Truth Social S3 harvesting in incremental mode..." in captured.out
 
-    def test_print_harvest_start_with_limit(self):
+    def test_print_harvest_start_with_limit(self, capsys):
         """Test print_harvest_start with limit."""
-        with patch('builtins.print') as mock_print:
-            print_harvest_start("backfill", limit=100)
-            
-            mock_print.assert_called_once_with("🚀 Starting Truth Social S3 harvesting in backfill mode (limit: 100)...")
+        print_harvest_start("backfill", limit=100)
+        
+        captured = capsys.readouterr()
+        assert "🚀 Starting Truth Social S3 harvesting in backfill mode (limit: 100)..." in captured.out
 
-    def test_print_harvest_progress(self):
+    def test_print_harvest_progress(self, capsys):
         """Test print_harvest_progress function."""
-        with patch('builtins.print') as mock_print:
-            print_harvest_progress(10, limit=None)
-            
-            mock_print.assert_called_once_with("📊 Progress: 10 posts harvested")
+        print_harvest_progress(10, limit=None)
+        
+        captured = capsys.readouterr()
+        assert "📊 Progress: 10 posts harvested" in captured.out
 
-    def test_print_harvest_progress_with_limit(self):
+    def test_print_harvest_progress_with_limit(self, capsys):
         """Test print_harvest_progress with limit."""
-        with patch('builtins.print') as mock_print:
-            print_harvest_progress(10, limit=100)
-            
-            mock_print.assert_called_once_with("📊 Progress: 10/100 posts harvested")
+        print_harvest_progress(10, limit=100)
+        
+        captured = capsys.readouterr()
+        assert "📊 Progress: 10/100 posts harvested" in captured.out
 
-    def test_print_harvest_complete(self):
+    def test_print_harvest_complete(self, capsys):
         """Test print_harvest_complete function."""
-        with patch('builtins.print') as mock_print:
-            print_harvest_complete(25, dry_run=False)
-            
-            assert mock_print.call_count == 2
-            calls = [call[0][0] for call in mock_print.call_args_list]
-            assert any("🎉 S3 harvesting completed! Total posts: 25" in call for call in calls)
-            assert any("✅ All data stored to S3 successfully" in call for call in calls)
+        print_harvest_complete(25, dry_run=False)
+        
+        captured = capsys.readouterr()
+        assert "S3 harvesting completed! Total posts: 25" in captured.out
+        assert "All data stored to S3 successfully" in captured.out
 
-    def test_print_harvest_complete_dry_run(self):
+    def test_print_harvest_complete_dry_run(self, capsys):
         """Test print_harvest_complete with dry run."""
-        with patch('builtins.print') as mock_print:
-            print_harvest_complete(25, dry_run=True)
-            
-            calls = [call[0][0] for call in mock_print.call_args_list]
-            assert any("🎉 S3 harvesting completed! Total posts: 25" in call for call in calls)
-            assert any("🔍 This was a dry run" in call for call in calls)
+        print_harvest_complete(25, dry_run=True)
+        
+        captured = capsys.readouterr()
+        assert "S3 harvesting completed! Total posts: 25" in captured.out
+        assert "This was a dry run" in captured.out
 
     def test_print_harvest_error(self):
         """Test print_harvest_error function."""
@@ -319,14 +316,14 @@ class TestPrintFunctions:
             mock_print_error.assert_called_once()
             mock_traceback.assert_called_once()
 
-    def test_print_harvest_interrupted(self):
+    def test_print_harvest_interrupted(self, capsys):
         """Test print_harvest_interrupted function."""
-        with patch('builtins.print') as mock_print:
-            print_harvest_interrupted()
-            
-            mock_print.assert_called_once_with("\n⏹️  Harvesting stopped by user")
+        print_harvest_interrupted()
+        
+        captured = capsys.readouterr()
+        assert "Harvesting stopped by user" in captured.out
 
-    def test_print_s3_stats_with_object(self):
+    def test_print_s3_stats_with_object(self, capsys):
         """Test print_s3_stats with S3Stats object."""
         from shit.s3.s3_models import S3Stats
         
@@ -338,18 +335,16 @@ class TestPrintFunctions:
             prefix="test-prefix"
         )
         
-        with patch('builtins.print') as mock_print:
-            print_s3_stats(stats)
-            
-            assert mock_print.call_count == 5  # Header + 4 stats
-            calls = [call[0][0] for call in mock_print.call_args_list]
-            assert any("📊 S3 Storage Statistics:" in call for call in calls)
-            assert any("Total files: 100" in call for call in calls)
-            assert any("Total size:" in call and "MB" in call for call in calls)
-            assert any("Bucket: test-bucket" in call for call in calls)
-            assert any("Prefix: test-prefix" in call for call in calls)
+        print_s3_stats(stats)
+        
+        captured = capsys.readouterr()
+        assert "📊 S3 Storage Statistics:" in captured.out
+        assert "Total files: 100" in captured.out
+        assert "Total size" in captured.out and "MB" in captured.out
+        assert "Bucket: test-bucket" in captured.out
+        assert "Prefix: test-prefix" in captured.out
 
-    def test_print_s3_stats_with_dict(self):
+    def test_print_s3_stats_with_dict(self, capsys):
         """Test print_s3_stats with dictionary."""
         stats = {
             'total_files': 100,
@@ -358,52 +353,47 @@ class TestPrintFunctions:
             'prefix': 'test-prefix'
         }
         
-        with patch('builtins.print') as mock_print:
-            print_s3_stats(stats)
-            
-            calls = [call[0][0] for call in mock_print.call_args_list]
-            assert any("Total files: 100" in call for call in calls)
-            assert any("Total size: 50.5 MB" in call for call in calls)
+        print_s3_stats(stats)
+        
+        captured = capsys.readouterr()
+        assert "Total files: 100" in captured.out
+        assert "Total size: 50.5 MB" in captured.out
 
-    def test_print_s3_stats_partial_dict(self):
+    def test_print_s3_stats_partial_dict(self, capsys):
         """Test print_s3_stats with partial dictionary."""
         stats = {'total_files': 100}
         
-        with patch('builtins.print') as mock_print:
-            print_s3_stats(stats)
-            
-            calls = [call[0][0] for call in mock_print.call_args_list]
-            assert any("Total files: 100" in call for call in calls)
-            assert any("Total size: 0 MB" in call for call in calls)
+        print_s3_stats(stats)
+        
+        captured = capsys.readouterr()
+        assert "Total files: 100" in captured.out
+        assert "Total size: 0 MB" in captured.out
 
-    def test_print_database_stats(self):
+    def test_print_database_stats(self, capsys):
         """Test print_database_stats function."""
-        with patch('builtins.print') as mock_print:
-            stats = {
-                'total_shitposts': 100,
-                'total_analyses': 75,
-                'average_confidence': 0.85,
-                'analysis_rate': 0.75
-            }
-            print_database_stats(stats)
-            
-            assert mock_print.call_count == 5  # Header + 4 stats
-            calls = [call[0][0] for call in mock_print.call_args_list]
-            assert any("📊 Database Statistics:" in call for call in calls)
-            assert any("Total shitposts: 100" in call for call in calls)
-            assert any("Total analyses: 75" in call for call in calls)
-            assert any("Average confidence: 0.85" in call for call in calls)
-            assert any("Analysis rate: 0.75" in call for call in calls)
+        stats = {
+            'total_shitposts': 100,
+            'total_analyses': 75,
+            'average_confidence': 0.85,
+            'analysis_rate': 0.75
+        }
+        print_database_stats(stats)
+        
+        captured = capsys.readouterr()
+        assert "📊 Database Statistics:" in captured.out
+        assert "Total shitposts: 100" in captured.out
+        assert "Total analyses: 75" in captured.out
+        assert "Average confidence: 0.85" in captured.out
+        assert "Analysis rate: 0.75" in captured.out
 
-    def test_print_database_stats_partial(self):
+    def test_print_database_stats_partial(self, capsys):
         """Test print_database_stats with partial stats."""
-        with patch('builtins.print') as mock_print:
-            stats = {'total_shitposts': 100}
-            print_database_stats(stats)
-            
-            calls = [call[0][0] for call in mock_print.call_args_list]
-            assert any("Total shitposts: 100" in call for call in calls)
-            assert any("Total analyses: 0" in call for call in calls)
+        stats = {'total_shitposts': 100}
+        print_database_stats(stats)
+        
+        captured = capsys.readouterr()
+        assert "Total shitposts: 100" in captured.out
+        assert "Total analyses: 0" in captured.out
 
 
 class TestHarvesterExamples:

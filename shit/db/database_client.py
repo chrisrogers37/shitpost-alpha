@@ -13,7 +13,12 @@ from typing import Optional
 from .database_config import DatabaseConfig
 from .data_models import Base
 
-logger = logging.getLogger(__name__)
+# Use centralized DatabaseLogger for beautiful logging
+from shit.logging.service_loggers import DatabaseLogger
+
+# Create DatabaseLogger instance
+db_logger = DatabaseLogger("database_client")
+logger = db_logger.logger
 
 class DatabaseClient:
     """Manages database connections and provides session instances."""
