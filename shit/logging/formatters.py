@@ -315,6 +315,8 @@ def create_formatter(format_type: Optional[OutputFormat] = None, enable_colors: 
 def print_success(message: str, **kwargs):
     """Print a success message.
     
+    Note: This function only prints to console. For file logging, use logger.info().
+    
     Args:
         message: Message to print
         **kwargs: Additional formatting options
@@ -326,6 +328,8 @@ def print_success(message: str, **kwargs):
 
 def print_error(message: str, **kwargs):
     """Print an error message.
+    
+    Note: This function only prints to console. For file logging, use logger.error().
     
     Args:
         message: Message to print
@@ -339,6 +343,8 @@ def print_error(message: str, **kwargs):
 def print_warning(message: str, **kwargs):
     """Print a warning message.
     
+    Note: This function only prints to console. For file logging, use logger.warning().
+    
     Args:
         message: Message to print
         **kwargs: Additional formatting options
@@ -350,6 +356,8 @@ def print_warning(message: str, **kwargs):
 
 def print_info(message: str, **kwargs):
     """Print an info message.
+    
+    Note: This function only prints to console. For file logging, use logger.info().
     
     Args:
         message: Message to print
