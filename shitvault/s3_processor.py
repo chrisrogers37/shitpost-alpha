@@ -47,10 +47,13 @@ class S3Processor:
             Dictionary with processing statistics
         """
         try:
+            logger.info("")
+            logger.info("═══════════════════════════════════════════════════════════")
             if dry_run:
-                logger.info(f"Starting S3 to Database processing (DRY RUN - no database writes)...")
+                logger.info("PROCESSING S3 TO DATABASE (DRY RUN)")
             else:
-                logger.info(f"Starting S3 to Database processing...")
+                logger.info("PROCESSING S3 TO DATABASE")
+            logger.info("═══════════════════════════════════════════════════════════")
             
             # Handle incremental mode
             if incremental:

@@ -118,6 +118,10 @@ async def process_s3_data(args):
     """Process S3 data to database using modular architecture."""
     try:
         print_database_start(args)
+        logger.info("")
+        logger.info("═══════════════════════════════════════════════════════════")
+        logger.info("INITIALIZING DATABASE & S3 CONNECTION")
+        logger.info("═══════════════════════════════════════════════════════════")
         
         # Parse dates
         start_date = None
@@ -125,9 +129,19 @@ async def process_s3_data(args):
         
         if args.start_date:
             start_date = datetime.strptime(args.start_date, '%Y-%m-%d')
+            logger.info(f"Start date: {start_date.date()}")
         
         if args.end_date:
             end_date = datetime.strptime(args.end_date, '%Y-%m-%d')
+            logger.info(f"End date: {end_date.date()}")
+        
+        if args.limit:
+            logger.info(f"Processing limit: {args.limit}")
+            
+        if args.dry_run:
+            logger.info("Mode: DRY RUN (no changes will be made)")
+            
+        logger.info(f"Processing mode: {args.mode}")
         
         # Initialize database and S3 components
         db_config = DatabaseConfig(database_url=settings.DATABASE_URL)
@@ -142,6 +156,9 @@ async def process_s3_data(args):
         )
         s3_data_lake = S3DataLake(s3_config)
         await s3_data_lake.initialize()
+        
+        logger.info("✅ Database and S3 connections initialized successfully")
+        logger.info("")
         
         # Create operations with proper session management
         async with db_client.get_session() as session:
@@ -158,6 +175,14 @@ async def process_s3_data(args):
             )
             
             print_database_complete(stats)
+            logger.info("")
+            logger.info("═══════════════════════════════════════════════════════════")
+            logger.info("PROCESSING COMPLETED")
+            logger.info("═══════════════════════════════════════════════════════════")
+            logger.info(f"Total processed: {stats.get('total_processed', 0)}")
+            logger.info(f"Successful: {stats.get('successful', 0)}")
+            logger.info(f"Failed: {stats.get('failed', 0)}")
+            logger.info(f"Skipped: {stats.get('skipped', 0)}")
         
         # Cleanup
         await db_client.cleanup()
