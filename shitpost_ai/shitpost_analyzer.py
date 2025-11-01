@@ -527,6 +527,10 @@ class ShitpostAnalyzer:
     
     async def cleanup(self):
         """Cleanup analyzer resources."""
+        # Close the session if it exists
+        if self.db_ops and hasattr(self.db_ops, 'session'):
+            await self.db_ops.session.close()
+        
         if self.db_client:
             await self.db_client.cleanup()
         logger.info("Shitpost Analyzer cleanup completed")
