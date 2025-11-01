@@ -69,7 +69,10 @@ class TruthSocialS3Harvester:
         
     async def initialize(self, dry_run: bool = False):
         """Initialize the Truth Social S3 harvester."""
-        logger.info(f"Initializing Truth Social S3 harvester for @{self.username}")
+        logger.info("")
+        logger.info("═══════════════════════════════════════════════════════════")
+        logger.info(f"INITIALIZING HARVESTER: @{self.username}")
+        logger.info("═══════════════════════════════════════════════════════════")
         logger.debug(f"🔧 Initialize method called with dry_run: {dry_run}")
         
         if not self.api_key:
@@ -89,7 +92,8 @@ class TruthSocialS3Harvester:
             # Test API connection
             logger.info("Testing Truth Social API connection...")
             await self._test_connection()
-            logger.info("Truth Social API connection successful")
+            logger.info("✅ API connection successful")
+            logger.info("")
             
             # Initialize S3 Data Lake only if not in dry run mode
             if not dry_run:
@@ -104,11 +108,12 @@ class TruthSocialS3Harvester:
                 )
                 self.s3_data_lake = S3DataLake(s3_config)
                 await self.s3_data_lake.initialize()
-                logger.info("S3 Data Lake initialized successfully")
+                logger.info("✅ S3 Data Lake initialized successfully")
             else:
                 logger.info("Dry run mode - skipping S3 initialization")
             
-            logger.info("Truth Social S3 harvester initialized successfully")
+            logger.info("✅ Harvester initialized successfully")
+            logger.info("")
             
         except Exception as e:
             logger.error(f"Failed to initialize Truth Social S3 harvester: {e}")
@@ -212,14 +217,19 @@ class TruthSocialS3Harvester:
             end_date: Optional end date filter (inclusive)
             incremental_mode: If True, stop when encountering existing posts in S3
         """
+        logger.info("")
+        logger.info("═══════════════════════════════════════════════════════════")
+        logger.info("HARVESTING POSTS")
+        logger.info("═══════════════════════════════════════════════════════════")
+        
         if incremental_mode:
-            logger.info("Starting incremental harvest - will stop when encountering existing posts in S3")
+            logger.info("Mode: Incremental (will stop when encountering existing posts in S3)")
             print("🔄 Incremental mode: Will stop when finding posts that already exist in S3")
         elif start_date and end_date:
-            logger.info(f"Starting date range harvest from {start_date.date()} to {end_date.date()}")
+            logger.info(f"Mode: Date Range ({start_date.date()} to {end_date.date()})")
             logger.debug("🔄 Note: API doesn't support date filtering - crawling backwards through all posts")
         else:
-            logger.info("Starting full backfill of Truth Social posts to S3")
+            logger.info("Mode: Full Backfill")
         
         # Use provided max_id or start from most recent
         max_id = self.max_id
@@ -355,7 +365,12 @@ class TruthSocialS3Harvester:
                 await handle_exceptions(e)
                 break
         
-        logger.info(f"Harvest completed. Total posts harvested: {total_harvested}, API calls: {self.api_call_count}")
+        logger.info("")
+        logger.info("═══════════════════════════════════════════════════════════")
+        logger.info("HARVEST SUMMARY")
+        logger.info("═══════════════════════════════════════════════════════════")
+        logger.info(f"Total posts harvested: {total_harvested}")
+        logger.info(f"Total API calls made: {self.api_call_count}")
         print(f"📊 API Call Summary: Made {self.api_call_count} API calls in this execution")
     
     
@@ -435,7 +450,12 @@ async def main():
         
         # Print completion message
         print_harvest_complete(harvested_count, args.dry_run)
-        logger.info(f"Harvest complete: {harvested_count} posts processed")
+        
+        logger.info("")
+        logger.info("═══════════════════════════════════════════════════════════")
+        logger.info("HARVEST COMPLETED")
+        logger.info("═══════════════════════════════════════════════════════════")
+        logger.info(f"Total posts processed: {harvested_count}")
         
         if not args.dry_run:
             # Show S3 statistics
