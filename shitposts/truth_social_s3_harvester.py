@@ -245,6 +245,7 @@ class TruthSocialS3Harvester:
                 
                 if incremental_mode:
                     print(f"📡 Processing {len(shitposts)} posts from API (checking for existing posts in S3)...")
+                    logger.info(f"Processing {len(shitposts)} posts from API (checking for existing posts in S3)")
                 
                 # Check if we've reached the limit before processing
                 if self.limit and total_harvested >= self.limit:
@@ -395,6 +396,8 @@ async def main():
     
     # Print start message
     print_harvest_start(args.mode, args.limit)
+    limit_text = f" (limit: {args.limit})" if args.limit else ""
+    logger.info(f"Starting Truth Social S3 harvesting in {args.mode} mode{limit_text}")
     
     # Create harvester with appropriate configuration
     harvester = TruthSocialS3Harvester(
@@ -410,29 +413,35 @@ async def main():
         
         # Harvest shitposts
         print("🔄 Starting harvest process...")
+        logger.info("Starting harvest process")
         harvested_count = 0
         
         async for result in harvester.harvest_shitposts(dry_run=args.dry_run):
             if args.dry_run:
                 print(f"📝 Would store: {result['shitpost_id']} - {result['content_preview']}")
+                logger.info(f"Would store post: {result['shitpost_id']}")
             else:
                 print(f"✅ Stored: {result['shitpost_id']} - {result['content_preview']}")
                 print(f"   S3 Key: {result['s3_key']}")
+                logger.info(f"Stored post: {result['shitpost_id']} to S3 key: {result['s3_key']}")
             
             harvested_count += 1
             
             # Apply limit if specified
             if args.limit and harvested_count >= args.limit:
                 print(f"🎯 Reached harvest limit of {args.limit} posts")
+                logger.info(f"Reached harvest limit of {args.limit} posts")
                 break
         
         # Print completion message
         print_harvest_complete(harvested_count, args.dry_run)
+        logger.info(f"Harvest complete: {harvested_count} posts processed")
         
         if not args.dry_run:
             # Show S3 statistics
             stats = await harvester.get_s3_stats()
             print_s3_stats(stats)
+            logger.info(f"S3 storage stats: {stats}")
         
     except KeyboardInterrupt:
         print_harvest_interrupted()
