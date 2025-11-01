@@ -153,8 +153,8 @@ class TruthSocialS3Harvester:
             
             self.api_call_count += 1
             print(f"🌐 Making API call #{self.api_call_count} to: {url}")
+            logger.info(f"Making API call #{self.api_call_count} to Truth Social API")
             logger.debug(f"⏱️  Starting API call with 30 second timeout...")
-            logger.debug(f"🔍 DEBUG: About to make API call #{self.api_call_count}")
             timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout
             async with self.session.get(url, params=params, timeout=timeout) as response:
                 logger.debug(f"📡 API response received, status: {response.status}")
@@ -170,7 +170,7 @@ class TruthSocialS3Harvester:
                     return []
                 
                 shitposts = data.get('posts', [])  # API returns 'posts' not 'data'
-                logger.debug(f"Fetched {len(shitposts)} shitposts from Truth Social")
+                logger.info(f"Fetched {len(shitposts)} posts from Truth Social API")
                 
                 return shitposts
                 
@@ -213,13 +213,13 @@ class TruthSocialS3Harvester:
             incremental_mode: If True, stop when encountering existing posts in S3
         """
         if incremental_mode:
-            logger.debug("Starting incremental harvest - will stop when encountering existing posts in S3")
+            logger.info("Starting incremental harvest - will stop when encountering existing posts in S3")
             print("🔄 Incremental mode: Will stop when finding posts that already exist in S3")
         elif start_date and end_date:
-            logger.debug(f"Starting date range harvest from {start_date.date()} to {end_date.date()}")
+            logger.info(f"Starting date range harvest from {start_date.date()} to {end_date.date()}")
             logger.debug("🔄 Note: API doesn't support date filtering - crawling backwards through all posts")
         else:
-            logger.debug("Starting full backfill of Truth Social posts to S3...")
+            logger.info("Starting full backfill of Truth Social posts to S3")
         
         # Use provided max_id or start from most recent
         max_id = self.max_id
@@ -293,10 +293,11 @@ class TruthSocialS3Harvester:
                                     print(f"✅ Found existing post {shitpost.get('id')} in S3")
                                     print(f"🔄 Incremental mode: Stopping harvest (no new posts to process)")
                                     print(f"📈 Total new posts harvested: {total_harvested}")
-                                    logger.debug(f"Incremental harvest completed - found existing post {shitpost.get('id')}")
+                                    logger.info(f"Incremental harvest completed - found existing post {shitpost.get('id')}, harvested {total_harvested} new posts")
                                     return
                                 else:
                                     print(f"📝 Post {shitpost.get('id')} is new - will process")
+                                    logger.debug(f"Post {shitpost.get('id')} is new, processing")
                                     
                             except asyncio.TimeoutError:
                                 print(f"⏰ S3 existence check timed out for post {shitpost.get('id')}")
@@ -311,9 +312,11 @@ class TruthSocialS3Harvester:
                         if dry_run:
                             # In dry run mode, just create a mock result
                             s3_key = f"truth-social/raw/2024/01/01/{shitpost.get('id')}.json"
+                            logger.debug(f"DRY RUN: Would store post {shitpost.get('id')}")
                         else:
                             # Store raw data to S3
                             s3_key = await self.s3_data_lake.store_raw_data(shitpost)
+                            logger.info(f"Stored post {shitpost.get('id')} to S3: {s3_key}")
                         
                         # Create result object
                         result = {
@@ -339,7 +342,7 @@ class TruthSocialS3Harvester:
                         logger.error(f"Error processing shitpost {shitpost.get('id')}: {e}")
                         continue
                 
-                logger.debug(f"Backfill progress: {total_harvested} posts harvested and stored to S3")
+                logger.info(f"Progress: {total_harvested} posts harvested and stored to S3")
                 
                 # Small delay to be respectful to API
                 await asyncio.sleep(1)
@@ -351,7 +354,7 @@ class TruthSocialS3Harvester:
                 await handle_exceptions(e)
                 break
         
-        logger.debug(f"Backfill completed. Total posts harvested and stored to S3: {total_harvested}")
+        logger.info(f"Harvest completed. Total posts harvested: {total_harvested}, API calls: {self.api_call_count}")
         print(f"📊 API Call Summary: Made {self.api_call_count} API calls in this execution")
     
     
