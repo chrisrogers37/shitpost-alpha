@@ -274,7 +274,7 @@ class TestSetupHarvesterLogging:
             setup_harvester_logging(verbose=True)
             
             # Verify calls
-            mock_setup_cli.assert_called_once_with(verbose=True)
+            mock_setup_cli.assert_called_once_with(verbose=True, service_name='harvester')
             mock_get_logger.assert_called_once_with('shitposts')
             mock_shitposts_logger.setLevel.assert_called_once_with(logging.DEBUG)
     
@@ -291,7 +291,7 @@ class TestSetupHarvesterLogging:
             setup_harvester_logging(verbose=False)
             
             # Verify calls
-            mock_setup_cli.assert_called_once_with(verbose=False)
+            mock_setup_cli.assert_called_once_with(verbose=False, service_name='harvester')
             mock_get_logger.assert_called_once_with('shitposts')
             mock_shitposts_logger.setLevel.assert_called_once_with(logging.INFO)
 
@@ -312,7 +312,7 @@ class TestSetupAnalyzerLogging:
             setup_analyzer_logging(verbose=True)
             
             # Verify calls
-            mock_setup_cli.assert_called_once_with(verbose=True)
+            mock_setup_cli.assert_called_once_with(verbose=True, service_name='analyzer')
             mock_get_logger.assert_called_once_with('shitpost_ai')
             mock_analyzer_logger.setLevel.assert_called_once_with(logging.DEBUG)
     
@@ -329,7 +329,7 @@ class TestSetupAnalyzerLogging:
             setup_analyzer_logging(verbose=False)
             
             # Verify calls
-            mock_setup_cli.assert_called_once_with(verbose=False)
+            mock_setup_cli.assert_called_once_with(verbose=False, service_name='analyzer')
             mock_get_logger.assert_called_once_with('shitpost_ai')
             mock_analyzer_logger.setLevel.assert_called_once_with(logging.INFO)
 
@@ -350,7 +350,7 @@ class TestSetupDatabaseLogging:
             setup_database_logging(verbose=True)
             
             # Verify calls
-            mock_setup_cli.assert_called_once_with(verbose=True)
+            mock_setup_cli.assert_called_once_with(verbose=True, service_name='shitvault')
             mock_get_logger.assert_called_once_with('shitvault')
             mock_database_logger.setLevel.assert_called_once_with(logging.DEBUG)
     
@@ -367,7 +367,7 @@ class TestSetupDatabaseLogging:
             setup_database_logging(verbose=False)
             
             # Verify calls
-            mock_setup_cli.assert_called_once_with(verbose=False)
+            mock_setup_cli.assert_called_once_with(verbose=False, service_name='shitvault')
             mock_get_logger.assert_called_once_with('shitvault')
             mock_database_logger.setLevel.assert_called_once_with(logging.INFO)
 
@@ -499,7 +499,7 @@ class TestCLILoggingEdgeCases:
                 setup_harvester_logging(verbose=True)
             
             # Should have called setup_cli_logging
-            mock_setup_cli.assert_called_once_with(verbose=True)
+            mock_setup_cli.assert_called_once_with(verbose=True, service_name='harvester')
     
     def test_get_cli_logger_with_special_characters(self):
         """Test get_cli_logger with special characters in module name."""
