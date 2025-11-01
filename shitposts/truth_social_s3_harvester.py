@@ -69,7 +69,7 @@ class TruthSocialS3Harvester:
         
     async def initialize(self, dry_run: bool = False):
         """Initialize the Truth Social S3 harvester."""
-        logger.debug(f"Initializing Truth Social S3 harvester for @{self.username}")
+        logger.info(f"Initializing Truth Social S3 harvester for @{self.username}")
         logger.debug(f"🔧 Initialize method called with dry_run: {dry_run}")
         
         if not self.api_key:
@@ -87,13 +87,13 @@ class TruthSocialS3Harvester:
             )
             
             # Test API connection
-            logger.debug("🔗 Testing API connection...")
+            logger.info("Testing Truth Social API connection...")
             await self._test_connection()
-            logger.debug("✅ API connection test completed")
+            logger.info("Truth Social API connection successful")
             
             # Initialize S3 Data Lake only if not in dry run mode
             if not dry_run:
-                logger.debug("☁️ Initializing S3 Data Lake...")
+                logger.info("Initializing S3 Data Lake...")
                 # Create S3 config from settings
                 s3_config = S3Config(
                     bucket_name=settings.S3_BUCKET_NAME,
@@ -104,11 +104,11 @@ class TruthSocialS3Harvester:
                 )
                 self.s3_data_lake = S3DataLake(s3_config)
                 await self.s3_data_lake.initialize()
-                logger.debug("✅ S3 Data Lake initialized")
+                logger.info("S3 Data Lake initialized successfully")
             else:
-                logger.debug("🔍 Dry run mode - skipping S3 initialization")
+                logger.info("Dry run mode - skipping S3 initialization")
             
-            logger.debug("Truth Social S3 harvester initialized successfully")
+            logger.info("Truth Social S3 harvester initialized successfully")
             
         except Exception as e:
             logger.error(f"Failed to initialize Truth Social S3 harvester: {e}")
