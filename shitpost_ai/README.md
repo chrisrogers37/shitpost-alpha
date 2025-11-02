@@ -5,13 +5,10 @@ This directory contains the AI-powered analysis engine for the Shitpost-Alpha pr
 ## 📁 Contents
 
 ### Core Files
-- **`shitpost_analyzer.py`** - Business logic orchestrator (no CLI)
+- **`shitpost_analyzer.py`** - Business logic orchestrator
 - **`cli.py`** - Shared CLI utilities
 - **`__main__.py`** - CLI entry point
 - **`README.md`** - This documentation file
-
-### Generated Files
-- **`__pycache__/`** - Python bytecode cache (auto-generated)
 
 ## 🏗️ Architecture
 
@@ -19,10 +16,9 @@ The AI engine follows a clean separation of concerns:
 
 ```
 shitpost_ai/
-├── shitpost_analyzer.py  # Business logic & orchestration (no CLI)
+├── shitpost_analyzer.py  # Business logic & orchestration
 ├── cli.py               # Shared CLI utilities
-├── __main__.py          # CLI entry point
-└── __pycache__/         # Python cache (auto-generated)
+└── __main__.py          # CLI entry point
 
 shit/llm/                # Base LLM utilities (shared across project)
 ├── llm_client.py        # Generic LLM API interaction
@@ -591,6 +587,12 @@ python -m shitpost_ai --mode range --from 2024-01-01 --dry-run
 - **Shitpost Collection** - `shitposts/` directory
 
 ## 🚀 Recent Improvements
+
+### Production Logging & Session Management (v0.19.0)
+- **Sectioned Logs** - Visual separation of operational phases (INITIALIZING, ANALYZING, COMPLETED)
+- **Session Cleanup** - Proper async context manager usage for SQLAlchemy sessions
+- **No Connection Warnings** - Eliminated all SQLAlchemy pool connection warnings
+- **Enhanced Visibility** - Comprehensive operation tracking in file logs
 
 ### Architecture Refactor (v0.8.0)
 - **LLM Utilities Extraction** - Moved LLM client and prompts to `shit/llm/` for reusability

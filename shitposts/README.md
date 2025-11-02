@@ -9,9 +9,6 @@ This directory contains the shitpost collection and harvesting system for the Sh
 - **`cli.py`** - Shared CLI functionality for harvesters
 - **`README.md`** - This documentation file
 
-### Generated Files
-- **`__pycache__/`** - Python bytecode cache (auto-generated)
-
 ## 🏗️ Architecture
 
 The shitpost collection system follows a clean, focused design:
@@ -20,8 +17,7 @@ The shitpost collection system follows a clean, focused design:
 shitposts/
 ├── truth_social_s3_harvester.py  # Truth Social S3 harvester
 ├── cli.py                        # Shared CLI functionality
-├── README.md                     # This documentation
-└── __pycache__/                  # Python cache (auto-generated)
+└── README.md                     # This documentation
 ```
 
 **Note:** S3 data lake management has been moved to `shit/s3/` for shared utilities across the project.
@@ -509,6 +505,12 @@ python -m shitposts --mode range --from 2024-01-01 --to 2024-01-02 --dry-run
 - **Configuration** - `shit/config/shitpost_settings.py`
 
 ## 🚀 Recent Improvements
+
+### Production Logging Enhancement (v0.19.0)
+- **Sectioned Logs** - Visual separation of operational phases (INITIALIZING, HARVESTING, COMPLETED)
+- **Enhanced Visibility** - Key operational messages now in INFO level (no verbose required)
+- **Service-Specific Logs** - Separate `harvester_*.log` files for easy filtering
+- **Better Debugging** - Comprehensive harvest summaries with API call counts and statistics
 
 ### Mode Consolidation (v0.7.0)
 - **Unified Code Path** - All harvesting modes now use a single `_harvest_backfill()` method
