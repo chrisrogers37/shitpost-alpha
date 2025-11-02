@@ -49,13 +49,18 @@ class TestShitpostAnalyzer:
         with patch('shitpost_ai.shitpost_analyzer.settings') as mock_settings:
             mock_settings.DATABASE_URL = "sqlite:///:memory:"
             mock_settings.SYSTEM_LAUNCH_DATE = "2024-01-01"
-            return ShitpostAnalyzer(
+            analyzer = ShitpostAnalyzer(
                 mode="incremental",
                 start_date=None,
                 end_date=None,
                 limit=None,
                 batch_size=5
             )
+            # Create mock operations for tests
+            analyzer.db_ops = MagicMock()
+            analyzer.shitpost_ops = MagicMock()
+            analyzer.prediction_ops = MagicMock()
+            return analyzer
 
     def test_initialization_defaults(self):
         """Test analyzer initialization with default values."""
@@ -117,28 +122,12 @@ class TestShitpostAnalyzer:
     async def test_initialize(self, analyzer):
         """Test analyzer initialization."""
         with patch.object(analyzer.db_client, 'initialize', new_callable=AsyncMock) as mock_db_init, \
-             patch.object(analyzer.db_client, 'get_session') as mock_get_session, \
-             patch('shitpost_ai.shitpost_analyzer.DatabaseOperations') as mock_db_ops_class, \
-             patch('shitpost_ai.shitpost_analyzer.ShitpostOperations') as mock_shitpost_ops_class, \
-             patch('shitpost_ai.shitpost_analyzer.PredictionOperations') as mock_prediction_ops_class, \
              patch.object(analyzer.llm_client, 'initialize', new_callable=AsyncMock) as mock_llm_init:
-            
-            mock_session = MagicMock()
-            mock_get_session.return_value = mock_session
-            mock_db_ops = MagicMock()
-            mock_db_ops_class.return_value = mock_db_ops
-            mock_shitpost_ops = MagicMock()
-            mock_shitpost_ops_class.return_value = mock_shitpost_ops
-            mock_prediction_ops = MagicMock()
-            mock_prediction_ops_class.return_value = mock_prediction_ops
             
             await analyzer.initialize()
             
             mock_db_init.assert_called_once()
             mock_llm_init.assert_called_once()
-            assert analyzer.db_ops == mock_db_ops
-            assert analyzer.shitpost_ops == mock_shitpost_ops
-            assert analyzer.prediction_ops == mock_prediction_ops
 
     @pytest.mark.asyncio
     async def test_cleanup(self, analyzer):

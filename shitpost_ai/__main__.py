@@ -46,21 +46,32 @@ async def main():
     try:
         await analyzer.initialize()
         
-        if args.dry_run:
-            print("🔍 DRY RUN MODE - No analysis will be saved to database")
-            print("📝 Would analyze unprocessed shitposts based on current configuration")
-            print(f"   Mode: {args.mode}")
-            if args.start_date:
-                print(f"   From: {args.start_date}")
-            if args.end_date:
-                print(f"   To: {args.end_date}")
-            if args.limit:
-                print(f"   Limit: {args.limit}")
-            print(f"   Batch Size: {args.batch_size}")
-        else:
-            # Run actual analysis
-            analyzed_count = await analyzer.analyze_shitposts(dry_run=args.dry_run)
-            print_analysis_complete(analyzed_count, args.dry_run)
+        # Use session as context manager for proper cleanup
+        async with analyzer.db_client.get_session() as session:
+            # Re-initialize operations with session context
+            from shit.db import DatabaseOperations
+            from shitvault.shitpost_operations import ShitpostOperations
+            from shitvault.prediction_operations import PredictionOperations
+            
+            analyzer.db_ops = DatabaseOperations(session)
+            analyzer.shitpost_ops = ShitpostOperations(analyzer.db_ops)
+            analyzer.prediction_ops = PredictionOperations(analyzer.db_ops)
+            
+            if args.dry_run:
+                print("🔍 DRY RUN MODE - No analysis will be saved to database")
+                print("📝 Would analyze unprocessed shitposts based on current configuration")
+                print(f"   Mode: {args.mode}")
+                if args.start_date:
+                    print(f"   From: {args.start_date}")
+                if args.end_date:
+                    print(f"   To: {args.end_date}")
+                if args.limit:
+                    print(f"   Limit: {args.limit}")
+                print(f"   Batch Size: {args.batch_size}")
+            else:
+                # Run actual analysis
+                analyzed_count = await analyzer.analyze_shitposts(dry_run=args.dry_run)
+                print_analysis_complete(analyzed_count, args.dry_run)
         
     except KeyboardInterrupt:
         print_analysis_interrupted()

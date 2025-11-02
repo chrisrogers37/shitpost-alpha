@@ -29,6 +29,14 @@ class TestMain:
                 self.dry_run = False
         
         return MockArgs()
+    
+    def _setup_mock_analyzer(self, mock_analyzer):
+        """Helper to setup mock analyzer with session context manager."""
+        mock_analyzer.db_client = MagicMock()
+        mock_session = MagicMock()
+        mock_analyzer.db_client.get_session.return_value.__aenter__.return_value = mock_session
+        mock_analyzer.db_client.get_session.return_value.__aexit__.return_value = None
+        return mock_session
 
     @pytest.mark.asyncio
     async def test_main_success(self, sample_args):
@@ -49,6 +57,7 @@ class TestMain:
             mock_analyzer.initialize = AsyncMock()
             mock_analyzer.analyze_shitposts = AsyncMock(return_value=5)
             mock_analyzer.cleanup = AsyncMock()
+            self._setup_mock_analyzer(mock_analyzer)
             
             await main()
             
@@ -81,6 +90,7 @@ class TestMain:
             mock_analyzer.initialize = AsyncMock()
             mock_analyzer.analyze_shitposts = AsyncMock(return_value=3)
             mock_analyzer.cleanup = AsyncMock()
+            self._setup_mock_analyzer(mock_analyzer)
             
             await main()
             
@@ -106,6 +116,7 @@ class TestMain:
             mock_analyzer_class.return_value = mock_analyzer
             mock_analyzer.initialize = AsyncMock()
             mock_analyzer.cleanup = AsyncMock()
+            self._setup_mock_analyzer(mock_analyzer)
             
             await main()
             
@@ -144,6 +155,7 @@ class TestMain:
             mock_analyzer.initialize = AsyncMock()
             mock_analyzer.analyze_shitposts = AsyncMock(return_value=15)
             mock_analyzer.cleanup = AsyncMock()
+            self._setup_mock_analyzer(mock_analyzer)
             
             await main()
             
@@ -176,6 +188,7 @@ class TestMain:
             mock_analyzer.initialize = AsyncMock()
             mock_analyzer.analyze_shitposts = AsyncMock(side_effect=KeyboardInterrupt())
             mock_analyzer.cleanup = AsyncMock()
+            self._setup_mock_analyzer(mock_analyzer)
             
             await main()
             
@@ -201,6 +214,7 @@ class TestMain:
             mock_analyzer.initialize = AsyncMock()
             mock_analyzer.analyze_shitposts = AsyncMock(side_effect=Exception("Analysis failed"))
             mock_analyzer.cleanup = AsyncMock()
+            self._setup_mock_analyzer(mock_analyzer)
             
             with pytest.raises(SystemExit):
                 await main()
@@ -229,6 +243,7 @@ class TestMain:
             mock_analyzer.initialize = AsyncMock()
             mock_analyzer.analyze_shitposts = AsyncMock(side_effect=Exception("Analysis failed"))
             mock_analyzer.cleanup = AsyncMock()
+            self._setup_mock_analyzer(mock_analyzer)
             
             with pytest.raises(SystemExit):
                 await main()
@@ -254,6 +269,7 @@ class TestMain:
             mock_analyzer_class.return_value = mock_analyzer
             mock_analyzer.initialize = AsyncMock(side_effect=Exception("Init failed"))
             mock_analyzer.cleanup = AsyncMock()
+            self._setup_mock_analyzer(mock_analyzer)
             
             with pytest.raises(SystemExit):
                 await main()
@@ -285,6 +301,7 @@ class TestMain:
             mock_analyzer_class.return_value = mock_analyzer
             mock_analyzer.initialize = AsyncMock()
             mock_analyzer.cleanup = AsyncMock()
+            self._setup_mock_analyzer(mock_analyzer)
             
             await main()
             
@@ -318,6 +335,7 @@ class TestMain:
             mock_analyzer_class.return_value = mock_analyzer
             mock_analyzer.initialize = AsyncMock()
             mock_analyzer.cleanup = AsyncMock()
+            self._setup_mock_analyzer(mock_analyzer)
             
             await main()
             
@@ -345,6 +363,7 @@ class TestMain:
             mock_analyzer.initialize = AsyncMock()
             mock_analyzer.analyze_shitposts = AsyncMock(return_value=0)
             mock_analyzer.cleanup = AsyncMock()
+            self._setup_mock_analyzer(mock_analyzer)
             
             await main()
             

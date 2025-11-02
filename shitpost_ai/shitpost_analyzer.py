@@ -69,11 +69,6 @@ class ShitpostAnalyzer:
         # Initialize database client
         await self.db_client.initialize()
         
-        # Create database operations
-        self.db_ops = DatabaseOperations(self.db_client.get_session())
-        self.shitpost_ops = ShitpostOperations(self.db_ops)
-        self.prediction_ops = PredictionOperations(self.db_ops)
-        
         # Initialize LLM client
         await self.llm_client.initialize()
         
@@ -527,10 +522,6 @@ class ShitpostAnalyzer:
     
     async def cleanup(self):
         """Cleanup analyzer resources."""
-        # Close the session if it exists
-        if self.db_ops and hasattr(self.db_ops, 'session'):
-            await self.db_ops.session.close()
-        
         if self.db_client:
             await self.db_client.cleanup()
         logger.info("Shitpost Analyzer cleanup completed")
