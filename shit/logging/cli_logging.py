@@ -5,7 +5,10 @@ Provides unified logging setup for all CLI modules.
 
 import logging
 import sys
+import os
+from pathlib import Path
 from typing import Optional
+from datetime import datetime
 
 from .config import configure_from_verbose, get_config
 from .formatters import create_formatter
@@ -14,7 +17,8 @@ from .formatters import create_formatter
 def setup_cli_logging(
     verbose: bool = False,
     quiet: bool = False,
-    format: Optional[str] = None
+    format: Optional[str] = None,
+    service_name: Optional[str] = None
 ) -> None:
     """Setup unified logging for CLI modules.
     
@@ -28,6 +32,7 @@ def setup_cli_logging(
         verbose: Enable verbose (DEBUG) logging
         quiet: Enable quiet (WARNING) logging - only show errors
         format: Optional format type override ('beautiful', 'structured', 'json')
+        service_name: Optional service name to include in log filename
     """
     # Configure centralized logging system
     if quiet:
@@ -64,9 +69,59 @@ def setup_cli_logging(
     # Add handler to root logger
     root_logger.addHandler(console_handler)
     
+    # Setup file logging if enabled
+    if config.file_logging:
+        _setup_file_handler(root_logger, config, level, service_name=service_name)
+    
     # Suppress verbose logging from third-party libraries
     if not verbose:
         _suppress_third_party_logging()
+
+
+def _setup_file_handler(root_logger: logging.Logger, config, level: int, service_name: Optional[str] = None) -> None:
+    """Setup file handler for logging.
+    
+    Args:
+        root_logger: Root logger to add handler to
+        config: Logging configuration
+        level: Log level to use
+        service_name: Optional service name to include in filename
+    """
+    # Determine log file path
+    if config.log_file_path:
+        log_file_path = Path(config.log_file_path)
+    else:
+        # Default to timestamped session file in logs directory
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Build filename based on service name
+        if service_name:
+            log_filename = f"{service_name}_{timestamp}.log"
+        else:
+            log_filename = f"shitpost_alpha_{timestamp}.log"
+        
+        log_file_path = Path(__file__).parent.parent.parent / "logs" / log_filename
+    
+    # Create logs directory if it doesn't exist
+    log_file_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Create file handler with rotation
+    # Use a simple file handler (could upgrade to RotatingFileHandler later)
+    file_handler = logging.FileHandler(log_file_path)
+    file_handler.setLevel(level)
+    
+    # Use structured formatter for file (no colors)
+    file_formatter = create_formatter(
+        format_type='structured',
+        enable_colors=False
+    )
+    file_handler.setFormatter(file_formatter)
+    
+    # Add handler to root logger
+    root_logger.addHandler(file_handler)
+    
+    # Log that file logging is enabled
+    logging.info(f"File logging enabled: {log_file_path}")
 
 
 def _suppress_third_party_logging() -> None:
@@ -97,7 +152,7 @@ def setup_harvester_logging(verbose: bool = False) -> None:
     Args:
         verbose: Enable verbose logging
     """
-    setup_cli_logging(verbose=verbose)
+    setup_cli_logging(verbose=verbose, service_name="harvester")
     
     # Also configure the shitposts module logger
     shitposts_logger = logging.getLogger('shitposts')
@@ -113,7 +168,7 @@ def setup_analyzer_logging(verbose: bool = False) -> None:
     Args:
         verbose: Enable verbose logging
     """
-    setup_cli_logging(verbose=verbose)
+    setup_cli_logging(verbose=verbose, service_name="analyzer")
     
     # Also configure the shitpost_ai module logger
     analyzer_logger = logging.getLogger('shitpost_ai')
@@ -129,7 +184,7 @@ def setup_database_logging(verbose: bool = False) -> None:
     Args:
         verbose: Enable verbose logging
     """
-    setup_cli_logging(verbose=verbose)
+    setup_cli_logging(verbose=verbose, service_name="shitvault")
     
     # Also configure the shitvault module logger
     database_logger = logging.getLogger('shitvault')

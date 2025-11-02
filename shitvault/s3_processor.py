@@ -47,10 +47,13 @@ class S3Processor:
             Dictionary with processing statistics
         """
         try:
+            logger.info("")
+            logger.info("═══════════════════════════════════════════════════════════")
             if dry_run:
-                logger.info(f"Starting S3 to Database processing (DRY RUN - no database writes)...")
+                logger.info("PROCESSING S3 TO DATABASE (DRY RUN)")
             else:
-                logger.info(f"Starting S3 to Database processing...")
+                logger.info("PROCESSING S3 TO DATABASE")
+            logger.info("═══════════════════════════════════════════════════════════")
             
             # Handle incremental mode
             if incremental:
@@ -63,8 +66,11 @@ class S3Processor:
                     cutoff_index = await self._find_cutoff_index(s3_keys, most_recent_post_id)
                     if cutoff_index is not None:
                         # Only process keys before the cutoff (newer posts)
+                        if cutoff_index == 0:
+                            logger.info(f"Incremental mode: Most recent post already processed - found 0 new posts to process")
+                        else:
+                            logger.info(f"Incremental mode: Found {cutoff_index} new posts to process (cutoff at index {cutoff_index})")
                         s3_keys = s3_keys[:cutoff_index]
-                        logger.info(f"Incremental mode: Found {len(s3_keys)} new posts to process (cutoff at index {cutoff_index})")
                     else:
                         logger.info(f"Incremental mode: Post ID {most_recent_post_id} not found in S3 - processing all files")
                 else:

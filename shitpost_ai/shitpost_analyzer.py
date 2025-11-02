@@ -60,6 +60,10 @@ class ShitpostAnalyzer:
         
     async def initialize(self):
         """Initialize the shitpost analyzer."""
+        logger.info("")
+        logger.info("═══════════════════════════════════════════════════════════")
+        logger.info("INITIALIZING ANALYZER")
+        logger.info("═══════════════════════════════════════════════════════════")
         logger.info("Initializing Shitpost Analyzer...")
         
         # Initialize database client
@@ -74,6 +78,8 @@ class ShitpostAnalyzer:
         await self.llm_client.initialize()
         
         logger.info(f"Shitpost Analyzer initialized with launch date: {self.launch_date}")
+        logger.info("✅ Analyzer initialized successfully")
+        logger.info("")
     
     async def analyze_shitposts(self, dry_run: bool = False) -> int:
         """Analyze shitposts based on configured mode.
@@ -84,14 +90,26 @@ class ShitpostAnalyzer:
         Returns:
             Number of posts analyzed
         """
+        logger.info("")
+        logger.info("═══════════════════════════════════════════════════════════")
+        logger.info("ANALYZING SHITPOSTS")
+        logger.info("═══════════════════════════════════════════════════════════")
         logger.info(f"Starting shitpost analysis in {self.mode} mode...")
         
         if self.mode == "backfill":
-            return await self._analyze_backfill(dry_run)
+            result = await self._analyze_backfill(dry_run)
         elif self.mode == "range":
-            return await self._analyze_date_range(dry_run)
+            result = await self._analyze_date_range(dry_run)
         else:  # incremental (default)
-            return await self._analyze_incremental(dry_run)
+            result = await self._analyze_incremental(dry_run)
+        
+        logger.info("")
+        logger.info("═══════════════════════════════════════════════════════════")
+        logger.info("ANALYSIS COMPLETED")
+        logger.info("═══════════════════════════════════════════════════════════")
+        logger.info(f"Total posts analyzed: {result}")
+        
+        return result
     
     async def _analyze_backfill(self, dry_run: bool = False) -> int:
         """Analyze all unprocessed shitposts from launch date onwards."""
@@ -509,6 +527,10 @@ class ShitpostAnalyzer:
     
     async def cleanup(self):
         """Cleanup analyzer resources."""
+        # Close the session if it exists
+        if self.db_ops and hasattr(self.db_ops, 'session'):
+            await self.db_ops.session.close()
+        
         if self.db_client:
             await self.db_client.cleanup()
         logger.info("Shitpost Analyzer cleanup completed")
