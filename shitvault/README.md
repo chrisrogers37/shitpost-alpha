@@ -13,11 +13,6 @@ This directory contains the database layer for the Shitpost-Alpha project, respo
 - **`cli.py`** - Command-line interface for database operations
 - **`README.md`** - This documentation file
 
-
-### Generated Files
-- **`__pycache__/`** - Python bytecode cache (auto-generated)
-- **`shitpost_alpha.db`** - SQLite database file (created at runtime)
-
 ## 🏗️ Architecture
 
 The database layer follows a modular architecture with clear separation of concerns:
@@ -29,8 +24,7 @@ shitvault/                           # Domain-specific operations
 ├── s3_processor.py                  # S3 → Database processing
 ├── statistics.py                    # Statistics generation
 ├── shitpost_models.py               # Domain-specific models
-├── cli.py                           # CLI interface
-└── shitpost_alpha.db                # SQLite database (runtime generated)
+└── cli.py                           # CLI interface
 
 shit/db/                             # Generic database infrastructure
 ├── database_client.py               # Connection management
@@ -463,6 +457,12 @@ The database implements a categorical approach to track all harvested posts:
 This ensures comprehensive tracking of all harvested content, not just successfully analyzed posts.
 
 ## 🚀 Recent Improvements
+
+### Production Logging & Session Management (v0.19.0)
+- **Sectioned Logs** - Visual separation of operational phases (INITIALIZING, PROCESSING, COMPLETED)
+- **Enhanced Visibility** - Comprehensive operation tracking with statistics in file logs
+- **Service-Specific Logs** - Separate `shitvault_*.log` files for easy filtering
+- **Better Debugging** - Detailed logging without verbose mode
 
 ### Modular Architecture Refactor (v0.10.0)
 - **Infrastructure Separation** - Extracted generic database infrastructure to `shit/db/`

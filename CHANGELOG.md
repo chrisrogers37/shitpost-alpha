@@ -766,3 +766,78 @@ python main.py --mode ingestion --harvest-mode from-date --from 2024-01-01
 #### New Directory Structure
 ```
 ```
+## [v0.19.0] - 2025-11-01
+
+### Added
+- **File Logging System**: Persistent timestamped log files for production debugging
+  - Per-session timestamped log files (YYYYMMDD_HHMMSS format)
+  - Service-specific filenames: `harvester_*.log`, `shitvault_*.log`, `analyzer_*.log`
+  - Structured plain-text output without ANSI colors in file logs
+  - Beautiful colored console output with structured file logs
+  - Configurable via `FILE_LOGGING` environment variable (default: False)
+  - Automatic logs directory creation
+- **Enhanced Log Sectioning**: Visual separation of operational phases in logs
+  - Section headers with separator lines for INITIALIZING, PROCESSING, COMPLETED phases
+  - Blank line spacing for improved readability
+  - Consistent formatting across all modules (harvester, shitvault, analyzer, orchestrator)
+  - Comprehensive operation tracking with detailed statistics
+
+### Changed
+- **Orchestrator Logging**: Enhanced main pipeline orchestrator with detailed subprocess execution logs
+  - Each subprocess gets own timestamped log file
+  - Clear success/failure indicators for each phase
+  - Comprehensive execution summaries
+- **Harvester Logging**: Promoted key operational messages from DEBUG to INFO level
+  - API calls and fetched post counts now in default file logs
+  - Harvest summaries with totals and statistics
+  - Clear incremental mode indicators
+- **Shitvault Logging**: Enhanced database operations with sectioned, detailed logs
+  - Processing statistics and mode indicators
+  - Clear incremental vs. full processing distinctions
+  - Comprehensive completion summaries
+- **Analyzer Logging**: Sectioned logs with proper initialization and cleanup tracking
+  - LLM connection and initialization details
+  - Batch processing information
+  - Clean completion messages
+
+### Fixed
+- **SQLAlchemy Connection Pool Warning**: Proper async session lifecycle management
+  - Analyzer now uses `async with` context manager for database sessions
+  - Eliminated "non-checked-in connection will be dropped" warnings
+  - Proper session cleanup without manual close() calls
+  - All database connections properly returned to pool
+- **Test Suite Reliability**: Updated all tests for new session management pattern
+  - Fixed async context manager mocking in analyzer tests
+  - All 948 tests passing with new architecture
+  - Proper test isolation maintained
+
+### Technical Details
+- **File Logging Implementation**:
+  - `FILE_LOGGING` environment variable controls file output
+  - `LOG_FILE_PATH` for custom log locations (optional)
+  - Default location: `logs/` directory at project root
+  - Service names automatically included in filenames for easy filtering
+- **Session Management**:
+  - Database sessions now managed through context managers in analyzer CLI
+  - Backward compatible with existing code
+  - Proper resource cleanup guaranteed
+- **Log Architecture**:
+  - Console: Beautiful colored output with emojis for UX
+  - File: Structured plain text for technical review
+  - Automatic detection of output destination
+  - No duplicate log entries between console and file
+
+### Testing
+- All 948 tests passing ✅
+- Comprehensive CLI validation across all modules
+- No SQLAlchemy warnings in production logs
+- Proper log file generation confirmed
+- Service-specific log filenames working correctly
+
+### Production Impact
+- Clean production logs with no connection pool warnings
+- Debuggable file logs available when needed
+- Better operational visibility with sectioned logs
+- Zero breaking changes to existing functionality
+
+## [v0.18.0] - 2024-10-30
