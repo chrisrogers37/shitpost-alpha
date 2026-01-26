@@ -244,6 +244,9 @@ reference_docs/
 secrets.json
 config/secrets.json
 
+# Claude Code local settings (user-specific)
+.claude/settings.local.json
+
 # Backup files
 *.bak
 *.backup
