@@ -12,6 +12,7 @@ from sqlalchemy import select
 from shit.db.database_operations import DatabaseOperations
 from shit.db.database_utils import DatabaseUtils
 from shitvault.shitpost_models import Prediction
+from shit.content import BypassService, BypassReason
 
 # Use centralized DatabaseLogger for beautiful logging
 from shit.logging.service_loggers import DatabaseLogger
@@ -22,9 +23,10 @@ logger = db_logger.logger
 
 class PredictionOperations:
     """Operations for managing predictions."""
-    
+
     def __init__(self, db_ops: DatabaseOperations):
         self.db_ops = db_ops
+        self.bypass_service = BypassService()
     
     async def store_analysis(self, shitpost_id: str, analysis_data: Dict[str, Any], shitpost_data: Dict[str, Any] = None) -> Optional[str]:
         """Store LLM analysis results in the database with enhanced shitpost data."""
@@ -93,11 +95,30 @@ class PredictionOperations:
             logger.error(f"Error storing analysis: {e}")
             return None
     
-    async def handle_no_text_prediction(self, shitpost_id: str, shitpost_data: Dict[str, Any]) -> Optional[str]:
-        """Create a prediction record for posts that can't be analyzed."""
+    async def handle_no_text_prediction(
+        self,
+        shitpost_id: str,
+        shitpost_data: Dict[str, Any],
+        bypass_reason: Optional[BypassReason] = None
+    ) -> Optional[str]:
+        """
+        Create a prediction record for posts that can't be analyzed.
+
+        Args:
+            shitpost_id: ID of the shitpost
+            shitpost_data: Shitpost data dictionary
+            bypass_reason: Optional pre-determined bypass reason. If not provided,
+                          will be determined using BypassService.
+
+        Returns:
+            Prediction ID if successful, None otherwise
+        """
         try:
-            # Determine the bypass reason based on content
-            reason = self._get_bypass_reason(shitpost_data)
+            # Determine the bypass reason if not provided
+            if bypass_reason is None:
+                _, bypass_reason = self.bypass_service.should_bypass_post(shitpost_data)
+
+            reason = str(bypass_reason) if bypass_reason else "Content not analyzable"
             
             prediction = Prediction(
                 shitpost_id=shitpost_id,
@@ -136,20 +157,6 @@ class PredictionOperations:
             logger.error(f"Error creating bypassed prediction: {e}")
             return None
     
-    def _get_bypass_reason(self, shitpost_data: Dict[str, Any]) -> str:
-        """Determine why a post should be bypassed for analysis."""
-        text_content = shitpost_data.get('text', '').strip()
-        
-        if not text_content:
-            return "No text content"
-        elif len(text_content) < 10:
-            return "Text too short"
-        elif text_content.lower() in ['test', 'testing', 'hello', 'hi']:
-            return "Test content"
-        elif len(text_content.split()) < 3:
-            return "Insufficient words"
-        else:
-            return "Content not analyzable"
     
     async def check_prediction_exists(self, shitpost_id: str) -> bool:
         """Check if a prediction already exists for a shitpost."""

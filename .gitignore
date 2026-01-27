@@ -233,9 +233,6 @@ logs/
 *.swo
 *~
 
-# Reference documentation (if not needed in version control) e
-reference_docs/
-
 # API keys and secrets
 .env
 .env.local

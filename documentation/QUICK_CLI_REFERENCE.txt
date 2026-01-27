@@ -1,0 +1,55 @@
+═══════════════════════════════════════════════════════════════════════════
+                 SHITPOST ALPHA - QUICK CLI REFERENCE
+═══════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. HARVESTING (Truth Social → S3)                                      │
+└─────────────────────────────────────────────────────────────────────────┘
+
+  python -m shitposts --mode incremental --limit 10
+  python -m shitposts --mode backfill --limit 100
+  python -m shitposts --mode range --from 2024-01-01 --to 2024-01-31
+  python -m shitposts --mode incremental --limit 5 --verbose
+  python -m shitposts --help
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. ANALYSIS (Database → LLM → Database)                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+  python -m shitpost_ai --mode incremental --limit 10
+  python -m shitpost_ai --mode backfill --limit 100
+  python -m shitpost_ai --mode range --from 2024-01-01 --to 2024-01-31
+  python -m shitpost_ai --mode incremental --batch-size 3 --limit 15
+  python -m shitpost_ai --help
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. DATABASE (S3 → Database & Statistics)                               │
+└─────────────────────────────────────────────────────────────────────────┘
+
+  python -m shitvault load-database-from-s3 --mode incremental --limit 10
+  python -m shitvault load-database-from-s3 --mode backfill --limit 100
+  python -m shitvault stats
+  python -m shitvault processing-stats
+  python -m shitvault --help
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 4. ORCHESTRATOR (Complete Pipeline)                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+
+  python shitpost_alpha.py --mode incremental --limit 10
+  python shitpost_alpha.py --dry-run --mode incremental --limit 10
+  python shitpost_alpha.py --mode incremental --limit 10 --verbose
+  python shitpost_alpha.py --help
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ COMMON FLAGS                                                            │
+└─────────────────────────────────────────────────────────────────────────┘
+
+  --mode:     incremental, backfill, range
+  --limit:    Max posts to process
+  --from:     Start date (YYYY-MM-DD)
+  --to:       End date (YYYY-MM-DD)
+  --verbose:  Enable debug logging
+  --dry-run:  Preview without executing
+
+═══════════════════════════════════════════════════════════════════════════
