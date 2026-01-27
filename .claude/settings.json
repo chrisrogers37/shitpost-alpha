@@ -1,0 +1,59 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python shitpost_alpha.py * --dry-run*)",
+      "Bash(python -m shitvault show-*)",
+      "Bash(python -m shit.tests*)",
+      "Bash(pytest*)",
+      "Bash(ruff*)",
+      "Bash(python -m pytest*)",
+      "Bash(pip install*)",
+      "Bash(source venv*)",
+      "Bash(. venv*)",
+      "Bash(tail -f logs/*)",
+      "Bash(tail logs/*)",
+      "Bash(cat logs/*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git checkout*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(git pull*)",
+      "Bash(git fetch*)",
+      "Bash(gh pr*)",
+      "Bash(gh issue*)",
+      "Bash(gh api*)",
+      "Bash(ls*)",
+      "Bash(mkdir*)",
+      "Bash(cp*)",
+      "Bash(mv*)",
+      "Bash(pwd*)"
+    ],
+    "deny": [
+      "Bash(python shitpost_alpha.py*)",
+      "Bash(python -m shitposts*)",
+      "Bash(python -m shitvault load-database-from-s3*)",
+      "Bash(python -m shitpost_ai analyze*)",
+      "Bash(rm -rf*)",
+      "Bash(aws s3 rm*)",
+      "Bash(psql * DELETE*)",
+      "Bash(psql * DROP*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_FILE_PATH\" == *.py ]]; then ruff format \"$CLAUDE_FILE_PATH\" 2>/dev/null || true; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
