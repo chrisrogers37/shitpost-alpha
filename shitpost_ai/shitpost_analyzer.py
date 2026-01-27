@@ -14,6 +14,7 @@ from shit.db import DatabaseConfig, DatabaseClient, DatabaseOperations
 from shitvault.shitpost_operations import ShitpostOperations
 from shitvault.prediction_operations import PredictionOperations
 from shit.utils.error_handling import handle_exceptions
+from shit.content import BypassService
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +40,9 @@ class ShitpostAnalyzer:
         self.prediction_ops = None  # Will be initialized in initialize()
         
         self.llm_client = LLMClient()
+        self.bypass_service = BypassService()
         self.launch_date = settings.SYSTEM_LAUNCH_DATE
-        
+
         # Analysis mode configuration
         self.mode = mode
         self.start_date = start_date
@@ -342,19 +344,20 @@ class ShitpostAnalyzer:
                 logger.warning("Shitpost missing ID, cannot analyze")
                 return None
             
-            # Check if post should be bypassed
-            if self._should_bypass_post(shitpost):
-                reason = self._get_bypass_reason(shitpost)
-                logger.info(f"Bypassing shitpost {shitpost_id}: {reason}")
-                
+            # Check if post should be bypassed using unified bypass service
+            should_bypass, bypass_reason = self.bypass_service.should_bypass_post(shitpost)
+
+            if should_bypass:
+                logger.info(f"Bypassing shitpost {shitpost_id}: {bypass_reason}")
+
                 if not dry_run:
                     # Create bypassed prediction record
-                    await self.prediction_ops.handle_no_text_prediction(shitpost_id, shitpost)
-                
+                    await self.prediction_ops.handle_no_text_prediction(shitpost_id, shitpost, bypass_reason)
+
                 return {
                     'shitpost_id': shitpost_id,
                     'analysis_status': 'bypassed',
-                    'analysis_comment': reason
+                    'analysis_comment': str(bypass_reason)
                 }
             
             # Prepare enhanced content for LLM analysis
@@ -388,63 +391,6 @@ class ShitpostAnalyzer:
         except Exception as e:
             logger.error(f"Error analyzing shitpost {shitpost.get('shitpost_id', 'unknown')}: {e}")
             return None
-    
-    def _should_bypass_post(self, shitpost: Dict) -> bool:
-        """Determine if a post should be bypassed for analysis.
-        
-        Args:
-            shitpost: Shitpost dictionary
-            
-        Returns:
-            True if post should be bypassed
-        """
-        text_content = shitpost.get('text', '').strip()
-        
-        # Check for various bypass conditions
-        if not text_content:
-            return True
-        
-        # Check if it's a retruth (retweet) - starts with "RT" or "RT:"
-        if text_content.startswith('RT ') or text_content.startswith('RT:'):
-            return True
-        
-        # Check if it's just a URL with no context
-        if text_content.startswith('http') and len(text_content.split()) <= 2:
-            return True
-        
-        # Check if it's just emojis/symbols
-        if all(ord(char) < 128 for char in text_content) and len(text_content.strip()) < 3:
-            return True
-        
-        # Check if it's just media (has media but no text)
-        if shitpost.get('has_media', False) and not text_content:
-            return True
-        
-        return False
-    
-    def _get_bypass_reason(self, shitpost: Dict) -> str:
-        """Get the reason why a post should be bypassed.
-        
-        Args:
-            shitpost: Shitpost dictionary
-            
-        Returns:
-            Bypass reason string
-        """
-        text_content = shitpost.get('text', '').strip()
-        
-        if not text_content:
-            return 'no_text'
-        elif text_content.startswith('RT ') or text_content.startswith('RT:'):
-            return 'retruth'
-        elif text_content.startswith('http') and len(text_content.split()) <= 2:
-            return 'url_only'
-        elif all(ord(char) < 128 for char in text_content) and len(text_content.strip()) < 3:
-            return 'symbols_only'
-        elif shitpost.get('has_media', False) and not text_content:
-            return 'media_only'
-        else:
-            return 'unanalyzable_content'
     
     def _prepare_enhanced_content(self, shitpost: Dict) -> str:
         """Prepare enhanced content for LLM analysis.
