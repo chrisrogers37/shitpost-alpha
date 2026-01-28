@@ -11,13 +11,6 @@ This directory contains configuration for optimal development with [Claude Code]
 ├── settings.local.json          # Your local settings (gitignored)
 ├── QUICK_REFERENCE.md           # Quick reference for Claude
 ├── PROJECT_CONTEXT.md           # Context for remote sessions
-├── commands/                    # Slash commands for workflows
-│   ├── quick-commit.md          # Stage and commit changes
-│   ├── commit-push-pr.md        # Full PR workflow
-│   ├── review-changes.md        # Code review suggestions
-│   ├── test-and-fix.md          # Run tests and fix failures
-│   ├── db-status.md             # Database health check
-│   └── check-logs.md            # Recent log review
 └── skills/
     └── first-principles/
         └── SKILL.md             # First principles thinking
@@ -51,50 +44,6 @@ Fast lookup for common tasks:
 
 ### PROJECT_CONTEXT.md
 Context document for Claude web/phone sessions. Copy this into remote sessions to give Claude full project context.
-
-## 🚀 Using Slash Commands
-
-Slash commands automate common workflows. Use them like this:
-
-```bash
-# In Claude Code terminal
-/quick-commit         # Fast commit with auto-verification
-/commit-push-pr       # Full PR workflow with tests
-/review-changes       # Get code review suggestions
-/test-and-fix         # Run tests and fix failures
-/db-status            # Check database health
-/check-logs           # Review recent logs
-```
-
-## 📝 Command Details
-
-### `/quick-commit`
-Stages all changes, runs tests + linting, creates a commit with a descriptive message.
-- ✅ **Use for**: Quick commits during development
-- ❌ **Don't use for**: Final PR commits (use `/commit-push-pr` instead)
-
-### `/commit-push-pr`
-Complete PR workflow: verify → stage → commit → push → create PR
-- ✅ **Use for**: Creating pull requests
-- Includes: Tests, linting, changelog check, PR description template
-
-### `/review-changes`
-Reviews uncommitted changes and suggests improvements
-- Checks: Code quality, testing needs, documentation, safety, best practices
-- ✅ **Use for**: Pre-commit code review
-
-### `/test-and-fix`
-Runs the test suite and helps fix any failures
-- Runs: pytest with coverage, ruff linting and formatting
-- ✅ **Use for**: Ensuring code quality before commit
-
-### `/db-status`
-Shows database statistics and recent activity
-- ✅ **Use for**: Quick health check, debugging issues
-
-### `/check-logs`
-Reviews recent logs from all services for errors
-- ✅ **Use for**: Debugging production issues, monitoring health
 
 ## 🎨 Skills
 
@@ -130,7 +79,7 @@ This setup follows best practices from [Boris Cherny](https://twitter.com/bchern
 
 1. **Shared CLAUDE.md**: Team-wide learnings (add mistakes Claude makes)
 2. **Verification loops**: Tests + linting before every commit (2-3x quality)
-3. **Slash commands**: Automate repetitive workflows with inline bash
+3. **Skills**: Specialized workflows for common tasks
 4. **PostToolUse hooks**: Auto-format Python files with ruff
 5. **Pre-allowed commands**: Common safe commands (tests, git, etc.)
 6. **Project context files**: Quick reference and remote session context
@@ -153,7 +102,7 @@ This setup follows best practices from [Boris Cherny](https://twitter.com/bchern
 ## 💡 Tips
 
 1. **Start every session**: Check CLAUDE.md for safety rules
-2. **Use slash commands**: They include context and verification
+2. **Use skills**: Invoke with `/skill-name` for specialized workflows
 3. **Update CLAUDE.md**: Add mistakes Claude makes so it learns
 4. **Remote sessions**: Copy PROJECT_CONTEXT.md for full context
 5. **Changelog**: Every PR must update CHANGELOG.md
