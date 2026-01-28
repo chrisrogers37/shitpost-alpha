@@ -1,377 +1,627 @@
 """
 Dashboard layout and callbacks for Shitty UI
-Obnoxiously American-themed dashboard for Shitpost Alpha.
+Redesigned to focus on prediction performance and insights.
 """
 
-import asyncio
 from datetime import datetime, timedelta
-from dash import Dash, html, dcc, dash_table, Input, Output, State, callback_context
+from dash import Dash, html, dcc, dash_table, Input, Output, State
+import dash_bootstrap_components as dbc
+import plotly.graph_objects as go
 import pandas as pd
-from data import load_recent_posts, load_filtered_posts, get_available_assets, get_prediction_stats
+from data import (
+    get_prediction_stats,
+    get_recent_signals,
+    get_performance_metrics,
+    get_accuracy_by_confidence,
+    get_accuracy_by_asset,
+    get_similar_predictions,
+    get_predictions_with_outcomes,
+    get_active_assets_from_db,
+)
+
+# Color palette - cleaner, more professional
+COLORS = {
+    "primary": "#1e293b",      # Slate 800 - main background
+    "secondary": "#334155",    # Slate 700 - cards
+    "accent": "#3b82f6",       # Blue 500 - highlights
+    "success": "#10b981",      # Emerald 500 - bullish/correct
+    "danger": "#ef4444",       # Red 500 - bearish/incorrect
+    "warning": "#f59e0b",      # Amber 500 - pending
+    "text": "#f1f5f9",         # Slate 100 - primary text
+    "text_muted": "#94a3b8",   # Slate 400 - secondary text
+    "border": "#475569",       # Slate 600 - borders
+}
+
 
 def create_app() -> Dash:
     """Create and configure the Dash app."""
-    
-    app = Dash(__name__, external_stylesheets=[
-        'https://codepen.io/chriddyp/pen/bWLwgP.css',
-        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css'
-    ])
-    
-    # Set the title
-    app.title = "🇺🇸 Shitpost Alpha - MURICA'S PREMIER TRADING DASHBOARD 🇺🇸"
-    
+
+    app = Dash(
+        __name__,
+        external_stylesheets=[
+            dbc.themes.DARKLY,
+            'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css'
+        ],
+        suppress_callback_exceptions=True
+    )
+
+    app.title = "Shitpost Alpha - Prediction Performance Dashboard"
+
     # Main layout
     app.layout = html.Div([
-        # Header with obnoxiously American styling
-        html.Div([
-            html.H1([
-                html.I(className="fas fa-flag-usa", style={"color": "#B22234", "margin-right": "10px"}),
-                "SHITPOST ALPHA",
-                html.I(className="fas fa-eagle", style={"color": "#3C3B6E", "margin-left": "10px"})
-            ], style={
-                "text-align": "center",
-                "color": "#B22234",
-                "font-size": "3em",
-                "font-weight": "bold",
-                "text-shadow": "2px 2px 4px #000000",
-                "background": "linear-gradient(45deg, #B22234, #FFFFFF, #3C3B6E)",
-                "background-clip": "text",
-                "margin": "20px 0",
-                "font-family": "Arial Black, sans-serif"
-            }),
-            html.P([
-                "🇺🇸 AMERICA'S #1 AUTOMATED SHITPOST TRADING SIGNAL GENERATOR 🇺🇸",
-                html.Br(),
-                "Powered exclusively by the Shitposts of the Commander-in-Chief's (and OpenAI)",
-                html.Br(),
-                "This is the Shitty UI, not the Shitpost Alpha Dashboard. More to come.",
-                html.Br(),
-                html.Small("Making America Rich Again, Maybe* 🚀📈")
-            ], style={
-                "text-align": "center",
-                "color": "#3C3B6E",
-                "font-size": "1.2em",
-                "font-weight": "bold",
-                "margin-bottom": "10px"
-            }),
-            
-        ]),
-        
         # Auto-refresh interval
         dcc.Interval(
             id="refresh-interval",
             interval=5*60*1000,  # 5 minutes
             n_intervals=0
         ),
-        
-        # Filter controls
+
+        # Store for selected asset
+        dcc.Store(id="selected-asset", data=None),
+
+        # Header
+        create_header(),
+
+        # Main content container
         html.Div([
-            html.H3([
-                html.I(className="fas fa-filter", style={"margin-right": "10px"}),
-                "FILTER SHITPOSTS!"
-            ], style={"color": "#B22234", "font-weight": "bold"}),
-            
-            html.Div([
-                # Has Prediction filter
-                html.Div([
-                    html.Label("Has Prediction:", style={"font-weight": "bold", "margin-right": "10px"}),
-                    dcc.Dropdown(
-                        id="has-prediction-filter",
-                        options=[
-                            {"label": "🇺🇸 ALL POSTS (MURICA!)", "value": "all"},
-                            {"label": "🎯 PREDICTIONS ONLY", "value": "true"},
-                            {"label": "📝 RAW POSTS ONLY", "value": "false"}
-                        ],
-                        value="all",
-                        style={"width": "200px"}
-                    )
-                ], style={"display": "inline-block", "margin-right": "20px"}),
-                
-                # Assets filter
-                html.Div([
-                    html.Label("Assets:", style={"font-weight": "bold", "margin-right": "10px"}),
-                    dcc.Dropdown(
-                        id="assets-filter",
-                        multi=True,
-                        placeholder="Select assets to filter...",
-                        style={"width": "250px"}
-                    )
-                ], style={"display": "inline-block", "margin-right": "20px"}),
-                
-                # Confidence range
-                html.Div([
-                    html.Label("Confidence Range:", style={"font-weight": "bold", "margin-right": "10px"}),
-                    dcc.RangeSlider(
-                        id="confidence-slider",
-                        min=0,
-                        max=1,
-                        step=0.05,
-                        value=[0, 1],
-                        marks={i/10: f"{i/10:.1f}" for i in range(0, 11)},
-                        tooltip={"placement": "bottom", "always_visible": True}
-                    )
-                ], style={"display": "inline-block", "width": "300px", "margin-right": "20px"}),
-                
-                # Date range
-                html.Div([
-                    html.Label("Date Range:", style={"font-weight": "bold", "margin-right": "10px"}),
-                    dcc.DatePickerRange(
-                        id="date-range-picker",
-                        start_date=(datetime.now() - timedelta(days=30)).date(),
-                        end_date=datetime.now().date(),
-                        display_format="YYYY-MM-DD"
-                    )
-                ], style={"display": "inline-block", "margin-right": "20px"}),
-                
-                # Limit selector
-                html.Div([
-                    html.Label("Posts to Show:", style={"font-weight": "bold", "margin-right": "10px"}),
-                    dcc.Dropdown(
-                        id="limit-selector",
-                        options=[
-                            {"label": "50", "value": 50},
-                            {"label": "100", "value": 100},
-                            {"label": "250", "value": 250},
-                            {"label": "500", "value": 500}
-                        ],
-                        value=100,
-                        style={"width": "100px"}
-                    )
-                ], style={"display": "inline-block"})
-                
-            ], style={"display": "flex", "align-items": "center", "flex-wrap": "wrap"})
-            
-        ], style={
-            "border": "3px solid #B22234",
-            "border-radius": "10px",
-            "padding": "20px",
-            "margin-bottom": "30px",
-            "background": "linear-gradient(135deg, #FFFFFF, #F8F9FA)"
-        }),
-        
-        # Main content area
-        html.Div([
-            # Posts table
-            html.Div([
-                html.H3([
-                    html.I(className="fas fa-table", style={"margin-right": "10px"}),
-                    "SHITPOST FEED - PRESIDENTIAL TRADING SIGNALS!"
-                ], style={"color": "#B22234", "font-weight": "bold"}),
-                
-                dash_table.DataTable(
-                    id="posts-table",
-                    columns=[
-                        {"name": "📅 Timestamp", "id": "timestamp", "type": "datetime"},
-                        {"name": "📝 Post Text", "id": "text", "presentation": "markdown"},
-                        {"name": "🎯 Assets", "id": "assets", "type": "text"},
-                        {"name": "📈 Sentiment", "id": "market_impact", "type": "text"},
-                        {"name": "🎲 Confidence", "id": "confidence", "type": "numeric", "format": {"specifier": ".2f"}},
-                        {"name": "🧠 Thesis", "id": "thesis", "presentation": "markdown"},
-                        {"name": "✅ Status", "id": "analysis_status", "type": "text"},
-                        {"name": "💬 Comment", "id": "analysis_comment", "type": "text"}
-                    ],
-                    style_cell={
-                        "textAlign": "left",
-                        "fontFamily": "Arial, sans-serif",
-                        "fontSize": "12px",
-                        "whiteSpace": "normal",
-                        "height": "auto",
-                        "padding": "10px"
-                    },
-                    style_header={
-                        "backgroundColor": "#B22234",
-                        "color": "white",
-                        "fontWeight": "bold",
-                        "textAlign": "center"
-                    },
-                    style_data_conditional=[
-                        {
-                            "if": {"filter_query": "{market_impact} contains bullish"},
-                            "backgroundColor": "#90EE90",
-                            "color": "black"
-                        },
-                        {
-                            "if": {"filter_query": "{market_impact} contains bearish"},
-                            "backgroundColor": "#FFB6C1",
-                            "color": "black"
-                        }
-                    ],
-                    page_size=20,
-                    sort_action="native",
-                    filter_action="native",
-                    style_table={"overflowX": "auto"}
+            # Performance Metrics Row
+            html.Div(id="performance-metrics", className="mb-4"),
+
+            # Two column layout: Charts + Asset Drilldown
+            dbc.Row([
+                # Left column: Performance charts
+                dbc.Col([
+                    # Accuracy by Confidence Chart
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.I(className="fas fa-chart-bar me-2"),
+                            "Accuracy by Confidence Level"
+                        ], className="fw-bold"),
+                        dbc.CardBody([
+                            dcc.Graph(id="confidence-accuracy-chart", config={"displayModeBar": False})
+                        ])
+                    ], className="mb-3", style={"backgroundColor": COLORS["secondary"]}),
+
+                    # Accuracy by Asset Chart
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.I(className="fas fa-coins me-2"),
+                            "Performance by Asset"
+                        ], className="fw-bold"),
+                        dbc.CardBody([
+                            dcc.Graph(id="asset-accuracy-chart", config={"displayModeBar": False})
+                        ])
+                    ], className="mb-3", style={"backgroundColor": COLORS["secondary"]}),
+                ], md=7),
+
+                # Right column: Recent Signals + Asset Drilldown
+                dbc.Col([
+                    # Recent Signals
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.I(className="fas fa-bolt me-2"),
+                            "Recent Signals"
+                        ], className="fw-bold"),
+                        dbc.CardBody(id="recent-signals-list", style={"maxHeight": "400px", "overflowY": "auto"})
+                    ], className="mb-3", style={"backgroundColor": COLORS["secondary"]}),
+
+                    # Asset Deep Dive
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.I(className="fas fa-search me-2"),
+                            "Asset Deep Dive"
+                        ], className="fw-bold"),
+                        dbc.CardBody([
+                            dcc.Dropdown(
+                                id="asset-selector",
+                                placeholder="Select an asset to see historical predictions...",
+                                className="mb-3",
+                                style={"backgroundColor": COLORS["primary"], "color": COLORS["text"]}
+                            ),
+                            html.Div(id="asset-drilldown-content")
+                        ])
+                    ], style={"backgroundColor": COLORS["secondary"]}),
+                ], md=5),
+            ]),
+
+            # Collapsible Full Data Table
+            dbc.Card([
+                dbc.CardHeader([
+                    dbc.Button(
+                        [html.I(className="fas fa-table me-2"), "Full Prediction Data"],
+                        id="collapse-table-button",
+                        color="link",
+                        className="text-white fw-bold p-0"
+                    ),
+                ], className="fw-bold"),
+                dbc.Collapse(
+                    dbc.CardBody([
+                        # Filter controls
+                        create_filter_controls(),
+                        # Data table
+                        html.Div(id="predictions-table-container", className="mt-3")
+                    ]),
+                    id="collapse-table",
+                    is_open=False,
                 )
-            ], style={"margin-bottom": "30px"}),
-            
-            # Statistics cards section
-            html.Div([
-                html.H3([
-                    html.I(className="fas fa-chart-bar", style={"margin-right": "10px"}),
-                    "SYSTEM KPIs - AMERICA'S METRICS! 📊"
-                ], style={"color": "#B22234", "font-weight": "bold", "text-align": "center", "margin-bottom": "20px"}),
-                
-                html.Div(id="stats-cards", style={"margin-bottom": "30px"})
-            ])
-            
-        ]),
-        
-        # Footer disclaimer
-        html.Div([
-            html.Hr(style={"border": "2px solid #B22234", "margin": "40px 0 20px 0"}),
-            html.P([
-                "* THIS IS VERY MUCH NOT FINANCIAL ADVICE AND VERY MUCH MORE FOR THE LOLS"
-            ], style={
-                "text-align": "center",
-                "color": "#666666",
-                "font-size": "0.9em",
-                "font-style": "italic",
-                "margin-bottom": "10px"
-            }),
-            html.P([
-                html.I(className="fab fa-github", style={"margin-right": "8px"}),
-                html.A(
-                    "View Source Code on GitHub",
-                    href="https://github.com/chrisrogers37/shitpost-alpha",
-                    target="_blank",
-                    style={
-                        "color": "#3C3B6E",
-                        "text-decoration": "none",
-                        "font-weight": "bold"
-                    }
-                )
-            ], style={
-                "text-align": "center",
-                "margin-bottom": "20px"
-            })
-        ])
-        
+            ], className="mt-4", style={"backgroundColor": COLORS["secondary"]}),
+
+            # Footer
+            create_footer(),
+
+        ], style={"padding": "20px", "maxWidth": "1400px", "margin": "0 auto"})
+
     ], style={
-        "background": "linear-gradient(135deg, #FFFFFF, #F8F9FA)",
-        "min-height": "100vh",
-        "padding": "20px",
-        "font-family": "Arial, sans-serif"
+        "backgroundColor": COLORS["primary"],
+        "minHeight": "100vh",
+        "color": COLORS["text"],
+        "fontFamily": "'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
     })
-    
+
     return app
+
+
+def create_header():
+    """Create the dashboard header."""
+    return html.Div([
+        html.Div([
+            html.H1([
+                html.Span("Shitpost Alpha", style={"color": COLORS["accent"]}),
+            ], style={"fontSize": "2rem", "fontWeight": "bold", "margin": 0}),
+            html.P(
+                "Trump Tweet Prediction Performance Dashboard",
+                style={"color": COLORS["text_muted"], "margin": 0, "fontSize": "0.9rem"}
+            ),
+        ], style={"flex": 1}),
+        html.Div([
+            html.Span("Auto-refresh: 5 min", style={"color": COLORS["text_muted"], "fontSize": "0.8rem"}),
+        ]),
+    ], style={
+        "display": "flex",
+        "justifyContent": "space-between",
+        "alignItems": "center",
+        "padding": "20px",
+        "borderBottom": f"1px solid {COLORS['border']}",
+        "backgroundColor": COLORS["secondary"],
+    })
+
+
+def create_filter_controls():
+    """Create filter controls for the data table."""
+    return dbc.Row([
+        dbc.Col([
+            html.Label("Confidence Range:", className="small text-muted"),
+            dcc.RangeSlider(
+                id="confidence-slider",
+                min=0,
+                max=1,
+                step=0.05,
+                value=[0, 1],
+                marks={0: "0", 0.5: "0.5", 1: "1"},
+                tooltip={"placement": "bottom", "always_visible": False}
+            )
+        ], md=4),
+        dbc.Col([
+            html.Label("Date Range:", className="small text-muted"),
+            dcc.DatePickerRange(
+                id="date-range-picker",
+                start_date=(datetime.now() - timedelta(days=90)).date(),
+                end_date=datetime.now().date(),
+                display_format="YYYY-MM-DD",
+                style={"fontSize": "0.8rem"}
+            )
+        ], md=4),
+        dbc.Col([
+            html.Label("Results:", className="small text-muted"),
+            dcc.Dropdown(
+                id="limit-selector",
+                options=[
+                    {"label": "25", "value": 25},
+                    {"label": "50", "value": 50},
+                    {"label": "100", "value": 100},
+                ],
+                value=50,
+                clearable=False,
+                style={"fontSize": "0.9rem"}
+            )
+        ], md=2),
+    ], className="g-3")
+
+
+def create_footer():
+    """Create the dashboard footer."""
+    return html.Div([
+        html.Hr(style={"borderColor": COLORS["border"], "margin": "40px 0 20px 0"}),
+        html.P([
+            "Disclaimer: This is NOT financial advice. For entertainment and research purposes only."
+        ], style={
+            "textAlign": "center",
+            "color": COLORS["text_muted"],
+            "fontSize": "0.8rem",
+            "fontStyle": "italic",
+        }),
+        html.P([
+            html.A(
+                [html.I(className="fab fa-github me-1"), "View Source"],
+                href="https://github.com/chrisrogers37/shitpost-alpha",
+                target="_blank",
+                style={"color": COLORS["accent"], "textDecoration": "none"}
+            )
+        ], style={"textAlign": "center", "marginBottom": "20px"})
+    ])
+
+
+def create_metric_card(title: str, value: str, subtitle: str = "", icon: str = "chart-line", color: str = None):
+    """Create a metric card component."""
+    color = color or COLORS["accent"]
+    return dbc.Card([
+        dbc.CardBody([
+            html.Div([
+                html.I(className=f"fas fa-{icon}", style={"fontSize": "1.5rem", "color": color}),
+            ], className="mb-2"),
+            html.H3(value, style={"margin": 0, "color": color, "fontWeight": "bold"}),
+            html.P(title, style={"margin": 0, "color": COLORS["text_muted"], "fontSize": "0.85rem"}),
+            html.Small(subtitle, style={"color": COLORS["text_muted"]}) if subtitle else None,
+        ], style={"textAlign": "center", "padding": "15px"})
+    ], style={"backgroundColor": COLORS["secondary"], "border": f"1px solid {COLORS['border']}"})
+
+
+def create_signal_card(row):
+    """Create a signal card for recent predictions."""
+    timestamp = row.get('timestamp')
+    text = row.get('text', '')[:150] + '...' if len(row.get('text', '')) > 150 else row.get('text', '')
+    confidence = row.get('confidence', 0)
+    assets = row.get('assets', [])
+    market_impact = row.get('market_impact', {})
+    return_t7 = row.get('return_t7')
+    correct_t7 = row.get('correct_t7')
+
+    # Determine sentiment from market_impact
+    sentiment = "neutral"
+    if isinstance(market_impact, dict) and market_impact:
+        first_sentiment = list(market_impact.values())[0]
+        if isinstance(first_sentiment, str):
+            sentiment = first_sentiment.lower()
+
+    # Format assets
+    asset_str = ", ".join(assets[:3]) if isinstance(assets, list) else str(assets)
+    if isinstance(assets, list) and len(assets) > 3:
+        asset_str += f" +{len(assets) - 3}"
+
+    # Outcome badge
+    if correct_t7 is True:
+        outcome_badge = html.Span("Correct", className="badge bg-success ms-2")
+    elif correct_t7 is False:
+        outcome_badge = html.Span("Incorrect", className="badge bg-danger ms-2")
+    else:
+        outcome_badge = html.Span("Pending", className="badge bg-warning text-dark ms-2")
+
+    # Sentiment color
+    sentiment_color = COLORS["success"] if sentiment == "bullish" else COLORS["danger"] if sentiment == "bearish" else COLORS["text_muted"]
+    sentiment_icon = "arrow-up" if sentiment == "bullish" else "arrow-down" if sentiment == "bearish" else "minus"
+
+    return html.Div([
+        html.Div([
+            html.Span(
+                timestamp.strftime("%b %d, %H:%M") if isinstance(timestamp, datetime) else str(timestamp)[:16],
+                style={"color": COLORS["text_muted"], "fontSize": "0.75rem"}
+            ),
+            outcome_badge,
+        ], className="d-flex justify-content-between align-items-center mb-1"),
+        html.P(text, style={"fontSize": "0.85rem", "margin": "5px 0", "lineHeight": "1.4"}),
+        html.Div([
+            html.Span([
+                html.I(className=f"fas fa-{sentiment_icon} me-1"),
+                sentiment.upper(),
+            ], style={"color": sentiment_color, "fontSize": "0.8rem", "fontWeight": "bold"}),
+            html.Span(f" | {asset_str}", style={"color": COLORS["text_muted"], "fontSize": "0.8rem"}),
+            html.Span(f" | Conf: {confidence:.0%}", style={"color": COLORS["text_muted"], "fontSize": "0.8rem"}),
+            html.Span(
+                f" | Return: {return_t7:+.1f}%" if return_t7 is not None else "",
+                style={"color": COLORS["success"] if return_t7 and return_t7 > 0 else COLORS["danger"], "fontSize": "0.8rem"}
+            ) if return_t7 is not None else None,
+        ]),
+    ], style={
+        "padding": "12px",
+        "borderBottom": f"1px solid {COLORS['border']}",
+        "cursor": "pointer"
+    }, className="signal-card")
+
 
 def register_callbacks(app: Dash):
     """Register all callbacks for the dashboard."""
-    
+
     @app.callback(
-        [Output("posts-table", "data"),
-         Output("assets-filter", "options"),
-         Output("stats-cards", "children")],
-        [Input("refresh-interval", "n_intervals"),
-         Input("has-prediction-filter", "value"),
-         Input("assets-filter", "value"),
-         Input("confidence-slider", "value"),
-         Input("date-range-picker", "start_date"),
-         Input("date-range-picker", "end_date"),
-         Input("limit-selector", "value")]
+        [
+            Output("performance-metrics", "children"),
+            Output("confidence-accuracy-chart", "figure"),
+            Output("asset-accuracy-chart", "figure"),
+            Output("recent-signals-list", "children"),
+            Output("asset-selector", "options"),
+        ],
+        [Input("refresh-interval", "n_intervals")]
     )
-    def update_dashboard(n_intervals, has_prediction, selected_assets, confidence_range, 
-                        start_date, end_date, limit):
-        """Update dashboard data based on filters."""
-        
-        # Prepare filter parameters
-        has_prediction_filter = None
-        if has_prediction == "true":
-            has_prediction_filter = True
-        elif has_prediction == "false":
-            has_prediction_filter = False
-        
-        # Load data with filters
-        try:
-            df = load_filtered_posts(
-                limit=limit or 100,
-                has_prediction=has_prediction_filter,
-                assets_filter=selected_assets,
-                confidence_min=confidence_range[0] if confidence_range else None,
-                confidence_max=confidence_range[1] if confidence_range else None,
-                date_from=start_date,
-                date_to=end_date
+    def update_dashboard(n_intervals):
+        """Update main dashboard components."""
+
+        # Get performance metrics
+        perf = get_performance_metrics()
+        stats = get_prediction_stats()
+
+        # Create metrics row
+        metrics_row = dbc.Row([
+            dbc.Col(create_metric_card(
+                "Prediction Accuracy",
+                f"{perf['accuracy_t7']:.1f}%",
+                f"{perf['correct_predictions']}/{perf['evaluated_predictions']} correct",
+                "bullseye",
+                COLORS["success"] if perf['accuracy_t7'] > 60 else COLORS["danger"]
+            ), md=3),
+            dbc.Col(create_metric_card(
+                "Total P&L (7-day)",
+                f"${perf['total_pnl_t7']:,.0f}",
+                "Based on $1,000 positions",
+                "dollar-sign",
+                COLORS["success"] if perf['total_pnl_t7'] > 0 else COLORS["danger"]
+            ), md=3),
+            dbc.Col(create_metric_card(
+                "Avg Return",
+                f"{perf['avg_return_t7']:+.2f}%",
+                "7-day average",
+                "chart-line",
+                COLORS["success"] if perf['avg_return_t7'] > 0 else COLORS["danger"]
+            ), md=3),
+            dbc.Col(create_metric_card(
+                "Predictions Evaluated",
+                f"{perf['evaluated_predictions']:,}",
+                f"of {stats['completed_analyses']:,} completed",
+                "clipboard-check",
+                COLORS["accent"]
+            ), md=3),
+        ], className="g-3")
+
+        # Confidence accuracy chart
+        conf_df = get_accuracy_by_confidence()
+        if not conf_df.empty:
+            conf_fig = go.Figure()
+            conf_fig.add_trace(go.Bar(
+                x=conf_df['confidence_level'],
+                y=conf_df['accuracy'],
+                text=conf_df['accuracy'].apply(lambda x: f"{x:.1f}%"),
+                textposition='outside',
+                marker_color=[COLORS["danger"], COLORS["warning"], COLORS["success"]],
+                hovertemplate="<b>%{x}</b><br>Accuracy: %{y:.1f}%<br>Total: %{customdata}<extra></extra>",
+                customdata=conf_df['total'],
+            ))
+            conf_fig.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font_color=COLORS["text"],
+                margin=dict(l=40, r=40, t=20, b=40),
+                yaxis=dict(range=[0, 100], title="Accuracy %", gridcolor=COLORS["border"]),
+                xaxis=dict(title=""),
+                height=250,
             )
-            
-            # Get available assets for dropdown
-            available_assets = get_available_assets()
-            asset_options = [{"label": f"🇺🇸 {asset}", "value": asset} for asset in available_assets]
-            
-            # Get stats
-            stats = get_prediction_stats()
-            
-        except Exception as e:
-            print(f"Error loading data: {e}")
-            df = pd.DataFrame()
-            asset_options = []
-            stats = {
-                "total_posts": 0,
-                "analyzed_posts": 0,
-                "completed_analyses": 0,
-                "bypassed_posts": 0,
-                "avg_confidence": 0.0,
-                "high_confidence_predictions": 0
-            }
-        
-        # Prepare table data with proper formatting
-        if not df.empty:
-            # Create a copy and format the data for display
-            df_display = df.copy()
-            
-            # Format timestamp as string
-            df_display['timestamp'] = df_display['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S')
-            
-            # Format assets as comma-separated string
-            df_display['assets'] = df_display['assets'].apply(
-                lambda x: ', '.join(x) if isinstance(x, list) and x else 'None'
-            )
-            
-            # Format market_impact as string
-            df_display['market_impact'] = df_display['market_impact'].apply(
-                lambda x: str(x) if x else 'None'
-            )
-            
-            # Handle NaN confidence values
-            df_display['confidence'] = df_display['confidence'].fillna(0.0)
-            
-            # Handle None values in other columns
-            df_display['analysis_comment'] = df_display['analysis_comment'].fillna('')
-            
-            table_data = df_display.to_dict("records")
         else:
-            table_data = []
-        
-        # Create stats cards
-        stats_cards = create_stats_cards(stats)
-        
-        return table_data, asset_options, stats_cards
+            conf_fig = go.Figure()
+            conf_fig.add_annotation(text="No outcome data available yet", showarrow=False)
+            conf_fig.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font_color=COLORS["text_muted"],
+                height=250,
+            )
 
+        # Asset accuracy chart
+        asset_df = get_accuracy_by_asset(limit=10)
+        if not asset_df.empty:
+            asset_fig = go.Figure()
+            colors = [COLORS["success"] if x >= 60 else COLORS["danger"] for x in asset_df['accuracy']]
+            asset_fig.add_trace(go.Bar(
+                x=asset_df['symbol'],
+                y=asset_df['accuracy'],
+                text=asset_df['accuracy'].apply(lambda x: f"{x:.0f}%"),
+                textposition='outside',
+                marker_color=colors,
+                hovertemplate="<b>%{x}</b><br>Accuracy: %{y:.1f}%<br>Predictions: %{customdata[0]}<br>Total P&L: $%{customdata[1]:,.0f}<extra></extra>",
+                customdata=list(zip(asset_df['total_predictions'], asset_df['total_pnl'])),
+            ))
+            asset_fig.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font_color=COLORS["text"],
+                margin=dict(l=40, r=40, t=20, b=40),
+                yaxis=dict(range=[0, 100], title="Accuracy %", gridcolor=COLORS["border"]),
+                xaxis=dict(title=""),
+                height=250,
+            )
+        else:
+            asset_fig = go.Figure()
+            asset_fig.add_annotation(text="No outcome data available yet", showarrow=False)
+            asset_fig.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font_color=COLORS["text_muted"],
+                height=250,
+            )
 
-def create_stats_cards(stats: dict) -> html.Div:
-    """Create statistics cards."""
-    cards = []
-    
-    card_data = [
-        ("Total Posts", stats.get("total_posts", 0), "fas fa-list", "#B22234"),
-        ("Analyzed Posts", stats.get("analyzed_posts", 0), "fas fa-brain", "#3C3B6E"),
-        ("High Confidence", stats.get("high_confidence_predictions", 0), "fas fa-star", "#FFD700"),
-        ("Avg Confidence", f"{stats.get('avg_confidence', 0):.2f}", "fas fa-chart-line", "#228B22")
-    ]
-    
-    for title, value, icon, color in card_data:
-        card = html.Div([
+        # Recent signals
+        signals_df = get_recent_signals(limit=10)
+        if not signals_df.empty:
+            signal_cards = [create_signal_card(row) for _, row in signals_df.iterrows()]
+        else:
+            signal_cards = [html.P("No recent signals with outcomes", style={"color": COLORS["text_muted"]})]
+
+        # Asset selector options
+        active_assets = get_active_assets_from_db()
+        asset_options = [{"label": asset, "value": asset} for asset in active_assets]
+
+        return metrics_row, conf_fig, asset_fig, signal_cards, asset_options
+
+    @app.callback(
+        Output("asset-drilldown-content", "children"),
+        [Input("asset-selector", "value")]
+    )
+    def update_asset_drilldown(asset):
+        """Update the asset deep dive section."""
+        if not asset:
+            return html.P(
+                "Select an asset above to see historical predictions and their outcomes.",
+                style={"color": COLORS["text_muted"], "textAlign": "center", "padding": "20px"}
+            )
+
+        similar_df = get_similar_predictions(asset, limit=10)
+
+        if similar_df.empty:
+            return html.P(
+                f"No historical predictions found for {asset}.",
+                style={"color": COLORS["text_muted"], "textAlign": "center", "padding": "20px"}
+            )
+
+        # Calculate summary stats for this asset
+        total = len(similar_df)
+        correct = similar_df['correct_t7'].sum() if 'correct_t7' in similar_df.columns else 0
+        accuracy = (correct / total * 100) if total > 0 else 0
+        avg_return = similar_df['return_t7'].mean() if 'return_t7' in similar_df.columns else 0
+        total_pnl = similar_df['pnl_t7'].sum() if 'pnl_t7' in similar_df.columns else 0
+
+        # Create summary
+        summary = html.Div([
+            html.H5(asset, className="mb-2"),
             html.Div([
-                html.I(className=icon, style={"font-size": "2em", "color": color}),
-                html.H3(str(value), style={"margin": "10px 0", "color": color, "font-weight": "bold"}),
-                html.P(title, style={"margin": 0, "font-size": "0.9em", "color": "#666"})
-            ], style={
-                "text-align": "center",
-                "padding": "20px",
-                "border": f"2px solid {color}",
-                "border-radius": "10px",
-                "background": "white",
-                "box-shadow": "0 4px 6px rgba(0,0,0,0.1)"
-            })
-        ], style={"width": "25%", "display": "inline-block", "margin": "10px"})
-        cards.append(card)
-    
-    return html.Div(cards, style={"display": "flex", "justify-content": "space-around", "flex-wrap": "wrap"})
+                html.Span("Accuracy: ", style={"color": COLORS["text_muted"]}),
+                html.Span(f"{accuracy:.0f}%", style={"color": COLORS["success"] if accuracy >= 60 else COLORS["danger"], "fontWeight": "bold"}),
+                html.Span(" | Avg Return: ", style={"color": COLORS["text_muted"]}),
+                html.Span(f"{avg_return:+.2f}%", style={"color": COLORS["success"] if avg_return > 0 else COLORS["danger"], "fontWeight": "bold"}),
+                html.Span(" | P&L: ", style={"color": COLORS["text_muted"]}),
+                html.Span(f"${total_pnl:,.0f}", style={"color": COLORS["success"] if total_pnl > 0 else COLORS["danger"], "fontWeight": "bold"}),
+            ], className="mb-3", style={"fontSize": "0.9rem"}),
+        ])
+
+        # Create prediction timeline
+        predictions = []
+        for _, row in similar_df.iterrows():
+            timestamp = row.get('timestamp')
+            text = row.get('text', '')[:100] + '...' if len(row.get('text', '')) > 100 else row.get('text', '')
+            sentiment = row.get('prediction_sentiment', 'neutral')
+            return_t7 = row.get('return_t7')
+            correct = row.get('correct_t7')
+
+            sentiment_color = COLORS["success"] if sentiment == "bullish" else COLORS["danger"] if sentiment == "bearish" else COLORS["text_muted"]
+            outcome_icon = "check-circle" if correct else "times-circle" if correct is False else "clock"
+            outcome_color = COLORS["success"] if correct else COLORS["danger"] if correct is False else COLORS["warning"]
+
+            predictions.append(html.Div([
+                html.Div([
+                    html.I(className=f"fas fa-{outcome_icon}", style={"color": outcome_color}),
+                    html.Span(
+                        timestamp.strftime("%b %d") if isinstance(timestamp, datetime) else str(timestamp)[:10],
+                        style={"marginLeft": "8px", "color": COLORS["text_muted"], "fontSize": "0.8rem"}
+                    ),
+                    html.Span(
+                        f" {sentiment.upper()}",
+                        style={"marginLeft": "8px", "color": sentiment_color, "fontSize": "0.8rem", "fontWeight": "bold"}
+                    ),
+                    html.Span(
+                        f" {return_t7:+.1f}%" if return_t7 is not None else "",
+                        style={"marginLeft": "8px", "color": COLORS["success"] if return_t7 and return_t7 > 0 else COLORS["danger"], "fontSize": "0.8rem"}
+                    ) if return_t7 is not None else None,
+                ]),
+                html.P(text, style={"fontSize": "0.8rem", "color": COLORS["text_muted"], "margin": "5px 0 0 24px", "lineHeight": "1.3"}),
+            ], style={"padding": "10px 0", "borderBottom": f"1px solid {COLORS['border']}"}))
+
+        return html.Div([
+            summary,
+            html.Div(predictions, style={"maxHeight": "300px", "overflowY": "auto"})
+        ])
+
+    @app.callback(
+        Output("collapse-table", "is_open"),
+        [Input("collapse-table-button", "n_clicks")],
+        [State("collapse-table", "is_open")],
+    )
+    def toggle_collapse(n_clicks, is_open):
+        """Toggle the data table collapse."""
+        if n_clicks:
+            return not is_open
+        return is_open
+
+    @app.callback(
+        Output("predictions-table-container", "children"),
+        [
+            Input("collapse-table", "is_open"),
+            Input("confidence-slider", "value"),
+            Input("date-range-picker", "start_date"),
+            Input("date-range-picker", "end_date"),
+            Input("limit-selector", "value"),
+        ]
+    )
+    def update_predictions_table(is_open, confidence_range, start_date, end_date, limit):
+        """Update the predictions data table."""
+        if not is_open:
+            return None
+
+        df = get_predictions_with_outcomes(limit=limit or 50)
+
+        if df.empty:
+            return html.P("No prediction data available.", style={"color": COLORS["text_muted"]})
+
+        # Format columns for display
+        display_df = df.copy()
+
+        # Format timestamp
+        if 'timestamp' in display_df.columns:
+            display_df['timestamp'] = pd.to_datetime(display_df['timestamp']).dt.strftime('%Y-%m-%d %H:%M')
+
+        # Format assets
+        if 'assets' in display_df.columns:
+            display_df['assets'] = display_df['assets'].apply(
+                lambda x: ', '.join(x[:3]) + (f' +{len(x)-3}' if len(x) > 3 else '') if isinstance(x, list) else str(x)
+            )
+
+        # Format returns
+        for col in ['return_t1', 'return_t3', 'return_t7']:
+            if col in display_df.columns:
+                display_df[col] = display_df[col].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "-")
+
+        # Format outcome
+        if 'correct_t7' in display_df.columns:
+            display_df['outcome'] = display_df['correct_t7'].apply(
+                lambda x: "Correct" if x is True else "Incorrect" if x is False else "Pending"
+            )
+
+        # Select columns to display
+        display_cols = ['timestamp', 'assets', 'confidence', 'return_t7', 'outcome']
+        display_cols = [c for c in display_cols if c in display_df.columns]
+
+        return dash_table.DataTable(
+            data=display_df[display_cols].to_dict('records'),
+            columns=[{"name": c.replace('_', ' ').title(), "id": c} for c in display_cols],
+            style_table={"overflowX": "auto"},
+            style_cell={
+                "textAlign": "left",
+                "padding": "10px",
+                "backgroundColor": COLORS["primary"],
+                "color": COLORS["text"],
+                "border": f"1px solid {COLORS['border']}",
+                "fontSize": "0.85rem",
+            },
+            style_header={
+                "backgroundColor": COLORS["secondary"],
+                "fontWeight": "bold",
+                "border": f"1px solid {COLORS['border']}",
+            },
+            style_data_conditional=[
+                {
+                    "if": {"filter_query": "{outcome} = 'Correct'"},
+                    "backgroundColor": "rgba(16, 185, 129, 0.1)",
+                },
+                {
+                    "if": {"filter_query": "{outcome} = 'Incorrect'"},
+                    "backgroundColor": "rgba(239, 68, 68, 0.1)",
+                },
+            ],
+            page_size=15,
+            sort_action="native",
+            filter_action="native",
+        )
