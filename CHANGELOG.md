@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Dashboard Redesign (Phase 0.2)** - Complete overhaul of shitty_ui to focus on prediction performance
+  - **Performance Metrics Row** - Key metrics at a glance: accuracy, P&L, average return, predictions evaluated
+  - **Accuracy by Confidence Chart** - Bar chart showing how accuracy varies by confidence level (Low/Medium/High)
+  - **Performance by Asset Chart** - Bar chart showing accuracy and P&L for top-performing assets
+  - **Recent Signals List** - Latest predictions with outcomes (Correct/Incorrect/Pending), sentiment, and returns
+  - **Asset Deep Dive** - Select any asset to see historical predictions and their outcomes
+  - **Collapsible Data Table** - Full prediction data still available, but moved to secondary position
+  - **Dark Theme** - Professional, clean design inspired by modern trading platforms
+  - **New Data Queries** - Added functions for prediction outcomes, accuracy by confidence/asset, similar predictions
+
+### Changed
+- **Dashboard Focus** - Shifted from table-first to performance-first approach
+- **Dashboard Theme** - Replaced American patriotic theme with professional dark theme
+- **Dashboard Layout** - Two-column layout with charts on left, signals/drilldown on right
+- **Data Layer** - Enhanced with prediction_outcomes integration for performance tracking
+
 ### Planned
 - Enhanced error handling and resilience
 - Performance optimizations
