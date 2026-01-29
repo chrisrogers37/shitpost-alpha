@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Planning Documentation** - Updated planning docs to reflect current deployment status
+  - Marked deployment to Railway as complete (09_DEPLOYMENT_GUIDE.md)
+  - Updated overview with deployment status (00_OVERVIEW.md)
+  - Added deployment status note to current state reference (01_CURRENT_STATE.md)
+
 ### Added
 - **Dashboard Redesign (Phase 0.2)** - Complete overhaul of shitty_ui to focus on prediction performance
   - **Performance Metrics Row** - Key metrics at a glance: accuracy, P&L, average return, predictions evaluated

@@ -4,9 +4,9 @@
 
 This document outlines the development roadmap for the Shitpost Alpha prediction performance dashboard. The project analyzes Trump's Truth Social posts using LLMs to generate market predictions, then tracks those predictions against actual market outcomes.
 
-**Current State**: Phase 0.2 partially complete - core dashboard redesigned with performance focus.
+**Current State**: Phase 0.2 complete - core dashboard redesigned with performance focus. **Already deployed to Railway with Neon PostgreSQL database.**
 
-**Goal**: Build a production-ready dashboard that enables users to understand prediction performance, drill into specific assets, and receive actionable trading signals.
+**Goal**: Enhance the production dashboard to enable users to understand prediction performance, drill into specific assets, and receive actionable trading signals.
 
 ---
 
@@ -22,7 +22,7 @@ This document outlines the development roadmap for the Shitpost Alpha prediction
 | [06_ALERTING_SYSTEM.md](./06_ALERTING_SYSTEM.md) | Push notifications | P2 | 4-5 days |
 | [07_DATA_LAYER_EXPANSION.md](./07_DATA_LAYER_EXPANSION.md) | New queries & caching | P1 | 2-3 days |
 | [08_TESTING_STRATEGY.md](./08_TESTING_STRATEGY.md) | Test coverage plan | P0 | Ongoing |
-| [09_DEPLOYMENT_GUIDE.md](./09_DEPLOYMENT_GUIDE.md) | Railway deployment | P0 | 1 day |
+| [09_DEPLOYMENT_GUIDE.md](./09_DEPLOYMENT_GUIDE.md) | Railway deployment | ✅ COMPLETE | - |
 
 ---
 
@@ -83,13 +83,15 @@ This document outlines the development roadmap for the Shitpost Alpha prediction
    - Visual indicators for new signals
 
 ### Phase 4: Production Hardening (Week 7-8)
-**Goal**: Production-ready deployment
+**Goal**: Optimize production deployment
 
-1. **Deployment** (09_DEPLOYMENT_GUIDE.md)
-   - Railway configuration
-   - Environment management
-   - Monitoring setup
-   - Error tracking
+> **NOTE**: Basic deployment is already complete. Dashboard and scraping services are live on Railway with Neon PostgreSQL.
+
+1. **Deployment Enhancements** (09_DEPLOYMENT_GUIDE.md) - ✅ BASIC COMPLETE
+   - ✅ Railway configuration
+   - ✅ Environment management
+   - [ ] Monitoring setup (optional enhancement)
+   - [ ] Error tracking (optional enhancement)
 
 2. **Performance Optimization**
    - Query optimization
@@ -143,7 +145,7 @@ market_prices           -- Historical OHLCV data
 - [ ] Mobile-responsive layout
 - [ ] Time period filtering (7d, 30d, 90d)
 - [ ] 80%+ test coverage
-- [ ] Production deployment on Railway
+- [x] Production deployment on Railway ✅
 
 ### Should Have (P1)
 - [ ] Performance page with equity curve

@@ -4,6 +4,8 @@
 
 This document describes the current implementation of the Shitpost Alpha dashboard as of the Phase 0.2 redesign. Use this as a reference when implementing new features.
 
+> **Deployment Status**: ✅ Live on Railway with Neon PostgreSQL database. Both dashboard and scraping services are operational.
+
 ---
 
 ## Directory Structure
