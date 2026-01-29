@@ -1,12 +1,88 @@
 # Data Layer Expansion Specification
 
+> **STATUS: PARTIAL** - Time filtering (Task 2) is partially complete. Caching and aggregates still pending.
+
+## Implementation Context for Engineering Team
+
+### Current State (as of 2026-01-29)
+
+**Task 2 (Time Filtering) is PARTIALLY IMPLEMENTED:**
+
+The following functions already support the `days` parameter (added in commit `fc5f6cd`):
+
+| Function | `days` param | Notes |
+|----------|-------------|-------|
+| `get_performance_metrics(days)` | ✅ Yes | Full implementation |
+| `get_accuracy_by_confidence(days)` | ✅ Yes | Full implementation |
+| `get_accuracy_by_asset(limit, days)` | ✅ Yes | Full implementation |
+| `get_recent_signals(limit, min_conf, days)` | ✅ Yes | Full implementation |
+
+**Implementation pattern used:**
+
+```python
+date_filter = ""
+params = {}
+if days is not None:
+    date_filter = "WHERE prediction_date >= :start_date"  # or "AND ..."
+    params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+```
+
+### What Still Needs Implementation
+
+1. **Task 1: Query Caching** - No caching implemented yet
+   - Use `ttl_cache` decorator pattern from this spec
+   - Apply to expensive aggregate queries
+
+2. **Task 2 Completion** - Add `days` param to remaining functions:
+   - `get_sentiment_distribution(days)` - Not yet
+   - `get_similar_predictions(asset, limit, days)` - Not yet
+   - `get_predictions_with_outcomes(limit, days)` - Not yet
+
+3. **Task 3: New Aggregate Functions** - None implemented:
+   - `get_cumulative_pnl(days)` - For equity curve
+   - `get_rolling_accuracy(window, days)` - For rolling performance
+   - `get_win_loss_streaks()` - For streak tracking
+   - `get_confidence_calibration(buckets)` - For calibration chart
+   - `get_monthly_performance(months)` - For periodic summary
+
+4. **Task 4: Connection Pool** - Basic pool exists but not tuned
+
+### Existing `data.py` Functions (13 total)
+
+```python
+# Base function
+execute_query(query, params)           # Generic executor
+
+# Post loading
+load_recent_posts(limit)               # Raw posts
+load_filtered_posts(...)               # Advanced filters
+
+# Statistics
+get_prediction_stats()                 # Prediction counts
+get_performance_metrics(days)          # ✅ Has days param
+get_accuracy_by_confidence(days)       # ✅ Has days param
+get_accuracy_by_asset(limit, days)     # ✅ Has days param
+get_sentiment_distribution()           # Needs days param
+
+# Signals & Predictions
+get_recent_signals(limit, conf, days)  # ✅ Has days param
+get_similar_predictions(asset, limit)  # Needs days param
+get_predictions_with_outcomes(limit)   # Needs days param
+
+# Assets
+get_available_assets()                 # Hardcoded list
+get_active_assets_from_db()            # From prediction_outcomes
+```
+
+---
+
 ## Overview
 
 This document specifies improvements to the data layer (`shitty_ui/data.py`). The current data layer queries the database on every page load with no caching, no time filtering, and limited aggregation. These enhancements make the dashboard faster and more feature-rich.
 
-**Estimated Effort**: 2-3 days
+**Estimated Effort**: 2-3 days (reduced due to partial completion)
 **Priority**: P1 (Should Have)
-**Prerequisites**: None (can be done in parallel with dashboard enhancements)
+**Prerequisites**: None - can be done in parallel with Performance Page (03)
 
 ---
 
@@ -706,7 +782,7 @@ SessionLocal = sessionmaker(engine, expire_on_commit=False)
 
 ## Checklist
 
-- [ ] Task 1: Query Caching
+- [ ] Task 1: Query Caching (NOT STARTED)
   - [ ] Create `ttl_cache` decorator
   - [ ] Apply to `get_performance_metrics`
   - [ ] Apply to `get_accuracy_by_confidence`
@@ -716,16 +792,16 @@ SessionLocal = sessionmaker(engine, expire_on_commit=False)
   - [ ] Add `clear_all_caches()` function
   - [ ] Add cache tests
 
-- [ ] Task 2: Time Filtering
-  - [ ] Create `_build_date_filter` helper
-  - [ ] Add `days` param to `get_performance_metrics`
-  - [ ] Add `days` param to `get_accuracy_by_confidence`
-  - [ ] Add `days` param to `get_accuracy_by_asset`
-  - [ ] Add `days` param to `get_recent_signals`
+- [x] Task 2: Time Filtering (PARTIAL - 4 of 6 functions done) ⚠️
+  - [ ] Create `_build_date_filter` helper (inline approach used instead)
+  - [x] Add `days` param to `get_performance_metrics` ✅
+  - [x] Add `days` param to `get_accuracy_by_confidence` ✅
+  - [x] Add `days` param to `get_accuracy_by_asset` ✅
+  - [x] Add `days` param to `get_recent_signals` ✅
   - [ ] Add `days` param to `get_sentiment_distribution`
-  - [ ] Add tests for date filtering
+  - [x] Add tests for date filtering ✅ (6 tests added)
 
-- [ ] Task 3: New Aggregate Functions
+- [ ] Task 3: New Aggregate Functions (NOT STARTED)
   - [ ] Implement `get_cumulative_pnl`
   - [ ] Implement `get_rolling_accuracy`
   - [ ] Implement `get_win_loss_streaks`
@@ -733,8 +809,8 @@ SessionLocal = sessionmaker(engine, expire_on_commit=False)
   - [ ] Implement `get_monthly_performance`
   - [ ] Add tests for all new functions
 
-- [ ] Task 4: Connection Pool
-  - [ ] Configure pool settings
+- [ ] Task 4: Connection Pool (BASIC SETUP EXISTS)
+  - [x] Configure pool settings (basic - in `data.py`)
   - [ ] Test under concurrent load
   - [ ] Monitor connection usage
 

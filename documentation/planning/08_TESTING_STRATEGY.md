@@ -1,5 +1,39 @@
 # Testing Strategy Specification
 
+> **STATUS: IN PROGRESS** - Test count increased from 49 to 67 with dashboard enhancements.
+
+## Implementation Context for Engineering Team
+
+### Current State (as of 2026-01-29)
+
+**Test counts have increased** as part of the dashboard enhancements (02):
+
+- **test_data.py**: 34 tests (was 28, +6 for time filtering)
+- **test_layout.py**: 33 tests (was 21, +12 for new components)
+- **Total**: 67 tests
+
+**New test classes added:**
+- `TestTimePeriodFiltering` - 6 tests for `days` parameter
+- `TestErrorCard` - Tests for `create_error_card()`
+- `TestEmptyChart` - Tests for `create_empty_chart()`
+- `TestPeriodButtonStyles` - Tests for button styling
+- `TestLoadingStates` - Tests for loading component verification
+- `TestTimePeriodSelector` - Tests for period store verification
+- `TestRefreshIndicator` - Tests for countdown interval verification
+
+### Running Tests
+
+```bash
+# From project root
+cd shit_tests/shitty_ui
+python3 -m pytest . -v
+
+# With coverage
+python3 -m pytest . -v --cov=../../shitty_ui --cov-report=html
+```
+
+---
+
 ## Overview
 
 This document defines the testing strategy for the shitty_ui dashboard. The goal is to achieve 80%+ code coverage with a mix of unit tests, integration tests, and visual regression tests.
@@ -11,25 +45,31 @@ This document defines the testing strategy for the shitty_ui dashboard. The goal
 
 ## Current Test Coverage
 
-### Existing Tests (49 total)
+### Existing Tests (67 total) - Updated 2026-01-29
 
 ```
 shit_tests/shitty_ui/
 ├── __init__.py
 ├── conftest.py         # Mock configuration
-├── test_data.py        # 28 data layer tests
-└── test_layout.py      # 21 layout component tests
+├── test_data.py        # 34 data layer tests (+6 from 02)
+└── test_layout.py      # 33 layout component tests (+12 from 02)
 ```
 
-### Coverage Gaps
+### Coverage Gaps (Updated 2026-01-29)
 
 | Area | Current | Target | Gap |
 |------|---------|--------|-----|
-| Data layer functions | ~70% | 90% | Edge cases, error paths |
-| Layout components | ~50% | 80% | Callback logic, conditional rendering |
-| Callback interactions | ~5% | 60% | Callback chains, state management |
+| Data layer functions | ~75% | 90% | Some edge cases, new aggregate functions |
+| Layout components | ~65% | 80% | Callback chain tests, error recovery |
+| Callback interactions | ~15% | 60% | Chart click → selector → drilldown |
 | Integration | 0% | 30% | End-to-end flows |
-| Error handling | ~20% | 80% | All error paths |
+| Error handling | ~40% | 80% | ✅ Improved - error boundary tests added |
+
+**Recent improvements (02_DASHBOARD_ENHANCEMENTS):**
+- ✅ Error handling tests for `create_error_card()` and `create_empty_chart()`
+- ✅ Time period filtering tests for 4 data functions
+- ✅ Loading state verification tests
+- ✅ Period button styling tests
 
 ---
 
@@ -520,21 +560,25 @@ jobs:
   - [ ] Add `TestExecuteQuery` (2 tests)
   - [ ] Add edge case tests for `get_accuracy_by_asset` (2 tests)
   - [ ] Add tests for each new function from 07_DATA_LAYER_EXPANSION.md
-  - [ ] Verify error handling returns safe defaults
+  - [x] Verify error handling returns safe defaults ✅ (partial - some functions tested)
+  - [x] Add `TestTimePeriodFiltering` (6 tests) ✅ ADDED
 
 - [ ] Layout Test Gaps
   - [ ] Add `TestCreateSignalCardEdgeCases` (3+ tests)
   - [ ] Add `TestMetricCardEdgeCases` (4 tests)
   - [ ] Add callback chain tests
-  - [ ] Add error boundary tests
+  - [x] Add error boundary tests ✅ ADDED (`TestErrorCard`, `TestEmptyChart`)
+  - [x] Add `TestLoadingStates` ✅ ADDED
+  - [x] Add `TestPeriodButtonStyles` ✅ ADDED
+  - [x] Add `TestRefreshIndicator` ✅ ADDED
 
-- [ ] New Feature Tests
-  - [ ] Write tests alongside every new feature
+- [ ] New Feature Tests (ONGOING)
+  - [x] Write tests alongside every new feature ✅ (Dashboard enhancements complete)
   - [ ] Each new data function: 3+ tests minimum
   - [ ] Each new layout component: 2+ tests minimum
   - [ ] Each new callback: 1+ test minimum
 
-- [ ] CI Pipeline
+- [ ] CI Pipeline (NOT STARTED)
   - [ ] Create GitHub Actions workflow
   - [ ] Configure coverage reporting
   - [ ] Set coverage threshold (80%)

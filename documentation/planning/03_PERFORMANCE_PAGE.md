@@ -1,12 +1,67 @@
 # Performance Page - Engineering Specification
 
+> **STATUS: PENDING** - Not yet implemented. This is the recommended next major feature.
+
+## Implementation Context for Engineering Team
+
+### Current State (as of 2026-01-29)
+
+The dashboard is currently a **single-page application** with all components in `layout.py`. The dashboard enhancements (02_DASHBOARD_ENHANCEMENTS.md) are **complete**, providing:
+
+- ✅ Loading states with `dcc.Loading` wrappers
+- ✅ Error boundaries with `create_error_card()` and `create_empty_chart()` functions
+- ✅ Time period selector (7D/30D/90D/All) with `get_period_button_styles()` helper
+- ✅ Chart interactivity (clicking asset bar updates drilldown)
+- ✅ Mobile responsiveness with CSS media queries
+- ✅ Refresh indicator with clientside JS countdown
+
+### Existing Data Functions in `data.py`
+
+Before implementing, familiarize yourself with these existing functions that can be reused or extended:
+
+| Function | Returns | Notes |
+|----------|---------|-------|
+| `get_performance_metrics(days)` | Dict with accuracy, P&L, returns | Already supports `days` param |
+| `get_accuracy_by_confidence(days)` | DataFrame by confidence level | Already supports `days` param |
+| `get_accuracy_by_asset(limit, days)` | DataFrame by ticker | Already supports `days` param |
+| `get_recent_signals(limit, min_conf, days)` | DataFrame of signals | Already supports `days` param |
+| `get_similar_predictions(asset, limit)` | Historical predictions for asset | Good for drilldowns |
+| `get_predictions_with_outcomes(limit)` | Full prediction data | For tables |
+
+### Database Tables Available
+
+The `prediction_outcomes` table is the **primary data source** for performance analytics:
+
+```sql
+prediction_outcomes (
+  id, prediction_id, symbol,
+  prediction_date, prediction_sentiment, prediction_confidence,
+  price_at_prediction, price_t1, price_t3, price_t7, price_t30,
+  return_t1, return_t3, return_t7, return_t30,
+  correct_t1, correct_t3, correct_t7, correct_t30,
+  pnl_t1, pnl_t3, pnl_t7, pnl_t30,
+  is_complete, created_at, updated_at
+)
+```
+
+Key indexes: `idx_prediction_outcome_symbol_date`, `idx_prediction_outcome_prediction_id`
+
+### Recommended Implementation Approach
+
+1. **Start with data layer** - Add new query functions to `data.py` first
+2. **Test queries locally** - Verify against production Neon database
+3. **Add components incrementally** - Build one chart at a time
+4. **Consider multi-page vs single-page** - The spec below proposes multi-page; alternatively, add a collapsible "Performance Details" section to existing page
+
+---
+
 ## Overview
 
 This document is a complete engineering specification for adding a dedicated `/performance` page to the Shitpost Alpha dashboard. The performance page provides deep analytical views into how the system's predictions have performed over time, including equity curves, drawdown analysis, streak tracking, rolling accuracy, confidence calibration, sentiment breakdowns, and periodic summary tables.
 
 **Estimated Effort**: 3-4 days
 **Priority**: P1 (Should Have)
-**Prerequisites**: Core dashboard working (Phase 0.2 complete)
+**Prerequisites**: ✅ Core dashboard working (Phase 0.2 complete) - **DONE**
 
 ---
 
