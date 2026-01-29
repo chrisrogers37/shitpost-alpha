@@ -12,18 +12,23 @@ from sqlalchemy.orm import sessionmaker
 from typing import List, Dict, Any, Optional
 
 # Add parent directory to path to import global settings
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 try:
     from shit.config.shitpost_settings import settings
+
     DATABASE_URL = settings.DATABASE_URL
     print(f"🔍 Dashboard using settings DATABASE_URL: {DATABASE_URL[:50]}...")
 except ImportError as e:
     # Fallback to environment variable if settings can't be imported
     DATABASE_URL = os.environ.get("DATABASE_URL")
-    print(f"🔍 Dashboard using environment DATABASE_URL: {DATABASE_URL[:50] if DATABASE_URL else 'None'}...")
+    print(
+        f"🔍 Dashboard using environment DATABASE_URL: {DATABASE_URL[:50] if DATABASE_URL else 'None'}..."
+    )
     if not DATABASE_URL:
-        raise ValueError(f"Could not load database URL from settings: {e}. Please set DATABASE_URL environment variable.")
+        raise ValueError(
+            f"Could not load database URL from settings: {e}. Please set DATABASE_URL environment variable."
+        )
 
 # Create engine based on database type
 if DATABASE_URL.startswith("sqlite"):
@@ -37,7 +42,7 @@ else:
     # Remove SSL parameters that might cause issues
     sync_url = sync_url.replace("?sslmode=require&channel_binding=require", "")
     print(f"🔍 Using PostgreSQL sync URL: {sync_url[:50]}...")
-    
+
     # Create synchronous engine for dashboard with explicit driver
     try:
         # Try psycopg2 first (more common)
@@ -47,13 +52,16 @@ else:
         print(f"⚠️ Failed to create engine with default driver: {e}")
         # Fallback: try to use psycopg2 explicitly
         try:
-            sync_url_with_driver = sync_url.replace("postgresql://", "postgresql+psycopg2://")
+            sync_url_with_driver = sync_url.replace(
+                "postgresql://", "postgresql+psycopg2://"
+            )
             engine = create_engine(sync_url_with_driver, echo=False, future=True)
             SessionLocal = sessionmaker(engine, expire_on_commit=False)
             print("✅ Successfully created engine with psycopg2 driver")
         except Exception as e2:
             print(f"❌ Failed to create engine with psycopg2: {e2}")
             raise
+
 
 def execute_query(query, params=None):
     """Execute query using appropriate session type."""
@@ -66,13 +74,14 @@ def execute_query(query, params=None):
         print(f"🔍 DATABASE_URL: {DATABASE_URL[:50]}...")
         raise
 
+
 def load_recent_posts(limit: int = 100) -> pd.DataFrame:
     """
     Load recent posts with their predictions.
-    
+
     Args:
         limit: Maximum number of posts to return
-        
+
     Returns:
         DataFrame with posts and prediction data
     """
@@ -96,10 +105,11 @@ def load_recent_posts(limit: int = 100) -> pd.DataFrame:
         ORDER BY tss.timestamp DESC
         LIMIT :limit
     """)
-    
+
     rows, columns = execute_query(query, {"limit": limit})
     df = pd.DataFrame(rows, columns=columns)
     return df
+
 
 def load_filtered_posts(
     limit: int = 100,
@@ -108,11 +118,11 @@ def load_filtered_posts(
     confidence_min: Optional[float] = None,
     confidence_max: Optional[float] = None,
     date_from: Optional[str] = None,
-    date_to: Optional[str] = None
+    date_to: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Load posts with advanced filtering options.
-    
+
     Args:
         limit: Maximum number of posts to return
         has_prediction: Filter for posts with/without predictions
@@ -121,7 +131,7 @@ def load_filtered_posts(
         confidence_max: Maximum confidence score
         date_from: Start date (YYYY-MM-DD format)
         date_to: End date (YYYY-MM-DD format)
-        
+
     Returns:
         Filtered DataFrame with posts and prediction data
     """
@@ -144,49 +154,59 @@ def load_filtered_posts(
             ON tss.shitpost_id = p.shitpost_id
         WHERE 1=1
     """)
-    
+
     params = {"limit": limit}
-    
+
     # Add filters dynamically
     if has_prediction is not None:
         if has_prediction:
-            query = text(str(query) + " AND p.assets IS NOT NULL AND p.assets::jsonb <> '[]'::jsonb")
+            query = text(
+                str(query)
+                + " AND p.assets IS NOT NULL AND p.assets::jsonb <> '[]'::jsonb"
+            )
         else:
-            query = text(str(query) + " AND (p.assets IS NULL OR p.assets::jsonb = '[]'::jsonb)")
-    
+            query = text(
+                str(query) + " AND (p.assets IS NULL OR p.assets::jsonb = '[]'::jsonb)"
+            )
+
     if confidence_min is not None:
         query = text(str(query) + " AND p.confidence >= :confidence_min")
         params["confidence_min"] = confidence_min
-    
+
     if confidence_max is not None:
         query = text(str(query) + " AND p.confidence <= :confidence_max")
         params["confidence_max"] = confidence_max
-    
+
     if date_from:
         query = text(str(query) + " AND tss.timestamp >= :date_from")
         # Convert string date to datetime object
         from datetime import datetime
+
         if isinstance(date_from, str):
             params["date_from"] = datetime.strptime(date_from, "%Y-%m-%d")
         else:
             params["date_from"] = date_from
-    
+
     if date_to:
         query = text(str(query) + " AND tss.timestamp < :date_to_plus_one")
         # Convert string date to datetime object and add one day to include the entire day
         from datetime import datetime, timedelta
+
         if isinstance(date_to, str):
-            params["date_to_plus_one"] = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
+            params["date_to_plus_one"] = datetime.strptime(
+                date_to, "%Y-%m-%d"
+            ) + timedelta(days=1)
         else:
             params["date_to_plus_one"] = date_to + timedelta(days=1)
-    
+
     query = text(str(query) + " ORDER BY tss.timestamp DESC LIMIT :limit")
-    
+
     rows, columns = execute_query(query, params)
     df = pd.DataFrame(rows, columns=columns)
-    
+
     # Post-process asset filtering (since it's JSON, easier to do in Python)
     if assets_filter and not df.empty:
+
         def has_asset(assets_json, target_assets):
             if pd.isna(assets_json) or not assets_json:
                 return False
@@ -195,22 +215,52 @@ def load_filtered_posts(
                 return any(asset in assets for asset in target_assets)
             except (TypeError, ValueError):
                 return False
-        
-        df = df[df['assets'].apply(lambda x: has_asset(x, assets_filter))]
-    
+
+        df = df[df["assets"].apply(lambda x: has_asset(x, assets_filter))]
+
     return df
+
 
 def get_available_assets() -> List[str]:
     """Get list of all unique assets mentioned in predictions."""
     # For now, return a hardcoded list of common assets
     # This avoids the JSON parsing complexity
     common_assets = [
-        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 
-        'AMD', 'INTC', 'CRM', 'ORCL', 'ADBE', 'PYPL', 'UBER', 'LYFT',
-        'SPY', 'QQQ', 'IWM', 'GLD', 'SLV', 'TLT', 'HYG', 'LQD',
-        'RTN', 'LMT', 'NOC', 'BA', 'GD', 'HII', 'LHX', 'TDY'
+        "AAPL",
+        "MSFT",
+        "GOOGL",
+        "AMZN",
+        "TSLA",
+        "META",
+        "NVDA",
+        "NFLX",
+        "AMD",
+        "INTC",
+        "CRM",
+        "ORCL",
+        "ADBE",
+        "PYPL",
+        "UBER",
+        "LYFT",
+        "SPY",
+        "QQQ",
+        "IWM",
+        "GLD",
+        "SLV",
+        "TLT",
+        "HYG",
+        "LQD",
+        "RTN",
+        "LMT",
+        "NOC",
+        "BA",
+        "GD",
+        "HII",
+        "LHX",
+        "TDY",
     ]
     return common_assets
+
 
 def get_prediction_stats() -> Dict[str, Any]:
     """Get summary statistics for predictions."""
@@ -250,7 +300,7 @@ def get_prediction_stats() -> Dict[str, Any]:
             "completed_analyses": row[2] or 0,
             "bypassed_posts": row[3] or 0,
             "avg_confidence": float(row[4]) if row[4] else 0.0,
-            "high_confidence_predictions": row[5] or 0
+            "high_confidence_predictions": row[5] or 0,
         }
     return {
         "total_posts": 0,
@@ -258,16 +308,33 @@ def get_prediction_stats() -> Dict[str, Any]:
         "completed_analyses": 0,
         "bypassed_posts": 0,
         "avg_confidence": 0.0,
-        "high_confidence_predictions": 0
+        "high_confidence_predictions": 0,
     }
 
 
-def get_recent_signals(limit: int = 10, min_confidence: float = 0.5) -> pd.DataFrame:
+def get_recent_signals(
+    limit: int = 10, min_confidence: float = 0.5, days: int = None
+) -> pd.DataFrame:
     """
     Get recent predictions with actionable signals (has assets and sentiment).
     Returns predictions with their outcomes if available.
+
+    Args:
+        limit: Maximum number of signals to return
+        min_confidence: Minimum confidence threshold
+        days: Number of days to look back (None = all time)
     """
-    query = text("""
+    # Build date filter
+    date_filter = ""
+    params = {"limit": limit, "min_confidence": min_confidence}
+
+    if days is not None:
+        date_filter = "AND tss.timestamp >= :start_date"
+        from datetime import datetime, timedelta
+
+        params["start_date"] = datetime.now() - timedelta(days=days)
+
+    query = text(f"""
         SELECT
             tss.timestamp,
             tss.text,
@@ -296,12 +363,13 @@ def get_recent_signals(limit: int = 10, min_confidence: float = 0.5) -> pd.DataF
             AND p.confidence >= :min_confidence
             AND p.assets IS NOT NULL
             AND p.assets::jsonb <> '[]'::jsonb
+            {date_filter}
         ORDER BY tss.timestamp DESC
         LIMIT :limit
     """)
 
     try:
-        rows, columns = execute_query(query, {"limit": limit, "min_confidence": min_confidence})
+        rows, columns = execute_query(query, params)
         df = pd.DataFrame(rows, columns=columns)
         return df
     except Exception as e:
@@ -309,11 +377,24 @@ def get_recent_signals(limit: int = 10, min_confidence: float = 0.5) -> pd.DataF
         return pd.DataFrame()
 
 
-def get_performance_metrics() -> Dict[str, Any]:
+def get_performance_metrics(days: int = None) -> Dict[str, Any]:
     """
     Get overall prediction performance metrics from prediction_outcomes table.
+
+    Args:
+        days: Number of days to look back (None = all time)
     """
-    query = text("""
+    # Build date filter
+    date_filter = ""
+    params = {}
+
+    if days is not None:
+        date_filter = "WHERE prediction_date >= :start_date"
+        from datetime import datetime, timedelta
+
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
         SELECT
             COUNT(*) as total_outcomes,
             COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct_t7,
@@ -323,10 +404,11 @@ def get_performance_metrics() -> Dict[str, Any]:
             SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END) as total_pnl_t7,
             AVG(prediction_confidence) as avg_confidence
         FROM prediction_outcomes
+        {date_filter}
     """)
 
     try:
-        rows, columns = execute_query(query)
+        rows, columns = execute_query(query, params)
         if rows and rows[0]:
             row = rows[0]
             total = row[3] or 0  # evaluated_t7
@@ -341,7 +423,7 @@ def get_performance_metrics() -> Dict[str, Any]:
                 "accuracy_t7": round(accuracy, 1),
                 "avg_return_t7": round(float(row[4]), 2) if row[4] else 0.0,
                 "total_pnl_t7": round(float(row[5]), 2) if row[5] else 0.0,
-                "avg_confidence": round(float(row[6]), 2) if row[6] else 0.0
+                "avg_confidence": round(float(row[6]), 2) if row[6] else 0.0,
             }
     except Exception as e:
         print(f"Error loading performance metrics: {e}")
@@ -354,15 +436,28 @@ def get_performance_metrics() -> Dict[str, Any]:
         "accuracy_t7": 0.0,
         "avg_return_t7": 0.0,
         "total_pnl_t7": 0.0,
-        "avg_confidence": 0.0
+        "avg_confidence": 0.0,
     }
 
 
-def get_accuracy_by_confidence() -> pd.DataFrame:
+def get_accuracy_by_confidence(days: int = None) -> pd.DataFrame:
     """
     Get prediction accuracy broken down by confidence level.
+
+    Args:
+        days: Number of days to look back (None = all time)
     """
-    query = text("""
+    # Build date filter
+    date_filter = ""
+    params = {}
+
+    if days is not None:
+        date_filter = "AND prediction_date >= :start_date"
+        from datetime import datetime, timedelta
+
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
         SELECT
             CASE
                 WHEN prediction_confidence < 0.6 THEN 'Low (<60%)'
@@ -376,6 +471,7 @@ def get_accuracy_by_confidence() -> pd.DataFrame:
             ROUND(SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END)::numeric, 2) as total_pnl
         FROM prediction_outcomes
         WHERE correct_t7 IS NOT NULL
+        {date_filter}
         GROUP BY
             CASE
                 WHEN prediction_confidence < 0.6 THEN 'Low (<60%)'
@@ -391,21 +487,35 @@ def get_accuracy_by_confidence() -> pd.DataFrame:
     """)
 
     try:
-        rows, columns = execute_query(query)
+        rows, columns = execute_query(query, params)
         df = pd.DataFrame(rows, columns=columns)
         if not df.empty:
-            df['accuracy'] = (df['correct'] / df['total'] * 100).round(1)
+            df["accuracy"] = (df["correct"] / df["total"] * 100).round(1)
         return df
     except Exception as e:
         print(f"Error loading accuracy by confidence: {e}")
         return pd.DataFrame()
 
 
-def get_accuracy_by_asset(limit: int = 15) -> pd.DataFrame:
+def get_accuracy_by_asset(limit: int = 15, days: int = None) -> pd.DataFrame:
     """
     Get prediction accuracy broken down by asset.
+
+    Args:
+        limit: Maximum number of assets to return
+        days: Number of days to look back (None = all time)
     """
-    query = text("""
+    # Build date filter
+    date_filter = ""
+    params = {"limit": limit}
+
+    if days is not None:
+        date_filter = "AND prediction_date >= :start_date"
+        from datetime import datetime, timedelta
+
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
         SELECT
             symbol,
             COUNT(*) as total_predictions,
@@ -415,6 +525,7 @@ def get_accuracy_by_asset(limit: int = 15) -> pd.DataFrame:
             ROUND(SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END)::numeric, 2) as total_pnl
         FROM prediction_outcomes
         WHERE correct_t7 IS NOT NULL
+        {date_filter}
         GROUP BY symbol
         HAVING COUNT(*) >= 2
         ORDER BY COUNT(*) DESC
@@ -422,10 +533,10 @@ def get_accuracy_by_asset(limit: int = 15) -> pd.DataFrame:
     """)
 
     try:
-        rows, columns = execute_query(query, {"limit": limit})
+        rows, columns = execute_query(query, params)
         df = pd.DataFrame(rows, columns=columns)
         if not df.empty:
-            df['accuracy'] = (df['correct'] / df['total_predictions'] * 100).round(1)
+            df["accuracy"] = (df["correct"] / df["total_predictions"] * 100).round(1)
         return df
     except Exception as e:
         print(f"Error loading accuracy by asset: {e}")
