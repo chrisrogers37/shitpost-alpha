@@ -1003,6 +1003,278 @@ def get_monthly_performance(months: int = 12) -> pd.DataFrame:
 
 
 # =============================================================================
+# Performance Page Data Functions
+# =============================================================================
+
+
+def get_equity_curve_data(days: int = None) -> pd.DataFrame:
+    """
+    Get detailed equity curve data with individual trade results.
+
+    Args:
+        days: Number of days to look back (None = all time)
+
+    Returns:
+        DataFrame with: prediction_date, symbol, prediction_sentiment,
+                       pnl_t7, prediction_confidence, correct_t7, cumulative_pnl
+    """
+    date_filter = ""
+    params: Dict[str, Any] = {}
+
+    if days is not None:
+        date_filter = "AND prediction_date >= :start_date"
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
+        SELECT
+            prediction_date,
+            symbol,
+            prediction_sentiment,
+            pnl_t7,
+            prediction_confidence,
+            correct_t7,
+            SUM(pnl_t7) OVER (
+                ORDER BY prediction_date, id
+            ) AS cumulative_pnl
+        FROM prediction_outcomes
+        WHERE pnl_t7 IS NOT NULL
+            AND correct_t7 IS NOT NULL
+            {date_filter}
+        ORDER BY prediction_date, id
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        df = pd.DataFrame(rows, columns=columns)
+        return df
+    except Exception as e:
+        print(f"Error loading equity curve data: {e}")
+        return pd.DataFrame()
+
+
+def get_drawdown_data(days: int = None) -> pd.DataFrame:
+    """
+    Calculate drawdown series from the equity curve.
+
+    Drawdown at any point = (current cumulative P&L - peak cumulative P&L).
+
+    Args:
+        days: Number of days to look back (None = all time)
+
+    Returns:
+        DataFrame with: prediction_date, cumulative_pnl, peak_pnl, drawdown, drawdown_pct
+    """
+    equity_df = get_equity_curve_data(days=days)
+
+    if equity_df.empty:
+        return pd.DataFrame()
+
+    # Group by date to get daily P&L
+    daily_df = (
+        equity_df.groupby("prediction_date")
+        .agg({"cumulative_pnl": "last", "pnl_t7": "sum"})
+        .reset_index()
+    )
+
+    # Calculate running peak and drawdown
+    daily_df["peak_pnl"] = daily_df["cumulative_pnl"].cummax()
+    daily_df["drawdown"] = daily_df["cumulative_pnl"] - daily_df["peak_pnl"]
+    daily_df["drawdown_pct"] = daily_df.apply(
+        lambda row: (row["drawdown"] / row["peak_pnl"] * 100)
+        if row["peak_pnl"] > 0
+        else 0.0,
+        axis=1,
+    )
+
+    return daily_df
+
+
+def get_sentiment_performance(days: int = None) -> pd.DataFrame:
+    """
+    Get performance metrics broken down by prediction sentiment.
+
+    Args:
+        days: Number of days to look back (None = all time)
+
+    Returns:
+        DataFrame with: prediction_sentiment, total, correct, incorrect,
+                       accuracy, avg_return, total_pnl, avg_confidence
+    """
+    date_filter = ""
+    params: Dict[str, Any] = {}
+
+    if days is not None:
+        date_filter = "AND prediction_date >= :start_date"
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
+        SELECT
+            prediction_sentiment,
+            COUNT(*) as total,
+            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct,
+            COUNT(CASE WHEN correct_t7 = false THEN 1 END) as incorrect,
+            ROUND(AVG(return_t7)::numeric, 2) as avg_return,
+            ROUND(SUM(COALESCE(pnl_t7, 0))::numeric, 2) as total_pnl,
+            ROUND(AVG(prediction_confidence)::numeric, 3) as avg_confidence
+        FROM prediction_outcomes
+        WHERE correct_t7 IS NOT NULL
+            AND prediction_sentiment IS NOT NULL
+            {date_filter}
+        GROUP BY prediction_sentiment
+        ORDER BY prediction_sentiment
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        df = pd.DataFrame(rows, columns=columns)
+        if not df.empty:
+            df["accuracy"] = (df["correct"] / df["total"] * 100).round(1)
+        return df
+    except Exception as e:
+        print(f"Error loading sentiment performance: {e}")
+        return pd.DataFrame()
+
+
+def get_performance_summary(days: int = None) -> Dict[str, Any]:
+    """
+    Get high-level summary stats for the performance page header cards.
+
+    Args:
+        days: Number of days to look back (None = all time)
+
+    Returns:
+        Dictionary with performance summary metrics
+    """
+    date_filter = ""
+    params: Dict[str, Any] = {}
+
+    if days is not None:
+        date_filter = "WHERE prediction_date >= :start_date"
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
+        SELECT
+            COUNT(*) as total_trades,
+            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as wins,
+            COUNT(CASE WHEN correct_t7 = false THEN 1 END) as losses,
+            SUM(COALESCE(pnl_t7, 0)) as total_pnl,
+            AVG(pnl_t7) as avg_pnl,
+            SUM(CASE WHEN pnl_t7 > 0 THEN pnl_t7 ELSE 0 END) as gross_profit,
+            SUM(CASE WHEN pnl_t7 < 0 THEN ABS(pnl_t7) ELSE 0 END) as gross_loss,
+            MAX(pnl_t7) as best_trade,
+            MIN(pnl_t7) as worst_trade,
+            AVG(prediction_confidence) as avg_confidence
+        FROM prediction_outcomes
+        {date_filter}
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        if rows and rows[0]:
+            row = rows[0]
+            total = row[0] or 0
+            wins = row[1] or 0
+            losses = row[2] or 0
+            gross_profit = float(row[5]) if row[5] else 0.0
+            gross_loss = float(row[6]) if row[6] else 0.0
+
+            win_rate = (wins / total * 100) if total > 0 else 0.0
+            profit_factor = (
+                (gross_profit / gross_loss)
+                if gross_loss > 0
+                else float("inf")
+                if gross_profit > 0
+                else 0.0
+            )
+
+            # Get max drawdown from drawdown data
+            dd_df = get_drawdown_data(days=days)
+            max_drawdown = float(dd_df["drawdown"].min()) if not dd_df.empty else 0.0
+
+            return {
+                "total_trades": total,
+                "wins": wins,
+                "losses": losses,
+                "win_rate": round(win_rate, 1),
+                "total_pnl": round(float(row[3]) if row[3] else 0.0, 2),
+                "avg_pnl_per_trade": round(float(row[4]) if row[4] else 0.0, 2),
+                "profit_factor": round(profit_factor, 2)
+                if profit_factor != float("inf")
+                else "Inf",
+                "best_trade": round(float(row[7]) if row[7] else 0.0, 2),
+                "worst_trade": round(float(row[8]) if row[8] else 0.0, 2),
+                "avg_confidence": round(float(row[9]) if row[9] else 0.0, 3),
+                "max_drawdown": round(max_drawdown, 2),
+            }
+    except Exception as e:
+        print(f"Error loading performance summary: {e}")
+
+    return {
+        "total_trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "total_pnl": 0.0,
+        "avg_pnl_per_trade": 0.0,
+        "profit_factor": 0.0,
+        "best_trade": 0.0,
+        "worst_trade": 0.0,
+        "avg_confidence": 0.0,
+        "max_drawdown": 0.0,
+    }
+
+
+def get_periodic_performance(period: str = "month", days: int = None) -> pd.DataFrame:
+    """
+    Get performance summary grouped by time period (week or month).
+
+    Args:
+        period: Either 'week' or 'month'
+        days: Number of days to look back (None = all time)
+
+    Returns:
+        DataFrame with periodic performance data
+    """
+    date_filter = ""
+    params: Dict[str, Any] = {}
+
+    if days is not None:
+        date_filter = "AND prediction_date >= :start_date"
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    if period == "week":
+        period_expr = "TO_CHAR(prediction_date, 'IYYY-\"W\"IW')"
+    else:
+        period_expr = "TO_CHAR(prediction_date, 'YYYY-MM')"
+
+    query = text(f"""
+        SELECT
+            {period_expr} as period_label,
+            COUNT(*) as total_predictions,
+            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct,
+            COUNT(CASE WHEN correct_t7 = false THEN 1 END) as incorrect,
+            ROUND(AVG(return_t7)::numeric, 2) as avg_return,
+            ROUND(SUM(COALESCE(pnl_t7, 0))::numeric, 2) as total_pnl,
+            ROUND(AVG(prediction_confidence)::numeric, 3) as avg_confidence
+        FROM prediction_outcomes
+        WHERE correct_t7 IS NOT NULL
+            {date_filter}
+        GROUP BY {period_expr}
+        ORDER BY {period_expr} DESC
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        df = pd.DataFrame(rows, columns=columns)
+        if not df.empty:
+            df["accuracy"] = (df["correct"] / df["total_predictions"] * 100).round(1)
+        return df
+    except Exception as e:
+        print(f"Error loading periodic performance: {e}")
+        return pd.DataFrame()
+
+
+# =============================================================================
 # Cache Management
 # =============================================================================
 

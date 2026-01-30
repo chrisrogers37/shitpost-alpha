@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Performance Page (03_PERFORMANCE_PAGE)** - New `/performance` route with detailed analytics
+  - **Multi-Page Architecture** - Converted dashboard to Dash Pages with shared navigation
+    - New `pages/` directory with `home.py` and `performance.py`
+    - New `components/` directory with reusable `nav.py` and `common.py`
+    - Shared navigation bar across all pages
+  - **Equity Curve Chart** - Cumulative P&L visualization with win/loss markers
+  - **Drawdown Analysis** - Visual drawdown chart with max drawdown highlight
+  - **Rolling Accuracy** - 30-day rolling accuracy trend with baseline markers
+  - **Win/Loss Streaks** - Current streak and historical best/worst streak display
+  - **Confidence Calibration** - Predicted vs actual accuracy comparison chart
+  - **Sentiment Performance** - Breakdown of accuracy by bullish/bearish/neutral
+  - **Periodic Summary Table** - Monthly/weekly performance toggle with DataTable
+  - **Summary Metrics** - Header cards with win rate, P&L, profit factor, max drawdown
+  - **New Data Functions** - 5 new aggregate functions in `data.py`:
+    - `get_equity_curve_data(days)` - Individual trade results with cumulative P&L
+    - `get_drawdown_data(days)` - Calculated drawdown series from equity curve
+    - `get_sentiment_performance(days)` - Performance metrics by sentiment
+    - `get_performance_summary(days)` - High-level summary for metric cards
+    - `get_periodic_performance(period, days)` - Weekly/monthly grouped data
+  - **New Tests** - 17 new tests for performance page data functions
 - **Data Layer Expansion (Phase 1)** - Performance aggregate functions and query caching for dashboard
   - **Query Caching** - TTL-based caching (5-10 min) for expensive aggregate queries:
     - `get_prediction_stats`, `get_performance_metrics`, `get_accuracy_by_confidence`

@@ -1166,6 +1166,322 @@ class TestMonthlyPerformance:
         assert result.empty
 
 
+class TestGetEquityCurveData:
+    """Tests for get_equity_curve_data function."""
+
+    @patch("data.execute_query")
+    def test_returns_dataframe_with_cumulative(self, mock_execute):
+        """Test that function returns DataFrame with cumulative P&L column."""
+        from data import get_equity_curve_data
+        from datetime import date
+
+        mock_execute.return_value = (
+            [
+                (date(2024, 1, 1), "AAPL", "bullish", 50.0, 0.8, True, 50.0),
+                (date(2024, 1, 2), "TSLA", "bearish", -30.0, 0.6, False, 20.0),
+            ],
+            [
+                "prediction_date",
+                "symbol",
+                "prediction_sentiment",
+                "pnl_t7",
+                "prediction_confidence",
+                "correct_t7",
+                "cumulative_pnl",
+            ],
+        )
+
+        result = get_equity_curve_data()
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 2
+        assert "cumulative_pnl" in result.columns
+
+    @patch("data.execute_query")
+    def test_with_days_parameter(self, mock_execute):
+        """Test that days parameter adds date filter."""
+        from data import get_equity_curve_data
+
+        mock_execute.return_value = ([], [])
+
+        result = get_equity_curve_data(days=30)
+
+        mock_execute.assert_called_once()
+        call_args = mock_execute.call_args[0]
+        assert "start_date" in call_args[1]
+
+    @patch("data.execute_query")
+    def test_returns_empty_dataframe_on_error(self, mock_execute):
+        """Test that function returns empty DataFrame on error."""
+        from data import get_equity_curve_data
+
+        mock_execute.side_effect = Exception("Database error")
+
+        result = get_equity_curve_data()
+
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+
+
+class TestGetDrawdownData:
+    """Tests for get_drawdown_data function."""
+
+    @patch("data.get_equity_curve_data")
+    def test_calculates_drawdown(self, mock_equity):
+        """Test that function calculates drawdown correctly."""
+        from data import get_drawdown_data
+        from datetime import date
+
+        mock_equity.return_value = pd.DataFrame(
+            {
+                "prediction_date": [
+                    date(2024, 1, 1),
+                    date(2024, 1, 2),
+                    date(2024, 1, 3),
+                ],
+                "cumulative_pnl": [100.0, 150.0, 80.0],
+                "pnl_t7": [100.0, 50.0, -70.0],
+                "symbol": ["AAPL", "TSLA", "GOOGL"],
+                "correct_t7": [True, True, False],
+            }
+        )
+
+        result = get_drawdown_data()
+
+        assert isinstance(result, pd.DataFrame)
+        assert "drawdown" in result.columns
+        assert "peak_pnl" in result.columns
+        # Peak should be 150, drawdown at end should be 80 - 150 = -70
+        assert result.iloc[-1]["drawdown"] == -70.0
+
+    @patch("data.get_equity_curve_data")
+    def test_returns_empty_on_no_data(self, mock_equity):
+        """Test that function returns empty DataFrame when equity data is empty."""
+        from data import get_drawdown_data
+
+        mock_equity.return_value = pd.DataFrame()
+
+        result = get_drawdown_data()
+
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+
+
+class TestGetSentimentPerformance:
+    """Tests for get_sentiment_performance function."""
+
+    @patch("data.execute_query")
+    def test_returns_sentiment_breakdown(self, mock_execute):
+        """Test that function returns performance by sentiment."""
+        from data import get_sentiment_performance
+
+        mock_execute.return_value = (
+            [
+                ("bullish", 50, 30, 20, 1.5, 1500.0, 0.72),
+                ("bearish", 30, 15, 15, -0.5, -500.0, 0.68),
+            ],
+            [
+                "prediction_sentiment",
+                "total",
+                "correct",
+                "incorrect",
+                "avg_return",
+                "total_pnl",
+                "avg_confidence",
+            ],
+        )
+
+        result = get_sentiment_performance()
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 2
+        assert "accuracy" in result.columns
+        assert result[result["prediction_sentiment"] == "bullish"]["accuracy"].iloc[
+            0
+        ] == 60.0  # 30/50
+
+    @patch("data.execute_query")
+    def test_with_days_parameter(self, mock_execute):
+        """Test that days parameter adds date filter."""
+        from data import get_sentiment_performance
+
+        mock_execute.return_value = ([], [])
+
+        result = get_sentiment_performance(days=30)
+
+        mock_execute.assert_called_once()
+        call_args = mock_execute.call_args[0]
+        assert "start_date" in call_args[1]
+
+    @patch("data.execute_query")
+    def test_returns_empty_dataframe_on_error(self, mock_execute):
+        """Test that function returns empty DataFrame on error."""
+        from data import get_sentiment_performance
+
+        mock_execute.side_effect = Exception("Database error")
+
+        result = get_sentiment_performance()
+
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+
+
+class TestGetPerformanceSummary:
+    """Tests for get_performance_summary function."""
+
+    @patch("data.get_drawdown_data")
+    @patch("data.execute_query")
+    def test_returns_summary_dict(self, mock_execute, mock_drawdown):
+        """Test that function returns dictionary with summary metrics."""
+        from data import get_performance_summary
+
+        mock_execute.return_value = (
+            [(100, 60, 40, 5000.0, 50.0, 7000.0, 2000.0, 200.0, -100.0, 0.72)],
+            [
+                "total_trades",
+                "wins",
+                "losses",
+                "total_pnl",
+                "avg_pnl",
+                "gross_profit",
+                "gross_loss",
+                "best_trade",
+                "worst_trade",
+                "avg_confidence",
+            ],
+        )
+        mock_drawdown.return_value = pd.DataFrame({"drawdown": [-500.0, -300.0, -100.0]})
+
+        result = get_performance_summary()
+
+        assert isinstance(result, dict)
+        assert result["total_trades"] == 100
+        assert result["win_rate"] == 60.0  # 60/100
+        assert result["total_pnl"] == 5000.0
+        assert result["profit_factor"] == 3.5  # 7000/2000
+        assert result["max_drawdown"] == -500.0
+
+    @patch("data.get_drawdown_data")
+    @patch("data.execute_query")
+    def test_handles_zero_gross_loss(self, mock_execute, mock_drawdown):
+        """Test that function handles zero gross loss (infinite profit factor)."""
+        from data import get_performance_summary
+
+        mock_execute.return_value = (
+            [(10, 10, 0, 1000.0, 100.0, 1000.0, 0.0, 200.0, 50.0, 0.8)],
+            [
+                "total_trades",
+                "wins",
+                "losses",
+                "total_pnl",
+                "avg_pnl",
+                "gross_profit",
+                "gross_loss",
+                "best_trade",
+                "worst_trade",
+                "avg_confidence",
+            ],
+        )
+        mock_drawdown.return_value = pd.DataFrame({"drawdown": [0.0]})
+
+        result = get_performance_summary()
+
+        assert result["profit_factor"] == "Inf"
+
+    @patch("data.execute_query")
+    def test_returns_defaults_on_error(self, mock_execute):
+        """Test that function returns defaults on error."""
+        from data import get_performance_summary
+
+        mock_execute.side_effect = Exception("Database error")
+
+        result = get_performance_summary()
+
+        assert result["total_trades"] == 0
+        assert result["win_rate"] == 0.0
+
+
+class TestGetPeriodicPerformance:
+    """Tests for get_periodic_performance function."""
+
+    @patch("data.execute_query")
+    def test_returns_monthly_performance(self, mock_execute):
+        """Test that function returns monthly performance data."""
+        from data import get_periodic_performance
+
+        mock_execute.return_value = (
+            [
+                ("2024-01", 50, 30, 20, 1.5, 1500.0, 0.72),
+                ("2024-02", 40, 25, 15, 2.0, 2000.0, 0.75),
+            ],
+            [
+                "period_label",
+                "total_predictions",
+                "correct",
+                "incorrect",
+                "avg_return",
+                "total_pnl",
+                "avg_confidence",
+            ],
+        )
+
+        result = get_periodic_performance(period="month")
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 2
+        assert "accuracy" in result.columns
+
+    @patch("data.execute_query")
+    def test_returns_weekly_performance(self, mock_execute):
+        """Test that function returns weekly performance data."""
+        from data import get_periodic_performance
+
+        mock_execute.return_value = (
+            [
+                ("2024-W01", 10, 6, 4, 1.0, 100.0, 0.70),
+            ],
+            [
+                "period_label",
+                "total_predictions",
+                "correct",
+                "incorrect",
+                "avg_return",
+                "total_pnl",
+                "avg_confidence",
+            ],
+        )
+
+        result = get_periodic_performance(period="week")
+
+        assert isinstance(result, pd.DataFrame)
+        assert result["period_label"].iloc[0] == "2024-W01"
+
+    @patch("data.execute_query")
+    def test_with_days_parameter(self, mock_execute):
+        """Test that days parameter adds date filter."""
+        from data import get_periodic_performance
+
+        mock_execute.return_value = ([], [])
+
+        result = get_periodic_performance(period="month", days=90)
+
+        mock_execute.assert_called_once()
+        call_args = mock_execute.call_args[0]
+        assert "start_date" in call_args[1]
+
+    @patch("data.execute_query")
+    def test_returns_empty_dataframe_on_error(self, mock_execute):
+        """Test that function returns empty DataFrame on error."""
+        from data import get_periodic_performance
+
+        mock_execute.side_effect = Exception("Database error")
+
+        result = get_periodic_performance()
+
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+
+
 class TestClearAllCaches:
     """Tests for clear_all_caches function."""
 
