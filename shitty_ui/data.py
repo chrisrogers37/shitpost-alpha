@@ -1304,3 +1304,57 @@ def get_related_assets(symbol: str, limit: int = 8) -> pd.DataFrame:
     except Exception as e:
         print(f"Error loading related assets for {symbol}: {e}")
         return pd.DataFrame()
+
+
+def get_new_predictions_since(since: datetime) -> List[Dict[str, Any]]:
+    """
+    Get new completed predictions created after the given timestamp.
+    Used by the alert system to find predictions the user hasn't been notified about.
+
+    Args:
+        since: Only return predictions created after this timestamp.
+
+    Returns:
+        List of prediction dicts with associated shitpost data.
+    """
+    query = text("""
+        SELECT
+            tss.timestamp,
+            tss.text,
+            tss.shitpost_id,
+            p.id as prediction_id,
+            p.assets,
+            p.market_impact,
+            p.confidence,
+            p.thesis,
+            p.analysis_status,
+            p.created_at as prediction_created_at
+        FROM predictions p
+        INNER JOIN truth_social_shitposts tss
+            ON tss.shitpost_id = p.shitpost_id
+        WHERE p.analysis_status = 'completed'
+            AND p.created_at > :since
+            AND p.confidence IS NOT NULL
+            AND p.assets IS NOT NULL
+            AND p.assets::jsonb <> '[]'::jsonb
+        ORDER BY p.created_at DESC
+        LIMIT 50
+    """)
+
+    try:
+        rows, columns = execute_query(query, {"since": since})
+        results = []
+        for row in rows:
+            row_dict = dict(zip(columns, row))
+            # Convert timestamp to ISO string for JSON serialization
+            if isinstance(row_dict.get("timestamp"), datetime):
+                row_dict["timestamp"] = row_dict["timestamp"].isoformat()
+            if isinstance(row_dict.get("prediction_created_at"), datetime):
+                row_dict["prediction_created_at"] = row_dict[
+                    "prediction_created_at"
+                ].isoformat()
+            results.append(row_dict)
+        return results
+    except Exception as e:
+        print(f"Error loading new predictions: {e}")
+        return []

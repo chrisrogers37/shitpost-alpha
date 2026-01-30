@@ -8,6 +8,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Alerts and Notifications System** - Real-time alert system for prediction monitoring
+  - **Alert Configuration Panel** - Slide-out offcanvas panel for configuring alert preferences
+    - Master toggle to enable/disable all alerts
+    - Confidence threshold slider (0-100%)
+    - Asset filter dropdown (select specific tickers or all)
+    - Sentiment filter (all/bullish/bearish/neutral)
+    - Quiet hours configuration for overnight alert suppression
+  - **Multi-Channel Notifications**:
+    - Browser push notifications with permission handling
+    - Email alerts via SMTP or SendGrid
+    - SMS alerts via Twilio (rate limited to 10/hour)
+  - **Alert History Panel** - Collapsible panel showing recent alerts with:
+    - Timestamp, sentiment, confidence, and assets
+    - Truncated post text preview
+    - Badge counter for alerts in last 24 hours
+  - **Alert Checking System**:
+    - 2-minute polling interval when alerts enabled
+    - Quiet hours support (e.g., 22:00-08:00)
+    - Preference filtering against new predictions
+    - localStorage persistence for preferences and history
+  - **New Core Functions**:
+    - `check_for_new_alerts(preferences, last_check)` - Main alert checking logic
+    - `filter_predictions_by_preferences(predictions, preferences)` - Filter engine
+    - `is_in_quiet_hours(preferences)` - Quiet hours checker
+    - `format_alert_message(alert)` / `format_alert_message_html(alert)` - Message formatters
+    - `_send_email_alert(to, subject, html, text)` - SMTP/SendGrid dispatcher
+    - `_send_sms_alert(to_phone, message)` - Twilio dispatcher with rate limiting
+    - `get_new_predictions_since(since)` - Data layer query for new predictions
+  - **Security Features**:
+    - Rate limiting for email (20/hour) and SMS (10/hour)
+    - E.164 phone number validation
+    - Email format validation
+    - Server-side credential handling (no API keys in frontend)
+  - **Settings Additions** - New environment variables:
+    - `EMAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`
+    - `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME`, `SENDGRID_API_KEY`
+  - **New Tests** - 51 new tests for alerts module covering:
+    - Prediction filtering logic
+    - Quiet hours checking
+    - Sentiment extraction
+    - Phone/email validation
+    - Message formatting
+    - Rate limiting
+    - Alert check integration
+    - Layout components
 - **Asset Deep Dive Pages (Phase 1)** - Dedicated `/assets/{symbol}` pages with comprehensive asset performance views
   - **Multi-Page URL Routing** - Added `dcc.Location` for client-side URL routing between dashboard and asset pages
   - **Asset Price Chart** - Candlestick chart with prediction overlay markers showing correct/incorrect outcomes
