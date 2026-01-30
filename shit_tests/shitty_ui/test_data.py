@@ -4,7 +4,7 @@ Tests all database query functions for the prediction performance dashboard.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from datetime import datetime
 import pandas as pd
 import sys
@@ -687,7 +687,7 @@ class TestTimePeriodFiltering:
             ],
         )
 
-        result = get_performance_metrics(days=30)
+        get_performance_metrics(days=30)
 
         mock_execute.assert_called_once()
         call_args = mock_execute.call_args[0]
@@ -711,7 +711,7 @@ class TestTimePeriodFiltering:
             ],
         )
 
-        result = get_performance_metrics(days=None)
+        get_performance_metrics(days=None)
 
         mock_execute.assert_called_once()
         call_args = mock_execute.call_args[0]
@@ -734,7 +734,7 @@ class TestTimePeriodFiltering:
             ],
         )
 
-        result = get_accuracy_by_confidence(days=7)
+        get_accuracy_by_confidence(days=7)
 
         mock_execute.assert_called_once()
         call_args = mock_execute.call_args[0]
@@ -757,7 +757,7 @@ class TestTimePeriodFiltering:
             ],
         )
 
-        result = get_accuracy_by_asset(limit=10, days=90)
+        get_accuracy_by_asset(limit=10, days=90)
 
         mock_execute.assert_called_once()
         call_args = mock_execute.call_args[0]
@@ -771,7 +771,7 @@ class TestTimePeriodFiltering:
 
         mock_execute.return_value = ([], [])
 
-        result = get_recent_signals(limit=10, days=7)
+        get_recent_signals(limit=10, days=7)
 
         mock_execute.assert_called_once()
         call_args = mock_execute.call_args[0]
@@ -785,7 +785,7 @@ class TestTimePeriodFiltering:
 
         mock_execute.return_value = ([], [])
 
-        result = get_recent_signals(limit=10, days=None)
+        get_recent_signals(limit=10, days=None)
 
         mock_execute.assert_called_once()
         call_args = mock_execute.call_args[0]
@@ -803,7 +803,7 @@ class TestTimePeriodFiltering:
 
         # Clear cache before test to ensure fresh call
         get_sentiment_distribution.clear_cache()
-        result = get_sentiment_distribution(days=30)
+        get_sentiment_distribution(days=30)
 
         mock_execute.assert_called_once()
         call_args = mock_execute.call_args[0]
@@ -816,7 +816,7 @@ class TestTimePeriodFiltering:
 
         mock_execute.return_value = ([], [])
 
-        result = get_similar_predictions(asset="AAPL", limit=10, days=7)
+        get_similar_predictions(asset="AAPL", limit=10, days=7)
 
         mock_execute.assert_called_once()
         call_args = mock_execute.call_args[0]
@@ -829,7 +829,7 @@ class TestTimePeriodFiltering:
 
         mock_execute.return_value = ([], [])
 
-        result = get_predictions_with_outcomes(limit=50, days=30)
+        get_predictions_with_outcomes(limit=50, days=30)
 
         mock_execute.assert_called_once()
         call_args = mock_execute.call_args[0]
@@ -841,7 +841,6 @@ class TestTTLCache:
 
     def test_caches_result(self):
         """Test that repeated calls return cached result."""
-        import time
         from data import ttl_cache
 
         call_count = 0
@@ -938,7 +937,7 @@ class TestCumulativePnl:
 
         mock_execute.return_value = ([], [])
 
-        result = get_cumulative_pnl(days=30)
+        get_cumulative_pnl(days=30)
 
         mock_execute.assert_called_once()
         call_args = mock_execute.call_args[0]
@@ -986,7 +985,7 @@ class TestRollingAccuracy:
 
         mock_execute.return_value = ([], [])
 
-        result = get_rolling_accuracy(window=30, days=90)
+        get_rolling_accuracy(window=30, days=90)
 
         mock_execute.assert_called_once()
         call_args = mock_execute.call_args[0]
@@ -1092,7 +1091,7 @@ class TestConfidenceCalibration:
 
         mock_execute.return_value = ([], [])
 
-        result = get_confidence_calibration(buckets=5)
+        get_confidence_calibration(buckets=5)
 
         mock_execute.assert_called_once()
         call_args = mock_execute.call_args[0]
@@ -1147,7 +1146,7 @@ class TestMonthlyPerformance:
 
         mock_execute.return_value = ([], [])
 
-        result = get_monthly_performance(months=6)
+        get_monthly_performance(months=6)
 
         mock_execute.assert_called_once()
         call_args = mock_execute.call_args[0]
@@ -1175,3 +1174,355 @@ class TestClearAllCaches:
 
         # Should not raise an exception
         clear_all_caches()
+
+
+# =============================================================================
+# Asset Deep Dive Function Tests
+# =============================================================================
+
+
+class TestGetAssetPriceHistory:
+    """Tests for get_asset_price_history function."""
+
+    @patch("data.execute_query")
+    def test_returns_dataframe_with_price_data(self, mock_execute):
+        """Test that function returns a DataFrame with price columns."""
+        from data import get_asset_price_history
+        from datetime import date
+
+        mock_execute.return_value = (
+            [
+                (date(2024, 1, 1), 150.0, 155.0, 149.0, 152.0, 1000000, 152.0),
+                (date(2024, 1, 2), 152.0, 158.0, 151.0, 157.0, 1200000, 157.0),
+            ],
+            ["date", "open", "high", "low", "close", "volume", "adjusted_close"],
+        )
+
+        result = get_asset_price_history("AAPL", days=30)
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 2
+        assert "date" in result.columns
+        assert "open" in result.columns
+        assert "close" in result.columns
+        assert "high" in result.columns
+        assert "low" in result.columns
+
+    @patch("data.execute_query")
+    def test_passes_symbol_and_date_to_query(self, mock_execute):
+        """Test that symbol and start_date are passed to the query."""
+        from data import get_asset_price_history
+
+        mock_execute.return_value = ([], [])
+
+        get_asset_price_history("TSLA", days=90)
+
+        mock_execute.assert_called_once()
+        call_args = mock_execute.call_args[0]
+        assert call_args[1]["symbol"] == "TSLA"
+        assert "start_date" in call_args[1]
+
+    @patch("data.execute_query")
+    def test_uppercases_symbol(self, mock_execute):
+        """Test that symbol is uppercased."""
+        from data import get_asset_price_history
+
+        mock_execute.return_value = ([], [])
+
+        get_asset_price_history("aapl", days=30)
+
+        call_args = mock_execute.call_args[0]
+        assert call_args[1]["symbol"] == "AAPL"
+
+    @patch("data.execute_query")
+    def test_returns_empty_dataframe_on_error(self, mock_execute):
+        """Test that function returns empty DataFrame on error."""
+        from data import get_asset_price_history
+
+        mock_execute.side_effect = Exception("Database error")
+
+        result = get_asset_price_history("AAPL")
+
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+
+
+class TestGetAssetPredictions:
+    """Tests for get_asset_predictions function."""
+
+    @patch("data.execute_query")
+    def test_returns_dataframe_with_predictions(self, mock_execute):
+        """Test that function returns a DataFrame with prediction data."""
+        from data import get_asset_predictions
+        from datetime import date
+
+        mock_execute.return_value = (
+            [
+                (
+                    date(2024, 1, 5),
+                    datetime(2024, 1, 5, 10, 30),
+                    "Trump says tariffs on China!",
+                    "post123",
+                    1,
+                    "bullish",
+                    0.85,
+                    150.0,
+                    155.0,
+                    1.0,
+                    2.5,
+                    3.5,
+                    5.0,
+                    True,
+                    True,
+                    True,
+                    False,
+                    35.0,
+                    True,
+                    0.85,
+                    "Tariff policy bullish for domestic manufacturing",
+                )
+            ],
+            [
+                "prediction_date",
+                "timestamp",
+                "text",
+                "shitpost_id",
+                "prediction_id",
+                "prediction_sentiment",
+                "prediction_confidence",
+                "price_at_prediction",
+                "price_t7",
+                "return_t1",
+                "return_t3",
+                "return_t7",
+                "return_t30",
+                "correct_t1",
+                "correct_t3",
+                "correct_t7",
+                "correct_t30",
+                "pnl_t7",
+                "is_complete",
+                "confidence",
+                "thesis",
+            ],
+        )
+
+        result = get_asset_predictions("AAPL", limit=10)
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 1
+        assert "prediction_date" in result.columns
+        assert "text" in result.columns
+        assert "prediction_sentiment" in result.columns
+
+    @patch("data.execute_query")
+    def test_respects_limit_parameter(self, mock_execute):
+        """Test that limit parameter is passed to query."""
+        from data import get_asset_predictions
+
+        mock_execute.return_value = ([], [])
+
+        get_asset_predictions("AAPL", limit=25)
+
+        call_args = mock_execute.call_args[0]
+        assert call_args[1]["limit"] == 25
+
+    @patch("data.execute_query")
+    def test_returns_empty_dataframe_on_error(self, mock_execute):
+        """Test that function returns empty DataFrame on error."""
+        from data import get_asset_predictions
+
+        mock_execute.side_effect = Exception("Database error")
+
+        result = get_asset_predictions("AAPL")
+
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+
+
+class TestGetAssetStats:
+    """Tests for get_asset_stats function."""
+
+    @patch("data.execute_query")
+    def test_returns_stats_dict(self, mock_execute):
+        """Test that function returns a dictionary with expected keys."""
+        from data import get_asset_stats
+
+        mock_execute.return_value = (
+            [
+                (
+                    20,  # total_predictions
+                    14,  # correct
+                    6,  # incorrect
+                    20,  # evaluated
+                    2.5,  # avg_return
+                    500.0,  # total_pnl
+                    0.78,  # avg_confidence
+                    12,  # bullish_count
+                    6,  # bearish_count
+                    2,  # neutral_count
+                    8.5,  # best_return
+                    -3.2,  # worst_return
+                    1000,  # overall_evaluated
+                    600,  # overall_correct
+                    1.8,  # overall_avg_return
+                )
+            ],
+            [
+                "total_predictions",
+                "correct",
+                "incorrect",
+                "evaluated",
+                "avg_return",
+                "total_pnl",
+                "avg_confidence",
+                "bullish_count",
+                "bearish_count",
+                "neutral_count",
+                "best_return",
+                "worst_return",
+                "overall_evaluated",
+                "overall_correct",
+                "overall_avg_return",
+            ],
+        )
+
+        # Clear cache before test
+        get_asset_stats.clear_cache()
+        result = get_asset_stats("AAPL")
+
+        assert isinstance(result, dict)
+        assert result["total_predictions"] == 20
+        assert result["correct_predictions"] == 14
+        assert result["accuracy_t7"] == 70.0  # 14/20 = 70%
+        assert result["bullish_count"] == 12
+        assert result["bearish_count"] == 6
+        assert result["best_return_t7"] == 8.5
+        assert result["worst_return_t7"] == -3.2
+        assert result["overall_accuracy_t7"] == 60.0  # 600/1000 = 60%
+
+    @patch("data.execute_query")
+    def test_handles_zero_evaluated(self, mock_execute):
+        """Test that function handles zero evaluated predictions."""
+        from data import get_asset_stats
+
+        mock_execute.return_value = (
+            [
+                (
+                    0,  # total_predictions
+                    0,  # correct
+                    0,  # incorrect
+                    0,  # evaluated
+                    None,  # avg_return
+                    0.0,  # total_pnl
+                    None,  # avg_confidence
+                    0,  # bullish_count
+                    0,  # bearish_count
+                    0,  # neutral_count
+                    None,  # best_return
+                    None,  # worst_return
+                    100,  # overall_evaluated
+                    60,  # overall_correct
+                    1.5,  # overall_avg_return
+                )
+            ],
+            [
+                "total_predictions",
+                "correct",
+                "incorrect",
+                "evaluated",
+                "avg_return",
+                "total_pnl",
+                "avg_confidence",
+                "bullish_count",
+                "bearish_count",
+                "neutral_count",
+                "best_return",
+                "worst_return",
+                "overall_evaluated",
+                "overall_correct",
+                "overall_avg_return",
+            ],
+        )
+
+        get_asset_stats.clear_cache()
+        result = get_asset_stats("UNKNOWN")
+
+        assert result["accuracy_t7"] == 0.0
+        assert result["best_return_t7"] is None
+
+    @patch("data.execute_query")
+    def test_returns_defaults_on_error(self, mock_execute):
+        """Test that function returns defaults on error."""
+        from data import get_asset_stats
+
+        mock_execute.side_effect = Exception("Database error")
+
+        get_asset_stats.clear_cache()
+        result = get_asset_stats("AAPL")
+
+        assert result["total_predictions"] == 0
+        assert result["accuracy_t7"] == 0.0
+        assert result["overall_accuracy_t7"] == 0.0
+
+
+class TestGetRelatedAssets:
+    """Tests for get_related_assets function."""
+
+    @patch("data.execute_query")
+    def test_returns_dataframe_with_related_assets(self, mock_execute):
+        """Test that function returns DataFrame with related assets."""
+        from data import get_related_assets
+
+        mock_execute.return_value = (
+            [
+                ("GOOGL", 15, 2.3),
+                ("MSFT", 12, 1.8),
+                ("AMZN", 8, -0.5),
+            ],
+            ["related_symbol", "co_occurrence_count", "avg_return_t7"],
+        )
+
+        result = get_related_assets("AAPL", limit=10)
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 3
+        assert "related_symbol" in result.columns
+        assert "co_occurrence_count" in result.columns
+        assert result.iloc[0]["related_symbol"] == "GOOGL"
+
+    @patch("data.execute_query")
+    def test_respects_limit_parameter(self, mock_execute):
+        """Test that limit parameter is passed to query."""
+        from data import get_related_assets
+
+        mock_execute.return_value = ([], [])
+
+        get_related_assets("AAPL", limit=5)
+
+        call_args = mock_execute.call_args[0]
+        assert call_args[1]["limit"] == 5
+
+    @patch("data.execute_query")
+    def test_uppercases_symbol(self, mock_execute):
+        """Test that symbol is uppercased."""
+        from data import get_related_assets
+
+        mock_execute.return_value = ([], [])
+
+        get_related_assets("aapl", limit=8)
+
+        call_args = mock_execute.call_args[0]
+        assert call_args[1]["symbol"] == "AAPL"
+
+    @patch("data.execute_query")
+    def test_returns_empty_dataframe_on_error(self, mock_execute):
+        """Test that function returns empty DataFrame on error."""
+        from data import get_related_assets
+
+        mock_execute.side_effect = Exception("Database error")
+
+        result = get_related_assets("AAPL")
+
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty

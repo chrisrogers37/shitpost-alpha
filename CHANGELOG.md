@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Asset Deep Dive Pages (Phase 1)** - Dedicated `/assets/{symbol}` pages with comprehensive asset performance views
+  - **Multi-Page URL Routing** - Added `dcc.Location` for client-side URL routing between dashboard and asset pages
+  - **Asset Price Chart** - Candlestick chart with prediction overlay markers showing correct/incorrect outcomes
+  - **Date Range Selector** - Toggle between 30D, 90D, 180D, and 1Y price history views
+  - **Asset Performance Summary** - Accuracy vs system-wide average comparison with best/worst predictions
+  - **Prediction Timeline** - Chronological list of all predictions for the asset with outcomes and P&L
+  - **Related Assets** - Assets frequently co-mentioned in predictions with navigation links
+  - **New Data Layer Functions**:
+    - `get_asset_price_history(symbol, days)` - OHLCV data from market_prices table
+    - `get_asset_predictions(symbol, limit)` - All predictions with outcomes for an asset
+    - `get_asset_stats(symbol)` - Comprehensive stats with system-wide comparison
+    - `get_related_assets(symbol, limit)` - Co-occurring assets from prediction_outcomes
+  - **New Tests** - 16 new tests for asset deep dive data functions
 - **Data Layer Expansion (Phase 1)** - Performance aggregate functions and query caching for dashboard
   - **Query Caching** - TTL-based caching (5-10 min) for expensive aggregate queries:
     - `get_prediction_stats`, `get_performance_metrics`, `get_accuracy_by_confidence`
