@@ -1,12 +1,67 @@
 # Asset Deep Dive Pages - Engineering Specification
 
+> **STATUS: PENDING** - Not yet implemented. Can be done in parallel with Performance Page (03).
+
+## Implementation Context for Engineering Team
+
+### Current State (as of 2026-01-29)
+
+The dashboard already has a **partial asset drilldown feature** in `layout.py`:
+
+- `asset-selector` dropdown with active assets
+- `get_similar_predictions(asset, limit)` function in `data.py` for historical predictions
+- `update_asset_drilldown()` callback that renders prediction cards for selected asset
+
+**This spec extends that feature** into dedicated full-page views with price charts.
+
+### Existing Related Functions in `data.py`
+
+| Function | Purpose | Reusable? |
+|----------|---------|-----------|
+| `get_similar_predictions(asset, limit)` | Historical predictions for one asset | ✅ Yes |
+| `get_accuracy_by_asset(limit, days)` | Accuracy stats per asset | ✅ Partial - need single-asset variant |
+| `get_active_assets_from_db()` | List of assets with outcomes | ✅ Yes - for validation |
+
+### Database Tables Available
+
+**For Price Charts** (`market_prices`):
+```sql
+market_prices (
+  id, symbol, date,
+  open, high, low, close, volume, adjusted_close,
+  source, last_updated, is_market_open, has_split, has_dividend
+)
+```
+Key index: `idx_market_price_symbol_date` (UNIQUE on symbol + date)
+
+**For Predictions** (`prediction_outcomes` + `predictions` + `truth_social_shitposts`):
+- Join `prediction_outcomes.prediction_id` → `predictions.id`
+- Join `predictions.shitpost_id` → `truth_social_shitposts.shitpost_id`
+- This gives full context: price data + prediction details + original tweet text
+
+### Key Implementation Notes
+
+1. **market_prices table exists** - Use it directly for OHLCV candlestick/line charts
+2. **Prediction overlay markers** - Plot vertical lines or markers at `prediction_date` with color based on `correct_t7`
+3. **URL routing** - Dash doesn't have native dynamic routes; use `dcc.Location` + pathname parsing
+4. **Chart library** - Use Plotly's `go.Candlestick` or `go.Scatter` for price charts
+
+### Recommended Implementation Approach
+
+1. **Add `get_asset_price_history(symbol, days)` function** to `data.py`
+2. **Add `get_asset_performance_summary(symbol)` function** for single-asset stats
+3. **Add URL routing** using `dcc.Location` and pathname callback
+4. **Build the asset page layout** with header, stats, chart, and prediction timeline
+
+---
+
 ## Overview
 
 This document specifies the implementation of dedicated `/assets/{symbol}` pages in the Shitpost Alpha dashboard. Each page provides a comprehensive view of a single asset: price history, prediction overlays, performance statistics, and related assets.
 
 **Estimated Effort**: 3-4 days
 **Priority**: P1 (Should Have)
-**Prerequisites**: Dashboard Enhancements (02) should be complete; existing `data.py` query patterns and `layout.py` component patterns should be understood.
+**Prerequisites**: ✅ Dashboard Enhancements (02) complete - **DONE**
 
 ---
 

@@ -1,12 +1,74 @@
 # Alerting System Specification
 
+> **STATUS: PENDING** - Not yet implemented. Depends on Signal Feed (05) patterns.
+
+## Implementation Context for Engineering Team
+
+### Current State (as of 2026-01-29)
+
+The database already has a **`subscribers` table** for SMS alert management:
+
+```sql
+subscribers (
+  id, created_at, updated_at,
+  phone_number (UNIQUE),    -- SMS target
+  name, email,              -- Contact info
+  is_active (DEFAULT=True), -- Active subscription
+  confidence_threshold (DEFAULT=0.7),  -- Min confidence for alerts
+  alert_frequency ('all', 'high_confidence', 'daily_summary'),
+  last_alert_sent,          -- Rate limiting
+  alerts_sent_today         -- Daily limit tracking
+)
+```
+
+**This table is ready to use** - no schema changes needed for SMS alerts.
+
+### Existing Infrastructure
+
+1. **Twilio Integration** - The project uses Twilio for SMS (see `shit/config/`)
+2. **Email Config** - SMTP settings available via environment variables
+3. **Browser localStorage** - No backend needed for browser push preferences
+4. **dcc.Interval** - Already used for 5-minute refresh; can add separate alert interval
+
+### Database Tables for Alert Logic
+
+```sql
+-- New predictions to check
+predictions (analysis_status='completed', confidence >= threshold)
+
+-- Recent signals for alert checking
+SELECT * FROM predictions p
+JOIN truth_social_shitposts tss ON p.shitpost_id = tss.shitpost_id
+WHERE p.analysis_status = 'completed'
+  AND p.confidence >= :threshold
+  AND tss.timestamp > :last_check_time
+ORDER BY tss.timestamp DESC
+```
+
+### Recommended Implementation Approach
+
+1. **Start with browser notifications** - Easiest to implement, no backend changes
+2. **Use clientside callback** - Store preferences in localStorage via JS
+3. **Add alert checker interval** - Separate from refresh interval (e.g., 2 min)
+4. **Add SMS later** - Use existing `subscribers` table
+5. **Add email last** - Requires SMTP/SendGrid setup
+
+### Security Notes
+
+- SMS phone numbers are stored in database (already exists)
+- Email addresses require user verification before alerts
+- Browser push requires explicit permission
+- No PII stored in localStorage (just preferences)
+
+---
+
 ## Overview
 
 This document specifies the alerting and notification system for the Shitpost Alpha dashboard. The system monitors for new high-confidence predictions and notifies users via browser push notifications, email, and SMS. Alert preferences are stored in browser localStorage so no user accounts are required.
 
 **Estimated Effort**: 4-5 days
 **Priority**: P2 (Nice to Have)
-**Prerequisites**: Dashboard Enhancements (02), Data Layer Expansion (07)
+**Prerequisites**: ✅ Dashboard Enhancements (02) - DONE; Data Layer Expansion (07) - Partial
 
 ---
 

@@ -4,23 +4,29 @@
 
 This document describes the current implementation of the Shitpost Alpha dashboard as of the Phase 0.2 redesign. Use this as a reference when implementing new features.
 
+> **Deployment Status**: ✅ Live on Railway with Neon PostgreSQL database. Both dashboard and scraping services are operational.
+
 ---
 
 ## Directory Structure
 
+> **Updated 2026-01-29** - Reflects dashboard enhancements (02) completion.
+
 ```
 shitty_ui/
 ├── app.py          # Application entry point
-├── layout.py       # Layout components and callbacks (632 lines)
-├── data.py         # Database query functions (564 lines)
+├── layout.py       # Layout components and callbacks (~1500 lines)
+├── data.py         # Database query functions (13 functions, ~650 lines)
 └── README.md       # Module documentation
 
 shit_tests/shitty_ui/
 ├── __init__.py
 ├── conftest.py     # Test configuration and mocks
-├── test_data.py    # Data layer tests (28 tests)
-└── test_layout.py  # Layout component tests (21 tests)
+├── test_data.py    # Data layer tests (34 tests)
+└── test_layout.py  # Layout component tests (33 tests)
 ```
+
+**Total tests: 67**
 
 ---
 

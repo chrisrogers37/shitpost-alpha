@@ -1,12 +1,56 @@
 # Signal Feed Page Specification
 
+> **STATUS: PENDING** - Not yet implemented. Lower priority than Performance (03) and Asset Deep Dive (04).
+
+## Implementation Context for Engineering Team
+
+### Current State (as of 2026-01-29)
+
+The dashboard already has a **"Recent Signals" section** on the main page:
+
+- 10 most recent signals displayed as cards
+- Uses `get_recent_signals(limit, min_confidence, days)` function in `data.py`
+- `create_signal_card()` function in `layout.py` renders each signal
+- Shows: timestamp, tweet text (truncated), confidence badge, assets, sentiment, return outcome
+
+**This spec extends that feature** into a dedicated full-page feed with filtering, pagination, and real-time updates.
+
+### Existing Related Functions in `data.py`
+
+| Function | Returns | Notes |
+|----------|---------|-------|
+| `get_recent_signals(limit, min_conf, days)` | DataFrame | ✅ Already supports time filtering |
+| `load_recent_posts(limit)` | DataFrame | Alternative raw post view |
+| `load_filtered_posts(...)` | DataFrame | Full filtering support |
+
+### Existing Component in `layout.py`
+
+```python
+def create_signal_card(row: dict) -> dbc.Card:
+    """Create a signal card showing prediction details."""
+    # Takes row with: timestamp, text, confidence, assets, market_impact, return_t7, correct_t7
+    # Returns styled dbc.Card component
+```
+
+**This component can be reused directly** for the signal feed cards.
+
+### Recommended Implementation Approach
+
+1. **Reuse `create_signal_card()`** - Already styled and tested
+2. **Add pagination** - The feed should paginate (e.g., 20 items per page)
+3. **Add filters** - Confidence threshold, sentiment, asset, date range
+4. **Consider virtual scrolling** - For very long lists, use windowing
+5. **Real-time indicator** - Badge showing "X new signals" since last view
+
+---
+
 ## Overview
 
 This document specifies a new `/signals` feed page for the Shitpost Alpha dashboard. The signal feed is a chronological, filterable stream of LLM-generated predictions derived from Trump's Truth Social posts. It displays each prediction as a card with the original tweet text, predicted assets, sentiment direction, confidence score, and validation outcome. The feed polls for new signals every two minutes and provides visual indicators when new signals arrive.
 
 **Estimated Effort**: 2-3 days
 **Priority**: P2 (Nice to Have)
-**Prerequisites**: Core dashboard (layout.py, data.py) must be functional. The `prediction_outcomes` table must be populated.
+**Prerequisites**: ✅ Core dashboard functional - **DONE**
 
 ---
 

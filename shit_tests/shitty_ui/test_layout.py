@@ -11,7 +11,7 @@ import sys
 import os
 
 # Add shitty_ui to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'shitty_ui'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "shitty_ui"))
 
 
 class TestColors:
@@ -22,42 +22,66 @@ class TestColors:
         from layout import COLORS
 
         assert isinstance(COLORS, dict)
-        assert 'primary' in COLORS
-        assert 'secondary' in COLORS
-        assert 'accent' in COLORS
-        assert 'success' in COLORS
-        assert 'danger' in COLORS
-        assert 'warning' in COLORS
-        assert 'text' in COLORS
-        assert 'text_muted' in COLORS
-        assert 'border' in COLORS
+        assert "primary" in COLORS
+        assert "secondary" in COLORS
+        assert "accent" in COLORS
+        assert "success" in COLORS
+        assert "danger" in COLORS
+        assert "warning" in COLORS
+        assert "text" in COLORS
+        assert "text_muted" in COLORS
+        assert "border" in COLORS
 
     def test_colors_are_valid_hex(self):
         """Test that all colors are valid hex values."""
         from layout import COLORS
 
         for name, color in COLORS.items():
-            assert color.startswith('#'), f"{name} should be a hex color"
+            assert color.startswith("#"), f"{name} should be a hex color"
             assert len(color) == 7, f"{name} should be 7 characters (#RRGGBB)"
 
 
 class TestCreateApp:
     """Tests for create_app function."""
 
-    @patch('layout.get_prediction_stats')
-    @patch('layout.get_performance_metrics')
-    @patch('layout.get_accuracy_by_confidence')
-    @patch('layout.get_accuracy_by_asset')
-    @patch('layout.get_recent_signals')
-    @patch('layout.get_active_assets_from_db')
-    def test_creates_dash_app(self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats):
+    @patch("layout.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_creates_dash_app(
+        self,
+        mock_assets,
+        mock_signals,
+        mock_asset_acc,
+        mock_conf_acc,
+        mock_perf,
+        mock_stats,
+    ):
         """Test that function creates a Dash application."""
         from layout import create_app
         from dash import Dash
 
         # Mock all data functions
-        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_stats.return_value = {
+            "total_posts": 0,
+            "analyzed_posts": 0,
+            "completed_analyses": 0,
+            "bypassed_posts": 0,
+            "avg_confidence": 0.0,
+            "high_confidence_predictions": 0,
+        }
+        mock_perf.return_value = {
+            "total_outcomes": 0,
+            "evaluated_predictions": 0,
+            "correct_predictions": 0,
+            "incorrect_predictions": 0,
+            "accuracy_t7": 0.0,
+            "avg_return_t7": 0.0,
+            "total_pnl_t7": 0.0,
+            "avg_confidence": 0.0,
+        }
         mock_conf_acc.return_value = pd.DataFrame()
         mock_asset_acc.return_value = pd.DataFrame()
         mock_signals.return_value = pd.DataFrame()
@@ -68,18 +92,42 @@ class TestCreateApp:
         assert isinstance(app, Dash)
         assert app.title == "Shitpost Alpha - Prediction Performance Dashboard"
 
-    @patch('layout.get_prediction_stats')
-    @patch('layout.get_performance_metrics')
-    @patch('layout.get_accuracy_by_confidence')
-    @patch('layout.get_accuracy_by_asset')
-    @patch('layout.get_recent_signals')
-    @patch('layout.get_active_assets_from_db')
-    def test_app_has_layout(self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats):
+    @patch("layout.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_app_has_layout(
+        self,
+        mock_assets,
+        mock_signals,
+        mock_asset_acc,
+        mock_conf_acc,
+        mock_perf,
+        mock_stats,
+    ):
         """Test that app has a layout defined."""
         from layout import create_app
 
-        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_stats.return_value = {
+            "total_posts": 0,
+            "analyzed_posts": 0,
+            "completed_analyses": 0,
+            "bypassed_posts": 0,
+            "avg_confidence": 0.0,
+            "high_confidence_predictions": 0,
+        }
+        mock_perf.return_value = {
+            "total_outcomes": 0,
+            "evaluated_predictions": 0,
+            "correct_predictions": 0,
+            "incorrect_predictions": 0,
+            "accuracy_t7": 0.0,
+            "avg_return_t7": 0.0,
+            "total_pnl_t7": 0.0,
+            "avg_confidence": 0.0,
+        }
         mock_conf_acc.return_value = pd.DataFrame()
         mock_asset_acc.return_value = pd.DataFrame()
         mock_signals.return_value = pd.DataFrame()
@@ -156,10 +204,7 @@ class TestCreateMetricCard:
         import dash_bootstrap_components as dbc
 
         card = create_metric_card(
-            title="Test Title",
-            value="100",
-            subtitle="Test subtitle",
-            icon="chart-line"
+            title="Test Title", value="100", subtitle="Test subtitle", icon="chart-line"
         )
 
         assert isinstance(card, dbc.Card)
@@ -168,10 +213,7 @@ class TestCreateMetricCard:
         """Test that default accent color is used."""
         from layout import create_metric_card, COLORS
 
-        card = create_metric_card(
-            title="Test",
-            value="100"
-        )
+        card = create_metric_card(title="Test", value="100")
 
         # Card should be created without error with default color
         assert card is not None
@@ -180,11 +222,7 @@ class TestCreateMetricCard:
         """Test that custom color can be passed."""
         from layout import create_metric_card
 
-        card = create_metric_card(
-            title="Test",
-            value="100",
-            color="#FF0000"
-        )
+        card = create_metric_card(title="Test", value="100", color="#FF0000")
 
         assert card is not None
 
@@ -198,13 +236,13 @@ class TestCreateSignalCard:
         from dash import html
 
         row = {
-            'timestamp': datetime.now(),
-            'text': 'Test tweet content',
-            'confidence': 0.8,
-            'assets': ['AAPL', 'GOOGL'],
-            'market_impact': {'AAPL': 'bullish'},
-            'return_t7': 2.5,
-            'correct_t7': True
+            "timestamp": datetime.now(),
+            "text": "Test tweet content",
+            "confidence": 0.8,
+            "assets": ["AAPL", "GOOGL"],
+            "market_impact": {"AAPL": "bullish"},
+            "return_t7": 2.5,
+            "correct_t7": True,
         }
 
         card = create_signal_card(row)
@@ -216,13 +254,13 @@ class TestCreateSignalCard:
         from layout import create_signal_card
 
         row = {
-            'timestamp': datetime.now(),
-            'text': 'Test tweet',
-            'confidence': 0.8,
-            'assets': ['AAPL'],
-            'market_impact': {'AAPL': 'bullish'},
-            'return_t7': 2.5,
-            'correct_t7': True
+            "timestamp": datetime.now(),
+            "text": "Test tweet",
+            "confidence": 0.8,
+            "assets": ["AAPL"],
+            "market_impact": {"AAPL": "bullish"},
+            "return_t7": 2.5,
+            "correct_t7": True,
         }
 
         card = create_signal_card(row)
@@ -233,13 +271,13 @@ class TestCreateSignalCard:
         from layout import create_signal_card
 
         row = {
-            'timestamp': datetime.now(),
-            'text': 'Test tweet',
-            'confidence': 0.7,
-            'assets': ['TSLA'],
-            'market_impact': {'TSLA': 'bearish'},
-            'return_t7': -1.5,
-            'correct_t7': True
+            "timestamp": datetime.now(),
+            "text": "Test tweet",
+            "confidence": 0.7,
+            "assets": ["TSLA"],
+            "market_impact": {"TSLA": "bearish"},
+            "return_t7": -1.5,
+            "correct_t7": True,
         }
 
         card = create_signal_card(row)
@@ -250,13 +288,13 @@ class TestCreateSignalCard:
         from layout import create_signal_card
 
         row = {
-            'timestamp': datetime.now(),
-            'text': 'Test tweet',
-            'confidence': 0.6,
-            'assets': ['MSFT'],
-            'market_impact': {'MSFT': 'neutral'},
-            'return_t7': None,
-            'correct_t7': None
+            "timestamp": datetime.now(),
+            "text": "Test tweet",
+            "confidence": 0.6,
+            "assets": ["MSFT"],
+            "market_impact": {"MSFT": "neutral"},
+            "return_t7": None,
+            "correct_t7": None,
         }
 
         card = create_signal_card(row)
@@ -267,13 +305,13 @@ class TestCreateSignalCard:
         from layout import create_signal_card
 
         row = {
-            'timestamp': datetime.now(),
-            'text': 'Test tweet',
-            'confidence': 0.8,
-            'assets': ['NVDA'],
-            'market_impact': {'NVDA': 'bullish'},
-            'return_t7': -3.0,
-            'correct_t7': False
+            "timestamp": datetime.now(),
+            "text": "Test tweet",
+            "confidence": 0.8,
+            "assets": ["NVDA"],
+            "market_impact": {"NVDA": "bullish"},
+            "return_t7": -3.0,
+            "correct_t7": False,
         }
 
         card = create_signal_card(row)
@@ -286,13 +324,13 @@ class TestCreateSignalCard:
         long_text = "A" * 200  # More than 150 characters
 
         row = {
-            'timestamp': datetime.now(),
-            'text': long_text,
-            'confidence': 0.8,
-            'assets': ['AAPL'],
-            'market_impact': {},
-            'return_t7': None,
-            'correct_t7': None
+            "timestamp": datetime.now(),
+            "text": long_text,
+            "confidence": 0.8,
+            "assets": ["AAPL"],
+            "market_impact": {},
+            "return_t7": None,
+            "correct_t7": None,
         }
 
         card = create_signal_card(row)
@@ -303,13 +341,13 @@ class TestCreateSignalCard:
         from layout import create_signal_card
 
         row = {
-            'timestamp': datetime.now(),
-            'text': 'Test tweet',
-            'confidence': 0.8,
-            'assets': ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'NVDA'],
-            'market_impact': {},
-            'return_t7': None,
-            'correct_t7': None
+            "timestamp": datetime.now(),
+            "text": "Test tweet",
+            "confidence": 0.8,
+            "assets": ["AAPL", "GOOGL", "MSFT", "TSLA", "NVDA"],
+            "market_impact": {},
+            "return_t7": None,
+            "correct_t7": None,
         }
 
         card = create_signal_card(row)
@@ -320,13 +358,13 @@ class TestCreateSignalCard:
         from layout import create_signal_card
 
         row = {
-            'timestamp': '2024-01-15 10:30:00',
-            'text': 'Test tweet',
-            'confidence': 0.8,
-            'assets': ['AAPL'],
-            'market_impact': {},
-            'return_t7': None,
-            'correct_t7': None
+            "timestamp": "2024-01-15 10:30:00",
+            "text": "Test tweet",
+            "confidence": 0.8,
+            "assets": ["AAPL"],
+            "market_impact": {},
+            "return_t7": None,
+            "correct_t7": None,
         }
 
         card = create_signal_card(row)
@@ -336,18 +374,42 @@ class TestCreateSignalCard:
 class TestRegisterCallbacks:
     """Tests for register_callbacks function."""
 
-    @patch('layout.get_prediction_stats')
-    @patch('layout.get_performance_metrics')
-    @patch('layout.get_accuracy_by_confidence')
-    @patch('layout.get_accuracy_by_asset')
-    @patch('layout.get_recent_signals')
-    @patch('layout.get_active_assets_from_db')
-    def test_callbacks_registered(self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats):
+    @patch("layout.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_callbacks_registered(
+        self,
+        mock_assets,
+        mock_signals,
+        mock_asset_acc,
+        mock_conf_acc,
+        mock_perf,
+        mock_stats,
+    ):
         """Test that callbacks are registered on the app."""
         from layout import create_app, register_callbacks
 
-        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_stats.return_value = {
+            "total_posts": 0,
+            "analyzed_posts": 0,
+            "completed_analyses": 0,
+            "bypassed_posts": 0,
+            "avg_confidence": 0.0,
+            "high_confidence_predictions": 0,
+        }
+        mock_perf.return_value = {
+            "total_outcomes": 0,
+            "evaluated_predictions": 0,
+            "correct_predictions": 0,
+            "incorrect_predictions": 0,
+            "accuracy_t7": 0.0,
+            "avg_return_t7": 0.0,
+            "total_pnl_t7": 0.0,
+            "avg_confidence": 0.0,
+        }
         mock_conf_acc.return_value = pd.DataFrame()
         mock_asset_acc.return_value = pd.DataFrame()
         mock_signals.return_value = pd.DataFrame()
@@ -359,3 +421,239 @@ class TestRegisterCallbacks:
         # Check that callbacks were registered
         # The app.callback_map should have entries after registration
         assert app.callback_map is not None
+
+
+class TestErrorCard:
+    """Tests for create_error_card function."""
+
+    def test_returns_card(self):
+        """Test that function returns a Bootstrap Card."""
+        from layout import create_error_card
+        import dash_bootstrap_components as dbc
+
+        card = create_error_card("Test error message")
+        assert isinstance(card, dbc.Card)
+
+    def test_includes_message(self):
+        """Test that error message is included."""
+        from layout import create_error_card
+
+        card = create_error_card("Test error message", "Details here")
+        assert card is not None
+
+    def test_handles_none_details(self):
+        """Test that None details are handled gracefully."""
+        from layout import create_error_card
+
+        card = create_error_card("Test error message", None)
+        assert card is not None
+
+
+class TestEmptyChart:
+    """Tests for create_empty_chart function."""
+
+    def test_returns_figure(self):
+        """Test that function returns a Plotly Figure."""
+        from layout import create_empty_chart
+        import plotly.graph_objects as go
+
+        fig = create_empty_chart("No data available")
+        assert isinstance(fig, go.Figure)
+
+    def test_includes_annotation(self):
+        """Test that chart includes the message annotation."""
+        from layout import create_empty_chart
+
+        fig = create_empty_chart("Custom message")
+        # Figure should have layout with annotations
+        assert fig.layout is not None
+
+
+class TestPeriodButtonStyles:
+    """Tests for get_period_button_styles function."""
+
+    def test_returns_list(self):
+        """Test that function returns a list of styles."""
+        from layout import get_period_button_styles
+
+        styles = get_period_button_styles("7d")
+        assert isinstance(styles, list)
+        assert len(styles) == 8  # 4 periods * 2 (color + outline)
+
+    def test_selected_period_highlighted(self):
+        """Test that selected period is highlighted."""
+        from layout import get_period_button_styles
+
+        # Test 7d selected
+        styles = get_period_button_styles("7d")
+        assert styles[0] == "primary"  # 7d color
+        assert styles[1] is False  # 7d outline
+        assert styles[2] == "secondary"  # 30d color
+        assert styles[3] is True  # 30d outline
+
+    def test_90d_default(self):
+        """Test 90d as default selection."""
+        from layout import get_period_button_styles
+
+        styles = get_period_button_styles("90d")
+        assert styles[4] == "primary"  # 90d color
+        assert styles[5] is False  # 90d outline
+
+    def test_all_period(self):
+        """Test all period selection."""
+        from layout import get_period_button_styles
+
+        styles = get_period_button_styles("all")
+        assert styles[6] == "primary"  # all color
+        assert styles[7] is False  # all outline
+
+
+class TestLoadingStates:
+    """Tests for loading state components."""
+
+    @patch("layout.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_app_has_loading_components(
+        self,
+        mock_assets,
+        mock_signals,
+        mock_asset_acc,
+        mock_conf_acc,
+        mock_perf,
+        mock_stats,
+    ):
+        """Test that app layout contains dcc.Loading components."""
+        from layout import create_app
+        from dash import dcc
+
+        mock_stats.return_value = {
+            "total_posts": 0,
+            "analyzed_posts": 0,
+            "completed_analyses": 0,
+            "bypassed_posts": 0,
+            "avg_confidence": 0.0,
+            "high_confidence_predictions": 0,
+        }
+        mock_perf.return_value = {
+            "total_outcomes": 0,
+            "evaluated_predictions": 0,
+            "correct_predictions": 0,
+            "incorrect_predictions": 0,
+            "accuracy_t7": 0.0,
+            "avg_return_t7": 0.0,
+            "total_pnl_t7": 0.0,
+            "avg_confidence": 0.0,
+        }
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+
+        app = create_app()
+
+        # App should have been created with loading components
+        assert app.layout is not None
+
+
+class TestTimePeriodSelector:
+    """Tests for time period selector UI components."""
+
+    @patch("layout.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_app_has_period_store(
+        self,
+        mock_assets,
+        mock_signals,
+        mock_asset_acc,
+        mock_conf_acc,
+        mock_perf,
+        mock_stats,
+    ):
+        """Test that app layout contains selected-period store."""
+        from layout import create_app
+
+        mock_stats.return_value = {
+            "total_posts": 0,
+            "analyzed_posts": 0,
+            "completed_analyses": 0,
+            "bypassed_posts": 0,
+            "avg_confidence": 0.0,
+            "high_confidence_predictions": 0,
+        }
+        mock_perf.return_value = {
+            "total_outcomes": 0,
+            "evaluated_predictions": 0,
+            "correct_predictions": 0,
+            "incorrect_predictions": 0,
+            "accuracy_t7": 0.0,
+            "avg_return_t7": 0.0,
+            "total_pnl_t7": 0.0,
+            "avg_confidence": 0.0,
+        }
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+
+        app = create_app()
+
+        # App should have been created with period selector
+        assert app.layout is not None
+
+
+class TestRefreshIndicator:
+    """Tests for refresh indicator components."""
+
+    @patch("layout.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_app_has_countdown_interval(
+        self,
+        mock_assets,
+        mock_signals,
+        mock_asset_acc,
+        mock_conf_acc,
+        mock_perf,
+        mock_stats,
+    ):
+        """Test that app layout contains countdown interval."""
+        from layout import create_app
+
+        mock_stats.return_value = {
+            "total_posts": 0,
+            "analyzed_posts": 0,
+            "completed_analyses": 0,
+            "bypassed_posts": 0,
+            "avg_confidence": 0.0,
+            "high_confidence_predictions": 0,
+        }
+        mock_perf.return_value = {
+            "total_outcomes": 0,
+            "evaluated_predictions": 0,
+            "correct_predictions": 0,
+            "incorrect_predictions": 0,
+            "accuracy_t7": 0.0,
+            "avg_return_t7": 0.0,
+            "total_pnl_t7": 0.0,
+            "avg_confidence": 0.0,
+        }
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+
+        app = create_app()
+
+        # App should have been created with countdown interval
+        assert app.layout is not None

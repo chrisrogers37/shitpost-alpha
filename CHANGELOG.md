@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Dashboard Enhancements (Phase 1)** - P0 improvements to production dashboard
+  - **Loading States** - Added loading spinners to all data components (metrics, charts, signals, drilldown, table)
+  - **Error Boundaries** - Graceful degradation with user-friendly error cards when data fails to load
+  - **Time Period Selector** - Filter all dashboard data by 7D, 30D, 90D, or All time periods
+  - **Chart Interactivity** - Click on asset chart bars to drill down into specific asset performance
+  - **Mobile Responsiveness** - Responsive layout with proper breakpoints and mobile-optimized CSS
+  - **Refresh Indicator** - Live countdown showing last update time and time until next auto-refresh
+- **Data Layer Time Filtering** - Added `days` parameter to query functions:
+  - `get_performance_metrics(days)` - Filter metrics by time period
+  - `get_accuracy_by_confidence(days)` - Filter confidence accuracy by time period
+  - `get_accuracy_by_asset(days)` - Filter asset accuracy by time period
+  - `get_recent_signals(days)` - Filter signals by time period
+- **New Test Coverage** - Added 15 new tests for dashboard enhancements
+  - Error card and empty chart helper functions
+  - Period button styles function
+  - Time filtering in data functions
+
+### Changed
+- **Planning Documentation** - Updated planning docs to reflect current deployment status
+  - Marked deployment to Railway as complete (09_DEPLOYMENT_GUIDE.md)
+  - Updated overview with deployment status (00_OVERVIEW.md)
+  - Added deployment status note to current state reference (01_CURRENT_STATE.md)
+- **Dashboard Callbacks** - Refactored to use error boundaries and time period filtering
+- **Metric Cards** - Now use responsive column sizing for mobile
+
+### Added (Phase 0.2)
 - **Dashboard Redesign (Phase 0.2)** - Complete overhaul of shitty_ui to focus on prediction performance
   - **Performance Metrics Row** - Key metrics at a glance: accuracy, P&L, average return, predictions evaluated
   - **Accuracy by Confidence Chart** - Bar chart showing how accuracy varies by confidence level (Low/Medium/High)
