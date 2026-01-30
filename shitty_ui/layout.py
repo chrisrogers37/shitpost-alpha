@@ -26,7 +26,12 @@ from data import (
     get_similar_predictions,
     get_predictions_with_outcomes,
     get_active_assets_from_db,
+    get_asset_price_history,
+    get_asset_predictions,
+    get_asset_stats,
+    get_related_assets,
 )
+from typing import Dict, Any
 
 # Color palette - cleaner, more professional
 COLORS = {
@@ -195,9 +200,11 @@ def create_app() -> Dash:
 </html>
 """
 
-    # Main layout
+    # Main layout with URL routing
     app.layout = html.Div(
         [
+            # URL tracking for multi-page routing
+            dcc.Location(id="url", refresh=False),
             # Auto-refresh interval (5 minutes)
             dcc.Interval(
                 id="refresh-interval",
@@ -216,6 +223,24 @@ def create_app() -> Dash:
             dcc.Store(id="selected-period", data="90d"),
             # Store for last update timestamp
             dcc.Store(id="last-update-timestamp", data=None),
+            # Page content - swapped by router callback
+            html.Div(id="page-content"),
+        ],
+        style={
+            "backgroundColor": COLORS["primary"],
+            "minHeight": "100vh",
+            "color": COLORS["text"],
+            "fontFamily": "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+        },
+    )
+
+    return app
+
+
+def create_dashboard_page() -> html.Div:
+    """Create the main dashboard page layout (shown at /)."""
+    return html.Div(
+        [
             # Header
             create_header(),
             # Main content container
@@ -488,16 +513,8 @@ def create_app() -> Dash:
                 ],
                 style={"padding": "20px", "maxWidth": "1400px", "margin": "0 auto"},
             ),
-        ],
-        style={
-            "backgroundColor": COLORS["primary"],
-            "minHeight": "100vh",
-            "color": COLORS["text"],
-            "fontFamily": "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-        },
+        ]
     )
-
-    return app
 
 
 def create_header():
@@ -829,8 +846,740 @@ def create_signal_card(row):
     )
 
 
+# =============================================================================
+# Asset Deep Dive Page Components
+# =============================================================================
+
+
+def create_asset_page(symbol: str) -> html.Div:
+    """
+    Create the full asset deep dive page for a given symbol.
+
+    This function is called by the router callback when the URL
+    matches /assets/{symbol}.
+
+    Args:
+        symbol: Ticker symbol (e.g., 'AAPL')
+
+    Returns:
+        html.Div containing the full asset page layout
+    """
+    return html.Div(
+        [
+            # Store the symbol so callbacks can access it
+            dcc.Store(id="asset-page-symbol", data=symbol),
+            # Asset header with back navigation
+            create_asset_header(symbol),
+            # Main content
+            html.Div(
+                [
+                    # Stat cards row (populated by callback)
+                    dcc.Loading(
+                        type="default",
+                        color=COLORS["accent"],
+                        children=html.Div(id="asset-stat-cards", className="mb-4"),
+                    ),
+                    # Price chart + Performance summary
+                    dbc.Row(
+                        [
+                            # Left: Price chart with prediction overlays
+                            dbc.Col(
+                                [
+                                    dbc.Card(
+                                        [
+                                            dbc.CardHeader(
+                                                [
+                                                    html.I(
+                                                        className="fas fa-chart-line me-2"
+                                                    ),
+                                                    f"{symbol} Price History",
+                                                    # Date range selector
+                                                    html.Div(
+                                                        [
+                                                            dbc.ButtonGroup(
+                                                                [
+                                                                    dbc.Button(
+                                                                        "30D",
+                                                                        id="asset-range-30d",
+                                                                        color="secondary",
+                                                                        outline=True,
+                                                                        size="sm",
+                                                                    ),
+                                                                    dbc.Button(
+                                                                        "90D",
+                                                                        id="asset-range-90d",
+                                                                        color="primary",
+                                                                        size="sm",
+                                                                    ),
+                                                                    dbc.Button(
+                                                                        "180D",
+                                                                        id="asset-range-180d",
+                                                                        color="secondary",
+                                                                        outline=True,
+                                                                        size="sm",
+                                                                    ),
+                                                                    dbc.Button(
+                                                                        "1Y",
+                                                                        id="asset-range-1y",
+                                                                        color="secondary",
+                                                                        outline=True,
+                                                                        size="sm",
+                                                                    ),
+                                                                ],
+                                                                size="sm",
+                                                            ),
+                                                        ],
+                                                        style={"float": "right"},
+                                                    ),
+                                                ],
+                                                className="fw-bold d-flex justify-content-between align-items-center",
+                                            ),
+                                            dbc.CardBody(
+                                                [
+                                                    dcc.Loading(
+                                                        type="circle",
+                                                        color=COLORS["accent"],
+                                                        children=dcc.Graph(
+                                                            id="asset-price-chart",
+                                                            config={
+                                                                "displayModeBar": False
+                                                            },
+                                                        ),
+                                                    )
+                                                ]
+                                            ),
+                                        ],
+                                        style={"backgroundColor": COLORS["secondary"]},
+                                    ),
+                                ],
+                                md=8,
+                                xs=12,
+                            ),
+                            # Right: Performance summary
+                            dbc.Col(
+                                [
+                                    dbc.Card(
+                                        [
+                                            dbc.CardHeader(
+                                                [
+                                                    html.I(
+                                                        className="fas fa-chart-pie me-2"
+                                                    ),
+                                                    "Performance Summary",
+                                                ],
+                                                className="fw-bold",
+                                            ),
+                                            dbc.CardBody(
+                                                id="asset-performance-summary"
+                                            ),
+                                        ],
+                                        className="mb-3",
+                                        style={"backgroundColor": COLORS["secondary"]},
+                                    ),
+                                    # Related assets card
+                                    dbc.Card(
+                                        [
+                                            dbc.CardHeader(
+                                                [
+                                                    html.I(
+                                                        className="fas fa-project-diagram me-2"
+                                                    ),
+                                                    "Related Assets",
+                                                ],
+                                                className="fw-bold",
+                                            ),
+                                            dbc.CardBody(id="asset-related-assets"),
+                                        ],
+                                        style={"backgroundColor": COLORS["secondary"]},
+                                    ),
+                                ],
+                                md=4,
+                                xs=12,
+                            ),
+                        ],
+                        className="mb-4",
+                    ),
+                    # Prediction timeline
+                    dbc.Card(
+                        [
+                            dbc.CardHeader(
+                                [
+                                    html.I(className="fas fa-history me-2"),
+                                    f"Prediction Timeline for {symbol}",
+                                ],
+                                className="fw-bold",
+                            ),
+                            dbc.CardBody(
+                                id="asset-prediction-timeline",
+                                style={"maxHeight": "600px", "overflowY": "auto"},
+                            ),
+                        ],
+                        style={"backgroundColor": COLORS["secondary"]},
+                    ),
+                    # Footer
+                    create_footer(),
+                ],
+                style={
+                    "padding": "20px",
+                    "maxWidth": "1400px",
+                    "margin": "0 auto",
+                },
+            ),
+        ]
+    )
+
+
+def create_asset_header(symbol: str) -> html.Div:
+    """
+    Create the header bar for an asset page.
+    Includes back navigation, symbol name, and a placeholder for
+    current price (populated by callback).
+
+    Args:
+        symbol: Ticker symbol
+
+    Returns:
+        html.Div header component
+    """
+    return html.Div(
+        [
+            html.Div(
+                [
+                    # Back link
+                    dcc.Link(
+                        [html.I(className="fas fa-arrow-left me-2"), "Dashboard"],
+                        href="/",
+                        style={
+                            "color": COLORS["accent"],
+                            "textDecoration": "none",
+                            "fontSize": "0.9rem",
+                        },
+                    ),
+                ],
+                style={"marginBottom": "10px"},
+            ),
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.H1(
+                                symbol,
+                                style={
+                                    "fontSize": "2rem",
+                                    "fontWeight": "bold",
+                                    "margin": 0,
+                                    "color": COLORS["text"],
+                                },
+                            ),
+                            html.Span(
+                                id="asset-current-price",
+                                style={
+                                    "fontSize": "1.5rem",
+                                    "color": COLORS["accent"],
+                                    "marginLeft": "15px",
+                                },
+                            ),
+                        ],
+                        style={"display": "flex", "alignItems": "baseline"},
+                    ),
+                    html.P(
+                        "Prediction Performance Deep Dive",
+                        style={
+                            "color": COLORS["text_muted"],
+                            "margin": 0,
+                            "fontSize": "0.9rem",
+                        },
+                    ),
+                ]
+            ),
+        ],
+        style={
+            "padding": "20px",
+            "borderBottom": f"1px solid {COLORS['border']}",
+            "backgroundColor": COLORS["secondary"],
+        },
+    )
+
+
+def create_prediction_timeline_card(row: dict) -> html.Div:
+    """
+    Create a single prediction card for the timeline.
+
+    Args:
+        row: Dictionary with keys from get_asset_predictions() DataFrame row
+
+    Returns:
+        html.Div component for one timeline entry
+    """
+    prediction_date = row.get("prediction_date")
+    timestamp = row.get("timestamp")
+    tweet_text = row.get("text", "")
+    sentiment = row.get("prediction_sentiment", "neutral")
+    confidence = row.get("prediction_confidence", 0)
+    return_t7 = row.get("return_t7")
+    correct_t7 = row.get("correct_t7")
+    pnl_t7 = row.get("pnl_t7")
+    price_at = row.get("price_at_prediction")
+    price_after = row.get("price_t7")
+
+    # Sentiment styling
+    if sentiment and sentiment.lower() == "bullish":
+        sentiment_color = COLORS["success"]
+        sentiment_icon = "arrow-up"
+    elif sentiment and sentiment.lower() == "bearish":
+        sentiment_color = COLORS["danger"]
+        sentiment_icon = "arrow-down"
+    else:
+        sentiment_color = COLORS["text_muted"]
+        sentiment_icon = "minus"
+
+    # Outcome badge
+    if correct_t7 is True:
+        outcome_badge = html.Span(
+            "Correct",
+            className="badge",
+            style={
+                "backgroundColor": COLORS["success"],
+                "marginLeft": "8px",
+            },
+        )
+    elif correct_t7 is False:
+        outcome_badge = html.Span(
+            "Incorrect",
+            className="badge",
+            style={
+                "backgroundColor": COLORS["danger"],
+                "marginLeft": "8px",
+            },
+        )
+    else:
+        outcome_badge = html.Span(
+            "Pending",
+            className="badge",
+            style={
+                "backgroundColor": COLORS["warning"],
+                "color": "#000",
+                "marginLeft": "8px",
+            },
+        )
+
+    # Format the date
+    if isinstance(prediction_date, datetime):
+        date_str = prediction_date.strftime("%b %d, %Y")
+    elif hasattr(prediction_date, "strftime"):
+        date_str = prediction_date.strftime("%b %d, %Y")
+    else:
+        date_str = str(prediction_date)[:10] if prediction_date else "Unknown"
+
+    # Format timestamp for the tweet time
+    if isinstance(timestamp, datetime):
+        time_str = timestamp.strftime("%H:%M")
+    else:
+        time_str = str(timestamp)[11:16] if timestamp else ""
+
+    # Truncate tweet text
+    display_text = tweet_text[:200] + "..." if len(tweet_text) > 200 else tweet_text
+
+    # Price change display
+    price_info = []
+    if price_at is not None:
+        price_info.append(
+            html.Span(
+                f"Entry: ${price_at:,.2f}",
+                style={"color": COLORS["text_muted"], "fontSize": "0.8rem"},
+            )
+        )
+    if price_after is not None:
+        price_info.append(
+            html.Span(
+                f" -> ${price_after:,.2f} (7d)",
+                style={"color": COLORS["text_muted"], "fontSize": "0.8rem"},
+            )
+        )
+
+    return html.Div(
+        [
+            # Top row: date, sentiment, outcome badge
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.Span(
+                                date_str,
+                                style={
+                                    "fontWeight": "bold",
+                                    "color": COLORS["text"],
+                                    "fontSize": "0.9rem",
+                                },
+                            ),
+                            html.Span(
+                                f" at {time_str}" if time_str else "",
+                                style={
+                                    "color": COLORS["text_muted"],
+                                    "fontSize": "0.8rem",
+                                },
+                            ),
+                            outcome_badge,
+                        ]
+                    ),
+                    html.Div(
+                        [
+                            html.I(
+                                className=f"fas fa-{sentiment_icon} me-1",
+                                style={"color": sentiment_color},
+                            ),
+                            html.Span(
+                                (sentiment or "neutral").upper(),
+                                style={
+                                    "color": sentiment_color,
+                                    "fontWeight": "bold",
+                                    "fontSize": "0.85rem",
+                                },
+                            ),
+                            html.Span(
+                                f" | Confidence: {confidence:.0%}"
+                                if confidence
+                                else "",
+                                style={
+                                    "color": COLORS["text_muted"],
+                                    "fontSize": "0.85rem",
+                                    "marginLeft": "10px",
+                                },
+                            ),
+                        ],
+                        style={"marginTop": "4px"},
+                    ),
+                ]
+            ),
+            # Tweet text
+            html.P(
+                display_text,
+                style={
+                    "fontSize": "0.85rem",
+                    "color": COLORS["text_muted"],
+                    "margin": "8px 0",
+                    "lineHeight": "1.5",
+                    "fontStyle": "italic",
+                    "borderLeft": f"3px solid {sentiment_color}",
+                    "paddingLeft": "12px",
+                },
+            ),
+            # Metrics row: return, P&L, prices
+            html.Div(
+                [
+                    # 7-day return
+                    html.Span(
+                        f"Return (7d): {return_t7:+.2f}%"
+                        if return_t7 is not None
+                        else "Return (7d): --",
+                        style={
+                            "color": (
+                                COLORS["success"]
+                                if return_t7 and return_t7 > 0
+                                else COLORS["danger"]
+                                if return_t7 and return_t7 < 0
+                                else COLORS["text_muted"]
+                            ),
+                            "fontSize": "0.85rem",
+                            "fontWeight": "bold",
+                        },
+                    ),
+                    html.Span(" | ", style={"color": COLORS["border"]}),
+                    # P&L
+                    html.Span(
+                        f"P&L: ${pnl_t7:+,.0f}" if pnl_t7 is not None else "P&L: --",
+                        style={
+                            "color": (
+                                COLORS["success"]
+                                if pnl_t7 and pnl_t7 > 0
+                                else COLORS["danger"]
+                                if pnl_t7 and pnl_t7 < 0
+                                else COLORS["text_muted"]
+                            ),
+                            "fontSize": "0.85rem",
+                        },
+                    ),
+                    html.Span(" | ", style={"color": COLORS["border"]}),
+                    # Price info
+                    *price_info,
+                ],
+                style={"marginBottom": "4px"},
+            ),
+        ],
+        style={
+            "padding": "16px",
+            "borderBottom": f"1px solid {COLORS['border']}",
+        },
+    )
+
+
+def create_related_asset_link(row: dict) -> html.Div:
+    """
+    Create a clickable link for a related asset.
+
+    Args:
+        row: Dictionary with keys: related_symbol, co_occurrence_count, avg_return_t7
+
+    Returns:
+        html.Div component
+    """
+    symbol = row.get("related_symbol", "???")
+    count = row.get("co_occurrence_count", 0)
+    avg_return = row.get("avg_return_t7")
+
+    return_color = COLORS["text_muted"]
+    return_str = "--"
+    if avg_return is not None:
+        return_color = COLORS["success"] if avg_return > 0 else COLORS["danger"]
+        return_str = f"{avg_return:+.2f}%"
+
+    return html.Div(
+        [
+            dcc.Link(
+                html.Span(
+                    symbol,
+                    style={
+                        "fontWeight": "bold",
+                        "color": COLORS["accent"],
+                        "fontSize": "0.95rem",
+                    },
+                ),
+                href=f"/assets/{symbol}",
+                style={"textDecoration": "none"},
+            ),
+            html.Span(
+                f" ({count} shared predictions)",
+                style={
+                    "color": COLORS["text_muted"],
+                    "fontSize": "0.8rem",
+                    "marginLeft": "8px",
+                },
+            ),
+            html.Span(
+                f" | Avg return: {return_str}",
+                style={
+                    "color": return_color,
+                    "fontSize": "0.8rem",
+                    "marginLeft": "8px",
+                },
+            ),
+        ],
+        style={
+            "padding": "10px 0",
+            "borderBottom": f"1px solid {COLORS['border']}",
+        },
+    )
+
+
+def create_performance_summary(stats: Dict[str, Any]) -> html.Div:
+    """
+    Create the performance summary comparing this asset vs overall system.
+
+    Args:
+        stats: Dictionary from get_asset_stats()
+
+    Returns:
+        html.Div with comparison metrics
+    """
+    asset_accuracy = stats.get("accuracy_t7", 0)
+    overall_accuracy = stats.get("overall_accuracy_t7", 0)
+    accuracy_diff = asset_accuracy - overall_accuracy
+
+    asset_return = stats.get("avg_return_t7", 0)
+    overall_return = stats.get("overall_avg_return_t7", 0)
+    return_diff = asset_return - overall_return
+
+    best = stats.get("best_return_t7")
+    worst = stats.get("worst_return_t7")
+
+    return html.Div(
+        [
+            # Accuracy comparison
+            html.Div(
+                [
+                    html.H6(
+                        "Accuracy vs Overall", style={"color": COLORS["text_muted"]}
+                    ),
+                    html.Div(
+                        [
+                            html.Div(
+                                [
+                                    html.Span(
+                                        f"{asset_accuracy:.1f}%",
+                                        style={
+                                            "fontSize": "1.5rem",
+                                            "fontWeight": "bold",
+                                            "color": (
+                                                COLORS["success"]
+                                                if asset_accuracy > 60
+                                                else COLORS["danger"]
+                                            ),
+                                        },
+                                    ),
+                                    html.Span(
+                                        " this asset",
+                                        style={
+                                            "color": COLORS["text_muted"],
+                                            "fontSize": "0.8rem",
+                                        },
+                                    ),
+                                ]
+                            ),
+                            html.Div(
+                                [
+                                    html.Span(
+                                        f"{overall_accuracy:.1f}%",
+                                        style={
+                                            "fontSize": "1rem",
+                                            "color": COLORS["text_muted"],
+                                        },
+                                    ),
+                                    html.Span(
+                                        " overall",
+                                        style={
+                                            "color": COLORS["text_muted"],
+                                            "fontSize": "0.8rem",
+                                        },
+                                    ),
+                                ]
+                            ),
+                            html.Div(
+                                [
+                                    html.Span(
+                                        f"{accuracy_diff:+.1f}pp",
+                                        style={
+                                            "color": (
+                                                COLORS["success"]
+                                                if accuracy_diff > 0
+                                                else COLORS["danger"]
+                                            ),
+                                            "fontWeight": "bold",
+                                            "fontSize": "0.9rem",
+                                        },
+                                    ),
+                                    html.Span(
+                                        " vs average",
+                                        style={
+                                            "color": COLORS["text_muted"],
+                                            "fontSize": "0.8rem",
+                                        },
+                                    ),
+                                ]
+                            ),
+                        ]
+                    ),
+                ],
+                style={
+                    "padding": "12px 0",
+                    "borderBottom": f"1px solid {COLORS['border']}",
+                },
+            ),
+            # Return comparison
+            html.Div(
+                [
+                    html.H6(
+                        "Avg 7-Day Return vs Overall",
+                        style={"color": COLORS["text_muted"]},
+                    ),
+                    html.Div(
+                        [
+                            html.Span(
+                                f"{asset_return:+.2f}%",
+                                style={
+                                    "fontSize": "1.2rem",
+                                    "fontWeight": "bold",
+                                    "color": (
+                                        COLORS["success"]
+                                        if asset_return > 0
+                                        else COLORS["danger"]
+                                    ),
+                                },
+                            ),
+                            html.Span(
+                                f" vs {overall_return:+.2f}% overall",
+                                style={
+                                    "color": COLORS["text_muted"],
+                                    "fontSize": "0.85rem",
+                                    "marginLeft": "10px",
+                                },
+                            ),
+                            html.Span(
+                                f" ({return_diff:+.2f}pp)",
+                                style={
+                                    "color": (
+                                        COLORS["success"]
+                                        if return_diff > 0
+                                        else COLORS["danger"]
+                                    ),
+                                    "fontSize": "0.85rem",
+                                    "marginLeft": "5px",
+                                },
+                            ),
+                        ]
+                    ),
+                ],
+                style={
+                    "padding": "12px 0",
+                    "borderBottom": f"1px solid {COLORS['border']}",
+                },
+            ),
+            # Best/Worst predictions
+            html.Div(
+                [
+                    html.H6(
+                        "Best / Worst Predictions",
+                        style={"color": COLORS["text_muted"]},
+                    ),
+                    html.Div(
+                        [
+                            html.Span(
+                                f"Best: {best:+.2f}%"
+                                if best is not None
+                                else "Best: --",
+                                style={
+                                    "color": COLORS["success"],
+                                    "fontSize": "0.9rem",
+                                    "fontWeight": "bold",
+                                },
+                            ),
+                            html.Span(" | ", style={"color": COLORS["border"]}),
+                            html.Span(
+                                f"Worst: {worst:+.2f}%"
+                                if worst is not None
+                                else "Worst: --",
+                                style={
+                                    "color": COLORS["danger"],
+                                    "fontSize": "0.9rem",
+                                    "fontWeight": "bold",
+                                },
+                            ),
+                        ]
+                    ),
+                ],
+                style={"padding": "12px 0"},
+            ),
+        ]
+    )
+
+
 def register_callbacks(app: Dash):
     """Register all callbacks for the dashboard."""
+
+    # ========== URL Router Callback ==========
+    @app.callback(
+        Output("page-content", "children"),
+        [Input("url", "pathname")],
+    )
+    def route_page(pathname: str):
+        """Route to the correct page based on URL pathname."""
+        if pathname and pathname.startswith("/assets/"):
+            # Extract symbol from URL: /assets/AAPL -> AAPL
+            symbol = pathname.split("/assets/")[-1].strip("/").upper()
+            if symbol:
+                return create_asset_page(symbol)
+
+        # Default: show main dashboard
+        return create_dashboard_page()
 
     # ========== Time Period Selection Callback ==========
     @app.callback(
@@ -1467,3 +2216,348 @@ def register_callbacks(app: Dash):
         except Exception as e:
             print(f"Error loading predictions table: {traceback.format_exc()}")
             return create_error_card("Unable to load prediction data", str(e))
+
+    # ========== Asset Page Callbacks ==========
+
+    @app.callback(
+        [
+            Output("asset-stat-cards", "children"),
+            Output("asset-current-price", "children"),
+            Output("asset-performance-summary", "children"),
+            Output("asset-prediction-timeline", "children"),
+            Output("asset-related-assets", "children"),
+        ],
+        [Input("asset-page-symbol", "data")],
+    )
+    def update_asset_page(symbol):
+        """
+        Populate all data-driven sections of the asset deep dive page.
+        Fires when the page first loads (symbol store receives data).
+        """
+        if not symbol:
+            empty = html.P("No asset selected.", style={"color": COLORS["text_muted"]})
+            return empty, "", empty, empty, empty
+
+        try:
+            # --- STAT CARDS ---
+            stats = get_asset_stats(symbol)
+            stat_cards = dbc.Row(
+                [
+                    dbc.Col(
+                        create_metric_card(
+                            "Prediction Accuracy",
+                            f"{stats['accuracy_t7']:.1f}%",
+                            f"{stats['correct_predictions']}/{stats['total_predictions']} correct",
+                            "bullseye",
+                            (
+                                COLORS["success"]
+                                if stats["accuracy_t7"] > 60
+                                else COLORS["danger"]
+                            ),
+                        ),
+                        md=3,
+                        xs=6,
+                    ),
+                    dbc.Col(
+                        create_metric_card(
+                            "Total Predictions",
+                            f"{stats['total_predictions']}",
+                            f"{stats['bullish_count']} bullish / {stats['bearish_count']} bearish",
+                            "clipboard-list",
+                            COLORS["accent"],
+                        ),
+                        md=3,
+                        xs=6,
+                    ),
+                    dbc.Col(
+                        create_metric_card(
+                            "Total P&L (7-day)",
+                            f"${stats['total_pnl_t7']:,.0f}",
+                            "Based on $1,000 positions",
+                            "dollar-sign",
+                            (
+                                COLORS["success"]
+                                if stats["total_pnl_t7"] > 0
+                                else COLORS["danger"]
+                            ),
+                        ),
+                        md=3,
+                        xs=6,
+                    ),
+                    dbc.Col(
+                        create_metric_card(
+                            "Avg 7-Day Return",
+                            f"{stats['avg_return_t7']:+.2f}%",
+                            f"Confidence: {stats['avg_confidence']:.0%}",
+                            "chart-line",
+                            (
+                                COLORS["success"]
+                                if stats["avg_return_t7"] > 0
+                                else COLORS["danger"]
+                            ),
+                        ),
+                        md=3,
+                        xs=6,
+                    ),
+                ],
+                className="g-3",
+            )
+
+            # --- CURRENT PRICE ---
+            price_df = get_asset_price_history(symbol, days=7)
+            if not price_df.empty:
+                latest_close = price_df.iloc[-1]["close"]
+                current_price_text = f"${latest_close:,.2f}"
+            else:
+                current_price_text = "Price unavailable"
+
+            # --- PERFORMANCE SUMMARY ---
+            performance_summary = create_performance_summary(stats)
+
+            # --- PREDICTION TIMELINE ---
+            predictions_df = get_asset_predictions(symbol, limit=50)
+            if not predictions_df.empty:
+                timeline_cards = [
+                    create_prediction_timeline_card(row.to_dict())
+                    for _, row in predictions_df.iterrows()
+                ]
+            else:
+                timeline_cards = [
+                    html.P(
+                        f"No predictions found for {symbol}.",
+                        style={
+                            "color": COLORS["text_muted"],
+                            "textAlign": "center",
+                            "padding": "20px",
+                        },
+                    )
+                ]
+
+            # --- RELATED ASSETS ---
+            related_df = get_related_assets(symbol, limit=8)
+            if not related_df.empty:
+                related_links = [
+                    create_related_asset_link(row.to_dict())
+                    for _, row in related_df.iterrows()
+                ]
+            else:
+                related_links = [
+                    html.P(
+                        "No related assets found.",
+                        style={
+                            "color": COLORS["text_muted"],
+                            "textAlign": "center",
+                            "padding": "10px",
+                        },
+                    )
+                ]
+
+            return (
+                stat_cards,
+                current_price_text,
+                performance_summary,
+                timeline_cards,
+                related_links,
+            )
+
+        except Exception as e:
+            print(f"Error loading asset page for {symbol}: {traceback.format_exc()}")
+            error_card = create_error_card(f"Unable to load data for {symbol}", str(e))
+            return error_card, "", error_card, error_card, error_card
+
+    @app.callback(
+        Output("asset-price-chart", "figure"),
+        [
+            Input("asset-page-symbol", "data"),
+            Input("asset-range-30d", "n_clicks"),
+            Input("asset-range-90d", "n_clicks"),
+            Input("asset-range-180d", "n_clicks"),
+            Input("asset-range-1y", "n_clicks"),
+        ],
+    )
+    def update_asset_price_chart(symbol, n30, n90, n180, n1y):
+        """Update the price chart with prediction overlays."""
+        if not symbol:
+            return create_empty_chart("No asset selected")
+
+        # Determine date range from button click
+        ctx = callback_context
+        days = 90  # Default
+        if ctx.triggered:
+            button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+            if button_id == "asset-range-30d":
+                days = 30
+            elif button_id == "asset-range-90d":
+                days = 90
+            elif button_id == "asset-range-180d":
+                days = 180
+            elif button_id == "asset-range-1y":
+                days = 365
+
+        try:
+            # Get price data
+            price_df = get_asset_price_history(symbol, days=days)
+            if price_df.empty:
+                return create_empty_chart(f"No price data available for {symbol}")
+
+            # Get predictions for this asset
+            predictions_df = get_asset_predictions(symbol, limit=100)
+
+            # Create the candlestick chart
+            fig = go.Figure()
+
+            # Add candlestick trace
+            fig.add_trace(
+                go.Candlestick(
+                    x=price_df["date"],
+                    open=price_df["open"],
+                    high=price_df["high"],
+                    low=price_df["low"],
+                    close=price_df["close"],
+                    name=symbol,
+                    increasing_line_color=COLORS["success"],
+                    decreasing_line_color=COLORS["danger"],
+                )
+            )
+
+            # Add prediction markers
+            if not predictions_df.empty:
+                # Filter predictions within the date range
+                cutoff_date = price_df["date"].min()
+                pred_in_range = predictions_df[
+                    predictions_df["prediction_date"] >= cutoff_date
+                ]
+
+                if not pred_in_range.empty:
+                    # Get price at prediction dates for marker placement
+                    for _, pred in pred_in_range.iterrows():
+                        pred_date = pred["prediction_date"]
+                        correct = pred.get("correct_t7")
+                        sentiment = pred.get("prediction_sentiment", "neutral")
+
+                        # Determine marker color and symbol
+                        if correct is True:
+                            marker_color = COLORS["success"]
+                            marker_symbol = "triangle-up"
+                        elif correct is False:
+                            marker_color = COLORS["danger"]
+                            marker_symbol = "triangle-down"
+                        else:
+                            marker_color = COLORS["warning"]
+                            marker_symbol = "circle"
+
+                        # Find price at prediction date
+                        price_at_date = price_df[
+                            price_df["date"].dt.date == pred_date.date()
+                        ]
+                        if not price_at_date.empty:
+                            y_val = price_at_date.iloc[0]["high"] * 1.02
+
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=[pred_date],
+                                    y=[y_val],
+                                    mode="markers",
+                                    marker=dict(
+                                        size=12,
+                                        color=marker_color,
+                                        symbol=marker_symbol,
+                                        line=dict(width=1, color=COLORS["text"]),
+                                    ),
+                                    name=f"{sentiment} prediction",
+                                    hovertemplate=(
+                                        f"<b>{pred_date.strftime('%Y-%m-%d')}</b><br>"
+                                        f"Sentiment: {sentiment}<br>"
+                                        f"Result: {'Correct' if correct else 'Incorrect' if correct is False else 'Pending'}<br>"
+                                        "<extra></extra>"
+                                    ),
+                                    showlegend=False,
+                                )
+                            )
+
+            # Update layout
+            fig.update_layout(
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                font_color=COLORS["text"],
+                margin=dict(l=40, r=40, t=20, b=40),
+                xaxis=dict(
+                    gridcolor=COLORS["border"],
+                    rangeslider=dict(visible=False),
+                ),
+                yaxis=dict(
+                    gridcolor=COLORS["border"],
+                    title="Price ($)",
+                ),
+                height=400,
+                showlegend=False,
+            )
+
+            return fig
+
+        except Exception as e:
+            print(f"Error loading price chart for {symbol}: {traceback.format_exc()}")
+            return create_empty_chart(f"Error: {str(e)[:50]}")
+
+    @app.callback(
+        [
+            Output("asset-range-30d", "color"),
+            Output("asset-range-30d", "outline"),
+            Output("asset-range-90d", "color"),
+            Output("asset-range-90d", "outline"),
+            Output("asset-range-180d", "color"),
+            Output("asset-range-180d", "outline"),
+            Output("asset-range-1y", "color"),
+            Output("asset-range-1y", "outline"),
+        ],
+        [
+            Input("asset-range-30d", "n_clicks"),
+            Input("asset-range-90d", "n_clicks"),
+            Input("asset-range-180d", "n_clicks"),
+            Input("asset-range-1y", "n_clicks"),
+        ],
+    )
+    def update_asset_range_buttons(n30, n90, n180, n1y):
+        """Update button styles when date range is changed."""
+        ctx = callback_context
+        if not ctx.triggered:
+            # Default: 90d selected
+            return (
+                "secondary",
+                True,
+                "primary",
+                False,
+                "secondary",
+                True,
+                "secondary",
+                True,
+            )
+
+        button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+
+        # Default all to unselected
+        styles = [
+            "secondary",
+            True,
+            "secondary",
+            True,
+            "secondary",
+            True,
+            "secondary",
+            True,
+        ]
+
+        # Set selected button
+        if button_id == "asset-range-30d":
+            styles[0:2] = ["primary", False]
+        elif button_id == "asset-range-90d":
+            styles[2:4] = ["primary", False]
+        elif button_id == "asset-range-180d":
+            styles[4:6] = ["primary", False]
+        elif button_id == "asset-range-1y":
+            styles[6:8] = ["primary", False]
+        else:
+            # Default to 90d
+            styles[2:4] = ["primary", False]
+
+        return tuple(styles)
