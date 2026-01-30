@@ -6,10 +6,54 @@ Integrates with the global Shitpost Alpha settings system.
 
 import sys
 import os
+import time
 import pandas as pd
+from datetime import datetime, timedelta
+from functools import wraps
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
+
+
+# Simple TTL cache decorator
+def ttl_cache(ttl_seconds: int = 300):
+    """
+    Cache function results for a given number of seconds.
+    Uses function arguments as cache key.
+
+    Args:
+        ttl_seconds: How long to cache results (default 5 minutes)
+    """
+
+    def decorator(func: Callable) -> Callable:
+        cache: Dict[tuple, tuple] = {}
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # Create cache key from function name and arguments
+            key = (func.__name__, args, tuple(sorted(kwargs.items())))
+            now = time.time()
+
+            # Check if cached result exists and is still valid
+            if key in cache:
+                result, timestamp = cache[key]
+                if now - timestamp < ttl_seconds:
+                    return result
+
+            # Call function and cache result
+            result = func(*args, **kwargs)
+            cache[key] = (result, now)
+            return result
+
+        # Add method to manually clear cache
+        def clear_cache():
+            cache.clear()
+
+        wrapper.clear_cache = clear_cache  # type: ignore
+        return wrapper
+
+    return decorator
+
 
 # Add parent directory to path to import global settings
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -44,9 +88,18 @@ else:
     print(f"🔍 Using PostgreSQL sync URL: {sync_url[:50]}...")
 
     # Create synchronous engine for dashboard with explicit driver
+    # Configure connection pool for better performance
+    pool_settings = {
+        "pool_size": 5,  # Number of persistent connections
+        "max_overflow": 10,  # Extra connections when pool is full
+        "pool_timeout": 30,  # Seconds to wait for a connection
+        "pool_recycle": 1800,  # Recycle connections after 30 minutes
+        "pool_pre_ping": True,  # Test connections before using
+    }
+
     try:
         # Try psycopg2 first (more common)
-        engine = create_engine(sync_url, echo=False, future=True)
+        engine = create_engine(sync_url, echo=False, future=True, **pool_settings)
         SessionLocal = sessionmaker(engine, expire_on_commit=False)
     except Exception as e:
         print(f"⚠️ Failed to create engine with default driver: {e}")
@@ -55,7 +108,9 @@ else:
             sync_url_with_driver = sync_url.replace(
                 "postgresql://", "postgresql+psycopg2://"
             )
-            engine = create_engine(sync_url_with_driver, echo=False, future=True)
+            engine = create_engine(
+                sync_url_with_driver, echo=False, future=True, **pool_settings
+            )
             SessionLocal = sessionmaker(engine, expire_on_commit=False)
             print("✅ Successfully created engine with psycopg2 driver")
         except Exception as e2:
@@ -262,6 +317,7 @@ def get_available_assets() -> List[str]:
     return common_assets
 
 
+@ttl_cache(ttl_seconds=300)  # Cache for 5 minutes
 def get_prediction_stats() -> Dict[str, Any]:
     """Get summary statistics for predictions."""
     if DATABASE_URL.startswith("sqlite"):
@@ -326,12 +382,10 @@ def get_recent_signals(
     """
     # Build date filter
     date_filter = ""
-    params = {"limit": limit, "min_confidence": min_confidence}
+    params: Dict[str, Any] = {"limit": limit, "min_confidence": min_confidence}
 
     if days is not None:
         date_filter = "AND tss.timestamp >= :start_date"
-        from datetime import datetime, timedelta
-
         params["start_date"] = datetime.now() - timedelta(days=days)
 
     query = text(f"""
@@ -377,6 +431,7 @@ def get_recent_signals(
         return pd.DataFrame()
 
 
+@ttl_cache(ttl_seconds=300)  # Cache for 5 minutes
 def get_performance_metrics(days: int = None) -> Dict[str, Any]:
     """
     Get overall prediction performance metrics from prediction_outcomes table.
@@ -386,12 +441,10 @@ def get_performance_metrics(days: int = None) -> Dict[str, Any]:
     """
     # Build date filter
     date_filter = ""
-    params = {}
+    params: Dict[str, Any] = {}
 
     if days is not None:
         date_filter = "WHERE prediction_date >= :start_date"
-        from datetime import datetime, timedelta
-
         params["start_date"] = (datetime.now() - timedelta(days=days)).date()
 
     query = text(f"""
@@ -440,6 +493,7 @@ def get_performance_metrics(days: int = None) -> Dict[str, Any]:
     }
 
 
+@ttl_cache(ttl_seconds=300)  # Cache for 5 minutes
 def get_accuracy_by_confidence(days: int = None) -> pd.DataFrame:
     """
     Get prediction accuracy broken down by confidence level.
@@ -449,12 +503,10 @@ def get_accuracy_by_confidence(days: int = None) -> pd.DataFrame:
     """
     # Build date filter
     date_filter = ""
-    params = {}
+    params: Dict[str, Any] = {}
 
     if days is not None:
         date_filter = "AND prediction_date >= :start_date"
-        from datetime import datetime, timedelta
-
         params["start_date"] = (datetime.now() - timedelta(days=days)).date()
 
     query = text(f"""
@@ -497,6 +549,7 @@ def get_accuracy_by_confidence(days: int = None) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+@ttl_cache(ttl_seconds=300)  # Cache for 5 minutes
 def get_accuracy_by_asset(limit: int = 15, days: int = None) -> pd.DataFrame:
     """
     Get prediction accuracy broken down by asset.
@@ -507,12 +560,10 @@ def get_accuracy_by_asset(limit: int = 15, days: int = None) -> pd.DataFrame:
     """
     # Build date filter
     date_filter = ""
-    params = {"limit": limit}
+    params: Dict[str, Any] = {"limit": limit}
 
     if days is not None:
         date_filter = "AND prediction_date >= :start_date"
-        from datetime import datetime, timedelta
-
         params["start_date"] = (datetime.now() - timedelta(days=days)).date()
 
     query = text(f"""
@@ -543,15 +594,30 @@ def get_accuracy_by_asset(limit: int = 15, days: int = None) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def get_similar_predictions(asset: str = None, limit: int = 10) -> pd.DataFrame:
+def get_similar_predictions(
+    asset: str = None, limit: int = 10, days: int = None
+) -> pd.DataFrame:
     """
     Get predictions for a specific asset with their outcomes.
     Shows historical performance for similar predictions.
+
+    Args:
+        asset: Asset symbol to filter by
+        limit: Maximum number of predictions to return
+        days: Number of days to look back (None = all time)
     """
     if not asset:
         return pd.DataFrame()
 
-    query = text("""
+    # Build date filter
+    date_filter = ""
+    params: Dict[str, Any] = {"asset": asset, "limit": limit}
+
+    if days is not None:
+        date_filter = "AND po.prediction_date >= :start_date"
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
         SELECT
             tss.timestamp,
             tss.text,
@@ -572,12 +638,13 @@ def get_similar_predictions(asset: str = None, limit: int = 10) -> pd.DataFrame:
         INNER JOIN truth_social_shitposts tss ON p.shitpost_id = tss.shitpost_id
         WHERE po.symbol = :asset
             AND po.correct_t7 IS NOT NULL
+            {date_filter}
         ORDER BY tss.timestamp DESC
         LIMIT :limit
     """)
 
     try:
-        rows, columns = execute_query(query, {"asset": asset, "limit": limit})
+        rows, columns = execute_query(query, params)
         df = pd.DataFrame(rows, columns=columns)
         return df
     except Exception as e:
@@ -585,12 +652,24 @@ def get_similar_predictions(asset: str = None, limit: int = 10) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def get_predictions_with_outcomes(limit: int = 50) -> pd.DataFrame:
+def get_predictions_with_outcomes(limit: int = 50, days: int = None) -> pd.DataFrame:
     """
     Get recent predictions with their validated outcomes.
     This is for the main data table showing prediction results.
+
+    Args:
+        limit: Maximum number of predictions to return
+        days: Number of days to look back (None = all time)
     """
-    query = text("""
+    # Build date filter
+    date_filter = ""
+    params: Dict[str, Any] = {"limit": limit}
+
+    if days is not None:
+        date_filter = "AND tss.timestamp >= :start_date"
+        params["start_date"] = datetime.now() - timedelta(days=days)
+
+    query = text(f"""
         SELECT
             tss.timestamp,
             tss.text,
@@ -616,12 +695,13 @@ def get_predictions_with_outcomes(limit: int = 50) -> pd.DataFrame:
         INNER JOIN predictions p ON tss.shitpost_id = p.shitpost_id
         LEFT JOIN prediction_outcomes po ON p.id = po.prediction_id
         WHERE p.analysis_status = 'completed'
+        {date_filter}
         ORDER BY tss.timestamp DESC
         LIMIT :limit
     """)
 
     try:
-        rows, columns = execute_query(query, {"limit": limit})
+        rows, columns = execute_query(query, params)
         df = pd.DataFrame(rows, columns=columns)
         return df
     except Exception as e:
@@ -629,21 +709,34 @@ def get_predictions_with_outcomes(limit: int = 50) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def get_sentiment_distribution() -> Dict[str, int]:
+@ttl_cache(ttl_seconds=300)  # Cache for 5 minutes
+def get_sentiment_distribution(days: int = None) -> Dict[str, int]:
     """
     Get distribution of bullish/bearish/neutral predictions.
+
+    Args:
+        days: Number of days to look back (None = all time)
     """
-    query = text("""
+    # Build date filter
+    date_filter = ""
+    params: Dict[str, Any] = {}
+
+    if days is not None:
+        date_filter = "AND prediction_date >= :start_date"
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
         SELECT
             prediction_sentiment,
             COUNT(*) as count
         FROM prediction_outcomes
         WHERE prediction_sentiment IS NOT NULL
+        {date_filter}
         GROUP BY prediction_sentiment
     """)
 
     try:
-        rows, columns = execute_query(query)
+        rows, columns = execute_query(query, params)
         result = {"bullish": 0, "bearish": 0, "neutral": 0}
         for row in rows:
             sentiment = row[0].lower() if row[0] else "neutral"
@@ -655,6 +748,7 @@ def get_sentiment_distribution() -> Dict[str, int]:
         return {"bullish": 0, "bearish": 0, "neutral": 0}
 
 
+@ttl_cache(ttl_seconds=600)  # Cache for 10 minutes (changes less often)
 def get_active_assets_from_db() -> List[str]:
     """
     Get list of assets that actually have predictions with outcomes.
@@ -672,3 +766,252 @@ def get_active_assets_from_db() -> List[str]:
     except Exception as e:
         print(f"Error loading active assets: {e}")
         return []
+
+
+# =============================================================================
+# New Aggregate Functions for Performance Dashboard
+# =============================================================================
+
+
+def get_cumulative_pnl(days: int = None) -> pd.DataFrame:
+    """
+    Get cumulative P&L over time for equity curve visualization.
+
+    Args:
+        days: Number of days to look back (None = all time)
+
+    Returns:
+        DataFrame with columns: prediction_date, daily_pnl, predictions_count, cumulative_pnl
+    """
+    # Build date filter
+    date_filter = ""
+    params: Dict[str, Any] = {}
+
+    if days is not None:
+        date_filter = "AND prediction_date >= :start_date"
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
+        SELECT
+            prediction_date,
+            SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END) as daily_pnl,
+            COUNT(*) as predictions_count
+        FROM prediction_outcomes
+        WHERE correct_t7 IS NOT NULL
+        {date_filter}
+        GROUP BY prediction_date
+        ORDER BY prediction_date ASC
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        df = pd.DataFrame(rows, columns=columns)
+        if not df.empty:
+            df["cumulative_pnl"] = df["daily_pnl"].cumsum()
+        return df
+    except Exception as e:
+        print(f"Error loading cumulative P&L: {e}")
+        return pd.DataFrame()
+
+
+def get_rolling_accuracy(window: int = 30, days: int = None) -> pd.DataFrame:
+    """
+    Get rolling accuracy over time.
+
+    Args:
+        window: Rolling window size in days
+        days: Total days to look back (None = all time)
+
+    Returns:
+        DataFrame with: prediction_date, correct, total, rolling_accuracy
+    """
+    # Build date filter
+    date_filter = ""
+    params: Dict[str, Any] = {}
+
+    if days is not None:
+        date_filter = "AND prediction_date >= :start_date"
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
+        SELECT
+            prediction_date,
+            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct,
+            COUNT(CASE WHEN correct_t7 IS NOT NULL THEN 1 END) as total
+        FROM prediction_outcomes
+        WHERE correct_t7 IS NOT NULL
+        {date_filter}
+        GROUP BY prediction_date
+        ORDER BY prediction_date ASC
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        df = pd.DataFrame(rows, columns=columns)
+        if not df.empty and len(df) > 0:
+            df["rolling_correct"] = (
+                df["correct"].rolling(window=window, min_periods=1).sum()
+            )
+            df["rolling_total"] = (
+                df["total"].rolling(window=window, min_periods=1).sum()
+            )
+            df["rolling_accuracy"] = (
+                df["rolling_correct"] / df["rolling_total"] * 100
+            ).round(1)
+        return df
+    except Exception as e:
+        print(f"Error loading rolling accuracy: {e}")
+        return pd.DataFrame()
+
+
+def get_win_loss_streaks() -> Dict[str, int]:
+    """
+    Calculate current and max win/loss streaks.
+
+    Returns:
+        Dict with:
+            current_streak: positive for wins, negative for losses
+            max_win_streak: longest consecutive correct predictions
+            max_loss_streak: longest consecutive incorrect predictions
+    """
+    query = text("""
+        SELECT
+            prediction_date,
+            correct_t7
+        FROM prediction_outcomes
+        WHERE correct_t7 IS NOT NULL
+        ORDER BY prediction_date ASC, created_at ASC
+    """)
+
+    try:
+        rows, columns = execute_query(query)
+        if not rows:
+            return {"current_streak": 0, "max_win_streak": 0, "max_loss_streak": 0}
+
+        outcomes = [row[1] for row in rows]  # List of True/False
+
+        # Calculate streaks
+        max_win = 0
+        max_loss = 0
+        current = 0
+
+        for correct in outcomes:
+            if correct:
+                if current > 0:
+                    current += 1
+                else:
+                    current = 1
+                max_win = max(max_win, current)
+            else:
+                if current < 0:
+                    current -= 1
+                else:
+                    current = -1
+                max_loss = max(max_loss, abs(current))
+
+        return {
+            "current_streak": current,
+            "max_win_streak": max_win,
+            "max_loss_streak": max_loss,
+        }
+    except Exception as e:
+        print(f"Error loading win/loss streaks: {e}")
+        return {"current_streak": 0, "max_win_streak": 0, "max_loss_streak": 0}
+
+
+def get_confidence_calibration(buckets: int = 10) -> pd.DataFrame:
+    """
+    Get confidence calibration data (predicted confidence vs actual accuracy).
+
+    Buckets predictions by confidence level and calculates actual
+    accuracy for each bucket. A well-calibrated model should show
+    predictions with 70% confidence being correct ~70% of the time.
+
+    Args:
+        buckets: Number of confidence buckets (default 10 = 0-10%, 10-20%, etc.)
+
+    Returns:
+        DataFrame with: bucket_start, total, correct, avg_confidence,
+                        actual_accuracy, predicted_confidence, bucket_label
+    """
+    bucket_size = 1.0 / buckets
+
+    query = text("""
+        SELECT
+            FLOOR(prediction_confidence / :bucket_size) * :bucket_size as bucket_start,
+            COUNT(*) as total,
+            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct,
+            AVG(prediction_confidence) as avg_confidence
+        FROM prediction_outcomes
+        WHERE correct_t7 IS NOT NULL
+            AND prediction_confidence IS NOT NULL
+        GROUP BY FLOOR(prediction_confidence / :bucket_size)
+        ORDER BY bucket_start ASC
+    """)
+
+    try:
+        rows, columns = execute_query(query, {"bucket_size": bucket_size})
+        df = pd.DataFrame(rows, columns=columns)
+        if not df.empty:
+            df["actual_accuracy"] = (df["correct"] / df["total"] * 100).round(1)
+            df["predicted_confidence"] = (df["avg_confidence"] * 100).round(1)
+            df["bucket_label"] = df["bucket_start"].apply(
+                lambda x: f"{int(x * 100)}-{int((x + bucket_size) * 100)}%"
+            )
+        return df
+    except Exception as e:
+        print(f"Error loading confidence calibration: {e}")
+        return pd.DataFrame()
+
+
+def get_monthly_performance(months: int = 12) -> pd.DataFrame:
+    """
+    Get monthly performance summary.
+
+    Args:
+        months: Number of months to look back
+
+    Returns:
+        DataFrame with: month, total_predictions, correct, incorrect,
+                        avg_return, total_pnl, accuracy
+    """
+    query = text("""
+        SELECT
+            DATE_TRUNC('month', prediction_date) as month,
+            COUNT(*) as total_predictions,
+            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct,
+            COUNT(CASE WHEN correct_t7 = false THEN 1 END) as incorrect,
+            ROUND(AVG(return_t7)::numeric, 2) as avg_return,
+            ROUND(SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END)::numeric, 2) as total_pnl
+        FROM prediction_outcomes
+        WHERE correct_t7 IS NOT NULL
+        GROUP BY DATE_TRUNC('month', prediction_date)
+        ORDER BY month DESC
+        LIMIT :months
+    """)
+
+    try:
+        rows, columns = execute_query(query, {"months": months})
+        df = pd.DataFrame(rows, columns=columns)
+        if not df.empty:
+            df["accuracy"] = (df["correct"] / df["total_predictions"] * 100).round(1)
+            df["month"] = pd.to_datetime(df["month"]).dt.strftime("%Y-%m")
+        return df
+    except Exception as e:
+        print(f"Error loading monthly performance: {e}")
+        return pd.DataFrame()
+
+
+# =============================================================================
+# Cache Management
+# =============================================================================
+
+
+def clear_all_caches() -> None:
+    """Clear all data layer caches. Call when forcing a full refresh."""
+    get_prediction_stats.clear_cache()  # type: ignore
+    get_performance_metrics.clear_cache()  # type: ignore
+    get_accuracy_by_confidence.clear_cache()  # type: ignore
+    get_accuracy_by_asset.clear_cache()  # type: ignore
+    get_active_assets_from_db.clear_cache()  # type: ignore
+    get_sentiment_distribution.clear_cache()  # type: ignore
