@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Data Layer Expansion (Phase 1)** - Performance aggregate functions and query caching for dashboard
+  - **Query Caching** - TTL-based caching (5-10 min) for expensive aggregate queries:
+    - `get_prediction_stats`, `get_performance_metrics`, `get_accuracy_by_confidence`
+    - `get_accuracy_by_asset`, `get_active_assets_from_db`, `get_sentiment_distribution`
+    - `clear_all_caches()` utility for manual cache invalidation
+  - **New Aggregate Functions** - Performance metrics for equity curve and analytics:
+    - `get_cumulative_pnl(days)` - Daily P&L with running cumulative total
+    - `get_rolling_accuracy(window, days)` - Rolling window accuracy over time
+    - `get_win_loss_streaks()` - Current and max win/loss streak tracking
+    - `get_confidence_calibration(buckets)` - Predicted vs actual accuracy by confidence
+    - `get_monthly_performance(months)` - Monthly summary with accuracy and P&L
+  - **Extended Time Filtering** - Added `days` parameter to remaining functions:
+    - `get_sentiment_distribution(days)` - Filter sentiment by time period
+    - `get_similar_predictions(asset, limit, days)` - Filter asset history by time
+    - `get_predictions_with_outcomes(limit, days)` - Filter outcomes by time period
+  - **Connection Pool Optimization** - Configured SQLAlchemy pool settings:
+    - Pool size: 5 persistent connections, 10 overflow
+    - Connection recycling every 30 minutes with pre-ping validation
+  - **New Tests** - 23 new tests for caching and aggregate functions
 - **Dashboard Enhancements (Phase 1)** - P0 improvements to production dashboard
   - **Loading States** - Added loading spinners to all data components (metrics, charts, signals, drilldown, table)
   - **Error Boundaries** - Graceful degradation with user-friendly error cards when data fails to load
