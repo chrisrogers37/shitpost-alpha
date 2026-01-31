@@ -626,6 +626,40 @@ def _send_sms_alert(
 
 
 # ============================================================
+# Telegram Dispatch
+# ============================================================
+
+
+def broadcast_telegram_alert(alert: Dict[str, Any]) -> Dict[str, int]:
+    """
+    Broadcast an alert to all active Telegram subscribers.
+
+    This is the main entry point for Telegram notifications.
+    It delegates to the telegram_bot module which handles:
+    - Fetching active subscriptions from database
+    - Filtering by each subscriber's preferences
+    - Sending messages via Telegram API
+    - Recording success/failure
+
+    Args:
+        alert: Alert dict with prediction data
+
+    Returns:
+        Dict with counts: {"sent": N, "failed": N, "filtered": N}
+    """
+    try:
+        from telegram_bot import broadcast_alert
+
+        return broadcast_alert(alert)
+    except ImportError:
+        logger.warning("Telegram bot module not available")
+        return {"sent": 0, "failed": 0, "filtered": 0}
+    except Exception as e:
+        logger.error(f"Error broadcasting Telegram alert: {e}")
+        return {"sent": 0, "failed": 0, "filtered": 0}
+
+
+# ============================================================
 # Server-side notification dispatch
 # ============================================================
 
@@ -633,19 +667,28 @@ def _send_sms_alert(
 def dispatch_server_notifications(
     alert: Dict[str, Any],
     preferences: Dict[str, Any],
-) -> None:
+) -> Dict[str, Any]:
     """
-    Dispatch email and SMS notifications for a matched alert.
+    Dispatch email, SMS, and Telegram notifications for a matched alert.
     This runs server-side in the callback.
 
     Args:
         alert: The matched alert dict.
-        preferences: User preferences dict.
+        preferences: User preferences dict (for email/SMS).
+
+    Returns:
+        Dict with dispatch results for each channel.
     """
-    # Send email if enabled
+    results = {
+        "email_sent": False,
+        "sms_sent": False,
+        "telegram": {"sent": 0, "failed": 0, "filtered": 0},
+    }
+
+    # Send email if enabled (per-user preference from localStorage)
     if preferences.get("email_enabled") and preferences.get("email_address"):
         try:
-            _send_email_alert(
+            results["email_sent"] = _send_email_alert(
                 to_email=preferences["email_address"],
                 subject=f"Shitpost Alpha: {alert.get('sentiment', 'NEW').upper()} Alert",
                 html_body=format_alert_message_html(alert),
@@ -654,12 +697,20 @@ def dispatch_server_notifications(
         except Exception as e:
             logger.error(f"Failed to send email alert: {e}")
 
-    # Send SMS if enabled
+    # Send SMS if enabled (per-user preference from localStorage)
     if preferences.get("sms_enabled") and preferences.get("sms_phone_number"):
         try:
-            _send_sms_alert(
+            results["sms_sent"] = _send_sms_alert(
                 to_phone=preferences["sms_phone_number"],
                 message=format_alert_message(alert),
             )
         except Exception as e:
             logger.error(f"Failed to send SMS alert: {e}")
+
+    # Broadcast to all Telegram subscribers (multi-tenant, database-driven)
+    try:
+        results["telegram"] = broadcast_telegram_alert(alert)
+    except Exception as e:
+        logger.error(f"Failed to broadcast Telegram alert: {e}")
+
+    return results

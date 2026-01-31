@@ -19,6 +19,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Browser push notifications with permission handling
     - Email alerts via SMTP or SendGrid
     - SMS alerts via Twilio (rate limited to 10/hour)
+    - **Telegram alerts (FREE!)** via multi-tenant bot architecture
+  - **Multi-Tenant Telegram Bot System** - Self-service subscription management
+    - **TelegramSubscription Database Model** - Full subscription tracking with:
+      - `chat_id`, `chat_type` (private/group/supergroup/channel)
+      - User info: `username`, `first_name`, `last_name`, `title`
+      - Subscription status: `is_active`, `subscribed_at`, `unsubscribed_at`
+      - Per-subscriber `alert_preferences` (JSON) for filtering
+      - Rate limiting: `last_alert_at`, `alerts_sent_count`
+      - Error tracking: `consecutive_errors`, `last_error`
+    - **Bot Command Handlers**:
+      - `/start` - Subscribe with welcome message
+      - `/stop` - Unsubscribe from alerts
+      - `/status` - View subscription status and stats
+      - `/settings [confidence|assets|sentiment] [value]` - Configure preferences
+      - `/help` - Show available commands
+    - **Telegram API Integration**:
+      - `send_telegram_message()` - Send formatted Markdown messages
+      - `broadcast_alert()` - Send to all matching subscribers
+      - Error tracking with auto-disable for broken chats
+    - **Message Formatting**:
+      - Sentiment emojis (🟢 bullish, 🔴 bearish, ⚪ neutral)
+      - Confidence percentage display
+      - Asset ticker listing
+      - Truncation for long posts
+      - Markdown escaping for special characters
+    - **Subscription Filtering**:
+      - Per-subscriber confidence threshold
+      - Asset whitelist filtering
+      - Sentiment filter (all/bullish/bearish/neutral)
+      - Quiet hours support
   - **Alert History Panel** - Collapsible panel showing recent alerts with:
     - Timestamp, sentiment, confidence, and assets
     - Truncated post text preview
@@ -36,6 +66,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `_send_email_alert(to, subject, html, text)` - SMTP/SendGrid dispatcher
     - `_send_sms_alert(to_phone, message)` - Twilio dispatcher with rate limiting
     - `get_new_predictions_since(since)` - Data layer query for new predictions
+  - **New Telegram Functions** (`telegram_bot.py`):
+    - `get_subscription(chat_id)` / `create_subscription()` / `update_subscription()` - CRUD operations
+    - `get_active_subscriptions()` - Fetch all active subscribers
+    - `send_telegram_message(chat_id, text)` - Send formatted message via API
+    - `broadcast_alert(alert)` - Send alert to all matching subscribers
+    - `format_telegram_alert(alert)` - Format alert for Telegram Markdown
+    - `escape_markdown(text)` - Escape special Markdown characters
+    - `handle_start_command()` / `handle_stop_command()` - Subscription management
+    - `handle_status_command()` / `handle_settings_command()` - User preferences
+    - `process_update(update)` - Route incoming Telegram updates to handlers
+    - `broadcast_telegram_alert(alert)` - Integration point in alerts.py
   - **Security Features**:
     - Rate limiting for email (20/hour) and SMS (10/hour)
     - E.164 phone number validation
@@ -44,7 +85,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Settings Additions** - New environment variables:
     - `EMAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`
     - `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME`, `SENDGRID_API_KEY`
-  - **New Tests** - 51 new tests for alerts module covering:
+    - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_URL`
+  - **New Tests** - 83 new tests for alerts and Telegram modules covering:
     - Prediction filtering logic
     - Quiet hours checking
     - Sentiment extraction
@@ -53,6 +95,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Rate limiting
     - Alert check integration
     - Layout components
+    - Telegram message formatting (bullish/bearish/neutral)
+    - Markdown escaping
+    - Bot command handlers (/start, /stop, /status, /settings, /help)
+    - Update routing and processing
+    - Telegram API calls and error handling
+    - TelegramSubscription database model
+    - Broadcast functionality with preference filtering
 - **Asset Deep Dive Pages (Phase 1)** - Dedicated `/assets/{symbol}` pages with comprehensive asset performance views
   - **Multi-Page URL Routing** - Added `dcc.Location` for client-side URL routing between dashboard and asset pages
   - **Asset Price Chart** - Candlestick chart with prediction overlay markers showing correct/incorrect outcomes

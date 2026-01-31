@@ -79,6 +79,15 @@ class Settings(BaseSettings):
     )
     SENDGRID_API_KEY: Optional[str] = Field(default=None, env="SENDGRID_API_KEY")
 
+    # Telegram Bot Configuration (Phase 2 - Alerting)
+    TELEGRAM_BOT_TOKEN: Optional[str] = Field(default=None, env="TELEGRAM_BOT_TOKEN")
+    TELEGRAM_BOT_USERNAME: Optional[str] = Field(
+        default=None, env="TELEGRAM_BOT_USERNAME"
+    )  # Without @ prefix
+    TELEGRAM_WEBHOOK_URL: Optional[str] = Field(
+        default=None, env="TELEGRAM_WEBHOOK_URL"
+    )  # For webhook mode (optional)
+
     # ScrapeCreators API Configuration
     SCRAPECREATORS_API_KEY: Optional[str] = Field(
         default=None, env="SCRAPECREATORS_API_KEY"
