@@ -1107,6 +1107,94 @@ def create_alert_config_panel():
                     "marginBottom": "10px",
                 },
             ),
+            # Telegram notifications (multi-tenant via bot)
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.Div(
+                                [
+                                    html.I(
+                                        className="fab fa-telegram me-2",
+                                        style={"color": "#0088cc"},
+                                    ),
+                                    html.Span(
+                                        "Telegram Notifications",
+                                        style={
+                                            "fontSize": "0.9rem",
+                                            "fontWeight": "bold",
+                                        },
+                                    ),
+                                    html.Span(
+                                        " (Free!)",
+                                        style={
+                                            "fontSize": "0.75rem",
+                                            "color": COLORS["success"],
+                                            "marginLeft": "5px",
+                                        },
+                                    ),
+                                ],
+                                style={"display": "flex", "alignItems": "center"},
+                            ),
+                        ]
+                    ),
+                    html.Div(
+                        [
+                            html.P(
+                                [
+                                    "Get unlimited free alerts via Telegram! ",
+                                    "Add our bot to receive predictions directly in your chat.",
+                                ],
+                                style={
+                                    "fontSize": "0.85rem",
+                                    "color": COLORS["text_muted"],
+                                    "margin": "10px 0",
+                                },
+                            ),
+                            html.Div(
+                                [
+                                    html.A(
+                                        [
+                                            html.I(className="fab fa-telegram me-2"),
+                                            "Open @ShitpostAlphaBot",
+                                        ],
+                                        href="https://t.me/ShitpostAlphaBot",
+                                        target="_blank",
+                                        className="btn btn-info btn-sm",
+                                        style={
+                                            "backgroundColor": "#0088cc",
+                                            "border": "none",
+                                            "color": "white",
+                                        },
+                                    ),
+                                ],
+                                className="mb-2",
+                            ),
+                            html.Small(
+                                [
+                                    "1. Click the link above to open the bot",
+                                    html.Br(),
+                                    "2. Send /start to subscribe",
+                                    html.Br(),
+                                    "3. Use /settings to customize your alerts",
+                                ],
+                                style={
+                                    "color": COLORS["text_muted"],
+                                    "fontSize": "0.75rem",
+                                    "lineHeight": "1.5",
+                                },
+                            ),
+                        ]
+                    ),
+                ],
+                style={
+                    "padding": "10px 15px",
+                    "backgroundColor": COLORS["secondary"],
+                    "borderRadius": "8px",
+                    "marginBottom": "10px",
+                    "border": "1px solid #0088cc33",
+                },
+            ),
             html.Hr(style={"borderColor": COLORS["border"]}),
             # --- Quiet Hours ---
             html.H6(
