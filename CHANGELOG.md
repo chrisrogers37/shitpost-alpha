@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **UI System Analysis Document** - Comprehensive review of dashboard bugs, gaps, and enhancement opportunities
+  - Root cause analysis of why the dashboard is non-functional (data pipeline gaps, not UI code)
+  - 6 bugs catalogued with severity, file locations, and fix recommendations
+  - 5 architecture gaps identified with recommended solutions
+  - 4 data pipeline gaps documented with existing tooling references
+  - 9 enhancement opportunities prioritized by impact
+  - Phased fix order from "make it work" through "polish"
+
+### Changed
+- **Planning Overview (00_OVERVIEW.md)** - Major update reflecting actual system state
+  - Added Phase 0: Stabilization as critical prerequisite to all other work
+  - Revised feature statuses (Code Written vs Pending vs Complete)
+  - Added critical data pipeline gap documentation (prediction_outcomes: ~9 rows, market_prices: 14 assets)
+  - Updated tech stack and key files to reflect alerts, telegram, and data layer additions
+  - Updated priority matrix to reflect that backfilling data is P0
+- **Current State Reference (01_CURRENT_STATE.md)** - Full rewrite with accurate architecture
+  - Updated layout hierarchy to show actual component tree (dashboard + asset pages)
+  - Documented all ~25 callbacks with triggers and purposes
+  - Updated data layer function table (20+ functions with cache and return info)
+  - Added Known Issues section organized by severity (Critical/Moderate/Low)
+  - Corrected file line counts (layout.py: ~3,862 lines, data.py: ~1,360 lines)
+
+### Added
 - **Alerts and Notifications System** - Real-time alert system for prediction monitoring
   - **Alert Configuration Panel** - Slide-out offcanvas panel for configuring alert preferences
     - Master toggle to enable/disable all alerts
