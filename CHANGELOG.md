@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Latest Posts Feed (BUG-01)** - New "Latest Posts" section on the dashboard showing Trump's posts with LLM analysis
+  - `create_post_card()` component displays post text, sentiment, assets, confidence, thesis, and engagement metrics
+  - `update_post_feed()` callback wires `load_recent_posts()` to the dashboard with auto-refresh
+  - Shows analysis status (completed/bypassed/pending) with appropriate styling
+
+### Fixed
+- **Table Filter Passthrough (BUG-05)** - Confidence slider and date range picker in data table section now filter results
+  - `update_predictions_table()` callback passes confidence_range and date filters to `get_predictions_with_outcomes()`
+  - `get_predictions_with_outcomes()` accepts `confidence_min`, `confidence_max`, `start_date`, `end_date` params
+- **Hardcoded Asset List (BUG-02)** - `get_available_assets()` now queries the predictions table's JSONB assets column
+  - Replaced static 31-ticker list with live DB query extracting distinct symbols from completed predictions
+  - Supports both PostgreSQL (jsonb_array_elements_text) and SQLite fallback
+  - Results cached for 10 minutes via TTL cache
+  - Alert config panel now uses `get_available_assets()` for fuller asset coverage
+- **DATABASE_URL Quote Handling** - Strip literal quotes from DATABASE_URL in data.py and sync_session.py
+  - Fixes SQLAlchemy URL parse errors when .env contains quoted values
+
+### Added
 - **UI System Analysis Document** - Comprehensive review of dashboard bugs, gaps, and enhancement opportunities
   - Root cause analysis of why the dashboard is non-functional (data pipeline gaps, not UI code)
   - 6 bugs catalogued with severity, file locations, and fix recommendations

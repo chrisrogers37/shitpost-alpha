@@ -12,7 +12,7 @@ from typing import Generator
 from shit.config.shitpost_settings import settings
 
 # Create synchronous engine based on database type
-DATABASE_URL = settings.DATABASE_URL
+DATABASE_URL = settings.DATABASE_URL.strip('"').strip("'")
 
 if DATABASE_URL.startswith("sqlite"):
     # SQLite - use synchronous SQLAlchemy
