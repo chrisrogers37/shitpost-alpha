@@ -61,11 +61,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 try:
     from shit.config.shitpost_settings import settings
 
-    DATABASE_URL = settings.DATABASE_URL
+    DATABASE_URL = settings.DATABASE_URL.strip('"').strip("'")
     print(f"🔍 Dashboard using settings DATABASE_URL: {DATABASE_URL[:50]}...")
 except ImportError as e:
     # Fallback to environment variable if settings can't be imported
-    DATABASE_URL = os.environ.get("DATABASE_URL")
+    DATABASE_URL = os.environ.get("DATABASE_URL", "").strip('"').strip("'")
     print(
         f"🔍 Dashboard using environment DATABASE_URL: {DATABASE_URL[:50] if DATABASE_URL else 'None'}..."
     )
@@ -276,45 +276,50 @@ def load_filtered_posts(
     return df
 
 
+@ttl_cache(ttl_seconds=600)  # Cache for 10 minutes
 def get_available_assets() -> List[str]:
-    """Get list of all unique assets mentioned in predictions."""
-    # For now, return a hardcoded list of common assets
-    # This avoids the JSON parsing complexity
-    common_assets = [
-        "AAPL",
-        "MSFT",
-        "GOOGL",
-        "AMZN",
-        "TSLA",
-        "META",
-        "NVDA",
-        "NFLX",
-        "AMD",
-        "INTC",
-        "CRM",
-        "ORCL",
-        "ADBE",
-        "PYPL",
-        "UBER",
-        "LYFT",
-        "SPY",
-        "QQQ",
-        "IWM",
-        "GLD",
-        "SLV",
-        "TLT",
-        "HYG",
-        "LQD",
-        "RTN",
-        "LMT",
-        "NOC",
-        "BA",
-        "GD",
-        "HII",
-        "LHX",
-        "TDY",
-    ]
-    return common_assets
+    """Get list of all unique assets mentioned in completed predictions.
+
+    Queries the predictions table's assets JSONB column to extract
+    all distinct ticker symbols. Falls back to a static list on error.
+    """
+    if DATABASE_URL.startswith("sqlite"):
+        # SQLite doesn't support jsonb_array_elements_text
+        # Fall back to loading predictions and extracting in Python
+        try:
+            query = text("""
+                SELECT assets
+                FROM predictions
+                WHERE analysis_status = 'completed'
+                    AND assets IS NOT NULL
+            """)
+            rows, columns = execute_query(query)
+            assets_set: set = set()
+            for row in rows:
+                assets_val = row[0]
+                if isinstance(assets_val, list):
+                    assets_set.update(assets_val)
+            return sorted(assets_set)
+        except Exception as e:
+            print(f"Error loading available assets (sqlite): {e}")
+            return []
+    else:
+        # PostgreSQL with JSONB support
+        try:
+            query = text("""
+                SELECT DISTINCT asset
+                FROM predictions p,
+                     jsonb_array_elements_text(p.assets) AS asset
+                WHERE p.analysis_status = 'completed'
+                    AND p.assets IS NOT NULL
+                    AND p.assets::jsonb <> '[]'::jsonb
+                ORDER BY asset
+            """)
+            rows, columns = execute_query(query)
+            return [row[0] for row in rows if row[0]]
+        except Exception as e:
+            print(f"Error loading available assets: {e}")
+            return []
 
 
 @ttl_cache(ttl_seconds=300)  # Cache for 5 minutes
@@ -652,7 +657,14 @@ def get_similar_predictions(
         return pd.DataFrame()
 
 
-def get_predictions_with_outcomes(limit: int = 50, days: int = None) -> pd.DataFrame:
+def get_predictions_with_outcomes(
+    limit: int = 50,
+    days: int = None,
+    confidence_min: Optional[float] = None,
+    confidence_max: Optional[float] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> pd.DataFrame:
     """
     Get recent predictions with their validated outcomes.
     This is for the main data table showing prediction results.
@@ -660,14 +672,42 @@ def get_predictions_with_outcomes(limit: int = 50, days: int = None) -> pd.DataF
     Args:
         limit: Maximum number of predictions to return
         days: Number of days to look back (None = all time)
+        confidence_min: Minimum confidence threshold (0.0-1.0)
+        confidence_max: Maximum confidence threshold (0.0-1.0)
+        start_date: Start date string (YYYY-MM-DD)
+        end_date: End date string (YYYY-MM-DD)
     """
-    # Build date filter
-    date_filter = ""
+    # Build filters
+    filters = []
     params: Dict[str, Any] = {"limit": limit}
 
-    if days is not None:
-        date_filter = "AND tss.timestamp >= :start_date"
+    if days is not None and start_date is None:
+        filters.append("AND tss.timestamp >= :start_date")
         params["start_date"] = datetime.now() - timedelta(days=days)
+
+    if confidence_min is not None:
+        filters.append("AND p.confidence >= :confidence_min")
+        params["confidence_min"] = confidence_min
+
+    if confidence_max is not None:
+        filters.append("AND p.confidence <= :confidence_max")
+        params["confidence_max"] = confidence_max
+
+    if start_date is not None:
+        filters.append("AND tss.timestamp >= :date_start")
+        if isinstance(start_date, str):
+            params["date_start"] = datetime.strptime(start_date, "%Y-%m-%d")
+        else:
+            params["date_start"] = start_date
+
+    if end_date is not None:
+        filters.append("AND tss.timestamp < :date_end_plus_one")
+        if isinstance(end_date, str):
+            params["date_end_plus_one"] = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+        else:
+            params["date_end_plus_one"] = end_date + timedelta(days=1)
+
+    filter_clause = "\n        ".join(filters)
 
     query = text(f"""
         SELECT
@@ -695,7 +735,7 @@ def get_predictions_with_outcomes(limit: int = 50, days: int = None) -> pd.DataF
         INNER JOIN predictions p ON tss.shitpost_id = p.shitpost_id
         LEFT JOIN prediction_outcomes po ON p.id = po.prediction_id
         WHERE p.analysis_status = 'completed'
-        {date_filter}
+        {filter_clause}
         ORDER BY tss.timestamp DESC
         LIMIT :limit
     """)
@@ -1016,6 +1056,7 @@ def clear_all_caches() -> None:
     get_active_assets_from_db.clear_cache()  # type: ignore
     get_sentiment_distribution.clear_cache()  # type: ignore
     get_asset_stats.clear_cache()  # type: ignore
+    get_available_assets.clear_cache()  # type: ignore
 
 
 # =============================================================================

@@ -26,10 +26,12 @@ from data import (
     get_similar_predictions,
     get_predictions_with_outcomes,
     get_active_assets_from_db,
+    get_available_assets,
     get_asset_price_history,
     get_asset_predictions,
     get_asset_stats,
     get_related_assets,
+    load_recent_posts,
 )
 from alerts import (
     DEFAULT_ALERT_PREFERENCES,
@@ -503,6 +505,44 @@ def create_dashboard_page() -> html.Div:
                                 xl=5,
                             ),
                         ]
+                    ),
+                    # Latest Posts Feed
+                    dbc.Card(
+                        [
+                            dbc.CardHeader(
+                                [
+                                    html.I(
+                                        className="fas fa-rss me-2"
+                                    ),
+                                    "Latest Posts",
+                                    html.Small(
+                                        " - Trump's posts with LLM analysis",
+                                        style={
+                                            "color": COLORS["text_muted"],
+                                            "fontWeight": "normal",
+                                        },
+                                    ),
+                                ],
+                                className="fw-bold",
+                            ),
+                            dbc.CardBody(
+                                [
+                                    dcc.Loading(
+                                        type="circle",
+                                        color=COLORS["accent"],
+                                        children=html.Div(
+                                            id="post-feed-container",
+                                            style={
+                                                "maxHeight": "600px",
+                                                "overflowY": "auto",
+                                            },
+                                        ),
+                                    )
+                                ]
+                            ),
+                        ],
+                        className="mt-4",
+                        style={"backgroundColor": COLORS["secondary"]},
                     ),
                     # Collapsible Full Data Table
                     dbc.Card(
@@ -1549,6 +1589,174 @@ def create_signal_card(row):
     )
 
 
+def create_post_card(row):
+    """Create a card for a post in the Latest Posts feed."""
+    timestamp = row.get("timestamp")
+    post_text = row.get("text", "")
+    analysis_status = row.get("analysis_status")
+    assets = row.get("assets", [])
+    market_impact = row.get("market_impact", {})
+    confidence = row.get("confidence")
+    thesis = row.get("thesis", "")
+    replies = row.get("replies_count", 0) or 0
+    reblogs = row.get("reblogs_count", 0) or 0
+    favourites = row.get("favourites_count", 0) or 0
+
+    # Truncate post text for display
+    display_text = post_text[:300] + "..." if len(post_text) > 300 else post_text
+
+    # Determine sentiment from market_impact
+    sentiment = None
+    if isinstance(market_impact, dict) and market_impact:
+        first_sentiment = list(market_impact.values())[0]
+        if isinstance(first_sentiment, str):
+            sentiment = first_sentiment.lower()
+
+    # Build analysis section based on status
+    if analysis_status == "completed" and assets:
+        # Format assets
+        asset_str = ", ".join(assets[:5]) if isinstance(assets, list) else str(assets)
+        if isinstance(assets, list) and len(assets) > 5:
+            asset_str += f" +{len(assets) - 5}"
+
+        sentiment_color = (
+            COLORS["success"] if sentiment == "bullish"
+            else COLORS["danger"] if sentiment == "bearish"
+            else COLORS["text_muted"]
+        )
+        sentiment_icon = (
+            "arrow-up" if sentiment == "bullish"
+            else "arrow-down" if sentiment == "bearish"
+            else "minus"
+        )
+
+        analysis_section = html.Div(
+            [
+                html.Div(
+                    [
+                        html.Span(
+                            [
+                                html.I(className=f"fas fa-{sentiment_icon} me-1"),
+                                (sentiment or "neutral").upper(),
+                            ],
+                            style={
+                                "color": sentiment_color,
+                                "fontSize": "0.85rem",
+                                "fontWeight": "bold",
+                            },
+                        ),
+                        html.Span(
+                            f" | {asset_str}",
+                            style={"color": COLORS["accent"], "fontSize": "0.85rem"},
+                        ),
+                        html.Span(
+                            f" | Confidence: {confidence:.0%}" if confidence else "",
+                            style={"color": COLORS["text_muted"], "fontSize": "0.85rem"},
+                        ),
+                    ],
+                    className="mb-1",
+                ),
+                html.P(
+                    thesis[:200] + "..." if thesis and len(thesis) > 200 else thesis,
+                    style={
+                        "fontSize": "0.8rem",
+                        "color": COLORS["text_muted"],
+                        "fontStyle": "italic",
+                        "margin": 0,
+                    },
+                ) if thesis else None,
+            ],
+            style={
+                "padding": "8px",
+                "backgroundColor": COLORS["primary"],
+                "borderRadius": "6px",
+                "marginTop": "8px",
+            },
+        )
+    elif analysis_status == "bypassed":
+        analysis_section = html.Div(
+            [
+                html.Span(
+                    [
+                        html.I(className="fas fa-forward me-1"),
+                        "Bypassed",
+                    ],
+                    className="badge",
+                    style={
+                        "backgroundColor": COLORS["border"],
+                        "color": COLORS["text_muted"],
+                        "fontSize": "0.75rem",
+                    },
+                ),
+                html.Small(
+                    f" {row.get('analysis_comment', '') or ''}",
+                    style={"color": COLORS["text_muted"]},
+                ),
+            ],
+            style={"marginTop": "8px"},
+        )
+    else:
+        analysis_section = html.Div(
+            html.Span(
+                [
+                    html.I(className="fas fa-clock me-1"),
+                    "Pending Analysis",
+                ],
+                className="badge",
+                style={
+                    "backgroundColor": COLORS["warning"],
+                    "color": COLORS["primary"],
+                    "fontSize": "0.75rem",
+                },
+            ),
+            style={"marginTop": "8px"},
+        )
+
+    # Engagement metrics
+    engagement = html.Div(
+        [
+            html.Span(
+                [html.I(className="fas fa-reply me-1"), f"{replies}"],
+                style={"color": COLORS["text_muted"], "fontSize": "0.75rem", "marginRight": "12px"},
+            ),
+            html.Span(
+                [html.I(className="fas fa-retweet me-1"), f"{reblogs}"],
+                style={"color": COLORS["text_muted"], "fontSize": "0.75rem", "marginRight": "12px"},
+            ),
+            html.Span(
+                [html.I(className="fas fa-heart me-1"), f"{favourites}"],
+                style={"color": COLORS["text_muted"], "fontSize": "0.75rem"},
+            ),
+        ],
+        style={"marginTop": "8px"},
+    )
+
+    return html.Div(
+        [
+            # Timestamp
+            html.Div(
+                timestamp.strftime("%b %d, %Y %H:%M")
+                if isinstance(timestamp, datetime)
+                else str(timestamp)[:16],
+                style={"color": COLORS["text_muted"], "fontSize": "0.75rem", "marginBottom": "4px"},
+            ),
+            # Post text
+            html.P(
+                display_text,
+                style={"fontSize": "0.9rem", "margin": "5px 0", "lineHeight": "1.5"},
+            ),
+            # Analysis
+            analysis_section,
+            # Engagement
+            engagement,
+        ],
+        style={
+            "padding": "15px",
+            "borderBottom": f"1px solid {COLORS['border']}",
+        },
+    )
+
+
 # =============================================================================
 # Asset Deep Dive Page Components
 # =============================================================================
@@ -2577,6 +2785,36 @@ def register_callbacks(app: Dash):
             current_time,
         )
 
+    # ========== Post Feed Callback ==========
+    @app.callback(
+        Output("post-feed-container", "children"),
+        [
+            Input("refresh-interval", "n_intervals"),
+            Input("selected-period", "data"),
+        ],
+    )
+    def update_post_feed(n_intervals, period):
+        """Update the Latest Posts feed with posts and their LLM analysis."""
+        try:
+            df = load_recent_posts(limit=20)
+
+            if df.empty:
+                return html.P(
+                    "No posts available.",
+                    style={
+                        "color": COLORS["text_muted"],
+                        "textAlign": "center",
+                        "padding": "20px",
+                    },
+                )
+
+            post_cards = [create_post_card(row) for _, row in df.iterrows()]
+            return post_cards
+
+        except Exception as e:
+            print(f"Error loading post feed: {traceback.format_exc()}")
+            return create_error_card("Unable to load post feed", str(e))
+
     # ========== Chart Click Handler ==========
     @app.callback(
         Output("asset-selector", "value"),
@@ -2831,7 +3069,23 @@ def register_callbacks(app: Dash):
             return None
 
         try:
-            df = get_predictions_with_outcomes(limit=limit or 50)
+            # Extract confidence range from slider
+            conf_min = confidence_range[0] if confidence_range else None
+            conf_max = confidence_range[1] if confidence_range else None
+
+            # Only pass confidence filters if they differ from full range
+            if conf_min == 0:
+                conf_min = None
+            if conf_max == 1:
+                conf_max = None
+
+            df = get_predictions_with_outcomes(
+                limit=limit or 50,
+                confidence_min=conf_min,
+                confidence_max=conf_max,
+                start_date=start_date,
+                end_date=end_date,
+            )
 
             if df.empty:
                 return html.P(
@@ -3360,8 +3614,8 @@ def register_alert_callbacks(app: Dash):
         """Populate the assets dropdown when the panel opens."""
         if not is_open:
             return no_update
-        active_assets = get_active_assets_from_db()
-        return [{"label": asset, "value": asset} for asset in active_assets]
+        available_assets = get_available_assets()
+        return [{"label": asset, "value": asset} for asset in available_assets]
 
     # --- Save preferences to localStorage ---
     @app.callback(
