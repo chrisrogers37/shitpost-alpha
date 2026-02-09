@@ -24,6 +24,11 @@
     "shitpost-alpha-dash": {
       "source": ".",
       "startCommand": "cd shitty_ui && python app.py"
+    },
+    "market-data": {
+      "source": ".",
+      "startCommand": "python -m shit.market_data auto-pipeline --days-back 30",
+      "cronSchedule": "*/15 * * * *"
     }
   }
 }
