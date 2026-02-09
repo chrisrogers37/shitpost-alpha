@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Kafka Architecture Evaluation Addendum** - Re-evaluation of communication patterns for multi-source expansion
+  - Amends D2 (database polling) recommendation: hybrid event-driven fan-in for N harvesters, polling retained downstream
+  - Kafka topic topology design with 3 topics, event schemas, partition strategy, and consumer group layout
+  - Technology comparison of Kafka, Redis Streams, PostgreSQL LISTEN/NOTIFY, SQS/SNS, and NATS
+  - Recommends Redis Streams via Upstash (near-term) with migration path to Upstash Kafka
+  - Introduces Normalizer service for source-agnostic content transformation
+  - Updated 7-phase migration plan with incremental event backbone adoption (Phase 3)
+  - Cost analysis: event backbone adds $0-1/month; dominant cost is LLM API scaling
 - **Architecture Evaluation Document** - Comprehensive service decomposition plan for the monorepo
   - Defines 7 logical services (Harvester, ETL, Analyzer, Market Data, Dashboard, Alerts, Price Updates)
   - Recommends database-as-queue polling pattern over event-driven infrastructure
