@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Architecture Evaluation Document** - Comprehensive service decomposition plan for the monorepo
+  - Defines 7 logical services (Harvester, ETL, Analyzer, Market Data, Dashboard, Alerts, Price Updates)
+  - Recommends database-as-queue polling pattern over event-driven infrastructure
+  - 5-phase migration plan starting with wiring the orphaned market data service
+  - Per-service requirements files and settings classes to eliminate dependency bloat
+  - Decision log documenting 8 key architectural tradeoffs with rationale
+  - Cost analysis: ~$8.25/month for fully decoupled pipeline vs. current ~$5/month
 - **Latest Posts Feed (BUG-01)** - New "Latest Posts" section on the dashboard showing Trump's posts with LLM analysis
   - `create_post_card()` component displays post text, sentiment, assets, confidence, thesis, and engagement metrics
   - `update_post_feed()` callback wires `load_recent_posts()` to the dashboard with auto-refresh
