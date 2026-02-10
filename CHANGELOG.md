@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Dashboard UX Overhaul (Phase 0.2)** - Redesigned dashboard from debug tool to actionable intelligence platform
+  - **Hero Signals Section** - Active high-confidence (>=75%) predictions displayed prominently with post preview, sentiment badges, assets, confidence, and outcome status (pending/correct/incorrect with P&L)
+  - **Redesigned Key Metrics Row** - Four KPI cards: Overall Accuracy, Signals This Week, High-Confidence Win Rate, Best Performing Asset
+  - **Accuracy Over Time Chart** - Line chart showing weekly prediction accuracy trend with 50% baseline reference
+  - **Performance Page (/performance)** - New dedicated analytics page with backtest simulation header ($10K portfolio following high-confidence signals), accuracy by confidence bar chart, sentiment breakdown donut chart with per-sentiment accuracy, and sortable performance-by-asset table with win rate, avg return, and total P&L
+  - **Asset Detail Page Enhancements** - Added navigation breadcrumbs linking Dashboard and Performance pages
+  - **Navigation System** - Header now includes nav links for Dashboard and Performance pages with active styling
+  - **7 New Data Query Functions** - `get_active_signals()`, `get_weekly_signal_count()`, `get_high_confidence_metrics()`, `get_best_performing_asset()`, `get_accuracy_over_time()`, `get_backtest_simulation()`, `get_sentiment_accuracy()` - all querying real prediction_outcomes data
+  - **21 New Tests** - Covering all new data query functions with mocked DB queries
+  - **Visual Design Update** - Darker page background (#0F172A), sentiment pill badges, card hover effects, custom scrollbar styling, Inter font integration
+
+### Changed
+- **Signal Cards Redesign** - Now show time-ago format, post preview, sentiment pill badge, asset tickers, confidence percentage, and outcome with P&L amount
+- **Asset Chart Click Behavior** - Clicking an asset bar now navigates to the asset detail page instead of populating a dropdown
+
 - **Market Data Pipeline Service** - Wired the orphaned market data service into the deployment pipeline
   - New `auto-pipeline` CLI command (`python -m shit.market_data auto-pipeline`) runs backfill + outcome calculation in sequence
   - Accepts `--days-back` (default 7) and `--limit` options for controlling scope

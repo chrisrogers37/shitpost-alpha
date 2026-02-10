@@ -44,7 +44,7 @@ class TestColors:
 class TestCreateApp:
     """Tests for create_app function."""
 
-    @patch("layout.get_prediction_stats")
+    @patch("data.get_prediction_stats")
     @patch("layout.get_performance_metrics")
     @patch("layout.get_accuracy_by_confidence")
     @patch("layout.get_accuracy_by_asset")
@@ -90,9 +90,9 @@ class TestCreateApp:
         app = create_app()
 
         assert isinstance(app, Dash)
-        assert app.title == "Shitpost Alpha - Prediction Performance Dashboard"
+        assert app.title == "Shitpost Alpha - Trading Intelligence Dashboard"
 
-    @patch("layout.get_prediction_stats")
+    @patch("data.get_prediction_stats")
     @patch("layout.get_performance_metrics")
     @patch("layout.get_accuracy_by_confidence")
     @patch("layout.get_accuracy_by_asset")
@@ -374,7 +374,7 @@ class TestCreateSignalCard:
 class TestRegisterCallbacks:
     """Tests for register_callbacks function."""
 
-    @patch("layout.get_prediction_stats")
+    @patch("data.get_prediction_stats")
     @patch("layout.get_performance_metrics")
     @patch("layout.get_accuracy_by_confidence")
     @patch("layout.get_accuracy_by_asset")
@@ -511,7 +511,7 @@ class TestPeriodButtonStyles:
 class TestLoadingStates:
     """Tests for loading state components."""
 
-    @patch("layout.get_prediction_stats")
+    @patch("data.get_prediction_stats")
     @patch("layout.get_performance_metrics")
     @patch("layout.get_accuracy_by_confidence")
     @patch("layout.get_accuracy_by_asset")
@@ -562,7 +562,7 @@ class TestLoadingStates:
 class TestTimePeriodSelector:
     """Tests for time period selector UI components."""
 
-    @patch("layout.get_prediction_stats")
+    @patch("data.get_prediction_stats")
     @patch("layout.get_performance_metrics")
     @patch("layout.get_accuracy_by_confidence")
     @patch("layout.get_accuracy_by_asset")
@@ -612,7 +612,7 @@ class TestTimePeriodSelector:
 class TestRefreshIndicator:
     """Tests for refresh indicator components."""
 
-    @patch("layout.get_prediction_stats")
+    @patch("data.get_prediction_stats")
     @patch("layout.get_performance_metrics")
     @patch("layout.get_accuracy_by_confidence")
     @patch("layout.get_accuracy_by_asset")

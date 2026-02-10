@@ -703,7 +703,9 @@ def get_predictions_with_outcomes(
     if end_date is not None:
         filters.append("AND tss.timestamp < :date_end_plus_one")
         if isinstance(end_date, str):
-            params["date_end_plus_one"] = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+            params["date_end_plus_one"] = datetime.strptime(
+                end_date, "%Y-%m-%d"
+            ) + timedelta(days=1)
         else:
             params["date_end_plus_one"] = end_date + timedelta(days=1)
 
@@ -1057,6 +1059,9 @@ def clear_all_caches() -> None:
     get_sentiment_distribution.clear_cache()  # type: ignore
     get_asset_stats.clear_cache()  # type: ignore
     get_available_assets.clear_cache()  # type: ignore
+    get_high_confidence_metrics.clear_cache()  # type: ignore
+    get_best_performing_asset.clear_cache()  # type: ignore
+    get_backtest_simulation.clear_cache()  # type: ignore
 
 
 # =============================================================================
@@ -1344,6 +1349,352 @@ def get_related_assets(symbol: str, limit: int = 8) -> pd.DataFrame:
         return df
     except Exception as e:
         print(f"Error loading related assets for {symbol}: {e}")
+        return pd.DataFrame()
+
+
+def get_active_signals(min_confidence: float = 0.75, hours: int = 48) -> pd.DataFrame:
+    """
+    Get recent high-confidence signals for the hero section.
+
+    Args:
+        min_confidence: Minimum confidence threshold
+        hours: How many hours back to look
+
+    Returns:
+        DataFrame with recent high-confidence predictions and their outcomes
+    """
+    params: Dict[str, Any] = {
+        "min_confidence": min_confidence,
+        "since": datetime.now() - timedelta(hours=hours),
+    }
+
+    query = text("""
+        SELECT
+            tss.timestamp,
+            tss.text,
+            tss.shitpost_id,
+            p.id as prediction_id,
+            p.assets,
+            p.market_impact,
+            p.confidence,
+            p.thesis,
+            po.symbol,
+            po.prediction_sentiment,
+            po.return_t7,
+            po.correct_t7,
+            po.pnl_t7,
+            po.is_complete
+        FROM truth_social_shitposts tss
+        INNER JOIN predictions p ON tss.shitpost_id = p.shitpost_id
+        LEFT JOIN prediction_outcomes po ON p.id = po.prediction_id
+        WHERE p.analysis_status = 'completed'
+            AND p.confidence IS NOT NULL
+            AND p.confidence >= :min_confidence
+            AND p.assets IS NOT NULL
+            AND p.assets::jsonb <> '[]'::jsonb
+            AND tss.timestamp >= :since
+        ORDER BY tss.timestamp DESC
+        LIMIT 5
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        df = pd.DataFrame(rows, columns=columns)
+        return df
+    except Exception as e:
+        print(f"Error loading active signals: {e}")
+        return pd.DataFrame()
+
+
+def get_weekly_signal_count() -> int:
+    """Get count of completed predictions this week."""
+    params: Dict[str, Any] = {
+        "week_start": (datetime.now() - timedelta(days=7)),
+    }
+
+    query = text("""
+        SELECT COUNT(*)
+        FROM predictions p
+        INNER JOIN truth_social_shitposts tss ON tss.shitpost_id = p.shitpost_id
+        WHERE p.analysis_status = 'completed'
+            AND p.confidence IS NOT NULL
+            AND p.assets IS NOT NULL
+            AND p.assets::jsonb <> '[]'::jsonb
+            AND tss.timestamp >= :week_start
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        return rows[0][0] if rows else 0
+    except Exception as e:
+        print(f"Error loading weekly signal count: {e}")
+        return 0
+
+
+@ttl_cache(ttl_seconds=300)
+def get_high_confidence_metrics(days: int = None) -> Dict[str, Any]:
+    """
+    Get win rate and count for high-confidence predictions (>=0.75).
+
+    Args:
+        days: Number of days to look back (None = all time)
+
+    Returns:
+        Dict with win_rate, total, correct, incorrect
+    """
+    date_filter = ""
+    params: Dict[str, Any] = {}
+
+    if days is not None:
+        date_filter = "AND prediction_date >= :start_date"
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
+        SELECT
+            COUNT(*) as total,
+            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct,
+            COUNT(CASE WHEN correct_t7 = false THEN 1 END) as incorrect
+        FROM prediction_outcomes
+        WHERE prediction_confidence >= 0.75
+            AND correct_t7 IS NOT NULL
+            {date_filter}
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        if rows and rows[0]:
+            total = rows[0][0] or 0
+            correct = rows[0][1] or 0
+            win_rate = (correct / total * 100) if total > 0 else 0
+            return {
+                "win_rate": round(win_rate, 1),
+                "total": total,
+                "correct": correct,
+                "incorrect": rows[0][2] or 0,
+            }
+    except Exception as e:
+        print(f"Error loading high confidence metrics: {e}")
+
+    return {"win_rate": 0.0, "total": 0, "correct": 0, "incorrect": 0}
+
+
+@ttl_cache(ttl_seconds=300)
+def get_best_performing_asset(days: int = None) -> Dict[str, Any]:
+    """
+    Get the best performing asset by total P&L.
+
+    Args:
+        days: Number of days to look back (None = all time)
+
+    Returns:
+        Dict with symbol, total_pnl, accuracy, prediction_count
+    """
+    date_filter = ""
+    params: Dict[str, Any] = {}
+
+    if days is not None:
+        date_filter = "AND prediction_date >= :start_date"
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
+        SELECT
+            symbol,
+            ROUND(SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END)::numeric, 2) as total_pnl,
+            COUNT(*) as prediction_count,
+            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct
+        FROM prediction_outcomes
+        WHERE correct_t7 IS NOT NULL
+            {date_filter}
+        GROUP BY symbol
+        HAVING COUNT(*) >= 2
+        ORDER BY SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END) DESC
+        LIMIT 1
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        if rows and rows[0]:
+            total = rows[0][2] or 0
+            correct = rows[0][3] or 0
+            return {
+                "symbol": rows[0][0],
+                "total_pnl": float(rows[0][1]) if rows[0][1] else 0.0,
+                "prediction_count": total,
+                "accuracy": round((correct / total * 100) if total > 0 else 0, 1),
+            }
+    except Exception as e:
+        print(f"Error loading best performing asset: {e}")
+
+    return {"symbol": "N/A", "total_pnl": 0.0, "prediction_count": 0, "accuracy": 0.0}
+
+
+def get_accuracy_over_time(days: int = None) -> pd.DataFrame:
+    """
+    Get prediction accuracy aggregated by week for line chart.
+
+    Args:
+        days: Number of days to look back (None = all time)
+
+    Returns:
+        DataFrame with columns: week, total, correct, accuracy
+    """
+    date_filter = ""
+    params: Dict[str, Any] = {}
+
+    if days is not None:
+        date_filter = "AND prediction_date >= :start_date"
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
+        SELECT
+            DATE_TRUNC('week', prediction_date) as week,
+            COUNT(*) as total,
+            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct
+        FROM prediction_outcomes
+        WHERE correct_t7 IS NOT NULL
+            {date_filter}
+        GROUP BY DATE_TRUNC('week', prediction_date)
+        HAVING COUNT(*) >= 1
+        ORDER BY week ASC
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        df = pd.DataFrame(rows, columns=columns)
+        if not df.empty:
+            df["accuracy"] = (df["correct"] / df["total"] * 100).round(1)
+            df["week"] = pd.to_datetime(df["week"])
+        return df
+    except Exception as e:
+        print(f"Error loading accuracy over time: {e}")
+        return pd.DataFrame()
+
+
+@ttl_cache(ttl_seconds=300)
+def get_backtest_simulation(
+    initial_capital: float = 10000,
+    min_confidence: float = 0.75,
+    days: int = 90,
+) -> Dict[str, Any]:
+    """
+    Simulate P&L if following high-confidence signals with a given capital.
+
+    Assumes equal position sizing per trade based on initial capital.
+
+    Args:
+        initial_capital: Starting capital
+        min_confidence: Minimum confidence threshold for trades
+        days: Number of days to look back
+
+    Returns:
+        Dict with final_value, total_return_pct, trade_count, wins, losses, win_rate
+    """
+    date_filter = ""
+    params: Dict[str, Any] = {"min_confidence": min_confidence}
+
+    if days is not None:
+        date_filter = "AND prediction_date >= :start_date"
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
+        SELECT
+            return_t7,
+            correct_t7,
+            pnl_t7
+        FROM prediction_outcomes
+        WHERE prediction_confidence >= :min_confidence
+            AND correct_t7 IS NOT NULL
+            AND return_t7 IS NOT NULL
+            {date_filter}
+        ORDER BY prediction_date ASC
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        if not rows:
+            return {
+                "initial_capital": initial_capital,
+                "final_value": initial_capital,
+                "total_return_pct": 0.0,
+                "trade_count": 0,
+                "wins": 0,
+                "losses": 0,
+                "win_rate": 0.0,
+            }
+
+        # Simulate: each trade uses a fixed fraction of capital
+        # Use $1000 per trade (matching existing pnl_t7 calculation)
+        total_pnl = sum(float(r[2]) for r in rows if r[2] is not None)
+        wins = sum(1 for r in rows if r[1] is True)
+        losses = sum(1 for r in rows if r[1] is False)
+        trade_count = wins + losses
+        win_rate = (wins / trade_count * 100) if trade_count > 0 else 0
+
+        final_value = initial_capital + total_pnl
+        total_return_pct = (
+            (total_pnl / initial_capital * 100) if initial_capital > 0 else 0
+        )
+
+        return {
+            "initial_capital": initial_capital,
+            "final_value": round(final_value, 2),
+            "total_return_pct": round(total_return_pct, 2),
+            "trade_count": trade_count,
+            "wins": wins,
+            "losses": losses,
+            "win_rate": round(win_rate, 1),
+        }
+    except Exception as e:
+        print(f"Error running backtest simulation: {e}")
+        return {
+            "initial_capital": initial_capital,
+            "final_value": initial_capital,
+            "total_return_pct": 0.0,
+            "trade_count": 0,
+            "wins": 0,
+            "losses": 0,
+            "win_rate": 0.0,
+        }
+
+
+def get_sentiment_accuracy(days: int = None) -> pd.DataFrame:
+    """
+    Get accuracy breakdown by sentiment type with counts.
+
+    Args:
+        days: Number of days to look back (None = all time)
+
+    Returns:
+        DataFrame with columns: sentiment, total, correct, accuracy
+    """
+    date_filter = ""
+    params: Dict[str, Any] = {}
+
+    if days is not None:
+        date_filter = "AND prediction_date >= :start_date"
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
+        SELECT
+            prediction_sentiment as sentiment,
+            COUNT(*) as total,
+            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct
+        FROM prediction_outcomes
+        WHERE prediction_sentiment IS NOT NULL
+            AND correct_t7 IS NOT NULL
+            {date_filter}
+        GROUP BY prediction_sentiment
+        ORDER BY COUNT(*) DESC
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        df = pd.DataFrame(rows, columns=columns)
+        if not df.empty:
+            df["accuracy"] = (df["correct"] / df["total"] * 100).round(1)
+        return df
+    except Exception as e:
+        print(f"Error loading sentiment accuracy: {e}")
         return pd.DataFrame()
 
 
