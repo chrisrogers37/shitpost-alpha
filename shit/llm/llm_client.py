@@ -204,9 +204,9 @@ class LLMClient:
                 # Validate JSON
                 json.loads(json_str)
                 return json_str
-        except:
+        except (json.JSONDecodeError, ValueError):
             pass
-        
+
         return None
     
     async def _parse_manual_response(self, response: str) -> Optional[Dict]:

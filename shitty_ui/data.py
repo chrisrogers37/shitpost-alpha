@@ -4,6 +4,7 @@ Handles database connections and query functions for posts and predictions.
 Integrates with the global Shitpost Alpha settings system.
 """
 
+import logging
 import sys
 import os
 import time
@@ -13,6 +14,8 @@ from functools import wraps
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from typing import List, Dict, Any, Optional, Callable
+
+logger = logging.getLogger(__name__)
 
 
 # Simple TTL cache decorator
@@ -62,13 +65,11 @@ try:
     from shit.config.shitpost_settings import settings
 
     DATABASE_URL = settings.DATABASE_URL.strip('"').strip("'")
-    print(f"🔍 Dashboard using settings DATABASE_URL: {DATABASE_URL[:50]}...")
+    logger.debug("Dashboard using settings-based DATABASE_URL")
 except ImportError as e:
     # Fallback to environment variable if settings can't be imported
     DATABASE_URL = os.environ.get("DATABASE_URL", "").strip('"').strip("'")
-    print(
-        f"🔍 Dashboard using environment DATABASE_URL: {DATABASE_URL[:50] if DATABASE_URL else 'None'}..."
-    )
+    logger.debug("Dashboard using environment-based DATABASE_URL")
     if not DATABASE_URL:
         raise ValueError(
             f"Could not load database URL from settings: {e}. Please set DATABASE_URL environment variable."
@@ -85,7 +86,7 @@ else:
     sync_url = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
     # Remove SSL parameters that might cause issues
     sync_url = sync_url.replace("?sslmode=require&channel_binding=require", "")
-    print(f"🔍 Using PostgreSQL sync URL: {sync_url[:50]}...")
+    logger.debug("Using PostgreSQL sync URL")
 
     # Create synchronous engine for dashboard with explicit driver
     # Configure connection pool for better performance
@@ -125,8 +126,8 @@ def execute_query(query, params=None):
             result = session.execute(query, params or {})
             return result.fetchall(), result.keys()
     except Exception as e:
-        print(f"❌ Database query error: {e}")
-        print(f"🔍 DATABASE_URL: {DATABASE_URL[:50]}...")
+        logger.error(f"Database query error: {e}")
+        logger.debug("Query failed against configured database")
         raise
 
 

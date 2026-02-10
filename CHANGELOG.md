@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **SQL Injection Prevention** - Added `_UPDATABLE_COLUMNS` whitelist to `notifications/db.py` `update_subscription()` to prevent column name injection via dynamic kwargs
+- **HTML Injection Prevention** - Applied `html.escape()` to all 4 user-derived values in `format_alert_message_html()` (sentiment, assets, post text, thesis)
+- **Bare Exception Clauses** - Replaced 4 bare `except:` with specific exception types across `llm_client.py`, `s3_models.py`, and `market_data/cli.py`
+- **Credential Logging** - Removed DATABASE_URL print statements from `shitty_ui/data.py` that exposed connection credentials to stdout
+
 ### Added
 - **Standalone Notifications Module** - Extracted Telegram alert service from `shitty_ui/` into independent `notifications/` module
   - `notifications/alert_engine.py` - Core alert check-and-dispatch loop, preference filtering, quiet hours, sentiment extraction

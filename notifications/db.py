@@ -16,6 +16,25 @@ from shit.db.sync_session import get_session
 
 logger = logging.getLogger(__name__)
 
+# Whitelist of columns that can be updated via update_subscription().
+# Prevents SQL injection through dynamic kwargs keys.
+_UPDATABLE_COLUMNS = frozenset({
+    "chat_type",
+    "username",
+    "first_name",
+    "last_name",
+    "title",
+    "is_active",
+    "subscribed_at",
+    "unsubscribed_at",
+    "alert_preferences",
+    "last_alert_at",
+    "alerts_sent_count",
+    "consecutive_errors",
+    "last_error",
+    "last_interaction_at",
+})
+
 
 # ============================================================
 # Subscription CRUD
@@ -175,6 +194,8 @@ def update_subscription(chat_id: str, **kwargs: Any) -> bool:
         params: Dict[str, Any] = {"chat_id": str(chat_id)}
 
         for key, value in kwargs.items():
+            if key not in _UPDATABLE_COLUMNS:
+                raise ValueError(f"Invalid column name for subscription update: {key}")
             if key == "alert_preferences" and isinstance(value, dict):
                 value = json.dumps(value)
             set_clauses.append(f"{key} = :{key}")
