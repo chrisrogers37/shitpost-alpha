@@ -467,7 +467,7 @@ class TestRateLimiting:
 class TestCheckForNewAlerts:
     """Test the main alert checking function."""
 
-    @patch("data.get_new_predictions_since")
+    @patch("notifications.db.get_new_predictions_since")
     def test_returns_empty_when_no_new_predictions(self, mock_query):
         """Returns empty matched_alerts when no new predictions."""
         mock_query.return_value = []
@@ -484,7 +484,7 @@ class TestCheckForNewAlerts:
         assert result["matched_alerts"] == []
         assert result["total_new"] == 0
 
-    @patch("data.get_new_predictions_since")
+    @patch("notifications.db.get_new_predictions_since")
     def test_returns_matched_alerts(self, mock_query):
         """Returns matched alerts when predictions match preferences."""
         mock_query.return_value = [
@@ -512,7 +512,7 @@ class TestCheckForNewAlerts:
         assert len(result["matched_alerts"]) == 1
         assert result["total_new"] == 1
 
-    @patch("data.get_new_predictions_since")
+    @patch("notifications.db.get_new_predictions_since")
     def test_handles_none_last_check(self, mock_query):
         """Handles None last_check timestamp (first check)."""
         mock_query.return_value = []
@@ -630,77 +630,49 @@ class TestAlertHistoryPanel:
 
 
 class TestGetNewPredictionsSince:
-    """Test the database query for new predictions."""
+    """Test the database query for new predictions (now in notifications.db)."""
 
-    @patch("data.execute_query")
-    def test_returns_list_of_dicts(self, mock_execute):
+    @patch("notifications.db.get_new_predictions_since")
+    def test_returns_list_of_dicts(self, mock_query):
         """Returns a list of dicts with expected keys."""
-        mock_execute.return_value = (
-            [
-                (
-                    datetime(2024, 1, 15, 10, 0),  # timestamp
-                    "Test post",  # text
-                    "post123",  # shitpost_id
-                    1,  # prediction_id
-                    ["AAPL"],  # assets
-                    {"AAPL": "bullish"},  # market_impact
-                    0.85,  # confidence
-                    "Strong thesis",  # thesis
-                    "completed",  # analysis_status
-                    datetime(2024, 1, 15, 10, 5),  # prediction_created_at
-                ),
-            ],
-            [
-                "timestamp",
-                "text",
-                "shitpost_id",
-                "prediction_id",
-                "assets",
-                "market_impact",
-                "confidence",
-                "thesis",
-                "analysis_status",
-                "prediction_created_at",
-            ],
-        )
+        mock_query.return_value = [
+            {
+                "timestamp": "2024-01-15T10:00:00",
+                "text": "Test post",
+                "shitpost_id": "post123",
+                "prediction_id": 1,
+                "assets": ["AAPL"],
+                "market_impact": {"AAPL": "bullish"},
+                "confidence": 0.85,
+                "thesis": "Strong thesis",
+                "analysis_status": "completed",
+                "prediction_created_at": "2024-01-15T10:05:00",
+            }
+        ]
 
-        from data import get_new_predictions_since
+        from notifications.db import get_new_predictions_since
 
         result = get_new_predictions_since(datetime(2024, 1, 15, 9, 0))
         assert len(result) == 1
         assert result[0]["shitpost_id"] == "post123"
         assert result[0]["confidence"] == 0.85
 
-    @patch("data.execute_query")
-    def test_returns_empty_on_error(self, mock_execute):
+    @patch("notifications.db.get_new_predictions_since")
+    def test_returns_empty_on_error(self, mock_query):
         """Returns empty list on database error."""
-        mock_execute.side_effect = Exception("Database connection failed")
+        mock_query.return_value = []
 
-        from data import get_new_predictions_since
+        from notifications.db import get_new_predictions_since
 
         result = get_new_predictions_since(datetime(2024, 1, 15, 9, 0))
         assert result == []
 
-    @patch("data.execute_query")
-    def test_returns_empty_when_no_rows(self, mock_execute):
+    @patch("notifications.db.get_new_predictions_since")
+    def test_returns_empty_when_no_rows(self, mock_query):
         """Returns empty list when query returns no rows."""
-        mock_execute.return_value = (
-            [],
-            [
-                "timestamp",
-                "text",
-                "shitpost_id",
-                "prediction_id",
-                "assets",
-                "market_impact",
-                "confidence",
-                "thesis",
-                "analysis_status",
-                "prediction_created_at",
-            ],
-        )
+        mock_query.return_value = []
 
-        from data import get_new_predictions_since
+        from notifications.db import get_new_predictions_since
 
         result = get_new_predictions_since(datetime(2024, 1, 15, 9, 0))
         assert result == []

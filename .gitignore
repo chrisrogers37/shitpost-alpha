@@ -244,6 +244,9 @@ config/secrets.json
 # Claude Code local settings (user-specific)
 .claude/settings.local.json
 
+# Test artifacts (mock-generated directories)
+MagicMock/
+
 # Backup files
 *.bak
 *.backup
