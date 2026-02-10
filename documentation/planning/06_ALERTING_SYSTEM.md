@@ -1,4 +1,4 @@
-# Alerting System Specification
+# Alerting System Specification [PENDING]
 
 > **STATUS: PENDING** - Not yet implemented. Depends on Signal Feed (05) patterns.
 

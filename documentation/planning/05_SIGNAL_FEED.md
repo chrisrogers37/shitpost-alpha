@@ -1,4 +1,4 @@
-# Signal Feed Page Specification
+# Signal Feed Page Specification [PENDING]
 
 > **STATUS: PENDING** - Not yet implemented. Lower priority than Performance (03) and Asset Deep Dive (04).
 

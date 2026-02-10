@@ -1,4 +1,4 @@
-# Testing Strategy Specification
+# Testing Strategy Specification [COMPLETED]
 
 > **STATUS: IN PROGRESS** - Test count increased from 49 to 67 with dashboard enhancements.
 
@@ -40,12 +40,13 @@ This document defines the testing strategy for the shitty_ui dashboard. The goal
 
 **Priority**: P0 (Must Have)
 **Ongoing**: Tests should be added with every feature
+**Status**: 1,010+ tests passing across the full project. Dashboard-specific tests in `shit_tests/shitty_ui/`.
 
 ---
 
 ## Current Test Coverage
 
-### Existing Tests (67 total) - Updated 2026-01-29
+### Existing UI Tests (67 total, part of 1,010+ project-wide tests) - Updated 2026-01-29
 
 ```
 shit_tests/shitty_ui/
@@ -105,18 +106,17 @@ os.environ['DATABASE_URL'] = 'sqlite:///test.db'
 ### Running Tests
 
 ```bash
-# From the test directory
-cd shit_tests/shitty_ui
-python3 -m pytest . -v
+# Run all dashboard tests
+pytest shit_tests/shitty_ui/ -v
 
 # With coverage
-python3 -m pytest . -v --cov=../../shitty_ui --cov-report=html
+pytest shit_tests/shitty_ui/ -v --cov=shitty_ui --cov-report=html
 
 # Specific test class
-python3 -m pytest test_data.py::TestGetPerformanceMetrics -v
+pytest shit_tests/shitty_ui/test_data.py::TestGetPerformanceMetrics -v
 
 # Specific test
-python3 -m pytest test_data.py::TestGetPerformanceMetrics::test_calculates_accuracy_correctly -v
+pytest shit_tests/shitty_ui/test_data.py::TestGetPerformanceMetrics::test_calculates_accuracy_correctly -v
 ```
 
 ---
@@ -533,7 +533,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
       - name: Install dependencies
         run: |
@@ -542,13 +542,12 @@ jobs:
 
       - name: Run tests
         run: |
-          cd shit_tests/shitty_ui
-          python -m pytest . -v --cov=../../shitty_ui --cov-report=xml
+          pytest shit_tests/shitty_ui/ -v --cov=shitty_ui --cov-report=xml
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
-          file: shit_tests/shitty_ui/coverage.xml
+          file: coverage.xml
 ```
 
 ---

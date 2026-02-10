@@ -1,10 +1,10 @@
-# Shitpost Alpha Dashboard - Development Planning Overview
+# Shitpost Alpha Dashboard - Development Planning Overview [IN PROGRESS]
 
 ## Executive Summary
 
 This document outlines the development roadmap for the Shitpost Alpha prediction performance dashboard. The project analyzes Trump's Truth Social posts using LLMs to generate market predictions, then tracks those predictions against actual market outcomes.
 
-**Current State**: Phase 0.2 complete. Dashboard deployed to Railway with Neon PostgreSQL. Significant code has been written for Phases 1-3 (Asset Deep Dive pages, Alert System, Data Layer Expansion), but the **UI is largely non-functional in production** due to critical data pipeline gaps and untested integration paths.
+**Current State**: v0.18.0+ — Dashboard deployed to Railway with Neon PostgreSQL. ~28,000 posts harvested, ~2,983 predictions, 1,010+ tests passing. Significant code has been written for Phases 1-3 (Asset Deep Dive pages, Alert System, Data Layer Expansion), but the **UI is largely non-functional in production** due to critical data pipeline gaps and untested integration paths.
 
 **Goal**: Stabilize the existing dashboard, fill data pipeline gaps, and deliver a working end-to-end experience: posts -> LLM analysis -> predictions -> market data -> validated outcomes -> user-facing dashboard.
 
@@ -68,7 +68,7 @@ This document outlines the development roadmap for the Shitpost Alpha prediction
    - [ ] Fix any runtime errors in callbacks
    - [ ] Confirm the post feed displays recent posts with LLM analysis
 
-### Phase 1: Dashboard Polish (Week 1-2)
+### Phase 1: Dashboard Polish (Week 1-2) [IN PROGRESS]
 **Goal**: Complete the core dashboard experience
 
 > **STATUS: PARTIALLY COMPLETE** - Dashboard enhancements done, data layer expansion complete, testing in progress.
@@ -76,15 +76,14 @@ This document outlines the development roadmap for the Shitpost Alpha prediction
 1. **Dashboard Enhancements** (02_DASHBOARD_ENHANCEMENTS.md) COMPLETE
    - Loading states, error handling, chart interactivity, time period selectors, mobile responsiveness, refresh indicator
 
-2. **Data Layer** (07_DATA_LAYER_EXPANSION.md) - COMPLETE
+2. **Data Layer** (07_DATA_LAYER_EXPANSION.md) — COMPLETED
    - TTL caching, time-filtered queries, aggregate functions, connection pooling
 
-3. **Testing** (08_TESTING_STRATEGY.md) - IN PROGRESS
-   - 67 UI-specific tests (test_data.py: 34, test_layout.py: 33)
-   - 83 alert/telegram tests added
+3. **Testing** (08_TESTING_STRATEGY.md) — COMPLETED
+   - 1,010+ project-wide tests passing (67 UI-specific + 83 alert/telegram tests)
    - **Gap**: No integration tests against real database; no E2E smoke tests
 
-### Phase 2: Multi-Page Application (Week 3-4)
+### Phase 2: Multi-Page Application (Week 3-4) [PENDING]
 **Goal**: Add dedicated pages for deeper analysis
 
 1. **Asset Deep Dive** (04_ASSET_DEEP_DIVE.md) - CODE WRITTEN, NEEDS DATA + TESTING
@@ -102,7 +101,7 @@ This document outlines the development roadmap for the Shitpost Alpha prediction
    - Chronological signal feed with filters and pagination
    - Partial: "Recent Signals" section on main page exists (10 items)
 
-### Phase 3: Real-Time & Alerts (Week 5-6)
+### Phase 3: Real-Time & Alerts (Week 5-6) [PENDING]
 **Goal**: Enable proactive user engagement
 
 1. **Alerting System** (06_ALERTING_SYSTEM.md) - CODE WRITTEN, NEEDS E2E TESTING
@@ -117,7 +116,7 @@ This document outlines the development roadmap for the Shitpost Alpha prediction
    - [ ] WebSocket integration (stretch goal)
    - [ ] Visual indicators for new signals
 
-### Phase 4: Production Hardening (Week 7-8)
+### Phase 4: Production Hardening (Week 7-8) [COMPLETED]
 **Goal**: Optimize production deployment
 
 > **NOTE**: Basic deployment is complete. Dashboard and scraping services are live on Railway with Neon PostgreSQL.
@@ -201,6 +200,40 @@ market_prices           -- Historical OHLCV data (~528 rows, 14 assets) <-- CRIT
 - [ ] API for external integrations
 
 ---
+
+## Getting Started
+
+### For New Developers
+
+1. **Read the current state document first**: [01_CURRENT_STATE.md](./01_CURRENT_STATE.md)
+2. **Set up local development**:
+   ```bash
+   cd shitpost-alpha
+   pip install -r requirements.txt
+   cp .env.example .env  # Configure DATABASE_URL
+   cd shitty_ui && python app.py
+   ```
+3. **Run tests**:
+   ```bash
+   pytest shit_tests/ -v
+   ```
+4. **Pick a task** from the appropriate planning document based on current phase
+
+### Code Style
+- Follow existing patterns in `layout.py` and `data.py`
+- Use type hints for all function signatures
+- Write tests for all new functions
+- Update CHANGELOG.md for all changes
+
+### PR Process
+1. Create feature branch from `main`
+2. Implement feature with tests
+3. Run `ruff check .` and `ruff format .`
+4. Update CHANGELOG.md
+5. Create PR with description of changes
+
+---
+
 
 ## Success Metrics
 

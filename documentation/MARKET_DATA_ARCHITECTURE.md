@@ -40,8 +40,9 @@
                                 │
                                 ▼
                          ┌─────────────┐
-                         │  PostgreSQL │
-                         │  shitposts  │
+                         │  PostgreSQL         │
+                         │  truth_social_      │
+                         │  shitposts          │
                          └──────┬──────┘
                                 │
                                 ▼

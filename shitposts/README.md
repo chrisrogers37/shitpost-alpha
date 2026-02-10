@@ -7,6 +7,7 @@ This directory contains the shitpost collection and harvesting system for the Sh
 ### Core Files
 - **`truth_social_s3_harvester.py`** - Truth Social S3 harvester (stores raw data in S3)
 - **`cli.py`** - Shared CLI functionality for harvesters
+- **`__main__.py`** - CLI entry point (`python -m shitposts`)
 - **`README.md`** - This documentation file
 
 ## 🏗️ Architecture
@@ -15,6 +16,7 @@ The shitpost collection system follows a clean, focused design:
 
 ```
 shitposts/
+├── __main__.py                   # CLI entry point
 ├── truth_social_s3_harvester.py  # Truth Social S3 harvester
 ├── cli.py                        # Shared CLI functionality
 └── README.md                     # This documentation

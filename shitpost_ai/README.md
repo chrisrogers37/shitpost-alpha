@@ -133,10 +133,10 @@ def _prepare_enhanced_content(shitpost: Dict) -> str
 
 def _enhance_analysis_with_shitpost_data(analysis: Dict, shitpost: Dict) -> Dict
 # Enhances LLM analysis with Truth Social data
-
-def _should_bypass_post(shitpost: Dict) -> bool
-# Determines if a post should be bypassed for analysis (no analyzable content)
 ```
+
+**Bypass Filtering (via `shit/content/bypass_service.py`):**
+The analyzer uses `BypassService` from `shit/content/` to determine if posts should skip LLM analysis.
 
 **Continuous Operation:**
 ```python
@@ -403,10 +403,12 @@ For posts with no analyzable content, the system creates a bypass record:
 }
 ```
 
-**Bypass Reasons:**
-- `"no_text"` - Posts with no text content
-- `"retruth"` - Retruths (RT @ or RT: patterns)
-- `"unanalyzable_content"` - Other unanalyzable content (URLs only, symbols, etc.)
+**Bypass Reasons (from `BypassReason` enum in `shit/content/bypass_service.py`):**
+- `NO_TEXT_CONTENT` - Posts with no text content
+- `RETRUTH` - Retruths (reblog field or RT prefix)
+- `TEXT_TOO_SHORT` - Text shorter than 10 characters
+- `INSUFFICIENT_WORDS` - Fewer than 3 words
+- `TEST_CONTENT` - Common test phrases (test, hello, etc.)
 
 ### Enhanced Analysis Features
 

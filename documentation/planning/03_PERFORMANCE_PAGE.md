@@ -1,4 +1,4 @@
-# Performance Page - Engineering Specification
+# Performance Page - Engineering Specification [PENDING]
 
 > **STATUS: PENDING** - Not yet implemented. This is the recommended next major feature.
 

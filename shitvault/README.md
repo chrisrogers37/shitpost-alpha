@@ -11,6 +11,7 @@ This directory contains the database layer for the Shitpost-Alpha project, respo
 - **`s3_processor.py`** - S3 to database processing operations
 - **`statistics.py`** - Statistics generation operations
 - **`cli.py`** - Command-line interface for database operations
+- **`__main__.py`** - CLI entry point (`python -m shitvault`)
 - **`README.md`** - This documentation file
 
 ## 🏗️ Architecture
@@ -19,6 +20,7 @@ The database layer follows a modular architecture with clear separation of conce
 
 ```
 shitvault/                           # Domain-specific operations
+├── __main__.py                      # CLI entry point
 ├── shitpost_operations.py           # Shitpost CRUD operations
 ├── prediction_operations.py         # Prediction CRUD operations
 ├── s3_processor.py                  # S3 → Database processing

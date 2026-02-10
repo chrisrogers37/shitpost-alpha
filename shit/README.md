@@ -6,9 +6,11 @@ This directory contains all the supporting infrastructure for the Shitpost-Alpha
 
 ### Core Directories
 - **`config/`** - Configuration management and environment settings
+- **`content/`** - Content analysis and bypass filtering service
 - **`db/`** - Database infrastructure, models, client, and operations
 - **`llm/`** - LLM client integration and prompt engineering
 - **`logging/`** - Centralized logging system with beautiful output
+- **`market_data/`** - Market price fetching, outcome calculation, and backfill
 - **`s3/`** - S3 client, data lake, and storage models
 - **`utils/`** - Utility functions and helper modules
 - **`README.md`** - This documentation file
@@ -18,9 +20,11 @@ This directory contains all the supporting infrastructure for the Shitpost-Alpha
 The `shit/` directory serves as the **supporting infrastructure layer** of the Shitpost-Alpha pipeline, responsible for:
 
 - **Configuration management** - Environment variables and settings
+- **Content analysis** - Bypass filtering to skip unanalyzable posts
 - **Database infrastructure** - Generic database client, models, and operations
 - **LLM integration** - Client and prompt management for AI analysis
 - **Logging system** - Centralized, beautiful logging with file support
+- **Market data** - Stock price fetching, prediction outcome calculation
 - **S3 storage** - Cloud storage client and data lake management
 - **Utility functions** - Error handling and helper functions
 
@@ -32,12 +36,15 @@ The supporting infrastructure follows a clean, organized design:
 shit/
 ├── config/                  # Configuration management
 │   └── shitpost_settings.py # Pydantic-based settings
+├── content/                 # Content analysis & filtering
+│   └── bypass_service.py    # BypassService & BypassReason enum
 ├── db/                      # Database infrastructure
 │   ├── data_models.py       # SQLAlchemy models
 │   ├── database_client.py   # Database connection management
 │   ├── database_config.py   # Database configuration
 │   ├── database_operations.py # Generic database operations
-│   └── database_utils.py    # Database utilities
+│   ├── database_utils.py    # Database utilities
+│   └── sync_session.py      # Synchronous session for CLI/dashboard
 ├── llm/                     # LLM integration
 │   ├── llm_client.py        # LLM client for OpenAI/Anthropic
 │   └── prompts.py           # Prompt engineering
@@ -47,6 +54,13 @@ shit/
 │   ├── formatters.py        # Beautiful output formatters
 │   ├── progress_tracker.py  # Progress tracking utilities
 │   └── service_loggers.py   # Service-specific loggers
+├── market_data/             # Market price & outcome tracking
+│   ├── auto_backfill_service.py # Automatic price backfill
+│   ├── backfill_prices.py   # Manual price backfill script
+│   ├── cli.py               # Market data CLI
+│   ├── client.py            # Market data API client
+│   ├── models.py            # MarketPrice & PredictionOutcome models
+│   └── outcome_calculator.py # Prediction outcome calculation
 ├── s3/                      # S3 cloud storage
 │   ├── s3_client.py         # S3 client wrapper
 │   ├── s3_config.py         # S3 configuration
@@ -78,6 +92,20 @@ shit/
 - **Environment Configuration** - Debug flags and environment settings
 - **Logging Configuration** - File logging and log levels
 
+### Content Analysis (`content/`)
+
+**Purpose:** Centralizes bypass logic to skip unanalyzable posts before making expensive LLM calls.
+
+**Key Components:**
+- **`bypass_service.py`** - `BypassService` class and `BypassReason` enum
+
+**Bypass Reasons (BypassReason enum):**
+- `NO_TEXT_CONTENT` - Posts with no text content
+- `RETRUTH` - Retruths/reblogs
+- `TEXT_TOO_SHORT` - Text shorter than 10 characters
+- `INSUFFICIENT_WORDS` - Fewer than 3 words
+- `TEST_CONTENT` - Common test phrases
+
 ### Database Infrastructure (`db/`)
 
 **Purpose:** Provides generic database infrastructure reused across all modules.
@@ -88,6 +116,7 @@ shit/
 - **`database_operations.py`** - Generic CRUD operations and queries
 - **`data_models.py`** - SQLAlchemy ORM models and base classes
 - **`database_utils.py`** - Database utility functions
+- **`sync_session.py`** - Synchronous session for CLI commands and the dashboard
 
 **Features:**
 - **Async SQLAlchemy** - Non-blocking database operations
@@ -142,6 +171,24 @@ shit/
 - **Incremental harvesting** - Efficient duplicate detection
 - **Async operations** - Non-blocking S3 calls
 - **Data lake patterns** - Raw data preservation
+
+### Market Data (`market_data/`)
+
+**Purpose:** Fetches stock prices and calculates prediction outcomes to validate LLM predictions.
+
+**Key Components:**
+- **`client.py`** - `MarketDataClient` for fetching prices from yfinance
+- **`models.py`** - `MarketPrice` and `PredictionOutcome` SQLAlchemy models
+- **`outcome_calculator.py`** - `OutcomeCalculator` for computing prediction accuracy
+- **`auto_backfill_service.py`** - Automatic price backfill service
+- **`backfill_prices.py`** - Manual price backfill script
+- **`cli.py`** - CLI for market data operations (`python -m shit.market_data`)
+
+**Features:**
+- **Price tracking** - Historical OHLCV data per symbol
+- **Outcome validation** - Compares predictions to actual price movements at T+1, T+3, T+7, T+30
+- **P&L simulation** - Simulated profit/loss assuming $1,000 positions
+- **Auto-backfill** - Automatically fetches missing price data
 
 ### Utility Functions (`utils/`)
 

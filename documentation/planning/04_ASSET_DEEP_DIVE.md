@@ -1,4 +1,4 @@
-# Asset Deep Dive Pages - Engineering Specification
+# Asset Deep Dive Pages - Engineering Specification [PENDING]
 
 > **STATUS: PENDING** - Not yet implemented. Can be done in parallel with Performance Page (03).
 

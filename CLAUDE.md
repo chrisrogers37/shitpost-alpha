@@ -20,9 +20,8 @@ python -m shitpost_ai analyze --mode backfill  # Mass LLM analysis ($$$)
 ### SAFE commands you CAN run:
 ```bash
 # Reading/inspection only - always safe
-python -m shitvault show-stats
-python -m shitvault show-latest
-python -m shitvault show-post <id>
+python -m shitvault stats
+python -m shitvault processing-stats
 pytest  # Tests
 python -m shit.tests  # Test framework
 
@@ -67,25 +66,40 @@ Truth Social API → S3 Data Lake → PostgreSQL → LLM Analysis → Database
 shitpost_alpha/
 ├── shitpost_alpha.py       # 🎯 MAIN ENTRY POINT - Pipeline orchestrator
 ├── shit/                   # Core infrastructure & shared utilities
-│   ├── config/             # Configuration management
-│   ├── db/                 # Database models, client & operations
-│   ├── llm/                # LLM client & prompts
-│   ├── s3/                 # S3 client, data lake & models
+│   ├── config/             # Configuration management (Pydantic settings)
+│   ├── content/            # Content processing (bypass service)
+│   ├── db/                 # Database client, models & operations
+│   ├── llm/                # LLM client & prompt templates
 │   ├── logging/            # Centralized logging system
-│   ├── tests/              # Testing framework
-│   └── utils/              # Utility functions & error handling
+│   ├── market_data/        # Market price fetching & outcome calculation
+│   ├── s3/                 # S3 client, data lake & models
+│   └── utils/              # Error handling utilities
 ├── shitvault/              # Data persistence & S3 processing
+│   ├── shitpost_models.py  # Domain-specific SQLAlchemy models
+│   ├── shitpost_operations.py  # Shitpost CRUD operations
+│   ├── prediction_operations.py  # Prediction CRUD operations
 │   ├── s3_processor.py     # S3 → Database processor
-│   ├── shitpost_models.py  # Database models
-│   ├── shitpost_operations.py  # Database CRUD
-│   └── statistics.py       # Analytics & reporting
+│   ├── statistics.py       # Analytics & reporting
+│   └── cli.py              # Database CLI
 ├── shitposts/              # Content harvesting
 │   ├── truth_social_s3_harvester.py  # API → S3 harvester
 │   └── cli.py              # Harvesting CLI
-└── shitpost_ai/            # AI analysis engine
-    ├── shitpost_analyzer.py  # Analysis orchestrator
-    ├── llm_client.py       # OpenAI API wrapper
-    └── prompts.py          # Analysis prompts
+├── shitpost_ai/            # AI analysis engine
+│   ├── shitpost_analyzer.py  # Analysis orchestrator
+│   └── cli.py              # Analysis CLI utilities
+├── shitty_ui/              # Prediction performance dashboard
+│   ├── app.py              # Dash application entry point
+│   ├── layout.py           # Dashboard components & callbacks
+│   └── data.py             # Database query functions
+└── shit_tests/             # Comprehensive test suite (973+ tests)
+    ├── conftest.py          # Shared fixtures & test configuration
+    ├── shit/                # Core infrastructure tests
+    ├── shitposts/           # Harvesting tests
+    ├── shitvault/           # Database tests
+    ├── shitpost_ai/         # AI analysis tests
+    ├── shitty_ui/           # Dashboard tests
+    ├── integration/         # End-to-end tests
+    └── fixtures/            # Test data & mock responses
 ```
 
 ### Key Design Principles
@@ -126,13 +140,10 @@ pytest
 python shitpost_alpha.py --mode incremental --dry-run
 
 # Show database statistics
-python -m shitvault show-stats
+python -m shitvault stats
 
-# Show latest posts
-python -m shitvault show-latest --limit 10
-
-# Show specific post with analysis
-python -m shitvault show-post <post-id>
+# Show processing statistics
+python -m shitvault processing-stats
 
 # Run tests
 pytest                          # All tests
@@ -218,35 +229,62 @@ python -m shitposts --mode backfill --from 2024-01-01 --to 2024-12-31
 
 ### Key Tables
 
-**`shitposts`** - All Truth Social posts
-```sql
-id (text, primary key)
-created_at (timestamp)
-body (text)  -- Post content
-retruth (boolean)  -- Is this a retruth?
-analyzed (boolean)  -- Has this been analyzed by LLM?
-bypassed (boolean)  -- Was this bypassed (e.g., retruth)?
-analyzed_at (timestamp)
-s3_location (text)
-```
+**`truth_social_shitposts`** - All Truth Social posts (field names match API structure)
+- `id` (integer, auto-increment primary key)
+- `shitpost_id` (string, unique) -- Original Truth Social post ID
+- `content` (text) -- HTML content of the post
+- `text` (text) -- Plain text content
+- `timestamp` (datetime) -- When the post was created
+- `username` (string) -- Author username
+- `platform` (string) -- Always "truth_social"
+- Engagement: `replies_count`, `reblogs_count`, `favourites_count`, `upvotes_count`, `downvotes_count`
+- Account: `account_id`, `account_display_name`, `account_verified`, `account_followers_count`
+- Media: `has_media`, `media_attachments` (JSON), `mentions` (JSON), `tags` (JSON)
+- Repost data: `reblog` (JSON, non-null means this is a retruth)
+- `raw_api_data` (JSON) -- Complete API response for debugging
 
 **`predictions`** - LLM analysis results
-```sql
-id (uuid, primary key)
-shitpost_id (text, foreign key)
-sentiment (text)  -- 'bullish', 'bearish', 'neutral'
-predicted_market_impact (text)
-assets_mentioned (text[])  -- Array of ticker symbols
-timeframe_days (integer)
-confidence (text)  -- 'high', 'medium', 'low'
-reasoning (text)
-bypass_reason (text, nullable)  -- Why was this bypassed?
-created_at (timestamp)
-```
+- `id` (integer, auto-increment primary key)
+- `shitpost_id` (string, foreign key → truth_social_shitposts.shitpost_id)
+- `assets` (JSON) -- List of asset tickers, e.g. ["AAPL", "TSLA"]
+- `market_impact` (JSON) -- Dict of asset → sentiment, e.g. {"AAPL": "bullish"}
+- `confidence` (float, nullable) -- 0.0-1.0, null for bypassed posts
+- `thesis` (text) -- Investment thesis / LLM reasoning
+- `analysis_status` (string) -- 'completed', 'bypassed', 'error', 'pending'
+- `analysis_comment` (string, nullable) -- Reason for bypass/error
+- Enhanced scores: `engagement_score`, `viral_score`, `sentiment_score`, `urgency_score` (all float)
+- Content metadata: `has_media`, `mentions_count`, `hashtags_count`, `content_length`
+- Engagement at analysis: `replies_at_analysis`, `reblogs_at_analysis`, `favourites_at_analysis`, `upvotes_at_analysis`
+- LLM metadata: `llm_provider`, `llm_model`, `analysis_timestamp`
+
+**`market_movements`** - Tracks actual market movements after predictions
+- `id`, `prediction_id` (FK → predictions.id)
+- `asset`, `price_at_prediction`, `price_after_24h`, `price_after_72h`
+- `movement_24h`, `movement_72h` (percentage changes)
+- `prediction_correct_24h`, `prediction_correct_72h` (boolean)
+
+**`market_prices`** - Historical OHLCV price data (from yfinance)
+- `id`, `symbol`, `date` (unique together)
+- OHLCV: `open`, `high`, `low`, `close`, `volume`, `adjusted_close`
+- Metadata: `source`, `last_updated`, `is_market_open`, `has_split`, `has_dividend`
+
+**`prediction_outcomes`** - Validated prediction accuracy with returns
+- `id`, `prediction_id` (FK → predictions.id), `symbol`
+- Prediction snapshot: `prediction_date`, `prediction_sentiment`, `prediction_confidence`
+- Price evolution: `price_at_prediction`, `price_t1`, `price_t3`, `price_t7`, `price_t30`
+- Returns: `return_t1`, `return_t3`, `return_t7`, `return_t30` (percentage change)
+- Accuracy: `correct_t1`, `correct_t3`, `correct_t7`, `correct_t30` (boolean)
+- P&L simulation: `pnl_t1`, `pnl_t3`, `pnl_t7`, `pnl_t30` ($1000 position)
+- `is_complete` (boolean) -- All timeframes tracked?
+
+**`subscribers`** - SMS alert subscribers (schema defined, not yet active)
+**`llm_feedback`** - LLM performance feedback (schema defined, not yet active)
 
 **Indexes**:
-- `shitposts`: (created_at), (analyzed), (bypassed)
-- `predictions`: (shitpost_id), (created_at), (assets_mentioned)
+- `truth_social_shitposts`: (`shitpost_id` unique), (`timestamp`)
+- `predictions`: (`shitpost_id`)
+- `market_prices`: (`symbol`, `date` unique composite)
+- `prediction_outcomes`: (`prediction_id`), (`symbol`, `prediction_date`)
 
 ---
 
@@ -275,10 +313,15 @@ Give Claude verification loops for 2-3x quality improvement:
 
 ### Logging Standards
 ```python
-from shit.logging import setup_service_logging, print_success, print_error
+from shit.logging import setup_cli_logging, print_success, print_error
 
-# Set up service-specific logging
-logger = setup_service_logging("my_service")
+# Set up CLI logging (for entry points)
+setup_cli_logging(verbose=True)
+
+# Or use service-specific loggers
+from shit.logging import DatabaseLogger, S3Logger, LLMLogger
+
+db_logger = DatabaseLogger(__name__)
 
 # Use structured logging with context
 logger.info("Processing post", extra={"post_id": post_id})
@@ -293,12 +336,14 @@ print_error("❌ Failed to connect to database")
 ### Database Operations
 ```python
 # ✅ CORRECT: Use SQLAlchemy models
-from shitvault.shitpost_models import Shitpost, Prediction
+from shitvault.shitpost_models import TruthSocialShitpost, Prediction
 
-shitpost = Shitpost(
-    id=post_id,
-    body=content,
-    created_at=timestamp
+shitpost = TruthSocialShitpost(
+    shitpost_id=post_id,
+    content=html_content,
+    text=plain_text,
+    timestamp=timestamp,
+    username="realDonaldTrump"
 )
 session.add(shitpost)
 session.commit()
@@ -310,10 +355,11 @@ session.execute("INSERT INTO shitposts VALUES (...)")
 ### LLM Operations
 ```python
 # ✅ CORRECT: Use LLMClient wrapper
-from shit.llm.llm_client import LLMClient
+from shit.llm import LLMClient
 
 client = LLMClient()
-response = await client.generate(prompt=prompt, temperature=0.1)
+await client.initialize()
+analysis = await client.analyze(content)
 
 # ❌ WRONG: Direct OpenAI API calls without error handling
 import openai
@@ -328,12 +374,23 @@ response = openai.ChatCompletion.create(...)  # No retries, no logging
 
 ```
 shit_tests/
-├── test_config.py
-├── test_db_client.py
-├── test_llm_client.py
-├── test_s3_client.py
-└── integration/
-    └── test_full_pipeline.py
+├── conftest.py                    # Shared fixtures & test configuration
+├── test_shitpost_alpha.py         # Main orchestrator tests (20 tests)
+├── test_performance.py            # Performance benchmarks (8 tests)
+├── shit/                          # Core infrastructure tests (619 tests)
+│   ├── config/                    # Settings tests
+│   ├── db/                        # Database layer tests
+│   ├── llm/                       # LLM client tests
+│   ├── logging/                   # Logging system tests
+│   ├── s3/                        # S3 operations tests
+│   └── utils/                     # Error handling tests
+├── shitposts/                     # Harvesting tests (79 tests)
+├── shitpost_ai/                   # AI analysis tests (102 tests)
+├── shitvault/                     # Database tests (153 tests)
+├── shitty_ui/                     # Dashboard tests (49 tests)
+├── content/                       # Bypass service tests
+├── integration/                   # End-to-end tests (16 tests)
+└── fixtures/                      # Test data & mock responses
 ```
 
 ### Writing Tests
@@ -401,15 +458,15 @@ FILE_LOGGING=true  # Enable service-specific log files
 ### Configuration Access
 
 ```python
-# ✅ CORRECT: Use centralized config
-from shit.config.config import Config
+# ✅ CORRECT: Use Pydantic settings singleton
+from shit.config.shitpost_settings import settings
 
-config = Config.load()
-api_key = config.openai_api_key
+api_key = settings.OPENAI_API_KEY
+database_url = settings.DATABASE_URL
 
 # ❌ WRONG: Direct os.getenv() without validation
 import os
-api_key = os.getenv("OPENAI_API_KEY")  # May be None, no validation
+api_key = os.getenv("OPENAI_API_KEY")  # May be None, no type safety
 ```
 
 ---
@@ -446,14 +503,20 @@ logger.info("Starting harvest")
 
 ### 2. Database Session Management
 
-Always use context managers for database sessions:
+Always use the async database client:
 
 ```python
-from shit.db.db_client import get_session
+from shit.db import DatabaseConfig, DatabaseClient
 
-with get_session() as session:
-    posts = session.query(Shitpost).filter_by(analyzed=False).all()
-    # Session automatically commits on success, rolls back on error
+db_config = DatabaseConfig(database_url=settings.DATABASE_URL)
+db_client = DatabaseClient(db_config)
+await db_client.initialize()
+
+# Use async sessions via the database client
+# Domain operations are accessed through operation classes:
+from shitvault.shitpost_operations import ShitpostOperations
+shitpost_ops = ShitpostOperations(db_ops)
+unprocessed = await shitpost_ops.get_unprocessed_shitposts(launch_date="2025-01-01", limit=10)
 ```
 
 ### 3. S3 Data Lake Organization
@@ -475,11 +538,16 @@ s3://shitpost-alpha/truth-social/posts/
 Not all posts are worth analyzing. Skip retruths and non-financial posts:
 
 ```python
-if post.retruth:
-    mark_bypassed(post, reason="retruth_detected")
+from shit.content import BypassService
+
+bypass_service = BypassService()
+should_bypass, reason = bypass_service.should_bypass_post(post_data)
+
+if should_bypass:
+    await prediction_ops.handle_no_text_prediction(shitpost_id, post_data, reason)
     return None
 
-analysis = await llm_client.analyze(post)
+analysis = await llm_client.analyze(enhanced_content)
 ```
 
 ### 5. Documentation Archiving
@@ -592,7 +660,7 @@ async def safe_operation():
 **Database connection errors**:
 - Check `DATABASE_URL` in `.env`
 - Verify Neon database is accessible (not paused)
-- Test connection: `python -m shit.db.test_connection`
+- Test connection: Verify DATABASE_URL in .env and check Neon dashboard
 
 **S3 access errors**:
 - Check AWS credentials in `.env`
@@ -625,7 +693,7 @@ async def safe_operation():
 
 **Quick Reference**:
 - Main orchestrator: `python shitpost_alpha.py --mode incremental`
-- Show stats: `python -m shitvault show-stats`
+- Show stats: `python -m shitvault stats`
 - Run tests: `pytest -v`
 - Check code: `ruff check .`
 - Format code: `ruff format .`

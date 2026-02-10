@@ -9,7 +9,7 @@
 - `python -m shitpost_ai analyze` (calls OpenAI API - $$$)
 
 **SAFE commands** (read-only):
-- `python -m shitvault show-stats` / `show-latest` / `show-post <id>`
+- `python -m shitvault stats` / `processing-stats`
 - `pytest` (all tests)
 - `python -m shit.tests` (test framework)
 - `tail -f logs/<service>.log` (view logs)
@@ -44,10 +44,13 @@ Truth Social API → S3 Data Lake → PostgreSQL → GPT-4 Analysis → Database
 | `shit/llm/` | LLM client wrapper |
 | `shit/s3/` | S3 client & data lake |
 | `shit/logging/` | Centralized logging |
+| `shit/content/` | Content processing (bypass service) |
+| `shit/market_data/` | Market price data & outcome calculation |
 | `shitvault/` | Database operations & models |
 | `shitposts/` | Truth Social harvesting |
 | `shitpost_ai/` | LLM analysis engine |
-| `shit_tests/` | Core unit tests |
+| `shitty_ui/` | Prediction performance dashboard |
+| `shit_tests/` | Comprehensive test suite (973+ tests) |
 | `logs/` | Service-specific log files |
 
 ---
@@ -59,9 +62,8 @@ Truth Social API → S3 Data Lake → PostgreSQL → GPT-4 Analysis → Database
 | Run tests | `pytest -v` |
 | Check linting | `ruff check .` |
 | Format code | `ruff format .` |
-| Show database stats | `python -m shitvault show-stats` |
-| Show latest posts | `python -m shitvault show-latest --limit 10` |
-| Show specific post | `python -m shitvault show-post <id>` |
+| Show database stats | `python -m shitvault stats` |
+| Show processing stats | `python -m shitvault processing-stats` |
 | View logs | `tail -f logs/<service>.log` |
 | Quick commit | `/quick-commit` command |
 | Full PR workflow | `/commit-push-pr` command |
@@ -72,13 +74,16 @@ Truth Social API → S3 Data Lake → PostgreSQL → GPT-4 Analysis → Database
 
 | Table | Purpose |
 |-------|---------|
-| `shitposts` | All posts (originals and retruths) |
-| `predictions` | LLM analysis results |
-| `statistics` | Aggregate metrics |
+| `truth_social_shitposts` | All posts with full API data |
+| `predictions` | LLM analysis results (assets, market_impact, confidence, thesis) |
+| `market_prices` | Historical OHLCV price data (yfinance) |
+| `prediction_outcomes` | Validated prediction accuracy with returns |
+| `market_movements` | Market movements after predictions |
 
 **Key Indexes**:
-- `shitposts`: (created_at), (analyzed), (bypassed)
-- `predictions`: (shitpost_id), (created_at), (assets_mentioned)
+- `truth_social_shitposts`: (`shitpost_id` unique), (`timestamp`)
+- `predictions`: (`shitpost_id`)
+- `market_prices`: (`symbol`, `date` unique composite)
 
 ---
 
@@ -93,8 +98,8 @@ Truth Social API → S3 Data Lake → PostgreSQL → GPT-4 Analysis → Database
 
 **Configuration Access**:
 ```python
-from shit.config.config import Config
-config = Config.load()
+from shit.config.shitpost_settings import settings
+# Pydantic Settings singleton, auto-loaded from .env
 ```
 
 ---
@@ -104,24 +109,31 @@ config = Config.load()
 | File | Contains |
 |------|----------|
 | `shitpost_alpha.py` | Main orchestrator CLI |
-| `shit/db/db_client.py` | Database session management |
+| `shit/db/database_client.py` | Database session management |
+| `shit/config/shitpost_settings.py` | Pydantic Settings configuration |
 | `shit/llm/llm_client.py` | OpenAI API wrapper |
 | `shit/s3/s3_client.py` | S3 operations |
 | `shit/logging/__init__.py` | Logging utilities |
+| `shit/content/bypass_service.py` | Unified bypass logic |
 | `shitvault/shitpost_models.py` | SQLAlchemy models |
 | `shitposts/truth_social_s3_harvester.py` | Harvesting logic |
 | `shitpost_ai/shitpost_analyzer.py` | Analysis orchestrator |
+| `shitty_ui/layout.py` | Dashboard components & callbacks |
 
 ---
 
 ## Logging Pattern
 
-Every service logs to its own file:
+Entry points use centralized logging setup:
 ```python
-from shit.logging import setup_service_logging
+from shit.logging import setup_cli_logging, print_success, print_error
 
-logger = setup_service_logging("my_service")  # Creates logs/my_service.log
-logger.info("Operation started")
+# Set up logging for CLI entry points
+setup_cli_logging(verbose=True)
+
+# Or use service-specific loggers
+from shit.logging import DatabaseLogger, S3Logger, LLMLogger
+logger = DatabaseLogger(__name__)
 ```
 
 **Log Files**:

@@ -61,23 +61,31 @@ shit_tests/
 ├── test_shitpost_alpha.py          # Main orchestrator tests (20 tests)
 │
 ├── shitposts/                      # Truth Social harvesting (79 tests)
-│   ├── test_cli.py
-│   ├── test_main.py
+│   ├── test_shitposts_cli.py
+│   ├── test_shitposts_main.py
 │   └── test_truth_social_s3_harvester.py
 │
 ├── shitpost_ai/                    # AI analysis (102 tests)
-│   ├── test_cli.py
-│   ├── test_main.py
+│   ├── test_shitpost_ai_cli.py
+│   ├── test_shitpost_ai_main.py
 │   └── test_shitpost_analyzer.py
 │
 ├── shitvault/                      # Database operations (153 tests)
-│   ├── test_main.py
-│   ├── test_cli.py
+│   ├── test_shitvault_main.py
+│   ├── test_shitvault_cli.py
 │   ├── test_s3_processor.py
 │   ├── test_shitpost_operations.py
 │   ├── test_prediction_operations.py
 │   ├── test_shitpost_models.py
 │   └── test_statistics.py
+│
+├── content/                        # Bypass service tests
+│   └── test_bypass_service.py
+│
+├── shitty_ui/                      # Dashboard tests
+│   ├── conftest.py
+│   ├── test_data.py
+│   └── test_layout.py
 │
 ├── shit/                           # Core infrastructure (619 tests)
 │   ├── config/                     # Configuration (46 tests)
@@ -88,7 +96,8 @@ shit_tests/
 │   └── utils/                      # Utilities (62 tests)
 │
 ├── integration/                    # End-to-end tests (16 tests)
-│   └── test_full_pipeline.py
+│   ├── test_full_pipeline.py
+│   └── test_database_workflows.py
 │
 └── fixtures/                       # Test data & mocks
     ├── test_data/                  # Sample data
