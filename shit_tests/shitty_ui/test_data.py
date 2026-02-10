@@ -1526,3 +1526,403 @@ class TestGetRelatedAssets:
 
         assert isinstance(result, pd.DataFrame)
         assert result.empty
+
+
+# =============================================================================
+# Phase 0.2 New Data Function Tests
+# =============================================================================
+
+
+class TestGetActiveSignals:
+    """Tests for get_active_signals function."""
+
+    @patch("data.execute_query")
+    def test_returns_dataframe(self, mock_execute):
+        """Test that function returns a pandas DataFrame."""
+        from data import get_active_signals
+
+        mock_execute.return_value = (
+            [
+                (
+                    datetime.now(),
+                    "test post text",
+                    "post123",
+                    1,
+                    ["AAPL"],
+                    {"AAPL": "bullish"},
+                    0.85,
+                    "thesis text",
+                    "AAPL",
+                    "bullish",
+                    3.0,
+                    True,
+                    30.0,
+                    True,
+                )
+            ],
+            [
+                "timestamp",
+                "text",
+                "shitpost_id",
+                "prediction_id",
+                "assets",
+                "market_impact",
+                "confidence",
+                "thesis",
+                "symbol",
+                "prediction_sentiment",
+                "return_t7",
+                "correct_t7",
+                "pnl_t7",
+                "is_complete",
+            ],
+        )
+
+        result = get_active_signals(min_confidence=0.75, hours=48)
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 1
+        assert result.iloc[0]["confidence"] == 0.85
+
+    @patch("data.execute_query")
+    def test_returns_empty_on_error(self, mock_execute):
+        """Test that function returns empty DataFrame on error."""
+        from data import get_active_signals
+
+        mock_execute.side_effect = Exception("Database error")
+
+        result = get_active_signals()
+
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+
+    @patch("data.execute_query")
+    def test_passes_params_to_query(self, mock_execute):
+        """Test that min_confidence and hours are used in query params."""
+        from data import get_active_signals
+
+        mock_execute.return_value = ([], [])
+
+        get_active_signals(min_confidence=0.8, hours=24)
+
+        mock_execute.assert_called_once()
+        call_args = mock_execute.call_args[0]
+        assert call_args[1]["min_confidence"] == 0.8
+
+
+class TestGetWeeklySignalCount:
+    """Tests for get_weekly_signal_count function."""
+
+    @patch("data.execute_query")
+    def test_returns_integer_count(self, mock_execute):
+        """Test that function returns an integer count."""
+        from data import get_weekly_signal_count
+
+        mock_execute.return_value = ([(15,)], ["count"])
+
+        result = get_weekly_signal_count()
+
+        assert isinstance(result, int)
+        assert result == 15
+
+    @patch("data.execute_query")
+    def test_returns_zero_on_empty(self, mock_execute):
+        """Test that function returns 0 when no results."""
+        from data import get_weekly_signal_count
+
+        mock_execute.return_value = ([], [])
+
+        result = get_weekly_signal_count()
+
+        assert result == 0
+
+    @patch("data.execute_query")
+    def test_returns_zero_on_error(self, mock_execute):
+        """Test that function returns 0 on error."""
+        from data import get_weekly_signal_count
+
+        mock_execute.side_effect = Exception("Database error")
+
+        result = get_weekly_signal_count()
+
+        assert result == 0
+
+
+class TestGetHighConfidenceMetrics:
+    """Tests for get_high_confidence_metrics function."""
+
+    @patch("data.execute_query")
+    def test_returns_metrics_dict(self, mock_execute):
+        """Test that function returns a dict with expected keys."""
+        from data import get_high_confidence_metrics
+
+        mock_execute.return_value = ([(20, 14, 6)], ["total", "correct", "incorrect"])
+
+        get_high_confidence_metrics.clear_cache()
+        result = get_high_confidence_metrics()
+
+        assert isinstance(result, dict)
+        assert result["total"] == 20
+        assert result["correct"] == 14
+        assert result["incorrect"] == 6
+        assert result["win_rate"] == 70.0
+
+    @patch("data.execute_query")
+    def test_handles_zero_total(self, mock_execute):
+        """Test that function handles zero total predictions."""
+        from data import get_high_confidence_metrics
+
+        mock_execute.return_value = ([(0, 0, 0)], ["total", "correct", "incorrect"])
+
+        get_high_confidence_metrics.clear_cache()
+        result = get_high_confidence_metrics()
+
+        assert result["win_rate"] == 0.0
+        assert result["total"] == 0
+
+    @patch("data.execute_query")
+    def test_with_days_parameter(self, mock_execute):
+        """Test that days parameter adds date filter."""
+        from data import get_high_confidence_metrics
+
+        mock_execute.return_value = ([(10, 7, 3)], ["total", "correct", "incorrect"])
+
+        get_high_confidence_metrics.clear_cache()
+        get_high_confidence_metrics(days=30)
+
+        mock_execute.assert_called_once()
+        call_args = mock_execute.call_args[0]
+        assert "start_date" in call_args[1]
+
+    @patch("data.execute_query")
+    def test_returns_defaults_on_error(self, mock_execute):
+        """Test that function returns defaults on error."""
+        from data import get_high_confidence_metrics
+
+        mock_execute.side_effect = Exception("Database error")
+
+        get_high_confidence_metrics.clear_cache()
+        result = get_high_confidence_metrics()
+
+        assert result == {"win_rate": 0.0, "total": 0, "correct": 0, "incorrect": 0}
+
+
+class TestGetBestPerformingAsset:
+    """Tests for get_best_performing_asset function."""
+
+    @patch("data.execute_query")
+    def test_returns_asset_dict(self, mock_execute):
+        """Test that function returns a dict with asset info."""
+        from data import get_best_performing_asset
+
+        mock_execute.return_value = (
+            [("AAPL", 500.0, 10, 7)],
+            ["symbol", "total_pnl", "prediction_count", "correct"],
+        )
+
+        get_best_performing_asset.clear_cache()
+        result = get_best_performing_asset()
+
+        assert result["symbol"] == "AAPL"
+        assert result["total_pnl"] == 500.0
+        assert result["prediction_count"] == 10
+        assert result["accuracy"] == 70.0
+
+    @patch("data.execute_query")
+    def test_returns_defaults_on_empty(self, mock_execute):
+        """Test that function returns defaults when no data."""
+        from data import get_best_performing_asset
+
+        mock_execute.return_value = ([], [])
+
+        get_best_performing_asset.clear_cache()
+        result = get_best_performing_asset()
+
+        assert result["symbol"] == "N/A"
+        assert result["total_pnl"] == 0.0
+
+    @patch("data.execute_query")
+    def test_returns_defaults_on_error(self, mock_execute):
+        """Test that function returns defaults on error."""
+        from data import get_best_performing_asset
+
+        mock_execute.side_effect = Exception("Database error")
+
+        get_best_performing_asset.clear_cache()
+        result = get_best_performing_asset()
+
+        assert result["symbol"] == "N/A"
+
+
+class TestGetAccuracyOverTime:
+    """Tests for get_accuracy_over_time function."""
+
+    @patch("data.execute_query")
+    def test_returns_dataframe_with_accuracy(self, mock_execute):
+        """Test that function returns DataFrame with accuracy column."""
+        from data import get_accuracy_over_time
+
+        mock_execute.return_value = (
+            [
+                (datetime(2024, 1, 1), 10, 7),
+                (datetime(2024, 1, 8), 12, 9),
+            ],
+            ["week", "total", "correct"],
+        )
+
+        result = get_accuracy_over_time()
+
+        assert isinstance(result, pd.DataFrame)
+        assert "accuracy" in result.columns
+        assert result["accuracy"].iloc[0] == 70.0  # 7/10
+
+    @patch("data.execute_query")
+    def test_with_days_parameter(self, mock_execute):
+        """Test that days parameter adds date filter."""
+        from data import get_accuracy_over_time
+
+        mock_execute.return_value = ([], [])
+
+        get_accuracy_over_time(days=90)
+
+        mock_execute.assert_called_once()
+        call_args = mock_execute.call_args[0]
+        assert "start_date" in call_args[1]
+
+    @patch("data.execute_query")
+    def test_returns_empty_on_error(self, mock_execute):
+        """Test that function returns empty DataFrame on error."""
+        from data import get_accuracy_over_time
+
+        mock_execute.side_effect = Exception("Database error")
+
+        result = get_accuracy_over_time()
+
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+
+
+class TestGetBacktestSimulation:
+    """Tests for get_backtest_simulation function."""
+
+    @patch("data.execute_query")
+    def test_returns_simulation_dict(self, mock_execute):
+        """Test that function returns a dict with simulation results."""
+        from data import get_backtest_simulation
+
+        mock_execute.return_value = (
+            [
+                (2.5, True, 25.0),
+                (-1.5, False, -15.0),
+                (3.0, True, 30.0),
+            ],
+            ["return_t7", "correct_t7", "pnl_t7"],
+        )
+
+        get_backtest_simulation.clear_cache()
+        result = get_backtest_simulation(initial_capital=10000, min_confidence=0.75)
+
+        assert result["initial_capital"] == 10000
+        assert result["trade_count"] == 3
+        assert result["wins"] == 2
+        assert result["losses"] == 1
+        assert result["final_value"] == 10040.0  # 10000 + 25 - 15 + 30
+
+    @patch("data.execute_query")
+    def test_returns_defaults_on_no_data(self, mock_execute):
+        """Test that function returns defaults when no data."""
+        from data import get_backtest_simulation
+
+        mock_execute.return_value = ([], [])
+
+        get_backtest_simulation.clear_cache()
+        result = get_backtest_simulation(initial_capital=10000)
+
+        assert result["final_value"] == 10000
+        assert result["trade_count"] == 0
+        assert result["win_rate"] == 0.0
+
+    @patch("data.execute_query")
+    def test_returns_defaults_on_error(self, mock_execute):
+        """Test that function returns defaults on error."""
+        from data import get_backtest_simulation
+
+        mock_execute.side_effect = Exception("Database error")
+
+        get_backtest_simulation.clear_cache()
+        result = get_backtest_simulation()
+
+        assert result["trade_count"] == 0
+        assert result["win_rate"] == 0.0
+
+    @patch("data.execute_query")
+    def test_win_rate_calculation(self, mock_execute):
+        """Test that win rate is calculated correctly."""
+        from data import get_backtest_simulation
+
+        mock_execute.return_value = (
+            [
+                (1.0, True, 10.0),
+                (2.0, True, 20.0),
+                (-1.0, False, -10.0),
+                (3.0, True, 30.0),
+            ],
+            ["return_t7", "correct_t7", "pnl_t7"],
+        )
+
+        get_backtest_simulation.clear_cache()
+        result = get_backtest_simulation()
+
+        assert result["wins"] == 3
+        assert result["losses"] == 1
+        assert result["win_rate"] == 75.0
+
+
+class TestGetSentimentAccuracy:
+    """Tests for get_sentiment_accuracy function."""
+
+    @patch("data.execute_query")
+    def test_returns_dataframe(self, mock_execute):
+        """Test that function returns a pandas DataFrame."""
+        from data import get_sentiment_accuracy
+
+        mock_execute.return_value = (
+            [
+                ("bullish", 50, 35),
+                ("bearish", 30, 15),
+                ("neutral", 20, 10),
+            ],
+            ["sentiment", "total", "correct"],
+        )
+
+        result = get_sentiment_accuracy()
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 3
+        assert "accuracy" in result.columns
+        assert result.iloc[0]["accuracy"] == 70.0  # 35/50
+
+    @patch("data.execute_query")
+    def test_with_days_parameter(self, mock_execute):
+        """Test that days parameter adds date filter."""
+        from data import get_sentiment_accuracy
+
+        mock_execute.return_value = ([], [])
+
+        get_sentiment_accuracy(days=30)
+
+        mock_execute.assert_called_once()
+        call_args = mock_execute.call_args[0]
+        assert "start_date" in call_args[1]
+
+    @patch("data.execute_query")
+    def test_returns_empty_on_error(self, mock_execute):
+        """Test that function returns empty DataFrame on error."""
+        from data import get_sentiment_accuracy
+
+        mock_execute.side_effect = Exception("Database error")
+
+        result = get_sentiment_accuracy()
+
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
