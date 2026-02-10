@@ -167,3 +167,35 @@ class TestFormatAlertMessageHtml:
         }
         result = format_alert_message_html(alert)
         assert "#ef4444" in result
+
+    def test_escapes_script_tags_in_all_fields(self):
+        """Verify HTML injection is prevented across all user-derived fields."""
+        malicious_alert = {
+            "confidence": 0.85,
+            "assets": ["<b>FAKE</b>", "AAPL"],
+            "sentiment": "bullish",
+            "thesis": '<script>alert("xss")</script>',
+            "text": '<img src=x onerror="steal()">',
+        }
+        result = format_alert_message_html(malicious_alert)
+
+        # All 4 injection points must be escaped
+        assert "<script>" not in result
+        assert "&lt;script&gt;" in result
+        assert 'onerror="steal()"' not in result
+        assert "&lt;img" in result
+        assert "<b>FAKE</b>" not in result
+        assert "&lt;b&gt;" in result
+
+    def test_escapes_html_in_thesis(self):
+        """Verify thesis field is escaped."""
+        alert = {
+            "confidence": 0.5,
+            "assets": ["SPY"],
+            "sentiment": "neutral",
+            "thesis": '<a href="http://evil.com">Click me</a>',
+            "text": "Normal text",
+        }
+        result = format_alert_message_html(alert)
+        assert 'href="http://evil.com"' not in result
+        assert "&lt;a href=" in result

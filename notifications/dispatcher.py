@@ -5,6 +5,7 @@ Handles email (SMTP/SendGrid) and SMS (Twilio) dispatch.
 Telegram dispatch is handled by the alert_engine module.
 """
 
+import html
 import logging
 import re
 import smtplib
@@ -386,9 +387,10 @@ def format_alert_message_html(alert: Dict[str, Any]) -> str:
         HTML string for email body.
     """
     confidence_pct = f"{alert.get('confidence', 0):.0%}"
-    assets_str = ", ".join(alert.get("assets", [])[:5])
-    sentiment = alert.get("sentiment", "neutral").upper()
-    thesis = alert.get("thesis", "No thesis provided.")
+    assets_str = html.escape(", ".join(alert.get("assets", [])[:5]))
+    sentiment = html.escape(alert.get("sentiment", "neutral").upper())
+    thesis = html.escape(alert.get("thesis", "No thesis provided."))
+    post_text = html.escape(alert.get("text", "")[:300])
 
     if sentiment == "BULLISH":
         sentiment_color = "#10b981"
@@ -413,7 +415,7 @@ def format_alert_message_html(alert: Dict[str, Any]) -> str:
 
             <div style="background: #334155; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                 <div style="color: #f1f5f9; font-size: 14px; line-height: 1.5;">
-                    {alert.get("text", "")[:300]}
+                    {post_text}
                 </div>
             </div>
 
