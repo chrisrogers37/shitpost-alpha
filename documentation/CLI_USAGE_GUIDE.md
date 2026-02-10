@@ -88,10 +88,10 @@ python -m shitvault load-database-from-s3 --mode range --start-date 2024-01-01 -
 #### Get Statistics
 ```bash
 # Database statistics
-python -m shitvault get-statistics
+python -m shitvault stats
 
 # Processing statistics
-python -m shitvault get-processing-stats
+python -m shitvault processing-stats
 ```
 
 ---
@@ -155,10 +155,10 @@ python shitpost_alpha.py --mode range --from 2024-10-01 --to 2024-10-31 --limit 
 python -m shitposts --mode incremental --limit 5 --verbose
 
 # Check database stats
-python -m shitvault get-statistics
+python -m shitvault stats
 
 # Check processing stats
-python -m shitvault get-processing-stats
+python -m shitvault processing-stats
 ```
 
 ---

@@ -1,4 +1,4 @@
-# Dashboard Enhancements Specification
+# Dashboard Enhancements Specification [IN PROGRESS]
 
 > **STATUS: ✅ COMPLETE** - All 6 tasks have been implemented and tested. See commit `fc5f6cd`.
 

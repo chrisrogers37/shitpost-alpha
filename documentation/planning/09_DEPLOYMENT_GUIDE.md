@@ -1,4 +1,4 @@
-# Deployment Guide - Railway
+# Deployment Guide - Railway [COMPLETED]
 
 > **STATUS: ✅ COMPLETE** - Dashboard and scraping services are already deployed to Railway with Neon PostgreSQL database.
 
@@ -88,7 +88,7 @@ gunicorn>=21.2.0
 
 Specify Python version:
 ```
-python-3.11.14
+python-3.13
 ```
 
 ---
@@ -166,7 +166,7 @@ If Railway's auto-detection doesn't work, create `nixpacks.toml`:
 
 ```toml
 [phases.setup]
-nixPkgs = ["python311"]
+nixPkgs = ["python313"]
 
 [phases.install]
 cmds = ["pip install -r requirements.txt"]

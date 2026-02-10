@@ -1,4 +1,4 @@
-# Data Layer Expansion Specification
+# Data Layer Expansion Specification [PENDING]
 
 > **STATUS: COMPLETE ✅** - All tasks implemented as of 2026-01-30.
 

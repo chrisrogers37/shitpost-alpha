@@ -46,10 +46,19 @@ Shitpost Alpha monitors Donald Trump's Truth Social posts in real-time, analyzes
 ┌───────────────▼─────────────────────┐
 │  shit/ (Core Infrastructure)        │
 │  • config/ - Environment management │
+│  • content/ - Bypass service        │
 │  • db/ - Database client & models   │
 │  • llm/ - OpenAI API wrapper        │
-│  • s3/ - AWS S3 operations          │
 │  • logging/ - Service-specific logs │
+│  • market_data/ - Price tracking    │
+│  • s3/ - AWS S3 operations          │
+└───────────────┬─────────────────────┘
+                │
+┌───────────────▼─────────────────────┐
+│  shitty_ui/ (Dashboard)             │
+│  • Dash + Plotly + Bootstrap        │
+│  • Performance metrics & charts     │
+│  • Asset deep dive & signal feed    │
 └─────────────────────────────────────┘
 ```
 
@@ -61,14 +70,17 @@ Shitpost Alpha monitors Donald Trump's Truth Social posts in real-time, analyzes
 
 | Table | Purpose | Key Fields |
 |-------|---------|------------|
-| `shitposts` | All posts (source of truth) | `id`, `body`, `created_at`, `retruth`, `analyzed`, `bypassed` |
-| `predictions` | LLM analysis results | `shitpost_id`, `sentiment`, `assets_mentioned`, `confidence`, `reasoning` |
-| `statistics` | Aggregate metrics | Various counters and summaries |
+| `truth_social_shitposts` | All posts (source of truth) | `shitpost_id` (unique), `content`, `text`, `timestamp`, `username`, `reblog` (JSON) |
+| `predictions` | LLM analysis results | `shitpost_id` (FK), `assets` (JSON), `market_impact` (JSON), `confidence` (float), `thesis`, `analysis_status` |
+| `market_prices` | Historical OHLCV price data | `symbol`, `date`, `close`, `volume` |
+| `prediction_outcomes` | Validated prediction accuracy | `prediction_id` (FK), `symbol`, `return_t7`, `correct_t7`, `pnl_t7` |
+| `market_movements` | Market movements after predictions | `prediction_id` (FK), `asset`, `movement_24h`, `movement_72h` |
 
 **Important Indexes**:
-- Posts by date: `shitposts(created_at)`
-- Unanalyzed posts: `shitposts(analyzed)`
-- Asset mentions: `predictions(assets_mentioned)` (GIN index for array search)
+- Posts by ID: `truth_social_shitposts(shitpost_id)` unique
+- Posts by date: `truth_social_shitposts(timestamp)`
+- Predictions by post: `predictions(shitpost_id)`
+- Prices: `market_prices(symbol, date)` unique composite
 
 ---
 
@@ -94,8 +106,9 @@ FILE_LOGGING=true  # Service-specific log files
 
 **Configuration Access**:
 ```python
-from shit.config.config import Config
-config = Config.load()  # Validates and loads all settings
+from shit.config.shitpost_settings import settings
+# Pydantic Settings singleton, auto-loaded from .env
+api_key = settings.OPENAI_API_KEY
 ```
 
 ---
@@ -105,12 +118,16 @@ config = Config.load()  # Validates and loads all settings
 | File | Purpose |
 |------|---------|
 | `shitpost_alpha.py` | Main orchestrator (CLI entry point) |
-| `shit/db/db_client.py` | Database session management |
+| `shit/db/database_client.py` | Database session management |
+| `shit/config/shitpost_settings.py` | Pydantic Settings configuration |
 | `shit/llm/llm_client.py` | OpenAI API wrapper with retries |
 | `shit/s3/s3_client.py` | S3 upload/download operations |
-| `shitvault/shitpost_models.py` | SQLAlchemy models (Shitpost, Prediction) |
+| `shit/content/bypass_service.py` | Unified bypass logic for post filtering |
+| `shit/market_data/client.py` | Market price data fetcher (yfinance) |
+| `shitvault/shitpost_models.py` | SQLAlchemy models (TruthSocialShitpost, Prediction) |
 | `shitposts/truth_social_s3_harvester.py` | API harvesting logic |
 | `shitpost_ai/shitpost_analyzer.py` | LLM analysis orchestrator |
+| `shitty_ui/app.py` | Dashboard entry point (Dash + Plotly) |
 
 ---
 
@@ -123,9 +140,8 @@ config = Config.load()  # Validates and loads all settings
 - `python -m shitpost_ai analyze` (calls OpenAI - costs money)
 
 **SAFE to suggest** (read-only):
-- `python -m shitvault show-stats` - Database statistics
-- `python -m shitvault show-latest` - Latest posts
-- `python -m shitvault show-post <id>` - Specific post details
+- `python -m shitvault stats` - Database statistics
+- `python -m shitvault processing-stats` - Processing statistics
 - `pytest` - Run tests
 - `tail -f logs/<service>.log` - View logs
 
@@ -142,7 +158,7 @@ config = Config.load()  # Validates and loads all settings
 - **LLM**: OpenAI GPT-4 (financial analysis)
 - **Posts Processed**: ~28,000+ historical
 - **Analyzed Posts**: ~700+ with LLM
-- **Version**: v0.14.0 (Enhanced Logging)
+- **Version**: v0.18.0 (Comprehensive Test Coverage)
 
 ---
 
@@ -157,7 +173,7 @@ config = Config.load()  # Validates and loads all settings
 
 ### Debugging production issues:
 1. Check logs: `tail -f logs/<service>.log`
-2. Query database: `python -m shitvault show-stats`
+2. Query database: `python -m shitvault stats`
 3. Test locally: `python shitpost_alpha.py --dry-run`
 
 ### Testing:
@@ -188,13 +204,21 @@ config = Config.load()  # Validates and loads all settings
 
 ---
 
-## Next Phase: Market Data Integration
+## Current Development Focus
 
-**Planned features**:
-- Stock price data integration (Yahoo Finance / Alpha Vantage)
-- Outcome calculation (did predictions come true?)
-- Performance metrics (hit rate, accuracy, ROI)
-- SMS alerting system (Twilio)
-- Subscriber management
+**Recently completed**:
+- Market data module (`shit/market_data/`) with yfinance integration
+- Prediction outcome tracking and accuracy calculation at T+1/3/7/30
+- Dashboard redesign (`shitty_ui/`) with performance metrics focus
+- 973+ passing tests with comprehensive coverage
+
+**In progress**:
+- Full asset price backfill for all 187+ predicted assets
+- Dashboard loading states, time period filtering, mobile responsiveness
+
+**Planned**:
+- Real-time alerting system (Telegram bot)
+- Multi-source signal aggregation
+- Monetization features
 
 See [CHANGELOG.md](../CHANGELOG.md) for full roadmap.

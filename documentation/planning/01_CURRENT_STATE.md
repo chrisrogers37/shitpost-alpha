@@ -1,4 +1,4 @@
-# Current State - Dashboard Architecture Reference
+# Current State - Dashboard Architecture Reference [COMPLETED]
 
 ## Overview
 

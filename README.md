@@ -75,47 +75,60 @@ The project uses a delightfully themed directory structure that's both logical, 
 
 - **`shit/`** - Universal container for supporting infrastructure
 - **`shitvault/`** - Secure data storage and S3 processing
-- **`shitposts/`** - Content harvesting and monitoring  
+- **`shitposts/`** - Content harvesting and monitoring
 - **`shitpost_ai/`** - AI analysis and LLM integration
+- **`shitty_ui/`** - Dashboard for prediction performance visualization
 
 ```
 shitpost_alpha/
 ├── shitpost_alpha.py       # 🎯 MAIN ENTRY POINT - Pipeline orchestrator
 ├── shit/                   # Core infrastructure & shared utilities
-│   ├── config/             # Configuration management
+│   ├── config/             # Configuration management (Pydantic settings)
+│   ├── content/            # Content processing (bypass logic)
 │   ├── db/                 # Database models, client & operations
-│   ├── llm/                # LLM client & prompts
+│   ├── llm/                # LLM client & prompt templates
+│   ├── logging/            # Centralized logging system
+│   ├── market_data/        # Market price fetching & outcome calculation
 │   ├── s3/                 # S3 client, data lake & models
-│   ├── tests/              # Testing framework
-│   └── utils/              # Utility functions & error handling
+│   └── utils/              # Error handling utilities
 ├── shitvault/              # Data persistence & S3 processing
-│   ├── README.md           # 📖 Database & S3 processing documentation
 │   ├── cli.py              # Database CLI operations
-│   ├── prediction_operations.py  # Prediction management
+│   ├── prediction_operations.py  # Prediction CRUD operations
 │   ├── s3_processor.py     # S3 → Database processor
-│   ├── shitpost_models.py  # Database models
-│   ├── shitpost_operations.py  # Shitpost management
+│   ├── shitpost_models.py  # Domain-specific SQLAlchemy models
+│   ├── shitpost_operations.py  # Shitpost CRUD operations
 │   └── statistics.py       # Database statistics & analytics
 ├── shitposts/              # Content harvesting
-│   ├── README.md           # 📖 Harvesting documentation
-│   ├── truth_social_s3_harvester.py  # S3-based harvester
-│   └── cli.py              # Shared CLI functionality
-└── shitpost_ai/            # AI analysis engine
-    ├── README.md           # 📖 AI analysis documentation
-    ├── llm_client.py       # LLM API interaction layer
-    ├── shitpost_analyzer.py # Analysis orchestrator
-    └── prompts.py          # Analysis prompts
+│   ├── truth_social_s3_harvester.py  # API → S3 harvester
+│   └── cli.py              # Harvesting CLI functionality
+├── shitpost_ai/            # AI analysis engine
+│   ├── shitpost_analyzer.py # Analysis orchestrator
+│   └── cli.py              # Analysis CLI utilities
+├── shitty_ui/              # Prediction performance dashboard
+│   ├── app.py              # Dash application entry point
+│   ├── layout.py           # Dashboard layout, components & callbacks
+│   └── data.py             # Database query functions for dashboard
+└── shit_tests/             # Comprehensive test suite (973+ tests)
+    ├── conftest.py          # Shared fixtures & test configuration
+    ├── shit/                # Core infrastructure tests
+    ├── shitposts/           # Harvesting module tests
+    ├── shitvault/           # Database module tests
+    ├── shitpost_ai/         # AI analysis tests
+    ├── shitty_ui/           # Dashboard tests
+    ├── integration/         # End-to-end pipeline tests
+    └── fixtures/            # Test data & mock responses
 ```
 
 ## 📊 Current System Status
 
 ### Production Metrics
 - **Posts Processed**: ~28,000+ historical posts harvested
-- **Analysis Coverage**: ~700+ posts analyzed with LLM
+- **Analysis Coverage**: ~2,900+ predictions (1,500+ completed, 1,400+ bypassed/pending)
 - **Database**: Neon PostgreSQL with real-time updates
 - **Storage**: AWS S3 data lake with organized structure
 - **Uptime**: Railway deployment running every 5 minutes
-- **Latest Version**: v0.19.0 (Production-Ready Logging & SQLAlchemy Fix)
+- **Test Suite**: 973+ passing tests with comprehensive coverage
+- **Latest Version**: v0.18.0 (Comprehensive Test Coverage)
 
 ## 📚 Technical Documentation
 
@@ -152,30 +165,47 @@ For detailed version history and recent improvements, see [CHANGELOG.md](CHANGEL
 
 ### Phase 1: Core Pipeline ✅ **COMPLETED**
 - [x] Truth Social monitoring and S3 storage
-- [x] S3 to Database processing  
+- [x] S3 to Database processing
 - [x] LLM analysis pipeline with categorical tracking
 - [x] Complete API → S3 → Database → LLM → Database pipeline
 - [x] Unified orchestration via `shitpost_alpha.py`
 - [x] Production deployment on Railway with Neon PostgreSQL
 - [x] Comprehensive error handling and logging
+- [x] Centralized bypass service for content filtering
+- [x] 973+ passing tests with comprehensive coverage
 
-### Phase 2: Market Data Integration 🚧 **NEXT**
-- [ ] **Stock Price Data Integration** - Yahoo Finance/Alpha Vantage API
-- [ ] **Outcome Calculation** - Track prediction accuracy (t1, t3, t7, t30)
-- [ ] **Performance Metrics** - Hit rate, accuracy, confidence scoring
-- [ ] **Market Correlation Analysis** - Historical performance tracking
+### Phase 2: Market Data & Prediction Validation 🚧 **IN PROGRESS**
+- [x] **Market Data Module** - `shit/market_data/` with yfinance integration
+- [x] **Price Storage** - `market_prices` table with OHLCV data
+- [x] **Outcome Tracking** - `prediction_outcomes` table with T+1/3/7/30 returns
+- [x] **Outcome Calculator** - Automated accuracy/P&L calculation
+- [x] **Price Backfill** - CLI tools for historical price backfilling
+- [ ] **Full Asset Coverage** - Backfill prices for all 187+ mentioned assets
+- [ ] **Automated Daily Updates** - Scheduled price fetching and outcome calculation
 
-### Phase 3: Alerting & User Management 📋 **PLANNED**
-- [ ] **SMS Alerting System** - Twilio integration for real-time notifications
-- [ ] **Subscriber Management** - Sign-up flow and preference management
-- [ ] **Alert Filtering** - Rate limiting and relevance scoring
-- [ ] **Admin Dashboard** - Monitoring and subscriber management interface
+### Phase 3: Dashboard & Visualization 🚧 **IN PROGRESS**
+- [x] **Dash-based Dashboard** - `shitty_ui/` with Plotly + Bootstrap
+- [x] **Performance Metrics** - Accuracy, P&L, average return at a glance
+- [x] **Accuracy by Confidence** - Chart showing calibration by confidence level
+- [x] **Performance by Asset** - Chart showing per-asset accuracy
+- [x] **Recent Signals** - Latest predictions with outcomes
+- [x] **Asset Deep Dive** - Historical predictions for any selected asset
+- [x] **Dark Theme** - Professional trading platform design
+- [ ] **Loading States & Error Handling** - Graceful degradation
+- [ ] **Time Period Filtering** - 7d/30d/90d/All selector
+- [ ] **Mobile Responsiveness** - Optimized mobile layout
 
-### Phase 4: Advanced Features 🔮 **FUTURE**
-- [ ] **Feedback Loop Implementation** - Continuous LLM improvement
+### Phase 4: Real-Time Alerting 📋 **PLANNED**
+- [ ] **Telegram Bot** - Real-time prediction alerts
+- [ ] **Alert Rules Engine** - Confidence threshold, asset filters
+- [ ] **Subscriber Management** - Subscription and preference management
+- [ ] **Rate Limiting** - Max alerts per hour/day per user
+
+### Phase 5: Advanced Features 🔮 **FUTURE**
 - [ ] **Multi-Source Aggregation** - Additional data sources beyond Truth Social
-- [ ] **Advanced Analytics** - Prediction confidence, market impact scoring
-- [ ] **API Endpoints** - REST API for external integrations
+- [ ] **Ensemble Models** - Multiple LLMs with aggregated predictions
+- [ ] **Public API** - REST API for external integrations
+- [ ] **Monetization** - Tiered access (free/premium/pro)
 - [ ] **Generational Wealth** - Heh...
 
 ## 📞 Contact

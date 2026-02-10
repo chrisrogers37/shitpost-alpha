@@ -48,12 +48,12 @@
 
 ## 🗺️ Development Phases
 
-### **Phase 0: Prediction Validation System** 🎯
+### **Phase 0: Prediction Validation System** 🎯 — IN PROGRESS
 **Priority**: CRITICAL
 **Timeline**: 2-3 weeks
 **Goal**: Prove the system works with real market data
 
-#### 0.1 Market Data Integration
+#### 0.1 Market Data Integration — IN PROGRESS
 **Objective**: Track actual stock prices for predicted assets
 
 **Data Source Options:**
@@ -64,12 +64,12 @@
 **Recommended**: Yahoo Finance via `yfinance` library (free, unlimited)
 
 **Implementation:**
-- [ ] Install yfinance library
-- [ ] Create `shit/market_data/` module
-- [ ] Build price fetcher for assets mentioned in predictions
-- [ ] Store historical prices in new `market_prices` table
-- [ ] Calculate price changes at T+1, T+3, T+7, T+30 days
-- [ ] Handle market closed days, splits, dividends
+- [x] Install yfinance library
+- [x] Create `shit/market_data/` module
+- [x] Build price fetcher for assets mentioned in predictions
+- [x] Store historical prices in new `market_prices` table
+- [x] Calculate price changes at T+1, T+3, T+7, T+30 days
+- [x] Handle market closed days, splits, dividends
 
 **Database Schema:**
 ```sql
@@ -138,7 +138,7 @@ python -m market_data accuracy-report
 - ✅ Generate daily outcome reports
 - ✅ Identify which prediction types work best
 
-#### 0.2 Dashboard UX Overhaul (shitty_ui → Professional UI)
+#### 0.2 Dashboard UX Overhaul (shitty_ui → Professional UI) — IN PROGRESS
 **Objective**: Transform the dashboard from basic data display to actionable intelligence platform
 
 **Current State Problems:**
@@ -485,7 +485,7 @@ Numbers: Tabular nums for alignment
 
 ---
 
-### **Phase 1: Real-Time Alerting System** 📲
+### **Phase 1: Real-Time Alerting System** 📲 — PENDING
 **Priority**: HIGH
 **Timeline**: 1-2 weeks
 **Goal**: Make signals actionable for real trading
@@ -620,7 +620,7 @@ python -m alerts reset-daily-counts
 
 ---
 
-### **Phase 2: Multi-Source Signal Aggregation** 🌐
+### **Phase 2: Multi-Source Signal Aggregation** 🌐 — PENDING
 **Priority**: MEDIUM
 **Timeline**: 3-4 weeks
 **Goal**: Increase signal coverage and confidence
@@ -705,7 +705,7 @@ class MarketSignal:
 
 ---
 
-### **Phase 3: Monetization Features** 💰
+### **Phase 3: Monetization Features** 💰 — PENDING
 **Priority**: MEDIUM
 **Timeline**: 3-4 weeks
 **Goal**: Generate revenue to offset costs
@@ -784,7 +784,7 @@ DELETE /api/v1/alerts/unsubscribe/{id}
 
 ---
 
-### **Phase 4: Learning & Experimentation** 🧪
+### **Phase 4: Learning & Experimentation** 🧪 — PENDING
 **Priority**: LOW-MEDIUM
 **Timeline**: Ongoing
 **Goal**: Skill development and system improvement
@@ -862,7 +862,7 @@ DELETE /api/v1/alerts/unsubscribe/{id}
 
 ---
 
-### **Phase 5: Advanced Features** 🚀
+### **Phase 5: Advanced Features** 🚀 — PENDING
 **Priority**: LOW
 **Timeline**: 8+ weeks
 **Goal**: Differentiation and sophistication
@@ -939,7 +939,7 @@ DELETE /api/v1/alerts/unsubscribe/{id}
 - Push notifications
 - Quick trade execution integration
 
-### **Phase 6: Cost Reduction & Infrastructure** 🏗️
+### **Phase 6: Cost Reduction & Infrastructure** 🏗️ — PENDING
 **Priority**: LOW (Future Optimization)
 **Timeline**: 2-3 weeks
 **Goal**: Eliminate expensive dependencies if needed
