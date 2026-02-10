@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `test_models.py` (25 tests) — `PredictionOutcome.calculate_return()`, `.is_correct()`, `.calculate_pnl()` with edge cases and boundary values
 
 ### Changed
+- **Code Deduplication** - Eliminated repeated patterns across orchestrator, dashboard, and notifications
+  - Extracted `_execute_subprocess()` + `_build_*_cmd()` helpers in `shitpost_alpha.py`, reducing 3 identical async functions to thin one-line wrappers; dry-run path reuses the same builders (~100 lines saved)
+  - Removed dead `get_new_predictions_since()` from `shitty_ui/data.py` (callers already import from `notifications/db.py`)
+  - Added `_row_to_dict()` / `_rows_to_dicts()` helpers in `notifications/db.py`, replacing 6 inline `dict(zip(columns, row))` patterns
 - **Database Session Consolidation** - Eliminated duplicate sync connection pool from `shitty_ui/data.py`
   - Dashboard now imports `SessionLocal` from `shit/db/sync_session` instead of creating its own engine
   - Enhanced `sync_session.py` with production pool settings (`pool_size=5`, `max_overflow=10`, `pool_recycle=1800`)
