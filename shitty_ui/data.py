@@ -5,15 +5,14 @@ Integrates with the global Shitpost Alpha settings system.
 """
 
 import logging
-import sys
-import os
 import time
 import pandas as pd
 from datetime import datetime, timedelta
 from functools import wraps
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
 from typing import List, Dict, Any, Optional, Callable
+
+from shit.db.sync_session import SessionLocal, DATABASE_URL
 
 logger = logging.getLogger(__name__)
 
@@ -56,67 +55,6 @@ def ttl_cache(ttl_seconds: int = 300):
         return wrapper
 
     return decorator
-
-
-# Add parent directory to path to import global settings
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-try:
-    from shit.config.shitpost_settings import settings
-
-    DATABASE_URL = settings.DATABASE_URL.strip('"').strip("'")
-    logger.debug("Dashboard using settings-based DATABASE_URL")
-except ImportError as e:
-    # Fallback to environment variable if settings can't be imported
-    DATABASE_URL = os.environ.get("DATABASE_URL", "").strip('"').strip("'")
-    logger.debug("Dashboard using environment-based DATABASE_URL")
-    if not DATABASE_URL:
-        raise ValueError(
-            f"Could not load database URL from settings: {e}. Please set DATABASE_URL environment variable."
-        )
-
-# Create engine based on database type
-if DATABASE_URL.startswith("sqlite"):
-    # SQLite - use synchronous SQLAlchemy
-    engine = create_engine(DATABASE_URL, echo=False, future=True)
-    SessionLocal = sessionmaker(engine, expire_on_commit=False)
-else:
-    # PostgreSQL - use synchronous engine for dashboard
-    # Convert async URL to sync for dashboard use
-    sync_url = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
-    # Remove SSL parameters that might cause issues
-    sync_url = sync_url.replace("?sslmode=require&channel_binding=require", "")
-    logger.debug("Using PostgreSQL sync URL")
-
-    # Create synchronous engine for dashboard with explicit driver
-    # Configure connection pool for better performance
-    pool_settings = {
-        "pool_size": 5,  # Number of persistent connections
-        "max_overflow": 10,  # Extra connections when pool is full
-        "pool_timeout": 30,  # Seconds to wait for a connection
-        "pool_recycle": 1800,  # Recycle connections after 30 minutes
-        "pool_pre_ping": True,  # Test connections before using
-    }
-
-    try:
-        # Try psycopg2 first (more common)
-        engine = create_engine(sync_url, echo=False, future=True, **pool_settings)
-        SessionLocal = sessionmaker(engine, expire_on_commit=False)
-    except Exception as e:
-        print(f"⚠️ Failed to create engine with default driver: {e}")
-        # Fallback: try to use psycopg2 explicitly
-        try:
-            sync_url_with_driver = sync_url.replace(
-                "postgresql://", "postgresql+psycopg2://"
-            )
-            engine = create_engine(
-                sync_url_with_driver, echo=False, future=True, **pool_settings
-            )
-            SessionLocal = sessionmaker(engine, expire_on_commit=False)
-            print("✅ Successfully created engine with psycopg2 driver")
-        except Exception as e2:
-            print(f"❌ Failed to create engine with psycopg2: {e2}")
-            raise
 
 
 def execute_query(query, params=None):

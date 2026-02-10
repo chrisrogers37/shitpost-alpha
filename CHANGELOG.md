@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `test_sync_session.py` (9 tests) — `get_session()` commit/rollback/close lifecycle, operation ordering, exception re-raise, `create_tables()`; coverage 97%
   - `test_models.py` (25 tests) — `PredictionOutcome.calculate_return()`, `.is_correct()`, `.calculate_pnl()` with edge cases and boundary values
 
+### Changed
+- **Database Session Consolidation** - Eliminated duplicate sync connection pool from `shitty_ui/data.py`
+  - Dashboard now imports `SessionLocal` from `shit/db/sync_session` instead of creating its own engine
+  - Enhanced `sync_session.py` with production pool settings (`pool_size=5`, `max_overflow=10`, `pool_recycle=1800`)
+  - Added SSL parameter stripping for Neon PostgreSQL compatibility
+  - Removed `sys.path` hack, unused `sys`/`os` imports, and `print()` statements from `data.py`
+  - Net reduction: 52 lines removed, application uses one shared pool instead of two
+
 ### Fixed
 - **SQL Injection Prevention** - Added `_UPDATABLE_COLUMNS` whitelist to `notifications/db.py` `update_subscription()` to prevent column name injection via dynamic kwargs
 - **HTML Injection Prevention** - Applied `html.escape()` to all 4 user-derived values in `format_alert_message_html()` (sentiment, assets, post text, thesis)
