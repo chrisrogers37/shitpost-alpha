@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Critical Test Coverage** - 85 new tests across 4 files for previously untested production-critical modules
+  - `test_outcome_calculator.py` (29 tests) — init, context manager, `_extract_sentiment`, `calculate_outcome_for_prediction`, `_calculate_single_outcome`, `calculate_outcomes_for_all_predictions`, `get_accuracy_stats`; coverage 92%
+  - `test_client.py` (22 tests) — init, context manager, `_get_existing_prices`, `fetch_price_history`, `get_price_on_date`, `get_latest_price`, `update_prices_for_symbols`, `get_price_stats`; coverage 76%
+  - `test_sync_session.py` (9 tests) — `get_session()` commit/rollback/close lifecycle, operation ordering, exception re-raise, `create_tables()`; coverage 97%
+  - `test_models.py` (25 tests) — `PredictionOutcome.calculate_return()`, `.is_correct()`, `.calculate_pnl()` with edge cases and boundary values
+
 ### Fixed
 - **SQL Injection Prevention** - Added `_UPDATABLE_COLUMNS` whitelist to `notifications/db.py` `update_subscription()` to prevent column name injection via dynamic kwargs
 - **HTML Injection Prevention** - Applied `html.escape()` to all 4 user-derived values in `format_alert_message_html()` (sentiment, assets, post text, thesis)
