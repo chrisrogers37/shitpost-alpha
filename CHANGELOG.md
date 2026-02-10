@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Standalone Notifications Module** - Extracted Telegram alert service from `shitty_ui/` into independent `notifications/` module
+  - `notifications/alert_engine.py` - Core alert check-and-dispatch loop, preference filtering, quiet hours, sentiment extraction
+  - `notifications/telegram_sender.py` - Low-level Telegram Bot API calls (sendMessage, setWebhook), message formatting
+  - `notifications/telegram_bot.py` - Command handlers (/start, /stop, /status, /settings, /stats, /latest, /help) and webhook update routing
+  - `notifications/db.py` - Database operations for subscriptions, predictions, and stats using SQLAlchemy sync sessions
+  - `notifications/dispatcher.py` - Multi-channel dispatch (email via SMTP/SendGrid, SMS via Twilio) with rate limiting and validation
+  - `notifications/__main__.py` - CLI entry point with 5 subcommands: `check-alerts`, `set-webhook`, `test-alert`, `list-subscribers`, `stats`
+  - New `/stats` bot command showing prediction accuracy, win rate, and total return from `prediction_outcomes`
+  - New `/latest` bot command showing 5 most recent predictions with outcome status (correct/incorrect/pending)
+  - `/telegram/webhook` POST endpoint on the dashboard's Flask server for receiving Telegram updates
+  - 87 new tests across 5 test files covering all notification module functionality
+  - Runnable via Railway cron: `python -m notifications check-alerts` (decoupled from dashboard lifecycle)
+
+### Changed
+- **shitty_ui/alerts.py** - Converted to thin wrapper delegating to `notifications.alert_engine` and `notifications.dispatcher`
+- **shitty_ui/telegram_bot.py** - Converted to thin wrapper re-exporting from `notifications.*` modules
+- **shitty_ui/app.py** - Added `register_webhook_route()` for Telegram webhook endpoint registration
 - **Dashboard UX Overhaul (Phase 0.2)** - Redesigned dashboard from debug tool to actionable intelligence platform
   - **Hero Signals Section** - Active high-confidence (>=75%) predictions displayed prominently with post preview, sentiment badges, assets, confidence, and outcome status (pending/correct/incorrect with P&L)
   - **Redesigned Key Metrics Row** - Four KPI cards: Overall Accuracy, Signals This Week, High-Confidence Win Rate, Best Performing Asset

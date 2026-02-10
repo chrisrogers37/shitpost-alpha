@@ -138,7 +138,7 @@ class TestEscapeMarkdown:
 class TestHandleStartCommand:
     """Test /start command handler."""
 
-    @patch("telegram_bot.create_subscription")
+    @patch("notifications.telegram_bot.create_subscription")
     def test_returns_welcome_message(self, mock_create):
         """Returns welcome message on successful subscription."""
         mock_create.return_value = True
@@ -154,7 +154,7 @@ class TestHandleStartCommand:
         assert "John" in result
         mock_create.assert_called_once()
 
-    @patch("telegram_bot.create_subscription")
+    @patch("notifications.telegram_bot.create_subscription")
     def test_returns_error_on_failure(self, mock_create):
         """Returns error message on subscription failure."""
         mock_create.return_value = False
@@ -172,7 +172,7 @@ class TestHandleStartCommand:
 class TestHandleStopCommand:
     """Test /stop command handler."""
 
-    @patch("telegram_bot.deactivate_subscription")
+    @patch("notifications.telegram_bot.deactivate_subscription")
     def test_returns_unsubscribe_message(self, mock_deactivate):
         """Returns unsubscribe confirmation."""
         mock_deactivate.return_value = True
@@ -186,7 +186,7 @@ class TestHandleStopCommand:
 class TestHandleStatusCommand:
     """Test /status command handler."""
 
-    @patch("telegram_bot.get_subscription")
+    @patch("notifications.telegram_bot.get_subscription")
     def test_shows_active_status(self, mock_get):
         """Shows active subscription status."""
         mock_get.return_value = {
@@ -208,7 +208,7 @@ class TestHandleStatusCommand:
         assert "42" in result
         assert "80%" in result
 
-    @patch("telegram_bot.get_subscription")
+    @patch("notifications.telegram_bot.get_subscription")
     def test_shows_not_subscribed(self, mock_get):
         """Shows not subscribed message for unknown user."""
         mock_get.return_value = None
@@ -222,7 +222,7 @@ class TestHandleStatusCommand:
 class TestHandleSettingsCommand:
     """Test /settings command handler."""
 
-    @patch("telegram_bot.get_subscription")
+    @patch("notifications.telegram_bot.get_subscription")
     def test_shows_current_settings(self, mock_get):
         """Shows current settings when no args provided."""
         mock_get.return_value = {
@@ -240,8 +240,8 @@ class TestHandleSettingsCommand:
         assert "Settings" in result
         assert "70%" in result
 
-    @patch("telegram_bot.update_subscription")
-    @patch("telegram_bot.get_subscription")
+    @patch("notifications.telegram_bot.update_subscription")
+    @patch("notifications.telegram_bot.get_subscription")
     def test_updates_confidence(self, mock_get, mock_update):
         """Updates confidence setting."""
         mock_get.return_value = {
@@ -259,8 +259,8 @@ class TestHandleSettingsCommand:
         assert "80%" in result
         mock_update.assert_called_once()
 
-    @patch("telegram_bot.update_subscription")
-    @patch("telegram_bot.get_subscription")
+    @patch("notifications.telegram_bot.update_subscription")
+    @patch("notifications.telegram_bot.get_subscription")
     def test_updates_assets(self, mock_get, mock_update):
         """Updates asset filter."""
         mock_get.return_value = {
@@ -278,7 +278,7 @@ class TestHandleSettingsCommand:
         assert "AAPL" in result
         assert "TSLA" in result
 
-    @patch("telegram_bot.get_subscription")
+    @patch("notifications.telegram_bot.get_subscription")
     def test_not_subscribed_error(self, mock_get):
         """Returns error for unsubscribed user."""
         mock_get.return_value = None
@@ -311,8 +311,8 @@ class TestHandleHelpCommand:
 class TestProcessUpdate:
     """Test processing Telegram updates."""
 
-    @patch("telegram_bot.handle_start_command")
-    @patch("telegram_bot.update_subscription")
+    @patch("notifications.telegram_bot.handle_start_command")
+    @patch("notifications.telegram_bot.update_subscription")
     def test_routes_start_command(self, mock_update, mock_start):
         """Routes /start command correctly."""
         mock_start.return_value = "Welcome!"
@@ -331,8 +331,8 @@ class TestProcessUpdate:
         assert result == "Welcome!"
         mock_start.assert_called_once()
 
-    @patch("telegram_bot.handle_help_command")
-    @patch("telegram_bot.update_subscription")
+    @patch("notifications.telegram_bot.handle_help_command")
+    @patch("notifications.telegram_bot.update_subscription")
     def test_routes_help_command(self, mock_update, mock_help):
         """Routes /help command correctly."""
         mock_help.return_value = "Help text"
@@ -350,7 +350,7 @@ class TestProcessUpdate:
         result = process_update(update)
         assert result == "Help text"
 
-    @patch("telegram_bot.update_subscription")
+    @patch("notifications.telegram_bot.update_subscription")
     def test_ignores_non_command(self, mock_update):
         """Ignores non-command messages."""
         mock_update.return_value = True
@@ -383,8 +383,8 @@ class TestProcessUpdate:
 class TestSendTelegramMessage:
     """Test sending Telegram messages."""
 
-    @patch("telegram_bot.get_bot_token")
-    @patch("telegram_bot.requests.post")
+    @patch("notifications.telegram_sender.get_bot_token")
+    @patch("notifications.telegram_sender.requests.post")
     def test_sends_message_successfully(self, mock_post, mock_token):
         """Sends message and returns success."""
         mock_token.return_value = "test_token"
@@ -398,8 +398,8 @@ class TestSendTelegramMessage:
         assert success is True
         assert error is None
 
-    @patch("telegram_bot.get_bot_token")
-    @patch("telegram_bot.requests.post")
+    @patch("notifications.telegram_sender.get_bot_token")
+    @patch("notifications.telegram_sender.requests.post")
     def test_handles_api_error(self, mock_post, mock_token):
         """Handles Telegram API error response."""
         mock_token.return_value = "test_token"
@@ -413,7 +413,7 @@ class TestSendTelegramMessage:
         assert success is False
         assert "Chat not found" in error
 
-    @patch("telegram_bot.get_bot_token")
+    @patch("notifications.telegram_sender.get_bot_token")
     def test_fails_without_token(self, mock_token):
         """Fails gracefully when token not configured."""
         mock_token.return_value = None
@@ -505,9 +505,9 @@ class TestTelegramSubscriptionModel:
 class TestBroadcastAlert:
     """Test broadcasting alerts to subscribers."""
 
-    @patch("telegram_bot.send_alert_to_subscriber")
-    @patch("alerts.filter_predictions_by_preferences")
-    @patch("alerts.is_in_quiet_hours")
+    @patch("telegram_bot.send_alert_to_subscriber", create=True)
+    @patch("notifications.alert_engine.filter_predictions_by_preferences")
+    @patch("notifications.alert_engine.is_in_quiet_hours")
     @patch("telegram_bot.get_active_subscriptions")
     def test_broadcasts_to_matching_subscribers(
         self, mock_get_subs, mock_quiet, mock_filter, mock_send
@@ -531,7 +531,7 @@ class TestBroadcastAlert:
         assert result["sent"] == 1
         assert result["failed"] == 0
 
-    @patch("alerts.is_in_quiet_hours")
+    @patch("notifications.alert_engine.is_in_quiet_hours")
     @patch("telegram_bot.get_active_subscriptions")
     def test_respects_quiet_hours(self, mock_get_subs, mock_quiet):
         """Filters out subscribers in quiet hours."""
