@@ -3,7 +3,6 @@ Synchronous Session Management
 Provides synchronous database sessions for non-async operations like CLI commands and data processing.
 """
 
-import os
 from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
@@ -21,12 +20,23 @@ else:
     # PostgreSQL - convert async URL to sync
     sync_url = DATABASE_URL.replace("postgresql+psycopg://", "postgresql://")
     sync_url = sync_url.replace("postgresql+asyncpg://", "postgresql://")
+    # Strip SSL parameters that cause issues with psycopg2
+    sync_url = sync_url.replace("?sslmode=require&channel_binding=require", "")
 
     # Try psycopg2 driver
     if not sync_url.startswith("postgresql+psycopg2://"):
         sync_url = sync_url.replace("postgresql://", "postgresql+psycopg2://")
 
-    engine = create_engine(sync_url, echo=False, future=True, pool_pre_ping=True)
+    engine = create_engine(
+        sync_url,
+        echo=False,
+        future=True,
+        pool_size=5,
+        max_overflow=10,
+        pool_timeout=30,
+        pool_recycle=1800,
+        pool_pre_ping=True,
+    )
 
 # Create session factory
 SessionLocal = sessionmaker(engine, expire_on_commit=False)
