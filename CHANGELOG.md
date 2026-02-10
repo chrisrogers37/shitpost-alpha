@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Market Data Pipeline Service** - Wired the orphaned market data service into the deployment pipeline
+  - New `auto-pipeline` CLI command (`python -m shit.market_data auto-pipeline`) runs backfill + outcome calculation in sequence
+  - Accepts `--days-back` (default 7) and `--limit` options for controlling scope
+  - Exits 0 on success, 1 on failure with structured logging throughout
+  - Added `market-data` cron service to `railway.json` running every 15 minutes
+  - 17 tests covering command registration, argument parsing, pipeline orchestration, and error handling
 - **Kafka Architecture Evaluation Addendum** - Re-evaluation of communication patterns for multi-source expansion
   - Amends D2 (database polling) recommendation: hybrid event-driven fan-in for N harvesters, polling retained downstream
   - Kafka topic topology design with 3 topics, event schemas, partition strategy, and consumer group layout

@@ -25,9 +25,9 @@ def cli():
 
 
 @cli.command()
-@click.option('--symbol', '-s', required=True, help='Ticker symbol (e.g., AAPL, TSLA)')
-@click.option('--days', '-d', default=30, help='Number of days of history to fetch')
-@click.option('--force', '-f', is_flag=True, help='Force refresh even if data exists')
+@click.option("--symbol", "-s", required=True, help="Ticker symbol (e.g., AAPL, TSLA)")
+@click.option("--days", "-d", default=30, help="Number of days of history to fetch")
+@click.option("--force", "-f", is_flag=True, help="Force refresh even if data exists")
 def fetch_prices(symbol: str, days: int, force: bool):
     """Fetch historical prices for a symbol."""
     start_date = date.today() - timedelta(days=days)
@@ -41,7 +41,7 @@ def fetch_prices(symbol: str, days: int, force: bool):
                 symbol=symbol,
                 start_date=start_date,
                 end_date=end_date,
-                force_refresh=force
+                force_refresh=force,
             )
 
             if prices:
@@ -57,7 +57,7 @@ def fetch_prices(symbol: str, days: int, force: bool):
                     table.add_row(
                         str(price.date),
                         f"${price.close:.2f}",
-                        f"{price.volume:,}" if price.volume else "N/A"
+                        f"{price.volume:,}" if price.volume else "N/A",
                     )
 
                 console.print(table)
@@ -70,8 +70,10 @@ def fetch_prices(symbol: str, days: int, force: bool):
 
 
 @cli.command()
-@click.option('--days', '-d', default=30, help='Fetch prices for assets mentioned in last N days')
-@click.option('--limit', '-l', type=int, help='Limit number of predictions to process')
+@click.option(
+    "--days", "-d", default=30, help="Fetch prices for assets mentioned in last N days"
+)
+@click.option("--limit", "-l", type=int, help="Limit number of predictions to process")
 def update_all_prices(days: int, limit: Optional[int]):
     """Update prices for all assets mentioned in predictions."""
     from shitvault.shitpost_models import Prediction
@@ -85,7 +87,7 @@ def update_all_prices(days: int, limit: Optional[int]):
             cutoff_date = date.today() - timedelta(days=days)
 
             query = session.query(
-                func.jsonb_array_elements_text(Prediction.assets).label('asset')
+                func.jsonb_array_elements_text(Prediction.assets).label("asset")
             ).distinct()
 
             if limit:
@@ -96,9 +98,9 @@ def update_all_prices(days: int, limit: Optional[int]):
                 assets = [row[0] for row in query.all()]
             except:
                 # Fallback for SQLite - get all predictions and extract assets manually
-                predictions = session.query(Prediction).filter(
-                    Prediction.assets != None
-                ).all()
+                predictions = (
+                    session.query(Prediction).filter(Prediction.assets != None).all()
+                )
 
                 if limit:
                     predictions = predictions[:limit]
@@ -120,8 +122,7 @@ def update_all_prices(days: int, limit: Optional[int]):
             start_date = date.today() - timedelta(days=days)
 
             results = client.update_prices_for_symbols(
-                symbols=assets,
-                start_date=start_date
+                symbols=assets, start_date=start_date
             )
 
             # Print results
@@ -143,9 +144,11 @@ def update_all_prices(days: int, limit: Optional[int]):
 
 
 @cli.command()
-@click.option('--limit', '-l', type=int, help='Limit number of predictions to process')
-@click.option('--days', '-d', type=int, help='Only process predictions from last N days')
-@click.option('--force', '-f', is_flag=True, help='Recalculate existing outcomes')
+@click.option("--limit", "-l", type=int, help="Limit number of predictions to process")
+@click.option(
+    "--days", "-d", type=int, help="Only process predictions from last N days"
+)
+@click.option("--force", "-f", is_flag=True, help="Recalculate existing outcomes")
 def calculate_outcomes(limit: Optional[int], days: Optional[int], force: bool):
     """Calculate outcomes for predictions."""
     print_info("Calculating prediction outcomes...")
@@ -153,9 +156,7 @@ def calculate_outcomes(limit: Optional[int], days: Optional[int], force: bool):
     try:
         with OutcomeCalculator() as calculator:
             stats = calculator.calculate_outcomes_for_all_predictions(
-                limit=limit,
-                days_back=days,
-                force_refresh=force
+                limit=limit, days_back=days, force_refresh=force
             )
 
             # Print statistics
@@ -165,8 +166,10 @@ def calculate_outcomes(limit: Optional[int], days: Optional[int], force: bool):
             rprint(f"  Outcomes created: {stats['outcomes_created']}")
             rprint(f"  Errors: {stats['errors']}")
 
-            if stats['outcomes_created'] > 0:
-                print_success(f"✅ Successfully calculated {stats['outcomes_created']} outcomes")
+            if stats["outcomes_created"] > 0:
+                print_success(
+                    f"✅ Successfully calculated {stats['outcomes_created']} outcomes"
+                )
             else:
                 print_info("No new outcomes created")
 
@@ -176,11 +179,22 @@ def calculate_outcomes(limit: Optional[int], days: Optional[int], force: bool):
 
 
 @cli.command()
-@click.option('--timeframe', '-t', default='t7', type=click.Choice(['t1', 't3', 't7', 't30']),
-              help='Timeframe to analyze (t1=1 day, t7=7 days, etc.)')
-@click.option('--min-confidence', '-c', type=float, help='Minimum confidence threshold (0.0-1.0)')
-@click.option('--by-confidence', '-b', is_flag=True, help='Show breakdown by confidence levels')
-def accuracy_report(timeframe: str, min_confidence: Optional[float], by_confidence: bool):
+@click.option(
+    "--timeframe",
+    "-t",
+    default="t7",
+    type=click.Choice(["t1", "t3", "t7", "t30"]),
+    help="Timeframe to analyze (t1=1 day, t7=7 days, etc.)",
+)
+@click.option(
+    "--min-confidence", "-c", type=float, help="Minimum confidence threshold (0.0-1.0)"
+)
+@click.option(
+    "--by-confidence", "-b", is_flag=True, help="Show breakdown by confidence levels"
+)
+def accuracy_report(
+    timeframe: str, min_confidence: Optional[float], by_confidence: bool
+):
     """Generate accuracy report for predictions."""
     print_info(f"Generating accuracy report for {timeframe}...")
 
@@ -191,7 +205,7 @@ def accuracy_report(timeframe: str, min_confidence: Optional[float], by_confiden
                 confidence_levels = [
                     (0.0, 0.6, "Low"),
                     (0.6, 0.75, "Medium"),
-                    (0.75, 1.0, "High")
+                    (0.75, 1.0, "High"),
                 ]
 
                 table = Table(title=f"Accuracy by Confidence Level ({timeframe})")
@@ -205,22 +219,44 @@ def accuracy_report(timeframe: str, min_confidence: Optional[float], by_confiden
                 for min_conf, max_conf, label in confidence_levels:
                     # Filter outcomes in this confidence range
                     from shit.market_data.models import PredictionOutcome
+
                     with get_session() as session:
-                        outcomes = session.query(PredictionOutcome).filter(
-                            PredictionOutcome.prediction_confidence >= min_conf,
-                            PredictionOutcome.prediction_confidence < max_conf
-                        ).all()
+                        outcomes = (
+                            session.query(PredictionOutcome)
+                            .filter(
+                                PredictionOutcome.prediction_confidence >= min_conf,
+                                PredictionOutcome.prediction_confidence < max_conf,
+                            )
+                            .all()
+                        )
 
                         if len(outcomes) == 0:
-                            table.add_row(f"{label} ({min_conf:.0%}-{max_conf:.0%})", "0", "0", "0", "0", "N/A")
+                            table.add_row(
+                                f"{label} ({min_conf:.0%}-{max_conf:.0%})",
+                                "0",
+                                "0",
+                                "0",
+                                "0",
+                                "N/A",
+                            )
                             continue
 
                         correct_attr = f"correct_{timeframe}"
                         total = len(outcomes)
-                        correct = sum(1 for o in outcomes if getattr(o, correct_attr) is True)
-                        incorrect = sum(1 for o in outcomes if getattr(o, correct_attr) is False)
-                        pending = sum(1 for o in outcomes if getattr(o, correct_attr) is None)
-                        accuracy = (correct / (correct + incorrect) * 100) if (correct + incorrect) > 0 else 0.0
+                        correct = sum(
+                            1 for o in outcomes if getattr(o, correct_attr) is True
+                        )
+                        incorrect = sum(
+                            1 for o in outcomes if getattr(o, correct_attr) is False
+                        )
+                        pending = sum(
+                            1 for o in outcomes if getattr(o, correct_attr) is None
+                        )
+                        accuracy = (
+                            (correct / (correct + incorrect) * 100)
+                            if (correct + incorrect) > 0
+                            else 0.0
+                        )
 
                         table.add_row(
                             f"{label} ({min_conf:.0%}-{max_conf:.0%})",
@@ -228,7 +264,7 @@ def accuracy_report(timeframe: str, min_confidence: Optional[float], by_confiden
                             str(correct),
                             str(incorrect),
                             str(pending),
-                            f"{accuracy:.1f}%"
+                            f"{accuracy:.1f}%",
                         )
 
                 console.print(table)
@@ -236,8 +272,7 @@ def accuracy_report(timeframe: str, min_confidence: Optional[float], by_confiden
             else:
                 # Show overall accuracy
                 stats = calculator.get_accuracy_stats(
-                    timeframe=timeframe,
-                    min_confidence=min_confidence
+                    timeframe=timeframe, min_confidence=min_confidence
                 )
 
                 rprint("\n[bold]Prediction Accuracy Report:[/bold]")
@@ -248,11 +283,13 @@ def accuracy_report(timeframe: str, min_confidence: Optional[float], by_confiden
                 rprint(f"  Correct: [green]{stats['correct']}[/green]")
                 rprint(f"  Incorrect: [red]{stats['incorrect']}[/red]")
                 rprint(f"  Pending: [yellow]{stats['pending']}[/yellow]")
-                rprint(f"\n  [bold magenta]Accuracy: {stats['accuracy']:.1f}%[/bold magenta]")
+                rprint(
+                    f"\n  [bold magenta]Accuracy: {stats['accuracy']:.1f}%[/bold magenta]"
+                )
 
-                if stats['accuracy'] >= 60:
+                if stats["accuracy"] >= 60:
                     print_success("✅ Above random chance!")
-                elif stats['accuracy'] >= 50:
+                elif stats["accuracy"] >= 50:
                     print_info("📊 Around random chance")
                 else:
                     print_error("❌ Below random chance")
@@ -263,7 +300,7 @@ def accuracy_report(timeframe: str, min_confidence: Optional[float], by_confiden
 
 
 @cli.command()
-@click.option('--symbol', '-s', help='Show stats for specific symbol')
+@click.option("--symbol", "-s", help="Show stats for specific symbol")
 def price_stats(symbol: Optional[str]):
     """Show statistics about stored price data."""
     try:
@@ -272,13 +309,15 @@ def price_stats(symbol: Optional[str]):
                 # Stats for specific symbol
                 stats = client.get_price_stats(symbol)
 
-                if stats['count'] == 0:
+                if stats["count"] == 0:
                     print_info(f"No price data found for {symbol}")
                     return
 
                 rprint(f"\n[bold]Price Data for {symbol}:[/bold]")
                 rprint(f"  Total Records: {stats['count']}")
-                rprint(f"  Date Range: {stats['earliest_date']} to {stats['latest_date']}")
+                rprint(
+                    f"  Date Range: {stats['earliest_date']} to {stats['latest_date']}"
+                )
                 rprint(f"  Latest Price: ${stats['latest_price']:.2f}")
 
             else:
@@ -287,11 +326,15 @@ def price_stats(symbol: Optional[str]):
                 from sqlalchemy import func
 
                 with get_session() as session:
-                    symbols = session.query(
-                        MarketPrice.symbol,
-                        func.count(MarketPrice.id).label('count'),
-                        func.max(MarketPrice.date).label('latest_date')
-                    ).group_by(MarketPrice.symbol).all()
+                    symbols = (
+                        session.query(
+                            MarketPrice.symbol,
+                            func.count(MarketPrice.id).label("count"),
+                            func.max(MarketPrice.date).label("latest_date"),
+                        )
+                        .group_by(MarketPrice.symbol)
+                        .all()
+                    )
 
                     if not symbols:
                         print_info("No price data found in database")
@@ -313,9 +356,75 @@ def price_stats(symbol: Optional[str]):
         raise click.Abort()
 
 
+@cli.command(name="auto-pipeline")
+@click.option(
+    "--days-back",
+    "-d",
+    default=7,
+    help="Backfill prices for predictions from last N days",
+)
+@click.option("--limit", "-l", type=int, help="Limit number of predictions to process")
+def auto_pipeline(days_back: int, limit: Optional[int]):
+    """Run the full market data pipeline: backfill prices then calculate outcomes."""
+    from shit.market_data.auto_backfill_service import auto_backfill_recent
+    from shit.logging import get_service_logger
+
+    logger = get_service_logger("market_data_pipeline")
+
+    logger.info(
+        "Starting market data pipeline", extra={"days_back": days_back, "limit": limit}
+    )
+    print_info(
+        f"Starting market data pipeline (days_back={days_back}, limit={limit})..."
+    )
+
+    try:
+        # Step 1: Backfill prices for recent predictions
+        print_info("Step 1: Backfilling prices for recent predictions...")
+        backfill_stats = auto_backfill_recent(days=days_back)
+        logger.info("Backfill complete", extra=backfill_stats)
+
+        rprint("\n[bold]Backfill Results:[/bold]")
+        rprint(
+            f"  Predictions processed: {backfill_stats.get('predictions_processed', 0)}"
+        )
+        rprint(f"  Assets backfilled: {backfill_stats.get('assets_backfilled', 0)}")
+        rprint(f"  Errors: {backfill_stats.get('errors', 0)}")
+
+        # Step 2: Calculate/refresh outcomes for all predictions
+        print_info("\nStep 2: Calculating outcomes for predictions...")
+        with OutcomeCalculator() as calculator:
+            outcome_stats = calculator.calculate_outcomes_for_all_predictions(
+                limit=limit, days_back=days_back
+            )
+        logger.info("Outcome calculation complete", extra=outcome_stats)
+
+        rprint("\n[bold]Outcome Calculation Results:[/bold]")
+        rprint(f"  Total predictions: {outcome_stats.get('total_predictions', 0)}")
+        rprint(f"  Processed: {outcome_stats.get('processed', 0)}")
+        rprint(f"  Outcomes created: {outcome_stats.get('outcomes_created', 0)}")
+        rprint(f"  Errors: {outcome_stats.get('errors', 0)}")
+
+        total_errors = backfill_stats.get("errors", 0) + outcome_stats.get("errors", 0)
+        if total_errors > 0:
+            print_info(f"\n⚠️  Pipeline completed with {total_errors} errors")
+        else:
+            print_success("\n✅ Market data pipeline completed successfully")
+
+        logger.info(
+            "Pipeline complete",
+            extra={"backfill_stats": backfill_stats, "outcome_stats": outcome_stats},
+        )
+
+    except Exception as e:
+        logger.error(f"Pipeline failed: {e}", exc_info=True)
+        print_error(f"❌ Market data pipeline failed: {e}")
+        raise SystemExit(1)
+
+
 @cli.command()
-@click.option('--days', '-d', default=7, help='Process predictions from last N days')
-@click.option('--limit', '-l', type=int, help='Limit number of predictions to process')
+@click.option("--days", "-d", default=7, help="Process predictions from last N days")
+@click.option("--limit", "-l", type=int, help="Limit number of predictions to process")
 def auto_backfill(days: int, limit: Optional[int]):
     """Automatically backfill assets for recent predictions."""
     from shit.market_data.auto_backfill_service import AutoBackfillService
@@ -332,7 +441,7 @@ def auto_backfill(days: int, limit: Optional[int]):
         rprint(f"  Outcomes calculated: {stats['outcomes_calculated']}")
         rprint(f"  Errors: {stats['errors']}")
 
-        if stats['assets_backfilled'] > 0:
+        if stats["assets_backfilled"] > 0:
             print_success(f"✅ Backfilled {stats['assets_backfilled']} assets")
         else:
             print_info("No new assets needed backfilling")
@@ -360,10 +469,14 @@ def backfill_all_missing():
         rprint(f"  Successfully backfilled: {stats['backfilled']}")
         rprint(f"  Failed: {stats['failed']}")
 
-        success_rate = (stats['backfilled'] / stats['missing_assets'] * 100) if stats['missing_assets'] > 0 else 0
+        success_rate = (
+            (stats["backfilled"] / stats["missing_assets"] * 100)
+            if stats["missing_assets"] > 0
+            else 0
+        )
         rprint(f"\n  [bold magenta]Success Rate: {success_rate:.1f}%[/bold magenta]")
 
-        if stats['backfilled'] > 0:
+        if stats["backfilled"] > 0:
             print_success(f"✅ Backfilled {stats['backfilled']} assets")
 
             # Suggest next step
@@ -377,5 +490,5 @@ def backfill_all_missing():
         raise click.Abort()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()

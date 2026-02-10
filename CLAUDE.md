@@ -482,7 +482,18 @@ if post.retruth:
 analysis = await llm_client.analyze(post)
 ```
 
-### 5. Incremental Processing
+### 5. Documentation Archiving
+
+When the user says to "archive" a document, move it from its current location to `documentation/archive/`:
+
+```bash
+# Example: archive a completed planning doc
+mv documentation/planning/SOME_DOC.md documentation/archive/SOME_DOC.md
+```
+
+Do NOT delete archived documents. They remain in `documentation/archive/` for reference.
+
+### 6. Incremental Processing
 
 Always default to incremental processing to avoid duplicate work:
 
