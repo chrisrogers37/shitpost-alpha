@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `/telegram/webhook` POST endpoint on the dashboard's Flask server for receiving Telegram updates
   - 87 new tests across 5 test files covering all notification module functionality
   - Runnable via Railway cron: `python -m notifications check-alerts` (decoupled from dashboard lifecycle)
+- **Telegram Setup Guide** (`documentation/TELEGRAM_SETUP_GUIDE.md`) - End-to-end guide for creating, configuring, and deploying the Telegram alert bot
+  - BotFather setup, env var configuration, webhook registration
+  - Multi-tenant setup for individual users, groups, and channels
+  - Per-subscriber preference configuration and troubleshooting
+  - Production deployment checklist
+- **Market Data Backfill Guide** (`documentation/MARKET_DATA_BACKFILL_GUIDE.md`) - Guide for setting up and operating the equities price tracking pipeline
+  - Initial backfill procedure for existing predictions
+  - CLI command reference with all flags and examples
+  - Production cron operation and data flow explanation
+  - Accuracy reporting, troubleshooting, and common scenarios
 
 ### Changed
 - **shitty_ui/alerts.py** - Converted to thin wrapper delegating to `notifications.alert_engine` and `notifications.dispatcher`
