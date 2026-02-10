@@ -16,6 +16,23 @@ from shit.db.sync_session import get_session
 
 logger = logging.getLogger(__name__)
 
+
+def _row_to_dict(result) -> Optional[Dict[str, Any]]:
+    """Convert a single query result row to a dictionary."""
+    rows = result.fetchall()
+    if not rows:
+        return None
+    columns = result.keys()
+    return dict(zip(columns, rows[0]))
+
+
+def _rows_to_dicts(result) -> List[Dict[str, Any]]:
+    """Convert query result rows to a list of dictionaries."""
+    rows = result.fetchall()
+    columns = result.keys()
+    return [dict(zip(columns, row)) for row in rows]
+
+
 # Whitelist of columns that can be updated via update_subscription().
 # Prevents SQL injection through dynamic kwargs keys.
 _UPDATABLE_COLUMNS = frozenset({
@@ -64,11 +81,7 @@ def get_subscription(chat_id: str) -> Optional[Dict[str, Any]]:
                 WHERE chat_id = :chat_id
             """)
             result = session.execute(query, {"chat_id": str(chat_id)})
-            rows = result.fetchall()
-            columns = result.keys()
-            if rows:
-                return dict(zip(columns, rows[0]))
-            return None
+            return _row_to_dict(result)
     except Exception as e:
         logger.error(f"Error getting subscription for chat_id {chat_id}: {e}")
         return None
@@ -94,9 +107,7 @@ def get_active_subscriptions() -> List[Dict[str, Any]]:
                 ORDER BY subscribed_at ASC
             """)
             result = session.execute(query)
-            rows = result.fetchall()
-            columns = result.keys()
-            return [dict(zip(columns, row)) for row in rows]
+            return _rows_to_dicts(result)
     except Exception as e:
         logger.error(f"Error getting active subscriptions: {e}")
         return []
@@ -278,11 +289,7 @@ def get_subscription_stats() -> Dict[str, Any]:
                 FROM telegram_subscriptions
             """)
             result = session.execute(query)
-            rows = result.fetchall()
-            columns = result.keys()
-            if rows:
-                return dict(zip(columns, rows[0]))
-            return {}
+            return _row_to_dict(result) or {}
     except Exception as e:
         logger.error(f"Error getting subscription stats: {e}")
         return {}
@@ -329,18 +336,14 @@ def get_new_predictions_since(since: datetime) -> List[Dict[str, Any]]:
                 LIMIT 50
             """)
             result = session.execute(query, {"since": since})
-            rows = result.fetchall()
-            columns = result.keys()
-            results = []
-            for row in rows:
-                row_dict = dict(zip(columns, row))
+            results = _rows_to_dicts(result)
+            for row_dict in results:
                 if isinstance(row_dict.get("timestamp"), datetime):
                     row_dict["timestamp"] = row_dict["timestamp"].isoformat()
                 if isinstance(row_dict.get("prediction_created_at"), datetime):
                     row_dict["prediction_created_at"] = row_dict[
                         "prediction_created_at"
                     ].isoformat()
-                results.append(row_dict)
             return results
     except Exception as e:
         logger.error(f"Error loading new predictions: {e}")
@@ -365,10 +368,8 @@ def get_prediction_stats() -> Dict[str, Any]:
                 FROM prediction_outcomes
             """)
             result = session.execute(query)
-            rows = result.fetchall()
-            columns = result.keys()
-            if rows:
-                row = dict(zip(columns, rows[0]))
+            row = _row_to_dict(result)
+            if row:
                 total = row.get("total_predictions", 0) or 0
                 correct = row.get("correct_count", 0) or 0
                 evaluated = row.get("evaluated_count", 0) or 0
@@ -420,14 +421,10 @@ def get_latest_predictions(limit: int = 5) -> List[Dict[str, Any]]:
                 LIMIT :limit
             """)
             result = session.execute(query, {"limit": limit})
-            rows = result.fetchall()
-            columns = result.keys()
-            results = []
-            for row in rows:
-                row_dict = dict(zip(columns, row))
+            results = _rows_to_dicts(result)
+            for row_dict in results:
                 if isinstance(row_dict.get("created_at"), datetime):
                     row_dict["created_at"] = row_dict["created_at"].isoformat()
-                results.append(row_dict)
             return results
     except Exception as e:
         logger.error(f"Error getting latest predictions: {e}")
