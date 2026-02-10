@@ -42,7 +42,7 @@ class LLMClient:
             self.client = AsyncOpenAI(api_key=self.api_key)
         elif self.provider == "anthropic":
             import anthropic
-            self.client = anthropic.Anthropic(api_key=self.api_key)
+            self.client = anthropic.AsyncAnthropic(api_key=self.api_key)
         else:
             raise ValueError(f"Unsupported LLM provider: {self.provider}")
     
