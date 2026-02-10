@@ -96,8 +96,8 @@ def update_all_prices(days: int, limit: Optional[int]):
             # This is PostgreSQL specific - for SQLite we'll need a different approach
             try:
                 assets = [row[0] for row in query.all()]
-            except:
-                # Fallback for SQLite - get all predictions and extract assets manually
+            except Exception:
+                # Fallback for SQLite (jsonb_array_elements_text not supported)
                 predictions = (
                     session.query(Prediction).filter(Prediction.assets != None).all()
                 )

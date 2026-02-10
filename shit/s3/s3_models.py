@@ -74,7 +74,7 @@ class S3KeyInfo:
             parts = self.key.split("/")
             if len(parts) >= 4:
                 return "/".join(parts[-4:-1])  # YYYY/MM/DD
-        except:
+        except (IndexError, ValueError):
             pass
         return None
     
@@ -85,7 +85,7 @@ class S3KeyInfo:
             # Extract post_id from key like "truth-social/raw/2024/01/15/post_id.json"
             filename = self.key.split("/")[-1]
             return filename.replace(".json", "")
-        except:
+        except (IndexError, ValueError):
             pass
         return None
 
