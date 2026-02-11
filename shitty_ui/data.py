@@ -1909,3 +1909,141 @@ def get_sentiment_accuracy(days: int = None) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+def get_price_with_signals(
+    symbol: str,
+    days: int = 90,
+) -> Dict[str, pd.DataFrame]:
+    """
+    Get combined price history and prediction signals for a symbol.
+
+    Returns two DataFrames in a dict:
+    - 'prices': OHLCV data from market_prices table
+    - 'signals': Prediction signals with sentiment, confidence, thesis, outcomes
+
+    Args:
+        symbol: Ticker symbol (e.g., 'AAPL')
+        days: Number of days of history
+
+    Returns:
+        Dict with 'prices' and 'signals' DataFrames.
+        Both may be empty if no data exists.
+    """
+    start_date = (datetime.now() - timedelta(days=days)).date()
+
+    price_query = text("""
+        SELECT
+            date,
+            open,
+            high,
+            low,
+            close,
+            volume,
+            adjusted_close
+        FROM market_prices
+        WHERE symbol = :symbol
+            AND date >= :start_date
+        ORDER BY date ASC
+    """)
+
+    signal_query = text("""
+        SELECT
+            po.prediction_date,
+            tss.timestamp AS post_timestamp,
+            po.prediction_sentiment,
+            po.prediction_confidence,
+            po.price_at_prediction,
+            po.return_t1,
+            po.return_t3,
+            po.return_t7,
+            po.return_t30,
+            po.correct_t1,
+            po.correct_t3,
+            po.correct_t7,
+            po.correct_t30,
+            po.pnl_t7,
+            po.is_complete,
+            p.thesis,
+            p.assets,
+            tss.text AS post_text
+        FROM prediction_outcomes po
+        INNER JOIN predictions p ON po.prediction_id = p.id
+        INNER JOIN truth_social_shitposts tss ON p.shitpost_id = tss.shitpost_id
+        WHERE po.symbol = :symbol
+            AND po.prediction_date >= :start_date
+        ORDER BY po.prediction_date ASC
+    """)
+
+    params = {"symbol": symbol.upper(), "start_date": start_date}
+
+    result: Dict[str, pd.DataFrame] = {"prices": pd.DataFrame(), "signals": pd.DataFrame()}
+
+    try:
+        rows, columns = execute_query(price_query, params)
+        price_df = pd.DataFrame(rows, columns=columns)
+        if not price_df.empty:
+            price_df["date"] = pd.to_datetime(price_df["date"])
+        result["prices"] = price_df
+    except Exception as e:
+        logger.error(f"Error loading prices for {symbol}: {e}")
+
+    try:
+        rows, columns = execute_query(signal_query, params)
+        signal_df = pd.DataFrame(rows, columns=columns)
+        if not signal_df.empty:
+            signal_df["prediction_date"] = pd.to_datetime(signal_df["prediction_date"])
+            signal_df["post_timestamp"] = pd.to_datetime(signal_df["post_timestamp"])
+        result["signals"] = signal_df
+    except Exception as e:
+        logger.error(f"Error loading signals for {symbol}: {e}")
+
+    return result
+
+
+def get_multi_asset_signals(
+    days: int = 90,
+    limit: int = 200,
+) -> pd.DataFrame:
+    """
+    Get recent prediction signals across all assets for the trend overview.
+
+    Args:
+        days: Number of days to look back
+        limit: Maximum signals to return
+
+    Returns:
+        DataFrame with signal data, or empty DataFrame on error.
+    """
+    start_date = (datetime.now() - timedelta(days=days)).date()
+
+    query = text("""
+        SELECT
+            po.symbol,
+            po.prediction_date,
+            tss.timestamp AS post_timestamp,
+            po.prediction_sentiment,
+            po.prediction_confidence,
+            po.price_at_prediction,
+            po.return_t7,
+            po.correct_t7,
+            po.pnl_t7,
+            po.is_complete,
+            p.thesis,
+            tss.text AS post_text
+        FROM prediction_outcomes po
+        INNER JOIN predictions p ON po.prediction_id = p.id
+        INNER JOIN truth_social_shitposts tss ON p.shitpost_id = tss.shitpost_id
+        WHERE po.prediction_date >= :start_date
+        ORDER BY po.prediction_date DESC
+        LIMIT :limit
+    """)
+
+    try:
+        rows, columns = execute_query(query, {"start_date": start_date, "limit": limit})
+        df = pd.DataFrame(rows, columns=columns)
+        if not df.empty:
+            df["prediction_date"] = pd.to_datetime(df["prediction_date"])
+        return df
+    except Exception as e:
+        logger.error(f"Error loading multi-asset signals: {e}")
+        return pd.DataFrame()
+

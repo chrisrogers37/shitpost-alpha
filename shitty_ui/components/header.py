@@ -61,6 +61,14 @@ def create_header():
                             ),
                             dcc.Link(
                                 [
+                                    html.I(className="fas fa-chart-area me-1"),
+                                    "Trends",
+                                ],
+                                href="/trends",
+                                className="nav-link-custom",
+                            ),
+                            dcc.Link(
+                                [
                                     html.I(className="fas fa-chart-pie me-1"),
                                     "Performance",
                                 ],

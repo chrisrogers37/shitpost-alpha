@@ -8,6 +8,7 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 
 from constants import COLORS
+from components.charts import build_signal_over_trend_chart, build_empty_signal_chart
 from components.cards import (
     create_error_card,
     create_empty_chart,
@@ -21,6 +22,7 @@ from data import (
     get_asset_price_history,
     get_asset_predictions,
     get_asset_stats,
+    get_price_with_signals,
     get_related_assets,
 )
 
@@ -453,13 +455,12 @@ def register_asset_callbacks(app: Dash):
         ],
     )
     def update_asset_price_chart(symbol, n30, n90, n180, n1y):
-        """Update the price chart with prediction overlays."""
+        """Update the price chart with prediction signal overlays."""
         if not symbol:
-            return create_empty_chart("No asset selected")
+            return build_empty_signal_chart("No asset selected")
 
-        # Determine date range from button click
         ctx = callback_context
-        days = 90  # Default
+        days = 90
         if ctx.triggered:
             button_id = ctx.triggered[0]["prop_id"].split(".")[0]
             if button_id == "asset-range-30d":
@@ -472,109 +473,22 @@ def register_asset_callbacks(app: Dash):
                 days = 365
 
         try:
-            # Get price data
-            price_df = get_asset_price_history(symbol, days=days)
-            if price_df.empty:
-                return create_empty_chart(f"No price data available for {symbol}")
+            data = get_price_with_signals(symbol, days=days)
 
-            # Get predictions for this asset
-            predictions_df = get_asset_predictions(symbol, limit=100)
+            if data["prices"].empty:
+                return build_empty_signal_chart(f"No price data available for {symbol}")
 
-            # Create the candlestick chart
-            fig = go.Figure()
-
-            # Add candlestick trace
-            fig.add_trace(
-                go.Candlestick(
-                    x=price_df["date"],
-                    open=price_df["open"],
-                    high=price_df["high"],
-                    low=price_df["low"],
-                    close=price_df["close"],
-                    name=symbol,
-                    increasing_line_color=COLORS["success"],
-                    decreasing_line_color=COLORS["danger"],
-                )
+            return build_signal_over_trend_chart(
+                prices_df=data["prices"],
+                signals_df=data["signals"],
+                symbol=symbol,
+                show_timeframe_windows=False,
+                chart_height=400,
             )
-
-            # Add prediction markers
-            if not predictions_df.empty:
-                # Filter predictions within the date range
-                cutoff_date = price_df["date"].min()
-                pred_in_range = predictions_df[
-                    predictions_df["prediction_date"] >= cutoff_date
-                ]
-
-                if not pred_in_range.empty:
-                    # Get price at prediction dates for marker placement
-                    for _, pred in pred_in_range.iterrows():
-                        pred_date = pred["prediction_date"]
-                        correct = pred.get("correct_t7")
-                        sentiment = pred.get("prediction_sentiment", "neutral")
-
-                        # Determine marker color and symbol
-                        if correct is True:
-                            marker_color = COLORS["success"]
-                            marker_symbol = "triangle-up"
-                        elif correct is False:
-                            marker_color = COLORS["danger"]
-                            marker_symbol = "triangle-down"
-                        else:
-                            marker_color = COLORS["warning"]
-                            marker_symbol = "circle"
-
-                        # Find price at prediction date
-                        price_at_date = price_df[
-                            price_df["date"].dt.date == pred_date.date()
-                        ]
-                        if not price_at_date.empty:
-                            y_val = price_at_date.iloc[0]["high"] * 1.02
-
-                            fig.add_trace(
-                                go.Scatter(
-                                    x=[pred_date],
-                                    y=[y_val],
-                                    mode="markers",
-                                    marker=dict(
-                                        size=12,
-                                        color=marker_color,
-                                        symbol=marker_symbol,
-                                        line=dict(width=1, color=COLORS["text"]),
-                                    ),
-                                    name=f"{sentiment} prediction",
-                                    hovertemplate=(
-                                        f"<b>{pred_date.strftime('%Y-%m-%d')}</b><br>"
-                                        f"Sentiment: {sentiment}<br>"
-                                        f"Result: {'Correct' if correct else 'Incorrect' if correct is False else 'Pending'}<br>"
-                                        "<extra></extra>"
-                                    ),
-                                    showlegend=False,
-                                )
-                            )
-
-            # Update layout
-            fig.update_layout(
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                font_color=COLORS["text"],
-                margin=dict(l=40, r=40, t=20, b=40),
-                xaxis=dict(
-                    gridcolor=COLORS["border"],
-                    rangeslider=dict(visible=False),
-                ),
-                yaxis=dict(
-                    gridcolor=COLORS["border"],
-                    title="Price ($)",
-                ),
-                height=400,
-                showlegend=False,
-            )
-
-            return fig
 
         except Exception as e:
             print(f"Error loading price chart for {symbol}: {traceback.format_exc()}")
-            return create_empty_chart(f"Error: {str(e)[:50]}")
+            return build_empty_signal_chart(f"Error: {str(e)[:50]}")
 
     @app.callback(
         [

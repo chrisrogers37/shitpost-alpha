@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Signal-Over-Trend Chart View** - New `/trends` page showing prediction signals overlaid on candlestick price charts
+  - Sentiment-colored markers (green=bullish, red=bearish, gray=neutral)
+  - Marker size scales with prediction confidence
+  - Rich tooltips with thesis text, confidence score, and outcome
+  - Optional 7-day evaluation window overlays
+  - Asset selector and time range controls (30D/90D/180D/1Y)
+  - Signal summary statistics panel below chart
+- **Reusable Chart Component** (`shitty_ui/components/charts.py`) - `build_signal_over_trend_chart()` shared between trends and asset pages
+- **Enhanced Asset Page Chart** - Existing asset page now uses the improved signal overlay component
+- **New navigation link** - "Trends" added to top navigation bar
 - **Source-Agnostic Signal Model** - New `signals` table that can represent content from any platform
   - Universal fields: text, author, timestamp, normalized engagement metrics (`likes_count`, `shares_count`)
   - Platform-specific data stored as JSON (`platform_data` column)
