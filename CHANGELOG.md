@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Reactive Ticker Lifecycle** - LLM analyzer now triggers market data backfill immediately when a prediction contains new tickers
+  - New `ticker_registry` database table tracks all ticker symbols the system has ever encountered
+  - `TickerRegistryService` manages ticker lifecycle (active/inactive/invalid status)
+  - `ShitpostAnalyzer._trigger_reactive_backfill()` runs backfill in a thread executor after each successful analysis
+  - `AutoBackfillService` integrates with ticker registry for registration and metadata updates
+  - Railway `market-data` cron reduced to 7-day lookback (reactive backfill handles new predictions immediately)
+  - New CLI commands: `ticker-registry` (view tracked tickers) and `register-tickers` (manually add tickers)
 - **Signal Feed Page** (`/signals`) - Chronological, filterable stream of all LLM-generated predictions
   - Multi-filter bar: sentiment, confidence range slider, asset dropdown, outcome (correct/incorrect/pending)
   - Paginated card feed with "Load More" button (20 signals per page)

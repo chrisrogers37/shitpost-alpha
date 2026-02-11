@@ -4,6 +4,7 @@ Business logic orchestrator for analyzing shitposts with enhanced context.
 """
 
 import asyncio
+import concurrent.futures
 from typing import Dict, List, Optional
 from datetime import datetime
 
@@ -15,6 +16,7 @@ from shitvault.prediction_operations import PredictionOperations
 from shit.utils.error_handling import handle_exceptions
 from shit.content import BypassService
 from shit.logging import get_service_logger
+from shit.market_data.auto_backfill_service import auto_backfill_prediction
 
 logger = get_service_logger("analyzer")
 
@@ -381,16 +383,26 @@ class ShitpostAnalyzer:
             if not dry_run:
                 # Store analysis in database
                 analysis_id = await self.prediction_ops.store_analysis(
-                    shitpost_id, 
-                    enhanced_analysis, 
+                    shitpost_id,
+                    enhanced_analysis,
                     shitpost
                 )
-                
+
                 if analysis_id:
                     logger.debug(f"Stored analysis for shitpost {shitpost_id}")
+
+                    # Reactively trigger market data backfill for new tickers
+                    assets = enhanced_analysis.get("assets", [])
+                    if assets:
+                        try:
+                            pred_id = int(analysis_id)
+                        except (ValueError, TypeError):
+                            pred_id = None
+                        if pred_id is not None:
+                            await self._trigger_reactive_backfill(pred_id, assets)
                 else:
                     logger.warning(f"Failed to store analysis for shitpost {shitpost_id}")
-            
+
             return enhanced_analysis
             
         except Exception as e:
@@ -471,6 +483,44 @@ class ShitpostAnalyzer:
         
         return enhanced_analysis
     
+    async def _trigger_reactive_backfill(self, prediction_id: int, assets: list) -> None:
+        """Trigger market data backfill for new tickers found in a prediction.
+
+        Runs the synchronous backfill service in a thread executor to avoid
+        blocking the async event loop. Failures are logged but do not
+        propagate -- the prediction was already stored successfully.
+
+        Args:
+            prediction_id: ID of the newly created prediction
+            assets: List of ticker symbols from the prediction
+        """
+        try:
+            loop = asyncio.get_event_loop()
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                result = await loop.run_in_executor(
+                    executor,
+                    auto_backfill_prediction,
+                    prediction_id,
+                )
+
+            if result:
+                logger.info(
+                    f"Reactive backfill completed for prediction {prediction_id}, assets: {assets}",
+                    extra={"prediction_id": prediction_id, "assets": assets},
+                )
+            else:
+                logger.debug(
+                    f"Reactive backfill: no new data needed for prediction {prediction_id}",
+                    extra={"prediction_id": prediction_id, "assets": assets},
+                )
+
+        except Exception as e:
+            # Never let backfill failure break the analysis pipeline
+            logger.warning(
+                f"Reactive backfill failed for prediction {prediction_id}: {e}",
+                extra={"prediction_id": prediction_id, "assets": assets, "error": str(e)},
+            )
+
     async def cleanup(self):
         """Cleanup analyzer resources."""
         if self.db_client:

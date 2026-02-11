@@ -76,6 +76,6 @@ def create_tables():
         Subscriber,
         LLMFeedback
     )
-    from shit.market_data.models import MarketPrice, PredictionOutcome
+    from shit.market_data.models import MarketPrice, PredictionOutcome, TickerRegistry
 
     Base.metadata.create_all(engine)

@@ -287,10 +287,18 @@ python -m shitposts --mode backfill --from 2024-01-01 --to 2024-12-31
 - P&L simulation: `pnl_t1`, `pnl_t3`, `pnl_t7`, `pnl_t30` ($1000 position)
 - `is_complete` (boolean) -- All timeframes tracked?
 
+**`ticker_registry`** - Registry of all tracked ticker symbols
+- `id`, `symbol` (unique), `first_seen_date`
+- `source_prediction_id` (FK → predictions.id)
+- `status` (active/inactive/invalid), `status_reason`
+- `last_price_update`, `price_data_start`, `price_data_end`, `total_price_records`
+- `asset_type`, `exchange`
+
 **`subscribers`** - SMS alert subscribers (schema defined, not yet active)
 **`llm_feedback`** - LLM performance feedback (schema defined, not yet active)
 
 **Indexes**:
+- `ticker_registry`: (`symbol` unique), (`status`), (`first_seen_date`)
 - `truth_social_shitposts`: (`shitpost_id` unique), (`timestamp`)
 - `predictions`: (`shitpost_id`)
 - `market_prices`: (`symbol`, `date` unique composite)
