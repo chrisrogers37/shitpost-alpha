@@ -4,6 +4,11 @@ Obnoxiously American-themed dashboard for Shitpost Alpha.
 """
 
 import os
+import sys
+
+# Add project root to Python path so imports like shit.db, notifications work
+# when running from shitty_ui/ directory (e.g. Railway: cd shitty_ui && python app.py)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import request, jsonify
 from layout import create_app, register_callbacks
