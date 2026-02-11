@@ -1,6 +1,6 @@
 # Alerting System Specification [PARTIALLY COMPLETE]
 
-> **STATUS: PARTIALLY COMPLETE** - Telegram bot is live (webhook mode, multi-tenant subscriptions). Email (SMTP) and SMS (Twilio) channels are coded but not configured in production. Browser notifications work client-side.
+> **STATUS: PARTIALLY COMPLETE** (as of 2026-02-10) — Browser alert panel (config + history + checking callbacks) is fully implemented in `callbacks/alerts.py`. Telegram bot is live (webhook mode, multi-tenant subscriptions) in `notifications/telegram_bot.py`. Email (SMTP) and SMS (Twilio) channels are coded but not configured in production. Remaining work is primarily ops/config (env vars, Twilio account, SMTP setup) rather than new code.
 
 ## Implementation Context for Engineering Team
 
