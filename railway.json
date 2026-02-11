@@ -27,7 +27,7 @@
     },
     "market-data": {
       "source": ".",
-      "startCommand": "python -m shit.market_data auto-pipeline --days-back 30",
+      "startCommand": "python -m shit.market_data auto-pipeline --days-back 7",
       "cronSchedule": "*/15 * * * *"
     }
   }

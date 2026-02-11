@@ -14,6 +14,7 @@ from sqlalchemy import and_
 from shit.market_data.client import MarketDataClient
 from shit.market_data.outcome_calculator import OutcomeCalculator
 from shit.market_data.models import MarketPrice
+from shit.market_data.ticker_registry import TickerRegistryService
 from shit.db.sync_session import get_session
 from shitvault.shitpost_models import Prediction
 from shit.logging import get_service_logger, print_success, print_error, print_info
@@ -45,6 +46,7 @@ class AutoBackfillService:
         """
         self.backfill_days = backfill_days
         self.logger = logger
+        self.registry = TickerRegistryService()
 
     def get_missing_tickers(self, symbols: List[str]) -> List[str]:
         """
@@ -130,12 +132,28 @@ class AutoBackfillService:
                         f"Backfilled {symbol}: {len(prices)} prices",
                         extra={"symbol": symbol, "count": len(prices)}
                     )
+                    # Update ticker registry metadata
+                    try:
+                        self.registry.update_price_metadata(symbol)
+                    except Exception as reg_err:
+                        self.logger.warning(
+                            f"Failed to update registry metadata for {symbol}: {reg_err}",
+                            extra={"symbol": symbol}
+                        )
                     return True
                 else:
                     self.logger.warning(
                         f"No price data available for {symbol}",
                         extra={"symbol": symbol}
                     )
+                    # Mark as invalid in ticker registry if no data found
+                    try:
+                        self.registry.mark_ticker_invalid(symbol, "yfinance returned no price data")
+                    except Exception as reg_err:
+                        self.logger.warning(
+                            f"Failed to mark {symbol} invalid in registry: {reg_err}",
+                            extra={"symbol": symbol}
+                        )
                     return False
 
         except Exception as e:
@@ -173,6 +191,23 @@ class AutoBackfillService:
             if not prediction.assets or len(prediction.assets) == 0:
                 self.logger.debug(f"Prediction {prediction_id} has no assets")
                 return (0, 0)
+
+            # Register any new tickers in the ticker registry
+            try:
+                newly_registered, _ = self.registry.register_tickers(
+                    prediction.assets,
+                    source_prediction_id=prediction.id,
+                )
+                if newly_registered:
+                    self.logger.info(
+                        f"Registered {len(newly_registered)} new tickers: {newly_registered}",
+                        extra={"tickers": newly_registered, "prediction_id": prediction.id},
+                    )
+            except Exception as reg_err:
+                self.logger.warning(
+                    f"Failed to register tickers for prediction {prediction_id}: {reg_err}",
+                    extra={"prediction_id": prediction_id},
+                )
 
             # Check which assets need backfilling
             missing_tickers = self.get_missing_tickers(prediction.assets)

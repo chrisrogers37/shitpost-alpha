@@ -147,6 +147,44 @@ class PredictionOutcome(Base, IDMixin, TimestampMixin):
             return None
 
 
+class TickerRegistry(Base, IDMixin, TimestampMixin):
+    """Registry of all ticker symbols the system tracks.
+
+    Once a ticker appears in an LLM prediction, it is registered here
+    and tracked for ongoing price updates. This provides:
+    - Instant lookup of whether a ticker is already known
+    - Status tracking (active, inactive, invalid)
+    - Audit trail of when each ticker was first seen
+    - Source prediction linkage for debugging
+    """
+
+    __tablename__ = "ticker_registry"
+
+    # Ticker identification
+    symbol = Column(String(20), unique=True, nullable=False, index=True)
+
+    # Lifecycle tracking
+    first_seen_date = Column(Date, nullable=False, index=True)
+    source_prediction_id = Column(Integer, ForeignKey("predictions.id"), nullable=True)
+
+    # Status: active (tracked), inactive (manually disabled), invalid (yfinance can't find it)
+    status = Column(String(20), nullable=False, default="active", index=True)
+    status_reason = Column(String(255), nullable=True)
+
+    # Price data tracking
+    last_price_update = Column(DateTime, nullable=True)
+    price_data_start = Column(Date, nullable=True)
+    price_data_end = Column(Date, nullable=True)
+    total_price_records = Column(Integer, default=0)
+
+    # Metadata
+    asset_type = Column(String(20), nullable=True)  # stock, crypto, etf, commodity, index
+    exchange = Column(String(20), nullable=True)  # NYSE, NASDAQ, etc.
+
+    def __repr__(self):
+        return f"<TickerRegistry(symbol='{self.symbol}', status='{self.status}', first_seen={self.first_seen_date})>"
+
+
 # Indexes for efficient querying
 from sqlalchemy import Index
 
@@ -154,3 +192,5 @@ from sqlalchemy import Index
 Index('idx_market_price_symbol_date', MarketPrice.symbol, MarketPrice.date, unique=True)
 Index('idx_prediction_outcome_symbol_date', PredictionOutcome.symbol, PredictionOutcome.prediction_date)
 Index('idx_prediction_outcome_prediction_id', PredictionOutcome.prediction_id)
+Index('idx_ticker_registry_symbol', TickerRegistry.symbol, unique=True)
+Index('idx_ticker_registry_status', TickerRegistry.status)
