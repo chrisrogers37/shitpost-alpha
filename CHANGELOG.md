@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Source-Agnostic Signal Model** - New `signals` table that can represent content from any platform
+  - Universal fields: text, author, timestamp, normalized engagement metrics (`likes_count`, `shares_count`)
+  - Platform-specific data stored as JSON (`platform_data` column)
+  - Content flags: `is_repost`, `is_reply`, `is_quote` for cross-platform bypass logic
+- **Signal Operations** (`shitvault/signal_operations.py`) - Source-agnostic CRUD with backward-compatible aliases
+- **Signal Transformer** (`shit/db/signal_utils.py`) - Pluggable per-source field mapping (`SignalTransformer.get_transformer()`)
+- **Dual-FK on Predictions** - `Prediction.signal_id` added alongside legacy `shitpost_id` with `content_id` property
+
+### Changed
+- **S3 Processor** - Now accepts `source` parameter and dual-writes to both `signals` and `truth_social_shitposts`
+- **Bypass Service** - `_is_retruth()` now checks `is_repost` flag before legacy `reblog` field
+- **Analyzer** - `_prepare_enhanced_content()` uses generic field names with fallback to legacy names
+- **Prediction Operations** - `store_analysis()`, `handle_no_text_prediction()`, `check_prediction_exists()` accept `use_signal` flag for dual-FK routing
+- **S3 Data Lake** - Storage metadata now uses dynamic source prefix instead of hardcoded `truth_social_api`
+- **sync_session** - `create_tables()` now imports and registers the `Signal` model
+
+### Deprecated
+- **ShitpostOperations** - Deprecated in favor of `SignalOperations`; emits `DeprecationWarning` on instantiation
+
 - **Grok/xAI LLM Provider** - Added xAI's Grok as a third LLM provider option
   - Uses OpenAI-compatible API with custom `base_url` (`https://api.x.ai/v1`)
   - Supports `grok-2` and `grok-2-mini` models

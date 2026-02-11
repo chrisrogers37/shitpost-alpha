@@ -75,11 +75,11 @@ class TestPredictionOperations:
         mock_db_ops.session.add.side_effect = mock_add
         
         result = await prediction_ops.store_analysis(
-            shitpost_id='123456789',
+            content_id='123456789',
             analysis_data=sample_analysis_data,
-            shitpost_data=sample_shitpost_data
+            content_data=sample_shitpost_data
         )
-        
+
         assert result == '1'
         mock_db_ops.session.add.assert_called_once()
         mock_db_ops.session.commit.assert_called_once()
@@ -90,16 +90,16 @@ class TestPredictionOperations:
         """Test storing analysis without shitpost data."""
         mock_prediction = MagicMock()
         mock_prediction.id = 1
-        
+
         def mock_add(prediction):
             prediction.id = 1
-        
+
         mock_db_ops.session.add.side_effect = mock_add
-        
+
         result = await prediction_ops.store_analysis(
-            shitpost_id='123456789',
+            content_id='123456789',
             analysis_data=sample_analysis_data,
-            shitpost_data=None
+            content_data=None
         )
         
         assert result == '1'
@@ -118,11 +118,11 @@ class TestPredictionOperations:
         mock_db_ops.session.add.side_effect = mock_add
         
         await prediction_ops.store_analysis(
-            shitpost_id='123456789',
+            content_id='123456789',
             analysis_data=sample_analysis_data,
-            shitpost_data=sample_shitpost_data
+            content_data=sample_shitpost_data
         )
-        
+
         # Verify engagement score calculation
         # (replies + reblogs + favourites) / followers
         # (100 + 500 + 1000) / 5000000 = 0.00032
@@ -143,11 +143,11 @@ class TestPredictionOperations:
         mock_db_ops.session.add.side_effect = mock_add
         
         await prediction_ops.store_analysis(
-            shitpost_id='123456789',
+            content_id='123456789',
             analysis_data=sample_analysis_data,
-            shitpost_data=sample_shitpost_data
+            content_data=sample_shitpost_data
         )
-        
+
         # Verify viral score calculation
         # reblogs / favourites = 500 / 1000 = 0.5
         assert captured_prediction is not None
@@ -169,9 +169,9 @@ class TestPredictionOperations:
         mock_db_ops.session.add.side_effect = mock_add
         
         await prediction_ops.store_analysis(
-            shitpost_id='123456789',
+            content_id='123456789',
             analysis_data=sample_analysis_data,
-            shitpost_data=sample_shitpost_data
+            content_data=sample_shitpost_data
         )
         
         # Engagement score should be None when followers is 0
@@ -192,9 +192,9 @@ class TestPredictionOperations:
         mock_db_ops.session.add.side_effect = mock_add
         
         await prediction_ops.store_analysis(
-            shitpost_id='123456789',
+            content_id='123456789',
             analysis_data=sample_analysis_data,
-            shitpost_data=sample_shitpost_data
+            content_data=sample_shitpost_data
         )
         
         # Viral score should be None when favourites is 0
@@ -213,9 +213,9 @@ class TestPredictionOperations:
         mock_db_ops.session.add.side_effect = mock_add
         
         await prediction_ops.store_analysis(
-            shitpost_id='123456789',
+            content_id='123456789',
             analysis_data=sample_analysis_data,
-            shitpost_data=sample_shitpost_data
+            content_data=sample_shitpost_data
         )
         
         assert captured_prediction.analysis_status == 'completed'
@@ -234,9 +234,9 @@ class TestPredictionOperations:
         mock_db_ops.session.add.side_effect = mock_add
         
         await prediction_ops.store_analysis(
-            shitpost_id='123456789',
+            content_id='123456789',
             analysis_data=sample_analysis_data,
-            shitpost_data=sample_shitpost_data
+            content_data=sample_shitpost_data
         )
         
         assert captured_prediction.has_media is False
@@ -257,9 +257,9 @@ class TestPredictionOperations:
         mock_db_ops.session.add.side_effect = mock_add
         
         await prediction_ops.store_analysis(
-            shitpost_id='123456789',
+            content_id='123456789',
             analysis_data=sample_analysis_data,
-            shitpost_data=sample_shitpost_data
+            content_data=sample_shitpost_data
         )
         
         assert captured_prediction.replies_at_analysis == 100
@@ -280,9 +280,9 @@ class TestPredictionOperations:
         mock_db_ops.session.add.side_effect = mock_add
         
         await prediction_ops.store_analysis(
-            shitpost_id='123456789',
+            content_id='123456789',
             analysis_data=sample_analysis_data,
-            shitpost_data=sample_shitpost_data
+            content_data=sample_shitpost_data
         )
         
         assert captured_prediction.llm_provider == 'openai'
@@ -295,9 +295,9 @@ class TestPredictionOperations:
         mock_db_ops.session.commit.side_effect = Exception("Database error")
         
         result = await prediction_ops.store_analysis(
-            shitpost_id='123456789',
+            content_id='123456789',
             analysis_data=sample_analysis_data,
-            shitpost_data=sample_shitpost_data
+            content_data=sample_shitpost_data
         )
         
         assert result is None
@@ -316,8 +316,8 @@ class TestPredictionOperations:
         mock_db_ops.session.add.side_effect = mock_add
         
         result = await prediction_ops.handle_no_text_prediction(
-            shitpost_id='123456789',
-            shitpost_data=sample_shitpost_data
+            content_id='123456789',
+            content_data=sample_shitpost_data
         )
         
         assert result == '1'
@@ -339,8 +339,8 @@ class TestPredictionOperations:
         mock_db_ops.session.add.side_effect = mock_add
         
         await prediction_ops.handle_no_text_prediction(
-            shitpost_id='123456789',
-            shitpost_data=sample_shitpost_data
+            content_id='123456789',
+            content_data=sample_shitpost_data
         )
         
         assert captured_prediction.analysis_status == 'bypassed'
@@ -381,8 +381,8 @@ class TestPredictionOperations:
             }
             
             await prediction_ops.handle_no_text_prediction(
-                shitpost_id='123',
-                shitpost_data=shitpost_data
+                content_id='123',
+                content_data=shitpost_data
             )
             
             assert captured_prediction.analysis_comment == expected_reason
@@ -393,8 +393,8 @@ class TestPredictionOperations:
         mock_db_ops.session.commit.side_effect = Exception("Database error")
         
         result = await prediction_ops.handle_no_text_prediction(
-            shitpost_id='123456789',
-            shitpost_data=sample_shitpost_data
+            content_id='123456789',
+            content_data=sample_shitpost_data
         )
         
         assert result is None

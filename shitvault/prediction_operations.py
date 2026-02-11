@@ -28,18 +28,25 @@ class PredictionOperations:
         self.db_ops = db_ops
         self.bypass_service = BypassService()
     
-    async def store_analysis(self, shitpost_id: str, analysis_data: Dict[str, Any], shitpost_data: Dict[str, Any] = None) -> Optional[str]:
-        """Store LLM analysis results in the database with enhanced shitpost data."""
+    async def store_analysis(self, content_id: str, analysis_data: Dict[str, Any], content_data: Dict[str, Any] = None, *, use_signal: bool = False) -> Optional[str]:
+        """Store LLM analysis results in the database with enhanced content data.
+
+        Args:
+            content_id: Signal ID or shitpost ID for the content.
+            analysis_data: LLM analysis results dict.
+            content_data: Content data dict (signal or shitpost format).
+            use_signal: If True, store as signal_id; otherwise as shitpost_id.
+        """
         try:
-            # Calculate engagement scores
+            # Calculate engagement scores (use generic names with fallback)
             engagement_score = None
             viral_score = None
-            if shitpost_data:
-                replies = shitpost_data.get('replies_count', 0)
-                reblogs = shitpost_data.get('reblogs_count', 0)
-                favourites = shitpost_data.get('favourites_count', 0)
-                upvotes = shitpost_data.get('upvotes_count', 0)
-                followers = shitpost_data.get('account_followers_count', 0)
+            if content_data:
+                replies = content_data.get('replies_count', 0)
+                reblogs = content_data.get('shares_count', content_data.get('reblogs_count', 0))
+                favourites = content_data.get('likes_count', content_data.get('favourites_count', 0))
+                upvotes = content_data.get('upvotes_count', 0)
+                followers = content_data.get('author_followers', content_data.get('account_followers_count', 0))
                 
                 # Engagement score based on interaction rate
                 if followers > 0:
@@ -50,34 +57,36 @@ class PredictionOperations:
                     viral_score = reblogs / favourites
             
             prediction = Prediction(
-                shitpost_id=shitpost_id,
+                # Dual-FK: set whichever is appropriate
+                shitpost_id=content_id if not use_signal else None,
+                signal_id=content_id if use_signal else None,
                 assets=analysis_data.get('assets', []),
                 market_impact=analysis_data.get('market_impact', {}),
                 confidence=analysis_data.get('confidence', 0.0),
                 thesis=analysis_data.get('thesis', ''),
-                
+
                 # Set analysis status for successful analyses
                 analysis_status='completed',
                 analysis_comment=None,
-                
+
                 # Enhanced analysis scores
                 engagement_score=engagement_score,
                 viral_score=viral_score,
                 sentiment_score=analysis_data.get('sentiment_score'),
                 urgency_score=analysis_data.get('urgency_score'),
-                
+
                 # Content analysis
-                has_media=shitpost_data.get('has_media', False) if shitpost_data else False,
-                mentions_count=len(shitpost_data.get('mentions', [])) if shitpost_data else 0,
-                hashtags_count=len(shitpost_data.get('tags', [])) if shitpost_data else 0,
-                content_length=len(shitpost_data.get('text', '')) if shitpost_data else 0,
-                
+                has_media=content_data.get('has_media', False) if content_data else False,
+                mentions_count=len(content_data.get('mentions', [])) if content_data else 0,
+                hashtags_count=len(content_data.get('tags', [])) if content_data else 0,
+                content_length=len(content_data.get('text', '')) if content_data else 0,
+
                 # Engagement metrics at analysis time
-                replies_at_analysis=shitpost_data.get('replies_count', 0) if shitpost_data else 0,
-                reblogs_at_analysis=shitpost_data.get('reblogs_count', 0) if shitpost_data else 0,
-                favourites_at_analysis=shitpost_data.get('favourites_count', 0) if shitpost_data else 0,
-                upvotes_at_analysis=shitpost_data.get('upvotes_count', 0) if shitpost_data else 0,
-                
+                replies_at_analysis=content_data.get('replies_count', 0) if content_data else 0,
+                reblogs_at_analysis=content_data.get('reblogs_count', 0) if content_data else 0,
+                favourites_at_analysis=content_data.get('favourites_count', 0) if content_data else 0,
+                upvotes_at_analysis=content_data.get('upvotes_count', 0) if content_data else 0,
+
                 # LLM metadata
                 llm_provider=analysis_data.get('llm_provider'),
                 llm_model=analysis_data.get('llm_model'),
@@ -97,18 +106,21 @@ class PredictionOperations:
     
     async def handle_no_text_prediction(
         self,
-        shitpost_id: str,
-        shitpost_data: Dict[str, Any],
-        bypass_reason: Optional[BypassReason] = None
+        content_id: str,
+        content_data: Dict[str, Any],
+        bypass_reason: Optional[BypassReason] = None,
+        *,
+        use_signal: bool = False
     ) -> Optional[str]:
         """
         Create a prediction record for posts that can't be analyzed.
 
         Args:
-            shitpost_id: ID of the shitpost
-            shitpost_data: Shitpost data dictionary
+            content_id: Signal ID or shitpost ID for the content.
+            content_data: Content data dictionary (signal or shitpost format).
             bypass_reason: Optional pre-determined bypass reason. If not provided,
                           will be determined using BypassService.
+            use_signal: If True, store as signal_id; otherwise as shitpost_id.
 
         Returns:
             Prediction ID if successful, None otherwise
@@ -116,12 +128,14 @@ class PredictionOperations:
         try:
             # Determine the bypass reason if not provided
             if bypass_reason is None:
-                _, bypass_reason = self.bypass_service.should_bypass_post(shitpost_data)
+                _, bypass_reason = self.bypass_service.should_bypass_post(content_data)
 
             reason = str(bypass_reason) if bypass_reason else "Content not analyzable"
-            
+
             prediction = Prediction(
-                shitpost_id=shitpost_id,
+                # Dual-FK: set whichever is appropriate
+                shitpost_id=content_id if not use_signal else None,
+                signal_id=content_id if use_signal else None,
                 analysis_status='bypassed',
                 analysis_comment=reason,
                 # Set minimal required fields for bypassed posts
@@ -133,38 +147,46 @@ class PredictionOperations:
                 viral_score=None,
                 sentiment_score=None,
                 urgency_score=None,
-                has_media=shitpost_data.get('has_media', False),
-                mentions_count=len(shitpost_data.get('mentions', [])),
-                hashtags_count=len(shitpost_data.get('tags', [])),
-                content_length=len(shitpost_data.get('text', '')),
-                replies_at_analysis=shitpost_data.get('replies_count', 0),
-                reblogs_at_analysis=shitpost_data.get('reblogs_count', 0),
-                favourites_at_analysis=shitpost_data.get('favourites_count', 0),
-                upvotes_at_analysis=shitpost_data.get('upvotes_count', 0),
+                has_media=content_data.get('has_media', False),
+                mentions_count=len(content_data.get('mentions', [])),
+                hashtags_count=len(content_data.get('tags', [])),
+                content_length=len(content_data.get('text', '')),
+                replies_at_analysis=content_data.get('replies_count', 0),
+                reblogs_at_analysis=content_data.get('reblogs_count', 0),
+                favourites_at_analysis=content_data.get('favourites_count', 0),
+                upvotes_at_analysis=content_data.get('upvotes_count', 0),
                 llm_provider=None,
                 llm_model=None,
                 analysis_timestamp=datetime.now()
             )
-            
+
             self.db_ops.session.add(prediction)
             await self.db_ops.session.commit()
             await self.db_ops.session.refresh(prediction)
-            
-            logger.info(f"Created bypassed prediction for {shitpost_id}: {reason}")
+
+            logger.info(f"Created bypassed prediction for {content_id}: {reason}")
             return str(prediction.id)
-            
+
         except Exception as e:
             logger.error(f"Error creating bypassed prediction: {e}")
             return None
     
     
-    async def check_prediction_exists(self, shitpost_id: str) -> bool:
-        """Check if a prediction already exists for a shitpost."""
+    async def check_prediction_exists(self, content_id: str, *, use_signal: bool = False) -> bool:
+        """Check if a prediction already exists for content.
+
+        Args:
+            content_id: Signal ID or shitpost ID to check.
+            use_signal: If True, check signal_id; otherwise check shitpost_id.
+        """
         try:
-            stmt = select(Prediction.id).where(Prediction.shitpost_id == shitpost_id)
+            if use_signal:
+                stmt = select(Prediction.id).where(Prediction.signal_id == content_id)
+            else:
+                stmt = select(Prediction.id).where(Prediction.shitpost_id == content_id)
             result = await self.db_ops.session.execute(stmt)
             return result.scalar_one_or_none() is not None
-            
+
         except Exception as e:
             logger.error(f"Error checking prediction existence: {e}")
             return False

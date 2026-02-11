@@ -409,41 +409,47 @@ class ShitpostAnalyzer:
             logger.error(f"Error analyzing shitpost {shitpost.get('shitpost_id', 'unknown')}: {e}")
             return None
     
-    def _prepare_enhanced_content(self, shitpost: Dict) -> str:
+    def _prepare_enhanced_content(self, signal_data: Dict) -> str:
         """Prepare enhanced content for LLM analysis.
-        
+
+        Uses generic field names with fallback to legacy names for
+        backward compatibility with both Signal and Shitpost dicts.
+
         Args:
-            shitpost: Shitpost dictionary
-            
+            signal_data: Signal or shitpost dictionary
+
         Returns:
             Enhanced content string
         """
-        content = shitpost.get('text', '')
-        username = shitpost.get('username', '')
-        timestamp = shitpost.get('timestamp', '')
-        
-        # Add engagement metrics
-        replies = shitpost.get('replies_count', 0)
-        reblogs = shitpost.get('reblogs_count', 0)
-        favourites = shitpost.get('favourites_count', 0)
-        upvotes = shitpost.get('upvotes_count', 0)
-        
-        # Add account information
-        account_verified = shitpost.get('account_verified', False)
-        followers = shitpost.get('account_followers_count', 0)
-        
-        # Add media information
-        has_media = shitpost.get('has_media', False)
-        mentions_count = len(shitpost.get('mentions', []))
-        tags_count = len(shitpost.get('tags', []))
-        
+        content = signal_data.get('text', '')
+        username = signal_data.get('author_username', signal_data.get('username', ''))
+        timestamp = signal_data.get('published_at', signal_data.get('timestamp', ''))
+        source = signal_data.get('source', signal_data.get('platform', 'unknown'))
+
+        # Engagement metrics (generic names with fallback)
+        replies = signal_data.get('replies_count', 0)
+        shares = signal_data.get('shares_count', signal_data.get('reblogs_count', 0))
+        likes = signal_data.get('likes_count', signal_data.get('favourites_count', 0))
+
+        # Account information (generic names with fallback)
+        verified = signal_data.get('author_verified', signal_data.get('account_verified', False))
+        followers = signal_data.get('author_followers', signal_data.get('account_followers_count', 0))
+
+        # Media information
+        has_media = signal_data.get('has_media', False)
+        mentions = signal_data.get('mentions', [])
+        mentions_count = len(mentions) if isinstance(mentions, list) else 0
+        tags = signal_data.get('tags', [])
+        tags_count = len(tags) if isinstance(tags, list) else 0
+
         # Build enhanced content
         enhanced_content = f"Content: {content}\n"
-        enhanced_content += f"Author: {username} (Verified: {account_verified}, Followers: {followers:,})\n"
+        enhanced_content += f"Source: {source}\n"
+        enhanced_content += f"Author: {username} (Verified: {verified}, Followers: {followers:,})\n"
         enhanced_content += f"Timestamp: {timestamp}\n"
-        enhanced_content += f"Engagement: {replies} replies, {reblogs} reblogs, {favourites} favourites, {upvotes} upvotes\n"
+        enhanced_content += f"Engagement: {replies} replies, {shares} shares, {likes} likes\n"
         enhanced_content += f"Media: {'Yes' if has_media else 'No'}, Mentions: {mentions_count}, Tags: {tags_count}"
-        
+
         return enhanced_content
     
     def _enhance_analysis_with_shitpost_data(self, analysis: Dict, shitpost: Dict) -> Dict:

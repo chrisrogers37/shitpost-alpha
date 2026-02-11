@@ -16,6 +16,9 @@ from shit.logging import get_service_logger
 
 logger = get_service_logger("dashboard_data")
 
+# Table reference -- will be changed to "signals" after full migration
+SIGNALS_TABLE = "truth_social_shitposts"
+
 
 # Simple TTL cache decorator
 def ttl_cache(ttl_seconds: int = 300):

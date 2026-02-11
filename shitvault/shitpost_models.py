@@ -104,9 +104,14 @@ class Prediction(Base, IDMixin, TimestampMixin):
     """Model for LLM predictions/analysis of shitposts."""
 
     __tablename__ = "predictions"
+    # Legacy FK -- nullable now, will be removed after full migration
     shitpost_id = Column(
-        String(255), ForeignKey("truth_social_shitposts.shitpost_id"), nullable=False
-    )  # Foreign key to TruthSocialShitpost.shitpost_id
+        String(255), ForeignKey("truth_social_shitposts.shitpost_id"), nullable=True
+    )
+    # New FK -- points to the source-agnostic signals table
+    signal_id = Column(
+        String(255), ForeignKey("signals.signal_id"), nullable=True
+    )
 
     # Analysis results
     assets = Column(JSON, default=list)  # List of asset tickers
@@ -153,7 +158,13 @@ class Prediction(Base, IDMixin, TimestampMixin):
 
     # Relationships
     shitpost = relationship("TruthSocialShitpost", back_populates="predictions")
+    signal = relationship("Signal", back_populates="predictions", foreign_keys=[signal_id])
     market_movements = relationship("MarketMovement", back_populates="prediction")
+
+    @property
+    def content_id(self) -> str:
+        """Return the signal or shitpost ID, whichever is set."""
+        return self.signal_id or self.shitpost_id
 
     def __repr__(self):
         return f"<Prediction(id={self.id}, confidence={self.confidence}, assets={self.assets})>"

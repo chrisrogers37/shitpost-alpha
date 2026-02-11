@@ -12,7 +12,9 @@ from shit.db.database_operations import DatabaseOperations
 from shit.db.database_utils import DatabaseUtils
 from shit.s3 import S3DataLake
 from shitvault.shitpost_operations import ShitpostOperations
+from shitvault.signal_operations import SignalOperations
 from shitvault.shitpost_models import TruthSocialShitpost
+from shit.db.signal_utils import SignalTransformer
 
 # Use centralized DatabaseLogger for beautiful logging
 from shit.logging.service_loggers import DatabaseLogger
@@ -24,10 +26,13 @@ logger = db_logger.logger
 class S3Processor:
     """Operations for processing S3 data to database."""
     
-    def __init__(self, db_ops: DatabaseOperations, s3_data_lake: S3DataLake):
+    def __init__(self, db_ops: DatabaseOperations, s3_data_lake: S3DataLake, source: str = "truth_social"):
         self.db_ops = db_ops
         self.s3_data_lake = s3_data_lake
-        self.shitpost_ops = ShitpostOperations(db_ops)
+        self.source = source
+        self.signal_ops = SignalOperations(db_ops)
+        self.shitpost_ops = ShitpostOperations(db_ops)  # Keep for backward compat
+        self._transformer = SignalTransformer.get_transformer(source)
     
     async def process_s3_to_database(self, start_date: Optional[datetime] = None,
                                    end_date: Optional[datetime] = None,
@@ -184,17 +189,20 @@ class S3Processor:
                 # In dry run, just count what would be processed
                 stats['successful'] += 1
             else:
-                # Transform S3 data to database format
-                transformed_data = DatabaseUtils.transform_s3_data_to_shitpost(s3_data)
-                
-                # Store in database (deduplication handled by store_shitpost)
-                result = await self.shitpost_ops.store_shitpost(transformed_data)
-                
+                # Transform using source-specific transformer and store in signals table
+                signal_data = self._transformer(s3_data)
+                result = await self.signal_ops.store_signal(signal_data)
+
+                # Also store in legacy table for backward compatibility
+                # TODO: Remove after full migration is complete
+                legacy_data = DatabaseUtils.transform_s3_data_to_shitpost(s3_data)
+                await self.shitpost_ops.store_shitpost(legacy_data)
+
                 if result:
                     stats['successful'] += 1
                 else:
                     stats['skipped'] += 1  # Already exists
-                    
+
         except Exception as e:
             logger.error(f"Error processing S3 data: {e}")
             stats['failed'] += 1

@@ -10,6 +10,8 @@ from datetime import datetime
 from sqlalchemy import select, and_, not_, exists
 from sqlalchemy.exc import IntegrityError
 
+import warnings
+
 from shit.db.database_operations import DatabaseOperations
 from shitvault.shitpost_models import TruthSocialShitpost, Prediction
 
@@ -20,10 +22,21 @@ from shit.logging.service_loggers import DatabaseLogger
 db_logger = DatabaseLogger("shitpost_operations")
 logger = db_logger.logger
 
+_DEPRECATION_MSG = (
+    "ShitpostOperations is deprecated. Use SignalOperations for new code. "
+    "ShitpostOperations will be removed once all consumers are migrated."
+)
+
+
 class ShitpostOperations:
-    """Operations for managing shitposts."""
-    
+    """Operations for managing shitposts.
+
+    .. deprecated::
+        Use :class:`shitvault.signal_operations.SignalOperations` instead.
+    """
+
     def __init__(self, db_ops: DatabaseOperations):
+        warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
         self.db_ops = db_ops
     
     async def store_shitpost(self, shitpost_data: Dict[str, Any]) -> Optional[str]:

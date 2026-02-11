@@ -35,14 +35,21 @@ class TestS3Processor:
     @pytest.fixture
     def s3_processor(self, mock_db_ops, mock_s3_data_lake):
         """S3Processor instance with mocked dependencies."""
-        with patch('shitvault.s3_processor.ShitpostOperations') as mock_shitpost_ops_class:
+        with patch('shitvault.s3_processor.ShitpostOperations') as mock_shitpost_ops_class, \
+             patch('shitvault.s3_processor.SignalOperations') as mock_signal_ops_class:
             mock_shitpost_ops = MagicMock()
             mock_shitpost_ops.store_shitpost = AsyncMock()
             mock_shitpost_ops.get_unprocessed_shitposts = AsyncMock(return_value=[])
             mock_shitpost_ops_class.return_value = mock_shitpost_ops
+
+            mock_signal_ops = MagicMock()
+            mock_signal_ops.store_signal = AsyncMock(return_value="1")
+            mock_signal_ops_class.return_value = mock_signal_ops
+
             processor = S3Processor(mock_db_ops, mock_s3_data_lake)
-            # Store the mock for assertions
+            # Store mocks for assertions
             processor._mock_shitpost_ops = mock_shitpost_ops
+            processor._mock_signal_ops = mock_signal_ops
             return processor
 
     @pytest.fixture
@@ -225,21 +232,22 @@ class TestS3Processor:
 
     @pytest.mark.asyncio
     async def test_process_s3_to_database_skips_existing(self, s3_processor, mock_db_ops, mock_s3_data_lake, sample_s3_data):
-        """Test that existing shitposts are skipped."""
+        """Test that existing signals are skipped."""
         async def mock_stream(start_date=None, end_date=None, limit=None):
             yield sample_s3_data
-        
+
         mock_s3_data_lake.stream_raw_data = mock_stream
-        
+
         with patch('shitvault.s3_processor.DatabaseUtils.transform_s3_data_to_shitpost') as mock_transform:
             mock_transform.return_value = sample_s3_data
-            s3_processor._mock_shitpost_ops.store_shitpost.return_value = None  # None means already exists
-            
+            # None from store_signal means integrity error (already exists)
+            s3_processor._mock_signal_ops.store_signal.return_value = None
+
             result = await s3_processor.process_s3_to_database(
                 incremental=False,
                 dry_run=False
             )
-            
+
             assert result['total_processed'] == 1
             assert result['successful'] == 0
             assert result['skipped'] == 1
