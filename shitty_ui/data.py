@@ -1596,6 +1596,275 @@ def get_backtest_simulation(
         }
 
 
+# =============================================================================
+# Signal Feed Functions
+# =============================================================================
+
+
+def get_signal_feed(
+    limit: int = 20,
+    offset: int = 0,
+    sentiment_filter: Optional[str] = None,
+    confidence_min: Optional[float] = None,
+    confidence_max: Optional[float] = None,
+    asset_filter: Optional[str] = None,
+    outcome_filter: Optional[str] = None,
+) -> pd.DataFrame:
+    """
+    Load signal feed data with filtering and pagination.
+
+    Returns predictions joined with source posts and validation outcomes,
+    ordered by timestamp descending (newest first).
+
+    Args:
+        limit: Maximum signals per page.
+        offset: Number of signals to skip (for load-more pagination).
+        sentiment_filter: 'bullish', 'bearish', or None.
+        confidence_min: Minimum confidence (0.0-1.0).
+        confidence_max: Maximum confidence (0.0-1.0).
+        asset_filter: Specific ticker symbol (e.g. 'AAPL').
+        outcome_filter: 'correct', 'incorrect', 'pending', or None.
+
+    Returns:
+        DataFrame with signal feed columns. Empty DataFrame on error.
+    """
+    base_query = """
+        SELECT
+            tss.timestamp,
+            tss.text,
+            tss.shitpost_id,
+            p.id as prediction_id,
+            p.assets,
+            p.market_impact,
+            p.confidence,
+            p.thesis,
+            p.analysis_status,
+            po.symbol,
+            po.prediction_sentiment,
+            po.prediction_confidence,
+            po.return_t1,
+            po.return_t3,
+            po.return_t7,
+            po.correct_t1,
+            po.correct_t3,
+            po.correct_t7,
+            po.pnl_t7,
+            po.is_complete
+        FROM truth_social_shitposts tss
+        INNER JOIN predictions p ON tss.shitpost_id = p.shitpost_id
+        LEFT JOIN prediction_outcomes po ON p.id = po.prediction_id
+        WHERE p.analysis_status = 'completed'
+            AND p.confidence IS NOT NULL
+            AND p.assets IS NOT NULL
+            AND p.assets::jsonb <> '[]'::jsonb
+    """
+
+    params: Dict[str, Any] = {"limit": limit, "offset": offset}
+
+    if sentiment_filter and sentiment_filter in ("bullish", "bearish"):
+        base_query += """
+            AND EXISTS (
+                SELECT 1 FROM jsonb_each_text(p.market_impact) kv
+                WHERE LOWER(kv.value) = :sentiment_filter
+            )
+        """
+        params["sentiment_filter"] = sentiment_filter.lower()
+
+    if confidence_min is not None:
+        base_query += " AND p.confidence >= :confidence_min"
+        params["confidence_min"] = confidence_min
+
+    if confidence_max is not None:
+        base_query += " AND p.confidence <= :confidence_max"
+        params["confidence_max"] = confidence_max
+
+    if asset_filter:
+        base_query += " AND po.symbol = :asset_filter"
+        params["asset_filter"] = asset_filter.upper()
+
+    if outcome_filter == "correct":
+        base_query += " AND po.correct_t7 = true"
+    elif outcome_filter == "incorrect":
+        base_query += " AND po.correct_t7 = false"
+    elif outcome_filter == "pending":
+        base_query += " AND po.correct_t7 IS NULL"
+
+    base_query += " ORDER BY tss.timestamp DESC LIMIT :limit OFFSET :offset"
+
+    try:
+        rows, columns = execute_query(text(base_query), params)
+        df = pd.DataFrame(rows, columns=columns)
+        return df
+    except Exception as e:
+        logger.error(f"Error loading signal feed: {e}")
+        return pd.DataFrame()
+
+
+def get_signal_feed_count(
+    sentiment_filter: Optional[str] = None,
+    confidence_min: Optional[float] = None,
+    confidence_max: Optional[float] = None,
+    asset_filter: Optional[str] = None,
+    outcome_filter: Optional[str] = None,
+) -> int:
+    """
+    Count total signals matching current filters.
+
+    Uses the same filter logic as get_signal_feed but returns only the count.
+
+    Returns:
+        Integer count of matching signals. Returns 0 on error.
+    """
+    base_query = """
+        SELECT COUNT(*) as total
+        FROM truth_social_shitposts tss
+        INNER JOIN predictions p ON tss.shitpost_id = p.shitpost_id
+        LEFT JOIN prediction_outcomes po ON p.id = po.prediction_id
+        WHERE p.analysis_status = 'completed'
+            AND p.confidence IS NOT NULL
+            AND p.assets IS NOT NULL
+            AND p.assets::jsonb <> '[]'::jsonb
+    """
+
+    params: Dict[str, Any] = {}
+
+    if sentiment_filter and sentiment_filter in ("bullish", "bearish"):
+        base_query += """
+            AND EXISTS (
+                SELECT 1 FROM jsonb_each_text(p.market_impact) kv
+                WHERE LOWER(kv.value) = :sentiment_filter
+            )
+        """
+        params["sentiment_filter"] = sentiment_filter.lower()
+
+    if confidence_min is not None:
+        base_query += " AND p.confidence >= :confidence_min"
+        params["confidence_min"] = confidence_min
+
+    if confidence_max is not None:
+        base_query += " AND p.confidence <= :confidence_max"
+        params["confidence_max"] = confidence_max
+
+    if asset_filter:
+        base_query += " AND po.symbol = :asset_filter"
+        params["asset_filter"] = asset_filter.upper()
+
+    if outcome_filter == "correct":
+        base_query += " AND po.correct_t7 = true"
+    elif outcome_filter == "incorrect":
+        base_query += " AND po.correct_t7 = false"
+    elif outcome_filter == "pending":
+        base_query += " AND po.correct_t7 IS NULL"
+
+    try:
+        rows, columns = execute_query(text(base_query), params)
+        if rows and rows[0]:
+            return rows[0][0] or 0
+        return 0
+    except Exception as e:
+        logger.error(f"Error counting signal feed: {e}")
+        return 0
+
+
+def get_new_signals_since(since_timestamp: str) -> int:
+    """
+    Count new completed predictions since a given ISO timestamp.
+
+    Used by the 'new signals since you last checked' indicator.
+
+    Args:
+        since_timestamp: ISO-format timestamp string.
+
+    Returns:
+        Integer count. Returns 0 on error or if since_timestamp is None/empty.
+    """
+    if not since_timestamp:
+        return 0
+
+    query = text("""
+        SELECT COUNT(*) as new_count
+        FROM truth_social_shitposts tss
+        INNER JOIN predictions p ON tss.shitpost_id = p.shitpost_id
+        WHERE p.analysis_status = 'completed'
+            AND p.confidence IS NOT NULL
+            AND p.assets IS NOT NULL
+            AND p.assets::jsonb <> '[]'::jsonb
+            AND tss.timestamp > :since_timestamp
+    """)
+
+    try:
+        rows, columns = execute_query(query, {"since_timestamp": since_timestamp})
+        if rows and rows[0]:
+            return rows[0][0] or 0
+        return 0
+    except Exception as e:
+        logger.error(f"Error counting new signals: {e}")
+        return 0
+
+
+def get_signal_feed_csv(
+    sentiment_filter: Optional[str] = None,
+    confidence_min: Optional[float] = None,
+    confidence_max: Optional[float] = None,
+    asset_filter: Optional[str] = None,
+    outcome_filter: Optional[str] = None,
+) -> pd.DataFrame:
+    """
+    Get full signal feed data formatted for CSV export.
+
+    Same filtering as get_signal_feed but without pagination and with
+    human-readable column names.
+
+    Returns:
+        DataFrame with export columns. Empty DataFrame on error.
+    """
+    df = get_signal_feed(
+        limit=10000,
+        offset=0,
+        sentiment_filter=sentiment_filter,
+        confidence_min=confidence_min,
+        confidence_max=confidence_max,
+        asset_filter=asset_filter,
+        outcome_filter=outcome_filter,
+    )
+
+    if df.empty:
+        return pd.DataFrame()
+
+    export_df = pd.DataFrame()
+    export_df["Timestamp"] = pd.to_datetime(df["timestamp"]).dt.strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+    export_df["Post Text"] = df["text"]
+    export_df["Asset"] = df["symbol"].fillna(
+        df["assets"].apply(
+            lambda x: ", ".join(x) if isinstance(x, list) else str(x)
+        )
+    )
+    export_df["Sentiment"] = df["prediction_sentiment"].fillna("N/A")
+    export_df["Confidence"] = df["confidence"].apply(
+        lambda x: f"{x:.0%}" if pd.notna(x) else "N/A"
+    )
+    export_df["Thesis"] = df["thesis"].fillna("")
+    export_df["Return (1d)"] = df["return_t1"].apply(
+        lambda x: f"{x:+.2f}%" if pd.notna(x) else ""
+    )
+    export_df["Return (3d)"] = df["return_t3"].apply(
+        lambda x: f"{x:+.2f}%" if pd.notna(x) else ""
+    )
+    export_df["Return (7d)"] = df["return_t7"].apply(
+        lambda x: f"{x:+.2f}%" if pd.notna(x) else ""
+    )
+    export_df["Outcome"] = df["correct_t7"].apply(
+        lambda x: "Correct" if x is True else ("Incorrect" if x is False else "Pending")
+    )
+    export_df["P&L (7d)"] = df["pnl_t7"].apply(
+        lambda x: f"${x:,.2f}" if pd.notna(x) else ""
+    )
+
+    return export_df
+
+
 def get_sentiment_accuracy(days: int = None) -> pd.DataFrame:
     """
     Get accuracy breakdown by sentiment type with counts.
