@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Grok/xAI LLM Provider** - Added xAI's Grok as a third LLM provider option
+  - Uses OpenAI-compatible API with custom `base_url` (`https://api.x.ai/v1`)
+  - Supports `grok-2` and `grok-2-mini` models
+  - Configure with `LLM_PROVIDER=grok` and `XAI_API_KEY`
+- **Provider Configuration Module** (`shit/llm/provider_config.py`) - Centralized provider metadata with model costs, rate limits, and recommendations
+- **Provider Comparison CLI** - Run `python -m shitpost_ai compare` to analyze content across multiple providers side-by-side
+  - Measures latency, asset extraction, sentiment agreement, and confidence spread
+  - Supports `--list-providers` to see all models and pricing
 - **Telegram Alert Deployment** - Deployed notification system to production
   - Notifications cron service in Railway (`*/2 * * * *`) for automated alert dispatch
   - Health check endpoint at `/telegram/health` for monitoring alert system status
@@ -37,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Escaped parentheses, dots, and other MarkdownV2 special characters in `format_telegram_alert()` template
 
 ### Changed
+- **LLMClient Multi-Provider Routing** - Refactored to use SDK-type routing instead of provider-name routing
+  - Grok routes through OpenAI SDK with custom `base_url`
+  - Added `base_url` parameter for OpenAI-compatible providers
+- **Anthropic SDK** - Updated minimum version from `0.7.0` to `0.40.0` for latest model support
 - **Logging Migration** - Migrated all remaining modules to centralized logging system (`get_service_logger`)
   - 15 files migrated from `logging.getLogger(__name__)` to `get_service_logger("name")`
   - 4 already-migrated shitvault files cleaned up (removed stale `import logging`)

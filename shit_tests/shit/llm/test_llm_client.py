@@ -489,13 +489,14 @@ class TestLLMClient:
             mock_settings.LLM_PROVIDER = "openai"
             mock_settings.LLM_MODEL = "gpt-4"
             mock_settings.get_llm_api_key.return_value = "settings-key"
+            mock_settings.get_llm_base_url.return_value = None
             mock_settings.CONFIDENCE_THRESHOLD = 0.8
-            
+
             with patch('openai.AsyncOpenAI') as mock_openai:
                 mock_openai.return_value = AsyncMock()
-                
+
                 client = LLMClient()  # No parameters, should use settings
-                
+
                 assert client.provider == "openai"
                 assert client.model == "gpt-4"
                 assert client.api_key == "settings-key"
@@ -508,16 +509,49 @@ class TestLLMClient:
             mock_settings.LLM_PROVIDER = "openai"
             mock_settings.LLM_MODEL = "gpt-4"
             mock_settings.get_llm_api_key.return_value = "settings-key"
+            mock_settings.get_llm_base_url.return_value = None
             mock_settings.CONFIDENCE_THRESHOLD = 0.7
-            
+
             with patch('openai.AsyncOpenAI') as mock_openai:
                 mock_openai.return_value = AsyncMock()
-                
+
                 client = LLMClient(model="gpt-3.5-turbo")  # Override model only
-                
+
                 assert client.provider == "openai"  # From settings
                 assert client.model == "gpt-3.5-turbo"  # Overridden
                 assert client.api_key == "settings-key"  # From settings
+
+    @pytest.mark.asyncio
+    async def test_sdk_type_openai(self):
+        """OpenAI provider has sdk_type 'openai'."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_openai.return_value = AsyncMock()
+            client = LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            assert client._sdk_type == "openai"
+
+    @pytest.mark.asyncio
+    async def test_sdk_type_anthropic(self):
+        """Anthropic provider has sdk_type 'anthropic'."""
+        with patch('anthropic.AsyncAnthropic') as mock_anthropic:
+            mock_anthropic.return_value = MagicMock()
+            client = LLMClient(provider="anthropic", model="claude-3-sonnet", api_key="test-key")
+            assert client._sdk_type == "anthropic"
+
+    @pytest.mark.asyncio
+    async def test_sdk_type_grok(self):
+        """Grok provider has sdk_type 'openai'."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_openai.return_value = AsyncMock()
+            client = LLMClient(provider="grok", model="grok-2", api_key="test-key", base_url="https://api.x.ai/v1")
+            assert client._sdk_type == "openai"
+
+    @pytest.mark.asyncio
+    async def test_base_url_not_passed_for_openai(self):
+        """OpenAI client is created without base_url when not specified."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_openai.return_value = AsyncMock()
+            LLMClient(provider="openai", model="gpt-3.5-turbo", api_key="test-key")
+            mock_openai.assert_called_once_with(api_key="test-key")
 
     @pytest.mark.asyncio
     async def test_analyze_short_content(self):

@@ -551,6 +551,7 @@ def setup_test_environment():
     os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
     os.environ['OPENAI_API_KEY'] = 'test_openai_key'
     os.environ['ANTHROPIC_API_KEY'] = 'test_anthropic_key'
+    os.environ['XAI_API_KEY'] = 'test_xai_key'
     os.environ['LLM_PROVIDER'] = 'openai'
     os.environ['LLM_MODEL'] = 'gpt-4'
     os.environ['TRUTH_SOCIAL_USERNAME'] = 'realDonaldTrump'
@@ -561,8 +562,8 @@ def setup_test_environment():
     yield
     
     # Cleanup
-    for key in ['ENVIRONMENT', 'DEBUG', 'DATABASE_URL', 'OPENAI_API_KEY', 
-                'ANTHROPIC_API_KEY', 'LLM_PROVIDER', 'LLM_MODEL', 
+    for key in ['ENVIRONMENT', 'DEBUG', 'DATABASE_URL', 'OPENAI_API_KEY',
+                'ANTHROPIC_API_KEY', 'XAI_API_KEY', 'LLM_PROVIDER', 'LLM_MODEL',
                 'TRUTH_SOCIAL_USERNAME', 'TRUTH_SOCIAL_MONITOR_INTERVAL',
                 'CONFIDENCE_THRESHOLD', 'MAX_POST_LENGTH']:
         if key in os.environ:

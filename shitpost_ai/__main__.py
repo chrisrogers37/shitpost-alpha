@@ -16,6 +16,11 @@ from shitpost_ai.cli import (
 from shitpost_ai.shitpost_analyzer import ShitpostAnalyzer
 
 
+def _is_compare_command() -> bool:
+    """Check if the CLI was invoked with the 'compare' subcommand."""
+    return len(sys.argv) > 1 and sys.argv[1] == "compare"
+
+
 async def main():
     """CLI entry point for shitpost analysis."""
     parser = create_analyzer_parser(
@@ -83,4 +88,8 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    if _is_compare_command():
+        from shitpost_ai.compare_cli import compare_main
+        asyncio.run(compare_main())
+    else:
+        asyncio.run(main())
