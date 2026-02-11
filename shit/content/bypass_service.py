@@ -6,11 +6,12 @@ This centralizes all bypass logic to ensure consistency across the codebase
 and avoid wasted LLM API calls on unanalyzable content.
 """
 
-import logging
 from typing import Dict, Any, Tuple, Optional
 from enum import Enum
 
-logger = logging.getLogger(__name__)
+from shit.logging import get_service_logger
+
+logger = get_service_logger("bypass_service")
 
 
 class BypassReason(str, Enum):

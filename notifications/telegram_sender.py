@@ -6,14 +6,14 @@ Uses the project's settings for bot token configuration.
 """
 
 import json
-import logging
 from typing import Any, Dict, Optional, Tuple
 
 import requests
 
 from shit.config.shitpost_settings import settings
+from shit.logging import get_service_logger
 
-logger = logging.getLogger(__name__)
+logger = get_service_logger("telegram_sender")
 
 TELEGRAM_API_BASE = "https://api.telegram.org/bot{token}/{method}"
 

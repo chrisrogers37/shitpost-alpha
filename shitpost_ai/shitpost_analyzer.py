@@ -4,7 +4,6 @@ Business logic orchestrator for analyzing shitposts with enhanced context.
 """
 
 import asyncio
-import logging
 from typing import Dict, List, Optional
 from datetime import datetime
 
@@ -15,8 +14,9 @@ from shitvault.shitpost_operations import ShitpostOperations
 from shitvault.prediction_operations import PredictionOperations
 from shit.utils.error_handling import handle_exceptions
 from shit.content import BypassService
+from shit.logging import get_service_logger
 
-logger = logging.getLogger(__name__)
+logger = get_service_logger("analyzer")
 
 
 class ShitpostAnalyzer:

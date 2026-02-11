@@ -3,13 +3,13 @@ Main entry point for Shitty UI Dashboard
 Obnoxiously American-themed dashboard for Shitpost Alpha.
 """
 
-import logging
 import os
 
 from flask import request, jsonify
 from layout import create_app, register_callbacks
+from shit.logging import get_service_logger
 
-logger = logging.getLogger(__name__)
+logger = get_service_logger("dashboard_app")
 
 
 def register_webhook_route(app):

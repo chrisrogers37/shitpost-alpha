@@ -4,7 +4,7 @@ Domain-specific operations for S3 to database processing.
 Extracted from ShitpostDatabase for modularity.
 """
 
-import logging
+
 from typing import Dict, Optional, Any, List
 from datetime import datetime
 

@@ -6,7 +6,6 @@ Telegram dispatch is handled by the alert_engine module.
 """
 
 import html
-import logging
 import re
 import smtplib
 import time
@@ -14,7 +13,9 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any, Dict, List
 
-logger = logging.getLogger(__name__)
+from shit.logging import get_service_logger
+
+logger = get_service_logger("notifications_dispatch")
 
 
 # Module-level rate limiters

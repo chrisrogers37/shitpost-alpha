@@ -6,7 +6,6 @@ and routes incoming webhook updates to the appropriate handler.
 """
 
 import json
-import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
@@ -19,8 +18,9 @@ from notifications.db import (
     update_subscription,
 )
 from notifications.telegram_sender import send_telegram_message
+from shit.logging import get_service_logger
 
-logger = logging.getLogger(__name__)
+logger = get_service_logger("telegram_bot")
 
 
 # ============================================================

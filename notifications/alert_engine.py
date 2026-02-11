@@ -7,7 +7,6 @@ every 2 minutes, completely decoupled from the dashboard.
 """
 
 import json
-import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
@@ -19,8 +18,9 @@ from notifications.db import (
     record_error,
 )
 from notifications.telegram_sender import format_telegram_alert, send_telegram_message
+from shit.logging import get_service_logger
 
-logger = logging.getLogger(__name__)
+logger = get_service_logger("alert_engine")
 
 
 def check_and_dispatch() -> Dict[str, Any]:

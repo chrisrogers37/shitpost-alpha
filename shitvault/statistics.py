@@ -4,7 +4,7 @@ Domain-specific operations for generating statistics.
 Extracted from ShitpostDatabase for modularity.
 """
 
-import logging
+
 from typing import Dict, Any
 from sqlalchemy import func, select
 

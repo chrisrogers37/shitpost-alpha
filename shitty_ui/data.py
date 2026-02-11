@@ -4,7 +4,6 @@ Handles database connections and query functions for posts and predictions.
 Integrates with the global Shitpost Alpha settings system.
 """
 
-import logging
 import time
 import pandas as pd
 from datetime import datetime, timedelta
@@ -13,8 +12,9 @@ from sqlalchemy import text
 from typing import List, Dict, Any, Optional, Callable
 
 from shit.db.sync_session import SessionLocal, DATABASE_URL
+from shit.logging import get_service_logger
 
-logger = logging.getLogger(__name__)
+logger = get_service_logger("dashboard_data")
 
 
 # Simple TTL cache decorator
