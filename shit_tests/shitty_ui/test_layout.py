@@ -657,3 +657,242 @@ class TestRefreshIndicator:
 
         # App should have been created with countdown interval
         assert app.layout is not None
+
+
+# =============================================================================
+# Signal Feed Component Tests
+# =============================================================================
+
+
+class TestCreateFeedSignalCard:
+    """Tests for create_feed_signal_card function."""
+
+    def _make_row(self, **overrides):
+        """Create a default row dict for create_feed_signal_card."""
+        row = {
+            "timestamp": datetime(2025, 1, 15, 10, 30),
+            "text": "Test post about markets",
+            "shitpost_id": "post123",
+            "prediction_id": 1,
+            "assets": ["AAPL"],
+            "market_impact": {"AAPL": "bullish"},
+            "confidence": 0.85,
+            "thesis": "Bullish thesis on Apple stock",
+            "analysis_status": "completed",
+            "symbol": "AAPL",
+            "prediction_sentiment": "bullish",
+            "prediction_confidence": 0.85,
+            "return_t1": 1.0,
+            "return_t3": 2.0,
+            "return_t7": 3.5,
+            "correct_t1": True,
+            "correct_t3": True,
+            "correct_t7": True,
+            "pnl_t7": 35.0,
+            "is_complete": True,
+        }
+        row.update(overrides)
+        return row
+
+    def test_returns_html_div(self):
+        """Test that function returns an HTML Div."""
+        from layout import create_feed_signal_card
+        from dash import html
+
+        card = create_feed_signal_card(self._make_row())
+        assert isinstance(card, html.Div)
+
+    def test_handles_bullish_sentiment(self):
+        """Test that bullish sentiment is rendered without error."""
+        from layout import create_feed_signal_card
+
+        card = create_feed_signal_card(self._make_row(prediction_sentiment="bullish"))
+        assert card is not None
+
+    def test_handles_bearish_sentiment(self):
+        """Test that bearish sentiment is rendered without error."""
+        from layout import create_feed_signal_card
+
+        card = create_feed_signal_card(
+            self._make_row(
+                prediction_sentiment="bearish",
+                market_impact={"TSLA": "bearish"},
+                return_t7=-2.0,
+                correct_t7=False,
+                pnl_t7=-20.0,
+            )
+        )
+        assert card is not None
+
+    def test_handles_neutral_sentiment(self):
+        """Test that neutral/unknown sentiment is rendered without error."""
+        from layout import create_feed_signal_card
+
+        card = create_feed_signal_card(
+            self._make_row(prediction_sentiment="neutral", market_impact={})
+        )
+        assert card is not None
+
+    def test_handles_pending_outcome(self):
+        """Test card with no outcome data yet."""
+        from layout import create_feed_signal_card
+
+        card = create_feed_signal_card(
+            self._make_row(
+                correct_t7=None,
+                return_t7=None,
+                pnl_t7=None,
+                is_complete=False,
+            )
+        )
+        assert card is not None
+
+    def test_handles_incorrect_outcome(self):
+        """Test card with an incorrect outcome."""
+        from layout import create_feed_signal_card
+
+        card = create_feed_signal_card(
+            self._make_row(
+                correct_t7=False,
+                return_t7=-3.0,
+                pnl_t7=-30.0,
+            )
+        )
+        assert card is not None
+
+    def test_handles_missing_fields(self):
+        """Test that card handles a row with minimal fields gracefully."""
+        from layout import create_feed_signal_card
+
+        card = create_feed_signal_card(
+            {
+                "timestamp": datetime(2025, 1, 15),
+                "text": "Minimal post",
+            }
+        )
+        assert card is not None
+
+    def test_handles_zero_confidence(self):
+        """Test card with zero confidence value."""
+        from layout import create_feed_signal_card
+
+        card = create_feed_signal_card(self._make_row(confidence=0))
+        assert card is not None
+
+    def test_handles_none_confidence(self):
+        """Test card with None confidence value."""
+        from layout import create_feed_signal_card
+
+        card = create_feed_signal_card(self._make_row(confidence=None))
+        assert card is not None
+
+    def test_handles_empty_thesis(self):
+        """Test card with empty thesis."""
+        from layout import create_feed_signal_card
+
+        card = create_feed_signal_card(self._make_row(thesis=""))
+        assert card is not None
+
+    def test_handles_long_thesis(self):
+        """Test card with a very long thesis that should be truncated."""
+        from layout import create_feed_signal_card
+
+        card = create_feed_signal_card(self._make_row(thesis="A" * 500))
+        assert card is not None
+
+
+class TestCreateNewSignalsBanner:
+    """Tests for create_new_signals_banner function."""
+
+    def test_returns_html_div(self):
+        """Test that function returns an HTML Div."""
+        from layout import create_new_signals_banner
+        from dash import html
+
+        banner = create_new_signals_banner(5)
+        assert isinstance(banner, html.Div)
+
+    def test_singular_for_count_one(self):
+        """Test that text uses singular form for count=1."""
+        from layout import create_new_signals_banner
+
+        banner = create_new_signals_banner(1)
+        # The banner should contain "1 new signal" (not "signals")
+        assert banner is not None
+
+    def test_plural_for_count_many(self):
+        """Test that text uses plural form for count > 1."""
+        from layout import create_new_signals_banner
+
+        banner = create_new_signals_banner(10)
+        assert banner is not None
+
+    def test_contains_show_button(self):
+        """Test that banner contains the 'Show New Signals' button."""
+        from layout import create_new_signals_banner
+        import dash_bootstrap_components as dbc
+
+        banner = create_new_signals_banner(3)
+        # Children should include the button
+        assert len(banner.children) == 2  # text div + button
+        assert isinstance(banner.children[1], dbc.Button)
+        assert banner.children[1].id == "signal-feed-show-new-btn"
+
+
+class TestCreateSignalFeedPage:
+    """Tests for create_signal_feed_page function."""
+
+    def test_returns_html_div(self):
+        """Test that function returns an HTML Div."""
+        from pages.signals import create_signal_feed_page
+        from dash import html
+
+        page = create_signal_feed_page()
+        assert isinstance(page, html.Div)
+
+    def test_has_filter_controls(self):
+        """Test that page contains filter controls."""
+        from pages.signals import create_signal_feed_page
+
+        page = create_signal_feed_page()
+        # Page should have multiple children (header, banner, interval, stores, filters, etc.)
+        assert len(page.children) > 5
+
+    def test_has_load_more_button(self):
+        """Test that page contains the load-more container."""
+        from pages.signals import create_signal_feed_page
+
+        page = create_signal_feed_page()
+        # Find the load-more container by its id
+        found = False
+        for child in page.children:
+            if hasattr(child, "id") and child.id == "signal-feed-load-more-container":
+                found = True
+                break
+        assert found, "Load More container not found in page"
+
+    def test_has_poll_interval(self):
+        """Test that page contains the signal-feed-poll-interval."""
+        from pages.signals import create_signal_feed_page
+        from dash import dcc
+
+        page = create_signal_feed_page()
+        found = False
+        for child in page.children:
+            if isinstance(child, dcc.Interval) and getattr(child, "id", None) == "signal-feed-poll-interval":
+                found = True
+                break
+        assert found, "Poll interval not found in page"
+
+    def test_has_csv_download(self):
+        """Test that page contains the CSV download component."""
+        from pages.signals import create_signal_feed_page
+        from dash import dcc
+
+        page = create_signal_feed_page()
+        found = False
+        for child in page.children:
+            if isinstance(child, dcc.Download) and getattr(child, "id", None) == "signal-feed-csv-download":
+                found = True
+                break
+        assert found, "CSV download component not found in page"

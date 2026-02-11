@@ -1,6 +1,25 @@
-# Signal Feed Page Specification [PENDING]
+# Signal Feed Page Specification [COMPLETE]
 
-> **STATUS: PENDING** - Not yet implemented. Lower priority than Performance (03) and Asset Deep Dive (04).
+> **STATUS: ✅ COMPLETE** — Started: 2026-02-10 | Completed: 2026-02-10
+
+### Implementation Notes (2026-02-10)
+
+**Codebase has changed since this spec was written.** PR #47 decomposed the 3,862-line `layout.py` monolith into a modular structure. Key remapping:
+
+| Plan says | Actual location |
+|-----------|----------------|
+| Add components to `layout.py` | `components/cards.py` for cards, `pages/signals.py` for page |
+| Add callbacks to `layout.py` | `callbacks/signals.py` (new file) |
+| `COLORS` in `layout.py` | `constants.py` |
+| Add `dcc.Location` to `create_app()` | Already exists in `layout.py` |
+| Add routing callback | Already exists — just add `/signals` route |
+| Extract `create_main_dashboard_page()` | Already done as `create_dashboard_page()` in `pages/dashboard.py` |
+| Nav bar in `layout.py` | `components/header.py` |
+| `print()` for error logging | Use `logger.error()` (existing pattern) |
+
+**Polling design fix:** Remove poll interval from main feed loader inputs. Poll only triggers new-signals banner check. Separate `dcc.Store("signal-feed-refresh-trigger")` handles "Show New Signals" reload.
+
+---
 
 ## Implementation Context for Engineering Team
 

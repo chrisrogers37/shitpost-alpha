@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Signal Feed Page** (`/signals`) - Chronological, filterable stream of all LLM-generated predictions
+  - Multi-filter bar: sentiment, confidence range slider, asset dropdown, outcome (correct/incorrect/pending)
+  - Paginated card feed with "Load More" button (20 signals per page)
+  - Real-time polling (2-minute interval) with "New Signals" banner
+  - CSV export of current filtered results
+  - Detailed signal cards: confidence bar, outcome badges, return/P&L metrics, thesis preview
+  - 45 new tests: 25 data layer tests + 20 layout/component tests
 - **Critical Test Coverage** - 85 new tests across 4 files for previously untested production-critical modules
   - `test_outcome_calculator.py` (29 tests) — init, context manager, `_extract_sentiment`, `calculate_outcome_for_prediction`, `_calculate_single_outcome`, `calculate_outcomes_for_all_predictions`, `get_accuracy_stats`; coverage 92%
   - `test_client.py` (22 tests) — init, context manager, `_get_existing_prices`, `fetch_price_history`, `get_price_on_date`, `get_latest_price`, `update_prices_for_symbols`, `get_price_stats`; coverage 76%

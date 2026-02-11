@@ -1926,3 +1926,512 @@ class TestGetSentimentAccuracy:
 
         assert isinstance(result, pd.DataFrame)
         assert result.empty
+
+
+# =============================================================================
+# Signal Feed Tests
+# =============================================================================
+
+
+class TestGetSignalFeed:
+    """Tests for get_signal_feed function."""
+
+    @patch("data.execute_query")
+    def test_returns_dataframe(self, mock_execute):
+        """Test that function returns a pandas DataFrame."""
+        from data import get_signal_feed
+
+        mock_execute.return_value = (
+            [
+                (
+                    datetime(2025, 1, 15, 10, 30),
+                    "Test post text",
+                    "post123",
+                    1,
+                    ["AAPL"],
+                    {"AAPL": "bullish"},
+                    0.85,
+                    "Test thesis",
+                    "completed",
+                    "AAPL",
+                    "bullish",
+                    0.85,
+                    1.5,
+                    2.0,
+                    3.5,
+                    True,
+                    True,
+                    True,
+                    35.0,
+                    True,
+                )
+            ],
+            [
+                "timestamp",
+                "text",
+                "shitpost_id",
+                "prediction_id",
+                "assets",
+                "market_impact",
+                "confidence",
+                "thesis",
+                "analysis_status",
+                "symbol",
+                "prediction_sentiment",
+                "prediction_confidence",
+                "return_t1",
+                "return_t3",
+                "return_t7",
+                "correct_t1",
+                "correct_t3",
+                "correct_t7",
+                "pnl_t7",
+                "is_complete",
+            ],
+        )
+
+        result = get_signal_feed(limit=20, offset=0)
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 1
+        assert result["confidence"].iloc[0] == 0.85
+
+    @patch("data.execute_query")
+    def test_passes_pagination_params(self, mock_execute):
+        """Test that limit and offset are passed to the query."""
+        from data import get_signal_feed
+
+        mock_execute.return_value = ([], [])
+
+        get_signal_feed(limit=10, offset=30)
+
+        mock_execute.assert_called_once()
+        call_args = mock_execute.call_args[0]
+        params = call_args[1]
+        assert params["limit"] == 10
+        assert params["offset"] == 30
+
+    @patch("data.execute_query")
+    def test_applies_sentiment_filter(self, mock_execute):
+        """Test that sentiment filter is included in query params."""
+        from data import get_signal_feed
+
+        mock_execute.return_value = ([], [])
+
+        get_signal_feed(sentiment_filter="bullish")
+
+        call_args = mock_execute.call_args[0]
+        params = call_args[1]
+        assert params["sentiment_filter"] == "bullish"
+
+    @patch("data.execute_query")
+    def test_applies_confidence_range(self, mock_execute):
+        """Test that confidence min and max are included in query params."""
+        from data import get_signal_feed
+
+        mock_execute.return_value = ([], [])
+
+        get_signal_feed(confidence_min=0.6, confidence_max=0.9)
+
+        call_args = mock_execute.call_args[0]
+        params = call_args[1]
+        assert params["confidence_min"] == 0.6
+        assert params["confidence_max"] == 0.9
+
+    @patch("data.execute_query")
+    def test_applies_asset_filter(self, mock_execute):
+        """Test that asset filter is uppercased and included in query params."""
+        from data import get_signal_feed
+
+        mock_execute.return_value = ([], [])
+
+        get_signal_feed(asset_filter="aapl")
+
+        call_args = mock_execute.call_args[0]
+        params = call_args[1]
+        assert params["asset_filter"] == "AAPL"
+
+    @patch("data.execute_query")
+    def test_applies_outcome_filter_correct(self, mock_execute):
+        """Test that outcome filter for 'correct' adds the right WHERE clause."""
+        from data import get_signal_feed
+
+        mock_execute.return_value = ([], [])
+
+        get_signal_feed(outcome_filter="correct")
+
+        call_args = mock_execute.call_args[0]
+        query_str = str(call_args[0])
+        assert "correct_t7 = true" in query_str
+
+    @patch("data.execute_query")
+    def test_applies_outcome_filter_incorrect(self, mock_execute):
+        """Test that outcome filter for 'incorrect' adds the right WHERE clause."""
+        from data import get_signal_feed
+
+        mock_execute.return_value = ([], [])
+
+        get_signal_feed(outcome_filter="incorrect")
+
+        call_args = mock_execute.call_args[0]
+        query_str = str(call_args[0])
+        assert "correct_t7 = false" in query_str
+
+    @patch("data.execute_query")
+    def test_applies_outcome_filter_pending(self, mock_execute):
+        """Test that outcome filter for 'pending' adds IS NULL clause."""
+        from data import get_signal_feed
+
+        mock_execute.return_value = ([], [])
+
+        get_signal_feed(outcome_filter="pending")
+
+        call_args = mock_execute.call_args[0]
+        query_str = str(call_args[0])
+        assert "correct_t7 IS NULL" in query_str
+
+    @patch("data.execute_query")
+    def test_no_filter_when_none(self, mock_execute):
+        """Test that no extra filters are added when all params are None."""
+        from data import get_signal_feed
+
+        mock_execute.return_value = ([], [])
+
+        get_signal_feed()
+
+        call_args = mock_execute.call_args[0]
+        params = call_args[1]
+        assert "sentiment_filter" not in params
+        assert "asset_filter" not in params
+        assert "confidence_min" not in params
+        assert "confidence_max" not in params
+
+    @patch("data.execute_query")
+    def test_returns_empty_dataframe_on_error(self, mock_execute):
+        """Test that function returns empty DataFrame on database error."""
+        from data import get_signal_feed
+
+        mock_execute.side_effect = Exception("Connection timeout")
+
+        result = get_signal_feed()
+
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+
+
+class TestGetSignalFeedCount:
+    """Tests for get_signal_feed_count function."""
+
+    @patch("data.execute_query")
+    def test_returns_integer_count(self, mock_execute):
+        """Test that function returns an integer."""
+        from data import get_signal_feed_count
+
+        mock_execute.return_value = ([(142,)], ["total"])
+
+        result = get_signal_feed_count()
+
+        assert isinstance(result, int)
+        assert result == 142
+
+    @patch("data.execute_query")
+    def test_returns_zero_on_no_results(self, mock_execute):
+        """Test that function returns 0 when query returns no rows."""
+        from data import get_signal_feed_count
+
+        mock_execute.return_value = ([], [])
+
+        result = get_signal_feed_count()
+
+        assert result == 0
+
+    @patch("data.execute_query")
+    def test_returns_zero_on_error(self, mock_execute):
+        """Test that function returns 0 on database error."""
+        from data import get_signal_feed_count
+
+        mock_execute.side_effect = Exception("Database error")
+
+        result = get_signal_feed_count()
+
+        assert result == 0
+
+    @patch("data.execute_query")
+    def test_applies_sentiment_filter(self, mock_execute):
+        """Test that sentiment filter is passed to query."""
+        from data import get_signal_feed_count
+
+        mock_execute.return_value = ([(50,)], ["total"])
+
+        get_signal_feed_count(sentiment_filter="bearish")
+
+        call_args = mock_execute.call_args[0]
+        params = call_args[1]
+        assert params["sentiment_filter"] == "bearish"
+
+    @patch("data.execute_query")
+    def test_returns_zero_on_null_count(self, mock_execute):
+        """Test that function returns 0 when database returns NULL count."""
+        from data import get_signal_feed_count
+
+        mock_execute.return_value = ([(None,)], ["total"])
+
+        result = get_signal_feed_count()
+
+        assert result == 0
+
+
+class TestGetNewSignalsSince:
+    """Tests for get_new_signals_since function."""
+
+    @patch("data.execute_query")
+    def test_returns_count_of_new_signals(self, mock_execute):
+        """Test that function returns the count of new signals."""
+        from data import get_new_signals_since
+
+        mock_execute.return_value = ([(5,)], ["new_count"])
+
+        result = get_new_signals_since("2025-01-15T10:00:00")
+
+        assert result == 5
+
+    def test_returns_zero_for_none_timestamp(self):
+        """Test that function returns 0 when timestamp is None."""
+        from data import get_new_signals_since
+
+        result = get_new_signals_since(None)
+
+        assert result == 0
+
+    def test_returns_zero_for_empty_timestamp(self):
+        """Test that function returns 0 when timestamp is empty string."""
+        from data import get_new_signals_since
+
+        result = get_new_signals_since("")
+
+        assert result == 0
+
+    @patch("data.execute_query")
+    def test_passes_timestamp_to_query(self, mock_execute):
+        """Test that timestamp is passed as query parameter."""
+        from data import get_new_signals_since
+
+        mock_execute.return_value = ([(0,)], ["new_count"])
+
+        get_new_signals_since("2025-01-15T10:00:00")
+
+        call_args = mock_execute.call_args[0]
+        params = call_args[1]
+        assert params["since_timestamp"] == "2025-01-15T10:00:00"
+
+    @patch("data.execute_query")
+    def test_returns_zero_on_error(self, mock_execute):
+        """Test that function returns 0 on database error."""
+        from data import get_new_signals_since
+
+        mock_execute.side_effect = Exception("Database error")
+
+        result = get_new_signals_since("2025-01-15T10:00:00")
+
+        assert result == 0
+
+
+class TestGetSignalFeedCsv:
+    """Tests for get_signal_feed_csv function."""
+
+    @patch("data.get_signal_feed")
+    def test_returns_dataframe_with_export_columns(self, mock_feed):
+        """Test that function returns a DataFrame with human-readable columns."""
+        from data import get_signal_feed_csv
+
+        mock_feed.return_value = pd.DataFrame(
+            [
+                {
+                    "timestamp": datetime(2025, 1, 15, 10, 30),
+                    "text": "Test post",
+                    "shitpost_id": "post123",
+                    "prediction_id": 1,
+                    "assets": ["AAPL"],
+                    "market_impact": {"AAPL": "bullish"},
+                    "confidence": 0.85,
+                    "thesis": "Bull thesis",
+                    "analysis_status": "completed",
+                    "symbol": "AAPL",
+                    "prediction_sentiment": "bullish",
+                    "prediction_confidence": 0.85,
+                    "return_t1": 1.0,
+                    "return_t3": 2.0,
+                    "return_t7": 3.5,
+                    "correct_t1": True,
+                    "correct_t3": True,
+                    "correct_t7": True,
+                    "pnl_t7": 35.0,
+                    "is_complete": True,
+                }
+            ]
+        )
+
+        result = get_signal_feed_csv()
+
+        assert isinstance(result, pd.DataFrame)
+        assert "Timestamp" in result.columns
+        assert "Post Text" in result.columns
+        assert "Asset" in result.columns
+        assert "Sentiment" in result.columns
+        assert "Confidence" in result.columns
+        assert "Outcome" in result.columns
+
+    @patch("data.get_signal_feed")
+    def test_returns_empty_dataframe_when_no_data(self, mock_feed):
+        """Test that function returns empty DataFrame when feed is empty."""
+        from data import get_signal_feed_csv
+
+        mock_feed.return_value = pd.DataFrame()
+
+        result = get_signal_feed_csv()
+
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+
+    @patch("data.get_signal_feed")
+    def test_formats_confidence_as_percentage(self, mock_feed):
+        """Test that confidence is formatted as a percentage string."""
+        from data import get_signal_feed_csv
+
+        mock_feed.return_value = pd.DataFrame(
+            [
+                {
+                    "timestamp": datetime(2025, 1, 15, 10, 30),
+                    "text": "Test",
+                    "shitpost_id": "p1",
+                    "prediction_id": 1,
+                    "assets": ["AAPL"],
+                    "market_impact": {},
+                    "confidence": 0.85,
+                    "thesis": "",
+                    "analysis_status": "completed",
+                    "symbol": "AAPL",
+                    "prediction_sentiment": "bullish",
+                    "prediction_confidence": 0.85,
+                    "return_t1": None,
+                    "return_t3": None,
+                    "return_t7": None,
+                    "correct_t1": None,
+                    "correct_t3": None,
+                    "correct_t7": None,
+                    "pnl_t7": None,
+                    "is_complete": False,
+                }
+            ]
+        )
+
+        result = get_signal_feed_csv()
+
+        assert result["Confidence"].iloc[0] == "85%"
+
+    @patch("data.get_signal_feed")
+    def test_formats_outcome_labels(self, mock_feed):
+        """Test that outcome column uses Correct/Incorrect/Pending labels."""
+        from data import get_signal_feed_csv
+
+        mock_feed.return_value = pd.DataFrame(
+            [
+                {
+                    "timestamp": datetime(2025, 1, 15),
+                    "text": "T1",
+                    "shitpost_id": "p1",
+                    "prediction_id": 1,
+                    "assets": [],
+                    "market_impact": {},
+                    "confidence": 0.7,
+                    "thesis": "",
+                    "analysis_status": "completed",
+                    "symbol": "AAPL",
+                    "prediction_sentiment": "bullish",
+                    "prediction_confidence": 0.7,
+                    "return_t1": None,
+                    "return_t3": None,
+                    "return_t7": 2.0,
+                    "correct_t1": None,
+                    "correct_t3": None,
+                    "correct_t7": True,
+                    "pnl_t7": 20.0,
+                    "is_complete": True,
+                },
+                {
+                    "timestamp": datetime(2025, 1, 14),
+                    "text": "T2",
+                    "shitpost_id": "p2",
+                    "prediction_id": 2,
+                    "assets": [],
+                    "market_impact": {},
+                    "confidence": 0.6,
+                    "thesis": "",
+                    "analysis_status": "completed",
+                    "symbol": "TSLA",
+                    "prediction_sentiment": "bearish",
+                    "prediction_confidence": 0.6,
+                    "return_t1": None,
+                    "return_t3": None,
+                    "return_t7": -1.0,
+                    "correct_t1": None,
+                    "correct_t3": None,
+                    "correct_t7": False,
+                    "pnl_t7": -10.0,
+                    "is_complete": True,
+                },
+                {
+                    "timestamp": datetime(2025, 1, 13),
+                    "text": "T3",
+                    "shitpost_id": "p3",
+                    "prediction_id": 3,
+                    "assets": [],
+                    "market_impact": {},
+                    "confidence": 0.5,
+                    "thesis": "",
+                    "analysis_status": "completed",
+                    "symbol": "MSFT",
+                    "prediction_sentiment": "neutral",
+                    "prediction_confidence": 0.5,
+                    "return_t1": None,
+                    "return_t3": None,
+                    "return_t7": None,
+                    "correct_t1": None,
+                    "correct_t3": None,
+                    "correct_t7": None,
+                    "pnl_t7": None,
+                    "is_complete": False,
+                },
+            ]
+        )
+
+        result = get_signal_feed_csv()
+
+        assert result["Outcome"].iloc[0] == "Correct"
+        assert result["Outcome"].iloc[1] == "Incorrect"
+        assert result["Outcome"].iloc[2] == "Pending"
+
+    @patch("data.get_signal_feed")
+    def test_passes_filters_to_feed(self, mock_feed):
+        """Test that filter params are forwarded to get_signal_feed."""
+        from data import get_signal_feed_csv
+
+        mock_feed.return_value = pd.DataFrame()
+
+        get_signal_feed_csv(
+            sentiment_filter="bullish",
+            confidence_min=0.7,
+            confidence_max=0.9,
+            asset_filter="AAPL",
+            outcome_filter="correct",
+        )
+
+        mock_feed.assert_called_once_with(
+            limit=10000,
+            offset=0,
+            sentiment_filter="bullish",
+            confidence_min=0.7,
+            confidence_max=0.9,
+            asset_filter="AAPL",
+            outcome_filter="correct",
+        )

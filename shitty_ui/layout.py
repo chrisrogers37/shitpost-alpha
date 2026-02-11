@@ -16,8 +16,10 @@ from constants import COLORS
 from components.cards import (
     create_error_card,
     create_empty_chart,
+    create_feed_signal_card,
     create_hero_signal_card,
     create_metric_card,
+    create_new_signals_banner,
     create_signal_card,
     create_post_card,
     create_prediction_timeline_card,
@@ -32,6 +34,7 @@ from pages.dashboard import (
     register_dashboard_callbacks,
 )
 from pages.assets import create_asset_page, create_asset_header, register_asset_callbacks
+from pages.signals import create_signal_feed_page, register_signal_callbacks
 from callbacks.alerts import (
     create_alert_config_panel,
     create_alert_history_panel,
@@ -277,9 +280,13 @@ def register_callbacks(app: Dash):
         if pathname == "/performance":
             return create_performance_page()
 
+        if pathname == "/signals":
+            return create_signal_feed_page()
+
         return create_dashboard_page()
 
     # Delegate to page/callback modules
     register_dashboard_callbacks(app)
     register_asset_callbacks(app)
+    register_signal_callbacks(app)
     register_alert_callbacks(app)

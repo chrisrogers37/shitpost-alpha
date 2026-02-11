@@ -1,6 +1,6 @@
 """Reusable card and chart components for the Shitty UI dashboard."""
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 
 from dash import html, dcc
@@ -1079,5 +1079,365 @@ def create_performance_summary(stats: Dict[str, Any]) -> html.Div:
                 style={"padding": "12px 0"},
             ),
         ]
+    )
+
+
+def create_feed_signal_card(row) -> html.Div:
+    """
+    Create a signal card for the /signals feed page.
+
+    More detailed than the dashboard signal card — includes badges,
+    confidence bar, thesis preview, and return/P&L metrics.
+
+    Args:
+        row: Dict-like object with keys from get_signal_feed().
+
+    Returns:
+        html.Div containing the rendered card.
+    """
+    timestamp = row.get("timestamp")
+    post_text = row.get("text", "")
+    confidence = row.get("confidence", 0) or 0
+    assets = row.get("assets", [])
+    market_impact = row.get("market_impact", {})
+    symbol = row.get("symbol")
+    prediction_sentiment = row.get("prediction_sentiment")
+    return_t7 = row.get("return_t7")
+    correct_t7 = row.get("correct_t7")
+    pnl_t7 = row.get("pnl_t7")
+    thesis = row.get("thesis", "")
+
+    # Determine if "New" badge should show (post < 24 hours old)
+    is_new = False
+    if isinstance(timestamp, datetime):
+        ts = timestamp if timestamp.tzinfo else timestamp.replace(tzinfo=timezone.utc)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+        is_new = ts > cutoff
+
+    # Determine sentiment direction
+    sentiment = "neutral"
+    if prediction_sentiment:
+        sentiment = prediction_sentiment.lower()
+    elif isinstance(market_impact, dict) and market_impact:
+        first_val = list(market_impact.values())[0]
+        if isinstance(first_val, str):
+            sentiment = first_val.lower()
+
+    sentiment_color = (
+        COLORS["success"]
+        if sentiment == "bullish"
+        else COLORS["danger"]
+        if sentiment == "bearish"
+        else COLORS["text_muted"]
+    )
+    sentiment_icon = (
+        "arrow-up"
+        if sentiment == "bullish"
+        else "arrow-down"
+        if sentiment == "bearish"
+        else "minus"
+    )
+
+    # Format asset display
+    if symbol:
+        asset_display = symbol
+    elif isinstance(assets, list):
+        asset_display = ", ".join(assets[:3])
+        if len(assets) > 3:
+            asset_display += f" +{len(assets) - 3}"
+    else:
+        asset_display = str(assets) if assets else "N/A"
+
+    # Truncate text
+    max_text_len = 250
+    display_text = (
+        post_text[:max_text_len] + "..." if len(post_text) > max_text_len else post_text
+    )
+
+    # Build badges
+    badges = []
+    if is_new:
+        badges.append(
+            html.Span(
+                "New",
+                className="badge me-2",
+                style={
+                    "backgroundColor": COLORS["accent"],
+                    "color": "white",
+                    "fontSize": "0.7rem",
+                    "padding": "4px 8px",
+                    "borderRadius": "4px",
+                },
+            )
+        )
+
+    if correct_t7 is True:
+        badges.append(
+            html.Span(
+                "Correct",
+                className="badge",
+                style={
+                    "backgroundColor": COLORS["success"],
+                    "color": "white",
+                    "fontSize": "0.7rem",
+                    "padding": "4px 8px",
+                    "borderRadius": "4px",
+                },
+            )
+        )
+    elif correct_t7 is False:
+        badges.append(
+            html.Span(
+                "Incorrect",
+                className="badge",
+                style={
+                    "backgroundColor": COLORS["danger"],
+                    "color": "white",
+                    "fontSize": "0.7rem",
+                    "padding": "4px 8px",
+                    "borderRadius": "4px",
+                },
+            )
+        )
+    else:
+        badges.append(
+            html.Span(
+                "Pending",
+                className="badge",
+                style={
+                    "backgroundColor": COLORS["warning"],
+                    "color": COLORS["primary"],
+                    "fontSize": "0.7rem",
+                    "padding": "4px 8px",
+                    "borderRadius": "4px",
+                },
+            )
+        )
+
+    # Format timestamp display
+    if isinstance(timestamp, datetime):
+        ts_display = timestamp.strftime("%b %d, %Y %H:%M")
+    else:
+        ts_display = str(timestamp)[:16] if timestamp else "Unknown"
+
+    # Confidence bar
+    conf_pct = confidence * 100
+    conf_bar_color = (
+        COLORS["success"]
+        if confidence >= 0.75
+        else COLORS["warning"]
+        if confidence >= 0.6
+        else COLORS["danger"]
+    )
+    confidence_bar = html.Div(
+        [
+            html.Div(
+                style={
+                    "width": f"{conf_pct}%",
+                    "height": "4px",
+                    "backgroundColor": conf_bar_color,
+                    "borderRadius": "2px",
+                }
+            ),
+        ],
+        style={
+            "width": "60px",
+            "height": "4px",
+            "backgroundColor": COLORS["border"],
+            "borderRadius": "2px",
+            "display": "inline-block",
+            "verticalAlign": "middle",
+            "marginLeft": "6px",
+        },
+    )
+
+    # Return / P&L display
+    metrics_children = []
+    if return_t7 is not None:
+        ret_color = COLORS["success"] if return_t7 > 0 else COLORS["danger"]
+        metrics_children.append(
+            html.Span(
+                f"7d Return: {return_t7:+.2f}%",
+                style={
+                    "color": ret_color,
+                    "fontSize": "0.8rem",
+                    "fontWeight": "bold",
+                },
+            )
+        )
+    if pnl_t7 is not None:
+        pnl_color = COLORS["success"] if pnl_t7 > 0 else COLORS["danger"]
+        if metrics_children:
+            metrics_children.append(
+                html.Span(
+                    " | ", style={"color": COLORS["border"], "margin": "0 6px"}
+                )
+            )
+        metrics_children.append(
+            html.Span(
+                f"P&L: ${pnl_t7:,.0f}",
+                style={"color": pnl_color, "fontSize": "0.8rem"},
+            )
+        )
+
+    # Assemble the card
+    children = [
+        # Row 1: Timestamp + Badges
+        html.Div(
+            [
+                html.Span(
+                    ts_display,
+                    style={"color": COLORS["text_muted"], "fontSize": "0.75rem"},
+                ),
+                html.Div(
+                    badges,
+                    style={"display": "inline-flex", "alignItems": "center"},
+                ),
+            ],
+            style={
+                "display": "flex",
+                "justifyContent": "space-between",
+                "alignItems": "center",
+                "marginBottom": "8px",
+            },
+        ),
+        # Row 2: Tweet text
+        html.P(
+            display_text,
+            style={
+                "fontSize": "0.9rem",
+                "margin": "0 0 10px 0",
+                "lineHeight": "1.5",
+                "color": COLORS["text"],
+            },
+        ),
+        # Row 3: Asset | Sentiment | Confidence
+        html.Div(
+            [
+                html.Span(
+                    asset_display,
+                    style={
+                        "backgroundColor": COLORS["primary"],
+                        "color": COLORS["accent"],
+                        "padding": "2px 8px",
+                        "borderRadius": "4px",
+                        "fontSize": "0.8rem",
+                        "fontWeight": "bold",
+                        "marginRight": "12px",
+                        "border": f"1px solid {COLORS['border']}",
+                    },
+                ),
+                html.Span(
+                    [
+                        html.I(className=f"fas fa-{sentiment_icon} me-1"),
+                        sentiment.upper(),
+                    ],
+                    style={
+                        "color": sentiment_color,
+                        "fontSize": "0.8rem",
+                        "fontWeight": "bold",
+                        "marginRight": "12px",
+                    },
+                ),
+                html.Span(
+                    [
+                        html.Span(
+                            f"{confidence:.0%}",
+                            style={
+                                "color": COLORS["text_muted"],
+                                "fontSize": "0.8rem",
+                            },
+                        ),
+                        confidence_bar,
+                    ]
+                ),
+            ],
+            style={
+                "display": "flex",
+                "alignItems": "center",
+                "flexWrap": "wrap",
+                "gap": "4px",
+            },
+        ),
+    ]
+
+    # Row 4: Return / P&L metrics (only if we have data)
+    if metrics_children:
+        children.append(
+            html.Div(metrics_children, style={"marginTop": "8px"})
+        )
+
+    # Row 5: Thesis preview
+    if thesis:
+        children.append(
+            html.P(
+                thesis[:120] + "..." if len(thesis) > 120 else thesis,
+                style={
+                    "fontSize": "0.8rem",
+                    "color": COLORS["text_muted"],
+                    "margin": "8px 0 0 0",
+                    "fontStyle": "italic",
+                    "lineHeight": "1.4",
+                },
+            )
+        )
+
+    return html.Div(
+        children,
+        style={
+            "padding": "16px",
+            "backgroundColor": COLORS["secondary"],
+            "border": f"1px solid {COLORS['border']}",
+            "borderRadius": "8px",
+            "marginBottom": "12px",
+        },
+    )
+
+
+def create_new_signals_banner(count: int) -> html.Div:
+    """
+    Create a banner showing how many new signals have arrived.
+
+    Args:
+        count: Number of new signals detected.
+
+    Returns:
+        html.Div with the banner content.
+    """
+    return html.Div(
+        [
+            html.Div(
+                [
+                    html.I(className="fas fa-bell me-2"),
+                    html.Span(
+                        f"{count} new signal{'s' if count != 1 else ''}"
+                        " since you last checked",
+                        style={"fontWeight": "bold"},
+                    ),
+                ],
+                style={
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                },
+            ),
+            dbc.Button(
+                "Show New Signals",
+                id="signal-feed-show-new-btn",
+                color="primary",
+                size="sm",
+                className="ms-3",
+            ),
+        ],
+        style={
+            "backgroundColor": "rgba(59, 130, 246, 0.15)",
+            "border": f"1px solid {COLORS['accent']}",
+            "borderRadius": "8px",
+            "padding": "12px 16px",
+            "marginBottom": "16px",
+            "display": "flex",
+            "justifyContent": "space-between",
+            "alignItems": "center",
+            "color": COLORS["accent"],
+        },
     )
 
