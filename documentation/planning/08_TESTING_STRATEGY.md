@@ -1,6 +1,6 @@
-# Testing Strategy Specification [COMPLETED]
+# Testing Strategy Specification [IN PROGRESS]
 
-> **STATUS: IN PROGRESS** - Test count increased from 49 to 67 with dashboard enhancements.
+> **STATUS: IN PROGRESS** - 210+ UI-specific tests. Unit test coverage is strong; integration/E2E tests remain a gap.
 
 ## Implementation Context for Engineering Team
 

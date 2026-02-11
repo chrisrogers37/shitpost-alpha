@@ -1,22 +1,8 @@
 # Market Data Architecture & Backfill Guide
 
-**Last Updated**: 2026-01-26
+**Last Updated**: 2026-02-10
 
----
-
-## 📊 Current State
-
-**Your Database:**
-- **2,983 total predictions** (1,548 completed, 1,435 bypassed/pending)
-- **187 unique assets** mentioned across all predictions
-- **14 assets** currently have price data (528 total price records)
-- **9 prediction outcomes** calculated (6 complete, 3 pending)
-
-**Coverage Gap:**
-- Missing prices for ~173 assets (92.5% of assets)
-- Missing outcomes for ~1,539 completed predictions (99.4% of predictions)
-
-**This is expected!** We just set up the infrastructure. Now we need to backfill.
+> **Note**: Row counts in this document are illustrative. Run `python -m shitvault stats` and `python -m shit.market_data price-stats` for current numbers.
 
 ---
 
@@ -53,7 +39,7 @@
                                 │
                                 ▼
                          ┌─────────────┐
-                         │ predictions │  <── We have 2,983 of these
+                         │ predictions │
                          │   table     │
                          └──────┬──────┘
                                 │
@@ -74,8 +60,8 @@
                                 │
                                 ▼
                     ┌───────────────────────┐
-                    │  market_prices        │  <── 528 records for 14 symbols
-                    │  (OHLCV data)         │      Need ~173 more symbols!
+                    │  market_prices        │
+                    │  (OHLCV data)         │
                     └───────────┬───────────┘
                                 │
                                 ▼
@@ -87,8 +73,8 @@
                                 │
                                 ▼
                     ┌───────────────────────┐
-                    │ prediction_outcomes   │  <── 9 outcomes calculated
-                    │ (Accuracy tracking)   │      Need ~1,539 more!
+                    │ prediction_outcomes   │
+                    │ (Accuracy tracking)   │
                     └───────────────────────┘
                                 │
                                 ▼
@@ -118,10 +104,7 @@ CREATE TABLE predictions (
 );
 ```
 
-**Current State:**
-- 2,983 predictions
-- 187 unique assets across all predictions
-- Example assets: AAPL, TSLA, GOOGL, SPY, DIA, AMD, META, etc.
+**Example assets**: AAPL, TSLA, GOOGL, SPY, DIA, AMD, META, etc.
 
 ---
 
@@ -153,12 +136,6 @@ CREATE TABLE market_prices (
     UNIQUE(symbol, date)       -- One record per symbol per day
 );
 ```
-
-**Current State:**
-- 528 total price records
-- 14 symbols: AAPL, TSLA, GOOGL, DAL, SPY, DIA, etc.
-- Date range: ~150 days back from today
-- **Need to backfill**: 173 more symbols (92.5% missing)
 
 **Purpose:**
 - Store historical price data so we don't re-fetch from yfinance constantly
@@ -212,12 +189,6 @@ CREATE TABLE prediction_outcomes (
     updated_at TIMESTAMP
 );
 ```
-
-**Current State:**
-- 9 outcomes calculated
-- 6 complete (all timeframes have data)
-- 3 pending (waiting for T+30 data)
-- **Need to calculate**: 1,539 more outcomes (99.4% missing)
 
 **Purpose:**
 - Track whether predictions were actually correct
@@ -318,16 +289,13 @@ for asset in prediction.assets:
 
 ### **Phase 1: Backfill All Asset Prices** ⏱️ ~10-15 minutes
 
-Run the comprehensive backfill script:
+Run the comprehensive backfill via the CLI:
 ```bash
 # Backfill ALL assets from earliest prediction to today
-python shit/market_data/backfill_prices.py
+python -m shit.market_data backfill-all-missing
 
-# Or specify a time range
-python shit/market_data/backfill_prices.py --days 365
-
-# Force refresh (re-fetch existing data)
-python shit/market_data/backfill_prices.py --force
+# Or update prices for all predicted assets (recent window)
+python -m shit.market_data update-all-prices --days 365
 ```
 
 **What this does:**
@@ -433,27 +401,18 @@ High (75%-100%)     287    234      53         81.5%
 
 ## 🔧 Maintenance & Updates
 
-### **Daily Updates (Automated)**
+### **Automated Updates (Production)**
 
-Run this via cron or Railway scheduler:
+A Railway cron service runs every 15 minutes:
 ```bash
-# Update prices for last 7 days (catches any new predictions)
-python -m shit.market_data update-all-prices --days 7
-
-# Calculate outcomes for recent predictions
-python -m shit.market_data calculate-outcomes --days 7
+python -m shit.market_data auto-pipeline --days-back 30
 ```
 
-**Frequency:** Daily at market close (4:00 PM ET / 9:00 PM UTC)
+This automatically:
+1. Backfills prices for any new tickers from recent predictions
+2. Recalculates outcomes for predictions in the last 30 days (filling in T+1, T+3, T+7, T+30 as time passes)
 
----
-
-### **Weekly Updates**
-
-```bash
-# Recalculate all pending outcomes (T+30 data may now be available)
-python -m shit.market_data calculate-outcomes --days 30 --force
-```
+See `railway.json` for the service definition (`market-data` service).
 
 ---
 
@@ -495,35 +454,18 @@ ORDER BY avg_pnl DESC;
 
 ---
 
-## 🎯 Next Steps
+## Summary
 
-1. **Run full backfill** (Phase 1 + 2 above)
-2. **Generate accuracy report** to see if system works
-3. **Fix any asset issues** (invalid tickers, etc.)
-4. **Set up daily cron job** for automated updates
-5. **Build dashboard** to visualize results
-
----
-
-## 📝 Summary
-
-**What We Built:**
+**Infrastructure:**
 - ✅ Standard OHLCV price storage (`market_prices`)
 - ✅ Prediction outcome tracking (`prediction_outcomes`)
 - ✅ Automated fetcher using yfinance
 - ✅ Outcome calculator with multiple timeframes
-- ✅ CLI tools for backfill and reporting
-
-**What You Need to Do:**
-- 🔲 Run backfill to populate price data for 173 assets
-- 🔲 Calculate outcomes for 1,539 predictions
-- 🔲 Generate accuracy reports
-- 🔲 Decide if the system actually works (>60% accuracy?)
+- ✅ CLI tools for backfill and reporting (`python -m shit.market_data`)
+- ✅ Automated Railway cron (every 15 min) for ongoing updates
 
 **Data Model:** Standard finance architecture
 - Separate price storage from analysis
 - Denormalized outcomes for fast queries
 - Multiple timeframes for different trading strategies
 - P&L simulation for portfolio tracking
-
-Ready to run the backfill? 🚀

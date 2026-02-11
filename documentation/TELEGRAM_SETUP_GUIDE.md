@@ -75,7 +75,7 @@ The settings are loaded from `shit/config/shitpost_settings.py` — no code chan
 The `telegram_subscriptions` table should already exist if you're running the current schema. Verify:
 
 ```bash
-python -m shitvault show-stats
+python -m shitvault stats
 ```
 
 If you need to create it manually:
@@ -177,6 +177,8 @@ In `railway.json`, add a service:
   }
 }
 ```
+
+> **Note (2026-02-10)**: This cron service is not yet added to `railway.json`. The webhook endpoint works (commands are processed when users message the bot), but automated alert dispatch requires adding this cron service to Railway.
 
 ---
 

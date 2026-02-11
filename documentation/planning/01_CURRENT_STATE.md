@@ -1,10 +1,10 @@
-# Current State - Dashboard Architecture Reference [COMPLETED]
+# Current State - Dashboard Architecture Reference
 
 ## Overview
 
-This document describes the current implementation of the Shitpost Alpha dashboard as of the latest review (2026-02-06). Use this as a reference when implementing new features.
+This document describes the current implementation of the Shitpost Alpha dashboard as of the latest review (2026-02-10). Use this as a reference when implementing new features.
 
-> **Deployment Status**: Live on Railway with Neon PostgreSQL database. Both dashboard and scraping services are operational. However, **the UI is largely non-functional** due to data pipeline gaps. See [UI_SYSTEM_ANALYSIS.md](../UI_SYSTEM_ANALYSIS.md).
+> **Deployment Status**: Live on Railway with Neon PostgreSQL database. Dashboard, scraping pipeline, market data cron, and notifications services are all operational.
 
 ---
 
@@ -14,23 +14,33 @@ This document describes the current implementation of the Shitpost Alpha dashboa
 
 ```
 shitty_ui/
-├── app.py              # Application entry point (25 lines)
-├── layout.py           # Layout components and callbacks (~3,862 lines)
-├── data.py             # Database query functions (20+ functions, ~1,360 lines)
-├── alerts.py           # Alert checking and dispatch (716 lines)
-├── telegram_bot.py     # Telegram bot integration (806 lines)
+├── app.py              # Application entry point
+├── layout.py           # App factory, router, callback registration (~285 lines)
+├── constants.py        # Color palette and styling constants
+├── data.py             # Database query functions (20+ functions)
+├── pages/              # Page modules (extracted from layout.py)
+│   ├── dashboard.py    # Main dashboard page layout + callbacks
+│   └── assets.py       # Asset deep dive page layout + callbacks
+├── components/         # Reusable UI components
+│   ├── cards.py        # Metric cards, signal cards, error cards
+│   ├── charts.py       # Chart builders (empty charts, etc.)
+│   ├── controls.py     # Filter controls, period selectors
+│   └── header.py       # Header and footer components
+├── callbacks/          # Callback groups
+│   ├── alerts.py       # Alert config, history, checking callbacks
+│   ├── clientside.py   # Clientside JS callbacks
+│   └── navigation.py   # URL routing and navigation
 └── README.md           # Module documentation
 
 shit_tests/shitty_ui/
-├── __init__.py
 ├── conftest.py         # Test configuration and mocks
-├── test_data.py        # Data layer tests (34 tests)
-├── test_layout.py      # Layout component tests (33 tests)
+├── test_data.py        # Data layer tests
+├── test_layout.py      # Layout component tests
 ├── test_alerts.py      # Alert system tests
 └── test_telegram.py    # Telegram bot tests
 ```
 
-**Total UI-specific tests: ~150** (67 data+layout + 83 alerts+telegram)
+**Total UI-specific tests: 210+**
 
 ---
 
@@ -40,40 +50,31 @@ shit_tests/shitty_ui/
 
 ```python
 from layout import create_app, register_callbacks
+from flask import request, jsonify
 
 def serve_app():
     app = create_app()
     register_callbacks(app)
+    register_webhook_route(app)  # Telegram webhook
     port = int(os.environ.get("PORT", 8050))
     app.run(host="0.0.0.0", port=port, debug=False)
 ```
 
 **Key Points**:
 - `create_app()` builds the Dash app with the main layout (URL router + stores)
-- `register_callbacks()` adds all interactive behavior (~20 callbacks)
+- `register_callbacks()` adds all interactive behavior (callbacks from `pages/`, `callbacks/`)
+- `register_webhook_route()` adds the `/telegram/webhook` Flask endpoint
 - Server runs on port 8050 by default (Railway provides `$PORT`)
 
 ---
 
 ## Layout Architecture
 
-**File**: `shitty_ui/layout.py` (~3,862 lines)
+**Files**: `shitty_ui/layout.py` (app factory + router, ~285 lines), `pages/`, `components/`, `callbacks/`
 
 ### Color Palette
 
-```python
-COLORS = {
-    "primary": "#1e293b",      # Slate 800 - main background
-    "secondary": "#334155",    # Slate 700 - cards
-    "accent": "#3b82f6",       # Blue 500 - highlights
-    "success": "#10b981",      # Emerald 500 - bullish/correct
-    "danger": "#ef4444",       # Red 500 - bearish/incorrect
-    "warning": "#f59e0b",      # Amber 500 - pending
-    "text": "#f1f5f9",         # Slate 100 - primary text
-    "text_muted": "#94a3b8",   # Slate 400 - secondary text
-    "border": "#475569",       # Slate 600 - borders
-}
-```
+Defined in `shitty_ui/constants.py`. Dark Slate palette with semantic colors for bullish/bearish/pending states.
 
 ### Layout Hierarchy (Current)
 
@@ -182,7 +183,7 @@ App Layout (create_app)
 
 ## Data Layer
 
-**File**: `shitty_ui/data.py` (~1,360 lines)
+**File**: `shitty_ui/data.py`
 
 ### Database Connection
 
@@ -291,33 +292,26 @@ CREATE TABLE market_prices (
 
 ## Known Issues & Current Limitations
 
-### Critical (Blocking UI)
+### Resolved (as of 2026-02-10)
 
-1. **Near-empty `prediction_outcomes` table** (~9 rows) - Most dashboard queries return no data
-2. **Sparse `market_prices` table** (~528 rows, 14 assets) - Asset deep dive pages show empty charts
-3. **Potential column name mismatch** - `data.py` queries reference `text`, `timestamp`, `shitpost_id` but SQLAlchemy model uses `body`, `created_at`, `id`
-4. **`get_available_assets()` returns hardcoded list** - Not queried from database
+- ~~Near-empty `prediction_outcomes` table~~ — Populated via market data pipeline (auto-pipeline cron runs every 15 min)
+- ~~Sparse `market_prices` table~~ — Backfilled and kept current by cron
+- ~~`get_available_assets()` returns hardcoded list~~ — Now queries `predictions` table dynamically
+- ~~3,862-line `layout.py` monolith~~ — Decomposed into `pages/`, `components/`, `callbacks/` (PR #47)
+- ~~Alert system untested E2E~~ — Telegram bot live, webhook configured
 
-### Moderate
+### Open
 
-5. **3,862-line `layout.py` monolith** - Hard to navigate and maintain; should be split into page modules
-6. **No `/performance` page** - Data layer functions exist but no route or components
-7. **Alert system untested E2E** - Code written but never verified with real SMTP/Twilio/Telegram
-8. **`load_recent_posts()` and `load_filtered_posts()` not used by any callback** - Dead code in data layer
-
-### Low Priority
-
-9. **No data export functionality** (CSV/JSON)
-10. **No dark/light theme toggle**
-11. **No WebSocket for real-time updates** (polling every 5 min is fine for now)
+1. **No `/performance` page** — Data layer functions exist but no route or components
+2. **No `/signals` page** — Only "Recent Signals" section on main dashboard (10 items)
+3. **No data export functionality** (CSV/JSON)
+4. **No dark/light theme toggle**
+5. **No WebSocket for real-time updates** (polling every 5 min is fine for now)
 
 ---
 
 ## Next Steps
 
-1. **Execute Phase 0 (Stabilization)** - Fill data pipeline gaps and verify queries
-2. **Build `/performance` page** - Data functions already exist, need components
-3. **Split `layout.py`** - Extract pages into `pages/dashboard.py`, `pages/assets.py`, `pages/performance.py`
-
-See [00_OVERVIEW.md](./00_OVERVIEW.md) for the full development roadmap.
-See [UI_SYSTEM_ANALYSIS.md](../UI_SYSTEM_ANALYSIS.md) for detailed bug and gap analysis.
+1. **Build `/performance` page** — Data functions already exist, need components
+2. **Build `/signals` feed page** — See [05_SIGNAL_FEED.md](./05_SIGNAL_FEED.md)
+3. **Add integration/E2E tests** — See [08_TESTING_STRATEGY.md](./08_TESTING_STRATEGY.md)

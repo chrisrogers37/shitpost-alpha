@@ -89,9 +89,19 @@ shitpost_alpha/
 │   └── cli.py              # Analysis CLI utilities
 ├── shitty_ui/              # Prediction performance dashboard
 │   ├── app.py              # Dash application entry point
-│   ├── layout.py           # Dashboard components & callbacks
-│   └── data.py             # Database query functions
-└── shit_tests/             # Comprehensive test suite (973+ tests)
+│   ├── layout.py           # App factory, router & callback registration
+│   ├── data.py             # Database query functions
+│   ├── pages/              # Page modules (dashboard, assets)
+│   ├── components/         # Reusable UI components
+│   └── callbacks/          # Callback groups (alerts, navigation, clientside)
+├── notifications/          # Alert dispatch & Telegram bot
+│   ├── alert_engine.py     # Core alert dispatch logic
+│   ├── dispatcher.py       # Multi-channel delivery (Telegram, Email, SMS)
+│   ├── telegram_bot.py     # Telegram bot command handler
+│   ├── telegram_sender.py  # Telegram API integration
+│   ├── db.py               # Subscription & alert database operations
+│   └── __main__.py         # CLI (check-alerts, set-webhook, test-alert, etc.)
+└── shit_tests/             # Comprehensive test suite (1000+ tests)
     ├── conftest.py          # Shared fixtures & test configuration
     ├── shit/                # Core infrastructure tests
     ├── shitposts/           # Harvesting tests
