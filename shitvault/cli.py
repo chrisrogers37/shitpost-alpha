@@ -5,7 +5,6 @@ Command-line interface for database operations using modular architecture.
 
 import argparse
 import asyncio
-import logging
 import sys
 from datetime import datetime
 from typing import Optional
@@ -16,6 +15,7 @@ from shit.db import DatabaseConfig, DatabaseClient, DatabaseOperations
 from shit.s3 import S3Config, S3DataLake
 from shit.logging import (
     setup_database_logging as setup_centralized_database_logging,
+    get_service_logger,
     print_success,
     print_error,
     print_info,
@@ -26,7 +26,7 @@ from .prediction_operations import PredictionOperations
 from .s3_processor import S3Processor
 from .statistics import Statistics
 
-logger = logging.getLogger(__name__)
+logger = get_service_logger("shitvault_cli")
 
 
 def create_database_parser() -> argparse.ArgumentParser:

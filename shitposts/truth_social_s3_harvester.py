@@ -4,7 +4,6 @@ Harvests raw Truth Social data and stores it directly in S3.
 """
 
 import asyncio
-import logging
 import time
 from datetime import datetime
 from typing import AsyncGenerator, Dict, Optional, List
@@ -20,8 +19,9 @@ from shitposts.cli import (
     print_harvest_error, print_harvest_interrupted, print_s3_stats,
     HARVESTER_EXAMPLES
 )
+from shit.logging import get_service_logger
 
-logger = logging.getLogger(__name__)
+logger = get_service_logger("harvester")
 
 
 class TruthSocialS3Harvester:

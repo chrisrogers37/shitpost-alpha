@@ -6,15 +6,15 @@ Uses the project's sync session pattern from shit/db/sync_session.py.
 """
 
 import json
-import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 
 from shit.db.sync_session import get_session
+from shit.logging import get_service_logger
 
-logger = logging.getLogger(__name__)
+logger = get_service_logger("notifications_db")
 
 
 def _row_to_dict(result) -> Optional[Dict[str, Any]]:

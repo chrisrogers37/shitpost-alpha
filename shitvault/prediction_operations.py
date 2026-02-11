@@ -4,7 +4,7 @@ Domain-specific operations for prediction management.
 Extracted from ShitpostDatabase for modularity.
 """
 
-import logging
+
 from typing import Dict, Optional, Any
 from datetime import datetime
 from sqlalchemy import select

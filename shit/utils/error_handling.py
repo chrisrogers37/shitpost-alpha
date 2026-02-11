@@ -9,7 +9,9 @@ import asyncio
 from typing import Optional, Callable, Any
 from functools import wraps
 
-logger = logging.getLogger(__name__)
+from shit.logging import get_service_logger
+
+logger = get_service_logger("error_handling")
 
 
 async def handle_exceptions(error: Exception, context: str = "Unknown") -> None:

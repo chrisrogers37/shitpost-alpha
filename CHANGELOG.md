@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `test_models.py` (25 tests) — `PredictionOutcome.calculate_return()`, `.is_correct()`, `.calculate_pnl()` with edge cases and boundary values
 
 ### Changed
+- **Logging Migration** - Migrated all remaining modules to centralized logging system (`get_service_logger`)
+  - 15 files migrated from `logging.getLogger(__name__)` to `get_service_logger("name")`
+  - 4 already-migrated shitvault files cleaned up (removed stale `import logging`)
+  - Modules covered: shitty_ui/ (3), notifications/ (6), shit/content/ (1), shit/utils/ (1), shitvault/ (1), shitpost_alpha.py, shitpost_ai/, shitposts/
+  - Zero `logging.getLogger(__name__)` calls remain in source code (test files excluded per convention)
 - **Layout Decomposition** - Decomposed 5,066-line `shitty_ui/layout.py` god file into focused modules
   - `constants.py` (15 lines) — COLORS palette and shared constants
   - `components/cards.py` (1,083 lines) — 9 reusable card/chart builders

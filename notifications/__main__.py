@@ -10,13 +10,12 @@ Usage:
 """
 
 import argparse
-import logging
 import sys
 
-from shit.logging import setup_cli_logging
+from shit.logging import setup_cli_logging, get_service_logger
 
 setup_cli_logging(service_name="notifications")
-logger = logging.getLogger(__name__)
+logger = get_service_logger("notifications")
 
 
 def cmd_check_alerts(args: argparse.Namespace) -> int:

@@ -4,7 +4,7 @@ Domain-specific operations for shitpost management.
 Extracted from ShitpostDatabase for modularity.
 """
 
-import logging
+
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from sqlalchemy import select, and_, not_, exists

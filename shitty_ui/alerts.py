@@ -5,7 +5,6 @@ Thin wrapper that delegates to the standalone notifications/ module.
 Kept for backward compatibility with existing dashboard imports.
 """
 
-import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
@@ -34,8 +33,9 @@ from notifications.dispatcher import (
     format_alert_message,
     format_alert_message_html,
 )
+from shit.logging import get_service_logger
 
-logger = logging.getLogger(__name__)
+logger = get_service_logger("dashboard_alerts")
 
 # Default alert preferences - used when no localStorage data exists
 DEFAULT_ALERT_PREFERENCES = {

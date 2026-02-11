@@ -5,16 +5,15 @@ Coordinates the Truth Social monitoring and LLM analysis pipeline by executing s
 """
 
 import asyncio
-import logging
 import sys
 import argparse
 from typing import List, Optional
 
 # Use centralized logging for beautiful output
-from shit.logging import setup_cli_logging, print_success, print_error, print_info, print_warning
+from shit.logging import setup_cli_logging, get_service_logger, print_success, print_error, print_info, print_warning
 
 # Configure logging will be set up in main() based on args
-logger = logging.getLogger(__name__)
+logger = get_service_logger("orchestrator")
 
 
 async def _execute_subprocess(cmd: list[str], phase_name: str, emoji: str) -> bool:
