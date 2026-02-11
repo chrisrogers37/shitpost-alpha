@@ -97,9 +97,9 @@ class S3DataLake:
                 raw_api_data=raw_data,
                 metadata={
                     'stored_at': datetime.now().isoformat(),
-                    'source': 'truth_social_api',
+                    'source': self.config.prefix,
                     'version': '1.0',
-                    'harvester': 'truth_social_s3_harvester'
+                    'harvester': f'{self.config.prefix}_harvester'
                 }
             )
             

@@ -78,5 +78,6 @@ def create_tables():
         TelegramSubscription,
     )
     from shit.market_data.models import MarketPrice, PredictionOutcome, TickerRegistry
+    from shitvault.signal_models import Signal
 
     Base.metadata.create_all(engine)

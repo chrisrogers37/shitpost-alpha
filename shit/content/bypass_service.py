@@ -129,7 +129,11 @@ class BypassService:
         Returns:
             True if post is a retruth
         """
-        # Check reblog field (JSON data indicating this is a reblog)
+        # Check source-agnostic flag first (Signal model)
+        if post_data.get('is_repost', False):
+            return True
+
+        # Legacy: check reblog field (Truth Social API)
         reblog_data = post_data.get('reblog')
         if reblog_data is not None:
             return True
