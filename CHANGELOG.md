@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Telegram Alert Deployment** - Deployed notification system to production
+  - Notifications cron service in Railway (`*/2 * * * *`) for automated alert dispatch
+  - Health check endpoint at `/telegram/health` for monitoring alert system status
+  - `TelegramSubscription` added to `create_tables()` for automatic table creation
 - **Reactive Ticker Lifecycle** - LLM analyzer now triggers market data backfill immediately when a prediction contains new tickers
   - New `ticker_registry` database table tracks all ticker symbols the system has ever encountered
   - `TickerRegistryService` manages ticker lifecycle (active/inactive/invalid status)
@@ -27,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `test_client.py` (22 tests) — init, context manager, `_get_existing_prices`, `fetch_price_history`, `get_price_on_date`, `get_latest_price`, `update_prices_for_symbols`, `get_price_stats`; coverage 76%
   - `test_sync_session.py` (9 tests) — `get_session()` commit/rollback/close lifecycle, operation ordering, exception re-raise, `create_tables()`; coverage 97%
   - `test_models.py` (25 tests) — `PredictionOutcome.calculate_return()`, `.is_correct()`, `.calculate_pnl()` with edge cases and boundary values
+
+### Fixed
+- **Telegram Markdown Parsing** - Changed default `parse_mode` from `Markdown` (v1) to `MarkdownV2` in `send_telegram_message()` to match bot response escaping
+  - Escaped parentheses, dots, and other MarkdownV2 special characters in `format_telegram_alert()` template
 
 ### Changed
 - **Logging Migration** - Migrated all remaining modules to centralized logging system (`get_service_logger`)

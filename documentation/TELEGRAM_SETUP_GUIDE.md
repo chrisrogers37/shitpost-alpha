@@ -178,7 +178,7 @@ In `railway.json`, add a service:
 }
 ```
 
-> **Note (2026-02-10)**: This cron service is not yet added to `railway.json`. The webhook endpoint works (commands are processed when users message the bot), but automated alert dispatch requires adding this cron service to Railway.
+> **Deployed (2026-02-11)**: The notifications cron service is active in `railway.json` running every 2 minutes. The health check endpoint is available at `/telegram/health`.
 
 ---
 
@@ -369,6 +369,30 @@ python -m notifications stats
 | Channel not receiving alerts | Ensure bot is admin with Post Messages permission, and the channel `chat_id` is in the DB |
 | `consecutive_errors` too high | Reset in DB: `UPDATE telegram_subscriptions SET consecutive_errors = 0 WHERE chat_id = 'xxx'` |
 | Webhook SSL error | Telegram requires HTTPS. Railway provides this automatically. For local dev, use ngrok. |
+
+---
+
+## Health Check
+
+Monitor the alert system status:
+
+```bash
+curl https://<dashboard-domain>.railway.app/telegram/health
+```
+
+Response:
+```json
+{
+  "ok": true,
+  "service": "telegram_alerts",
+  "bot_configured": true,
+  "subscribers": {"total": 5, "active": 3},
+  "last_alert_check": "2026-02-11T10:30:00",
+  "total_alerts_sent": 42
+}
+```
+
+A `200` status with `"ok": true` means the system is healthy. A `503` status indicates a problem (database unreachable, missing token, etc.).
 
 ---
 

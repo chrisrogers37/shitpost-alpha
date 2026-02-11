@@ -26,7 +26,7 @@ def get_bot_token() -> Optional[str]:
 def send_telegram_message(
     chat_id: str,
     text: str,
-    parse_mode: str = "Markdown",
+    parse_mode: str = "MarkdownV2",
     disable_notification: bool = False,
     reply_markup: Optional[Dict] = None,
 ) -> Tuple[bool, Optional[str]]:
@@ -36,7 +36,7 @@ def send_telegram_message(
     Args:
         chat_id: Telegram chat ID.
         text: Message text (supports Markdown).
-        parse_mode: "Markdown" or "HTML".
+        parse_mode: "MarkdownV2", "Markdown", or "HTML".
         disable_notification: Send silently.
         reply_markup: Optional inline keyboard.
 
@@ -125,9 +125,9 @@ def format_telegram_alert(alert: Dict[str, Any]) -> str:
     """
     sentiment = alert.get("sentiment", "neutral").upper()
     confidence = alert.get("confidence", 0)
-    confidence_pct = f"{confidence:.0%}" if confidence else "N/A"
+    confidence_pct = escape_markdown(f"{confidence:.0%}") if confidence else "N/A"
     assets = alert.get("assets", [])
-    assets_str = ", ".join(assets[:5]) if assets else "None specified"
+    assets_str = escape_markdown(", ".join(assets[:5])) if assets else "None specified"
     text = alert.get("text", "")[:300]
     thesis = alert.get("thesis", "")[:200]
 
@@ -141,7 +141,7 @@ def format_telegram_alert(alert: Dict[str, Any]) -> str:
     message = f"""
 {emoji} *SHITPOST ALPHA ALERT*
 
-*Sentiment:* {sentiment} ({confidence_pct} confidence)
+*Sentiment:* {sentiment} \\({confidence_pct} confidence\\)
 *Assets:* {assets_str}
 
 \U0001f4dd *Post:*
@@ -150,7 +150,7 @@ _{escape_markdown(text)}_
 \U0001f4a1 *Thesis:*
 {escape_markdown(thesis)}
 
-\u26a0\ufe0f _This is NOT financial advice. For entertainment only._
+\u26a0\ufe0f _This is NOT financial advice\\. For entertainment only\\._
 """
     return message.strip()
 
