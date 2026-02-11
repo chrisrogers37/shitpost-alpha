@@ -41,7 +41,7 @@ Verify your environment:
 python -c "import yfinance; print('yfinance OK')"
 
 # Check database connection
-python -m shitvault show-stats
+python -m shitvault stats
 ```
 
 ---
@@ -101,7 +101,7 @@ If you're starting fresh or have existing predictions without market data, run t
 
 ```bash
 # See how many predictions exist and their date range
-python -m shitvault show-stats
+python -m shitvault stats
 
 # See price data coverage
 python -m shit.market_data price-stats

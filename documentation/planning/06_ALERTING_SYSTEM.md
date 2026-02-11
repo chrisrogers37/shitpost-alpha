@@ -1,6 +1,6 @@
-# Alerting System Specification [PENDING]
+# Alerting System Specification [PARTIALLY COMPLETE]
 
-> **STATUS: PENDING** - Not yet implemented. Depends on Signal Feed (05) patterns.
+> **STATUS: PARTIALLY COMPLETE** - Telegram bot is live (webhook mode, multi-tenant subscriptions). Email (SMTP) and SMS (Twilio) channels are coded but not configured in production. Browser notifications work client-side.
 
 ## Implementation Context for Engineering Team
 
