@@ -67,13 +67,18 @@ class ShitpostAnalyzer:
         logger.info("INITIALIZING ANALYZER")
         logger.info("═══════════════════════════════════════════════════════════")
         logger.info("Initializing Shitpost Analyzer...")
-        
+
         # Initialize database client
         await self.db_client.initialize()
-        
+
+        # Initialize operation classes with the database client
+        self.db_ops = DatabaseOperations(self.db_client)
+        self.shitpost_ops = ShitpostOperations(self.db_client)
+        self.prediction_ops = PredictionOperations(self.db_client)
+
         # Initialize LLM client
         await self.llm_client.initialize()
-        
+
         logger.info(f"Shitpost Analyzer initialized with launch date: {self.launch_date}")
         logger.info("✅ Analyzer initialized successfully")
         logger.info("")

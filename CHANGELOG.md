@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Net reduction: 52 lines removed, application uses one shared pool instead of two
 
 ### Fixed
+- **Analyzer Init Bug** - `ShitpostAnalyzer.initialize()` now sets `db_ops`, `shitpost_ops`, and `prediction_ops` (previously left as `None`, causing `AttributeError` on first use)
+- **Async Anthropic Client** - Changed `anthropic.Anthropic` to `anthropic.AsyncAnthropic` in `LLMClient.__init__()` so `await` calls in `_call_llm()` work correctly
+- **Error Handling Consistency** - Converted 26 `print(f"Error ...")` calls to `logger.error()` in `shitty_ui/data.py` for consistent structured logging
+- **Stale Analyzer Tests** - Updated 6 tests mocking removed `_should_bypass_post()`/`_get_bypass_reason()` to use `bypass_service.should_bypass_post()` instead; removed 12 dead tests for methods that no longer exist (bypass logic covered by `test_bypass_service.py`)
 - **SQL Injection Prevention** - Added `_UPDATABLE_COLUMNS` whitelist to `notifications/db.py` `update_subscription()` to prevent column name injection via dynamic kwargs
 - **HTML Injection Prevention** - Applied `html.escape()` to all 4 user-derived values in `format_alert_message_html()` (sentiment, assets, post text, thesis)
 - **Bare Exception Clauses** - Replaced 4 bare `except:` with specific exception types across `llm_client.py`, `s3_models.py`, and `market_data/cli.py`

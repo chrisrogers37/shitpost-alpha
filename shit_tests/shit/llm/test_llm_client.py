@@ -71,7 +71,7 @@ class TestLLMClient:
     @pytest.mark.asyncio
     async def test_initialization_anthropic(self):
         """Test Anthropic client initialization."""
-        with patch('anthropic.Anthropic') as mock_anthropic_class:
+        with patch('anthropic.AsyncAnthropic') as mock_anthropic_class:
             mock_client = MagicMock()
             mock_anthropic_class.return_value = mock_client
             
@@ -317,7 +317,7 @@ class TestLLMClient:
     @pytest.mark.asyncio
     async def test_call_llm_anthropic(self):
         """Test Anthropic LLM call."""
-        with patch('anthropic.Anthropic') as mock_anthropic_class:
+        with patch('anthropic.AsyncAnthropic') as mock_anthropic_class:
             mock_client = MagicMock()
             mock_anthropic_class.return_value = mock_client
             

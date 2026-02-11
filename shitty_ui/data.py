@@ -240,7 +240,7 @@ def get_available_assets() -> List[str]:
                     assets_set.update(assets_val)
             return sorted(assets_set)
         except Exception as e:
-            print(f"Error loading available assets (sqlite): {e}")
+            logger.error(f"Error loading available assets (sqlite): {e}")
             return []
     else:
         # PostgreSQL with JSONB support
@@ -257,7 +257,7 @@ def get_available_assets() -> List[str]:
             rows, columns = execute_query(query)
             return [row[0] for row in rows if row[0]]
         except Exception as e:
-            print(f"Error loading available assets: {e}")
+            logger.error(f"Error loading available assets: {e}")
             return []
 
 
@@ -371,7 +371,7 @@ def get_recent_signals(
         df = pd.DataFrame(rows, columns=columns)
         return df
     except Exception as e:
-        print(f"Error loading recent signals: {e}")
+        logger.error(f"Error loading recent signals: {e}")
         return pd.DataFrame()
 
 
@@ -423,7 +423,7 @@ def get_performance_metrics(days: int = None) -> Dict[str, Any]:
                 "avg_confidence": round(float(row[6]), 2) if row[6] else 0.0,
             }
     except Exception as e:
-        print(f"Error loading performance metrics: {e}")
+        logger.error(f"Error loading performance metrics: {e}")
 
     return {
         "total_outcomes": 0,
@@ -489,7 +489,7 @@ def get_accuracy_by_confidence(days: int = None) -> pd.DataFrame:
             df["accuracy"] = (df["correct"] / df["total"] * 100).round(1)
         return df
     except Exception as e:
-        print(f"Error loading accuracy by confidence: {e}")
+        logger.error(f"Error loading accuracy by confidence: {e}")
         return pd.DataFrame()
 
 
@@ -534,7 +534,7 @@ def get_accuracy_by_asset(limit: int = 15, days: int = None) -> pd.DataFrame:
             df["accuracy"] = (df["correct"] / df["total_predictions"] * 100).round(1)
         return df
     except Exception as e:
-        print(f"Error loading accuracy by asset: {e}")
+        logger.error(f"Error loading accuracy by asset: {e}")
         return pd.DataFrame()
 
 
@@ -592,7 +592,7 @@ def get_similar_predictions(
         df = pd.DataFrame(rows, columns=columns)
         return df
     except Exception as e:
-        print(f"Error loading similar predictions: {e}")
+        logger.error(f"Error loading similar predictions: {e}")
         return pd.DataFrame()
 
 
@@ -686,7 +686,7 @@ def get_predictions_with_outcomes(
         df = pd.DataFrame(rows, columns=columns)
         return df
     except Exception as e:
-        print(f"Error loading predictions with outcomes: {e}")
+        logger.error(f"Error loading predictions with outcomes: {e}")
         return pd.DataFrame()
 
 
@@ -725,7 +725,7 @@ def get_sentiment_distribution(days: int = None) -> Dict[str, int]:
                 result[sentiment] = row[1]
         return result
     except Exception as e:
-        print(f"Error loading sentiment distribution: {e}")
+        logger.error(f"Error loading sentiment distribution: {e}")
         return {"bullish": 0, "bearish": 0, "neutral": 0}
 
 
@@ -745,7 +745,7 @@ def get_active_assets_from_db() -> List[str]:
         rows, columns = execute_query(query)
         return [row[0] for row in rows if row[0]]
     except Exception as e:
-        print(f"Error loading active assets: {e}")
+        logger.error(f"Error loading active assets: {e}")
         return []
 
 
@@ -791,7 +791,7 @@ def get_cumulative_pnl(days: int = None) -> pd.DataFrame:
             df["cumulative_pnl"] = df["daily_pnl"].cumsum()
         return df
     except Exception as e:
-        print(f"Error loading cumulative P&L: {e}")
+        logger.error(f"Error loading cumulative P&L: {e}")
         return pd.DataFrame()
 
 
@@ -841,7 +841,7 @@ def get_rolling_accuracy(window: int = 30, days: int = None) -> pd.DataFrame:
             ).round(1)
         return df
     except Exception as e:
-        print(f"Error loading rolling accuracy: {e}")
+        logger.error(f"Error loading rolling accuracy: {e}")
         return pd.DataFrame()
 
 
@@ -896,7 +896,7 @@ def get_win_loss_streaks() -> Dict[str, int]:
             "max_loss_streak": max_loss,
         }
     except Exception as e:
-        print(f"Error loading win/loss streaks: {e}")
+        logger.error(f"Error loading win/loss streaks: {e}")
         return {"current_streak": 0, "max_win_streak": 0, "max_loss_streak": 0}
 
 
@@ -941,7 +941,7 @@ def get_confidence_calibration(buckets: int = 10) -> pd.DataFrame:
             )
         return df
     except Exception as e:
-        print(f"Error loading confidence calibration: {e}")
+        logger.error(f"Error loading confidence calibration: {e}")
         return pd.DataFrame()
 
 
@@ -979,7 +979,7 @@ def get_monthly_performance(months: int = 12) -> pd.DataFrame:
             df["month"] = pd.to_datetime(df["month"]).dt.strftime("%Y-%m")
         return df
     except Exception as e:
-        print(f"Error loading monthly performance: {e}")
+        logger.error(f"Error loading monthly performance: {e}")
         return pd.DataFrame()
 
 
@@ -1047,7 +1047,7 @@ def get_asset_price_history(symbol: str, days: int = 180) -> pd.DataFrame:
             df["date"] = pd.to_datetime(df["date"])
         return df
     except Exception as e:
-        print(f"Error loading price history for {symbol}: {e}")
+        logger.error(f"Error loading price history for {symbol}: {e}")
         return pd.DataFrame()
 
 
@@ -1108,7 +1108,7 @@ def get_asset_predictions(symbol: str, limit: int = 50) -> pd.DataFrame:
             df["timestamp"] = pd.to_datetime(df["timestamp"])
         return df
     except Exception as e:
-        print(f"Error loading predictions for {symbol}: {e}")
+        logger.error(f"Error loading predictions for {symbol}: {e}")
         return pd.DataFrame()
 
 
@@ -1216,7 +1216,7 @@ def get_asset_stats(symbol: str) -> Dict[str, Any]:
                 "overall_avg_return_t7": (round(float(row[14]), 2) if row[14] else 0.0),
             }
     except Exception as e:
-        print(f"Error loading asset stats for {symbol}: {e}")
+        logger.error(f"Error loading asset stats for {symbol}: {e}")
 
     return {
         "total_predictions": 0,
@@ -1287,7 +1287,7 @@ def get_related_assets(symbol: str, limit: int = 8) -> pd.DataFrame:
         df = pd.DataFrame(rows, columns=columns)
         return df
     except Exception as e:
-        print(f"Error loading related assets for {symbol}: {e}")
+        logger.error(f"Error loading related assets for {symbol}: {e}")
         return pd.DataFrame()
 
 
@@ -1341,7 +1341,7 @@ def get_active_signals(min_confidence: float = 0.75, hours: int = 48) -> pd.Data
         df = pd.DataFrame(rows, columns=columns)
         return df
     except Exception as e:
-        print(f"Error loading active signals: {e}")
+        logger.error(f"Error loading active signals: {e}")
         return pd.DataFrame()
 
 
@@ -1366,7 +1366,7 @@ def get_weekly_signal_count() -> int:
         rows, columns = execute_query(query, params)
         return rows[0][0] if rows else 0
     except Exception as e:
-        print(f"Error loading weekly signal count: {e}")
+        logger.error(f"Error loading weekly signal count: {e}")
         return 0
 
 
@@ -1412,7 +1412,7 @@ def get_high_confidence_metrics(days: int = None) -> Dict[str, Any]:
                 "incorrect": rows[0][2] or 0,
             }
     except Exception as e:
-        print(f"Error loading high confidence metrics: {e}")
+        logger.error(f"Error loading high confidence metrics: {e}")
 
     return {"win_rate": 0.0, "total": 0, "correct": 0, "incorrect": 0}
 
@@ -1462,7 +1462,7 @@ def get_best_performing_asset(days: int = None) -> Dict[str, Any]:
                 "accuracy": round((correct / total * 100) if total > 0 else 0, 1),
             }
     except Exception as e:
-        print(f"Error loading best performing asset: {e}")
+        logger.error(f"Error loading best performing asset: {e}")
 
     return {"symbol": "N/A", "total_pnl": 0.0, "prediction_count": 0, "accuracy": 0.0}
 
@@ -1505,7 +1505,7 @@ def get_accuracy_over_time(days: int = None) -> pd.DataFrame:
             df["week"] = pd.to_datetime(df["week"])
         return df
     except Exception as e:
-        print(f"Error loading accuracy over time: {e}")
+        logger.error(f"Error loading accuracy over time: {e}")
         return pd.DataFrame()
 
 
@@ -1584,7 +1584,7 @@ def get_backtest_simulation(
             "win_rate": round(win_rate, 1),
         }
     except Exception as e:
-        print(f"Error running backtest simulation: {e}")
+        logger.error(f"Error running backtest simulation: {e}")
         return {
             "initial_capital": initial_capital,
             "final_value": initial_capital,
@@ -1633,7 +1633,7 @@ def get_sentiment_accuracy(days: int = None) -> pd.DataFrame:
             df["accuracy"] = (df["correct"] / df["total"] * 100).round(1)
         return df
     except Exception as e:
-        print(f"Error loading sentiment accuracy: {e}")
+        logger.error(f"Error loading sentiment accuracy: {e}")
         return pd.DataFrame()
 
 

@@ -120,14 +120,22 @@ class TestShitpostAnalyzer:
 
     @pytest.mark.asyncio
     async def test_initialize(self, analyzer):
-        """Test analyzer initialization."""
+        """Test analyzer initialization sets db_ops, shitpost_ops, prediction_ops."""
+        # Reset ops to None to verify initialize() sets them
+        analyzer.db_ops = None
+        analyzer.shitpost_ops = None
+        analyzer.prediction_ops = None
+
         with patch.object(analyzer.db_client, 'initialize', new_callable=AsyncMock) as mock_db_init, \
              patch.object(analyzer.llm_client, 'initialize', new_callable=AsyncMock) as mock_llm_init:
-            
+
             await analyzer.initialize()
-            
+
             mock_db_init.assert_called_once()
             mock_llm_init.assert_called_once()
+            assert analyzer.db_ops is not None
+            assert analyzer.shitpost_ops is not None
+            assert analyzer.prediction_ops is not None
 
     @pytest.mark.asyncio
     async def test_cleanup(self, analyzer):
@@ -402,15 +410,15 @@ class TestShitpostAnalyzer:
     async def test_analyze_shitpost_success(self, analyzer, sample_shitpost_data, sample_analysis_result):
         """Test successful shitpost analysis."""
         await analyzer.initialize()
-        
-        with patch.object(analyzer, '_should_bypass_post', return_value=False) as mock_bypass, \
+
+        with patch.object(analyzer.bypass_service, 'should_bypass_post', return_value=(False, None)) as mock_bypass, \
              patch.object(analyzer, '_prepare_enhanced_content', return_value="Enhanced content") as mock_prepare, \
              patch.object(analyzer.llm_client, 'analyze', new_callable=AsyncMock, return_value=sample_analysis_result) as mock_llm, \
              patch.object(analyzer, '_enhance_analysis_with_shitpost_data', return_value=sample_analysis_result) as mock_enhance, \
              patch.object(analyzer.prediction_ops, 'store_analysis', new_callable=AsyncMock, return_value="analysis_001") as mock_store:
-            
+
             result = await analyzer._analyze_shitpost(sample_shitpost_data, dry_run=False)
-            
+
             assert result == sample_analysis_result
             mock_bypass.assert_called_once_with(sample_shitpost_data)
             mock_prepare.assert_called_once_with(sample_shitpost_data)
@@ -419,32 +427,29 @@ class TestShitpostAnalyzer:
 
     @pytest.mark.asyncio
     async def test_analyze_shitpost_bypass(self, analyzer, sample_shitpost_data):
-        """Test shitpost bypassing."""
+        """Test shitpost bypassing via BypassService."""
         await analyzer.initialize()
-        
-        with patch.object(analyzer, '_should_bypass_post', return_value=True) as mock_bypass, \
-             patch.object(analyzer, '_get_bypass_reason', return_value="no_text") as mock_reason, \
+
+        with patch.object(analyzer.bypass_service, 'should_bypass_post', return_value=(True, "no_text")) as mock_bypass, \
              patch.object(analyzer.prediction_ops, 'handle_no_text_prediction', new_callable=AsyncMock) as mock_handle:
-            
+
             result = await analyzer._analyze_shitpost(sample_shitpost_data, dry_run=False)
-            
+
             assert result is not None
             assert result['analysis_status'] == 'bypassed'
             assert result['analysis_comment'] == 'no_text'
-            mock_bypass.assert_called_once()
-            mock_reason.assert_called_once()
+            mock_bypass.assert_called_once_with(sample_shitpost_data)
             mock_handle.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_analyze_shitpost_bypass_dry_run(self, analyzer, sample_shitpost_data):
-        """Test shitpost bypassing in dry run mode."""
+        """Test shitpost bypassing in dry run mode does not write to DB."""
         await analyzer.initialize()
-        
-        with patch.object(analyzer, '_should_bypass_post', return_value=True) as mock_bypass, \
-             patch.object(analyzer, '_get_bypass_reason', return_value="no_text") as mock_reason:
-            
+
+        with patch.object(analyzer.bypass_service, 'should_bypass_post', return_value=(True, "no_text")) as mock_bypass:
+
             result = await analyzer._analyze_shitpost(sample_shitpost_data, dry_run=True)
-            
+
             assert result is not None
             assert result['analysis_status'] == 'bypassed'
             # Should not call handle_no_text_prediction in dry run
@@ -453,13 +458,13 @@ class TestShitpostAnalyzer:
     async def test_analyze_shitpost_llm_failure(self, analyzer, sample_shitpost_data):
         """Test shitpost analysis with LLM failure."""
         await analyzer.initialize()
-        
-        with patch.object(analyzer, '_should_bypass_post', return_value=False) as mock_bypass, \
+
+        with patch.object(analyzer.bypass_service, 'should_bypass_post', return_value=(False, None)) as mock_bypass, \
              patch.object(analyzer, '_prepare_enhanced_content', return_value="Enhanced content") as mock_prepare, \
              patch.object(analyzer.llm_client, 'analyze', new_callable=AsyncMock, return_value=None) as mock_llm:
-            
+
             result = await analyzer._analyze_shitpost(sample_shitpost_data, dry_run=False)
-            
+
             assert result is None
             mock_llm.assert_called_once()
 
@@ -467,129 +472,25 @@ class TestShitpostAnalyzer:
     async def test_analyze_shitpost_missing_id(self, analyzer):
         """Test shitpost analysis with missing ID."""
         await analyzer.initialize()
-        
+
         invalid_shitpost = {'text': 'Test content'}
-        
+
         result = await analyzer._analyze_shitpost(invalid_shitpost, dry_run=False)
-        
+
         assert result is None
 
     @pytest.mark.asyncio
     async def test_analyze_shitpost_error(self, analyzer, sample_shitpost_data):
-        """Test shitpost analysis with error."""
+        """Test shitpost analysis with error in bypass check."""
         await analyzer.initialize()
-        
-        with patch.object(analyzer, '_should_bypass_post', side_effect=Exception("Error")) as mock_bypass:
+
+        with patch.object(analyzer.bypass_service, 'should_bypass_post', side_effect=Exception("Error")) as mock_bypass:
             result = await analyzer._analyze_shitpost(sample_shitpost_data, dry_run=False)
-            
+
             assert result is None
 
-    def test_should_bypass_post_no_text(self, analyzer):
-        """Test bypassing posts with no text."""
-        post = {'text': ''}
-        assert analyzer._should_bypass_post(post) is True
-        
-        post = {'text': '   '}
-        assert analyzer._should_bypass_post(post) is True
-        
-        post = {}
-        assert analyzer._should_bypass_post(post) is True
-
-    def test_should_bypass_post_retruth(self, analyzer):
-        """Test bypassing retruth posts."""
-        post = {'text': 'RT @someone: Original content'}
-        assert analyzer._should_bypass_post(post) is True
-        
-        post = {'text': 'RT: Original content'}
-        assert analyzer._should_bypass_post(post) is True
-
-    def test_should_bypass_post_url_only(self, analyzer):
-        """Test bypassing URL-only posts."""
-        post = {'text': 'https://example.com'}
-        assert analyzer._should_bypass_post(post) is True
-        
-        # URL with <= 2 words still bypasses
-        post = {'text': 'https://example.com link'}
-        assert analyzer._should_bypass_post(post) is True  # 2 words, still bypasses
-        
-        # URL with > 2 words does not bypass
-        post = {'text': 'https://example.com link here'}
-        assert analyzer._should_bypass_post(post) is False  # Has context (> 2 words)
-
-    def test_should_bypass_post_symbols_only(self, analyzer):
-        """Test bypassing posts with only symbols."""
-        # Emojis have ord() > 128, so they don't match the symbols_only check
-        # The actual logic checks: all(ord(char) < 128) and len < 3
-        post = {'text': '🚀📈💰'}
-        assert analyzer._should_bypass_post(post) is False  # Emojis don't match ord() < 128
-        
-        post = {'text': '!!'}
-        assert analyzer._should_bypass_post(post) is True  # ASCII symbols, len < 3
-        
-        post = {'text': '!!!'}
-        assert analyzer._should_bypass_post(post) is False  # ASCII symbols, len >= 3
-
-    def test_should_bypass_post_media_only(self, analyzer):
-        """Test bypassing media-only posts."""
-        post = {'text': '', 'has_media': True}
-        assert analyzer._should_bypass_post(post) is True
-
-    def test_should_bypass_post_analyzable_content(self, analyzer):
-        """Test not bypassing posts with analyzable content."""
-        post = {'text': 'Tesla stock is going to the moon!'}
-        assert analyzer._should_bypass_post(post) is False
-
-    def test_get_bypass_reason_no_text(self, analyzer):
-        """Test getting bypass reason for no text."""
-        post = {'text': ''}
-        reason = analyzer._get_bypass_reason(post)
-        assert reason == 'no_text'
-
-    def test_get_bypass_reason_retruth(self, analyzer):
-        """Test getting bypass reason for retruth."""
-        post = {'text': 'RT @someone: Content'}
-        reason = analyzer._get_bypass_reason(post)
-        assert reason == 'retruth'
-        
-        post = {'text': 'RT: Content'}
-        reason = analyzer._get_bypass_reason(post)
-        assert reason == 'retruth'
-
-    def test_get_bypass_reason_url_only(self, analyzer):
-        """Test getting bypass reason for URL-only."""
-        post = {'text': 'https://example.com'}
-        reason = analyzer._get_bypass_reason(post)
-        assert reason == 'url_only'
-
-    def test_get_bypass_reason_symbols_only(self, analyzer):
-        """Test getting bypass reason for symbols-only."""
-        # Emojis have ord() > 128, so they don't match the symbols_only check
-        post = {'text': '🚀📈💰'}
-        reason = analyzer._get_bypass_reason(post)
-        assert reason == 'unanalyzable_content'  # Emojis don't match ord() < 128
-        
-        # ASCII symbols with len < 3 match
-        post = {'text': '!!'}
-        reason = analyzer._get_bypass_reason(post)
-        assert reason == 'symbols_only'
-
-    def test_get_bypass_reason_media_only(self, analyzer):
-        """Test getting bypass reason for media-only."""
-        # The check for no_text happens before media_only
-        # So if text is empty, it returns 'no_text' first
-        post = {'text': '', 'has_media': True}
-        reason = analyzer._get_bypass_reason(post)
-        assert reason == 'no_text'  # Empty text is checked first
-        
-        # Media-only check requires has_media=True and no text
-        # But since empty text returns 'no_text', we can't test media_only directly
-        # This documents the actual behavior
-
-    def test_get_bypass_reason_default(self, analyzer):
-        """Test getting bypass reason default."""
-        post = {'text': 'Some unanalyzable content'}
-        reason = analyzer._get_bypass_reason(post)
-        assert reason == 'unanalyzable_content'
+    # Bypass logic tests removed — bypass is now handled by BypassService
+    # and tested in shit_tests/content/test_bypass_service.py
 
     def test_prepare_enhanced_content(self, analyzer, sample_shitpost_data):
         """Test preparing enhanced content."""
