@@ -19,10 +19,11 @@ logger = get_service_logger("dashboard_app")
 
 def register_webhook_route(app):
     """
-    Register the Telegram webhook endpoint on the Dash app's Flask server.
+    Register the Telegram webhook and health check endpoints on the Dash app's Flask server.
 
-    This is a thin passthrough that receives Telegram updates and delegates
-    to the standalone notifications module for processing.
+    Endpoints:
+        POST /telegram/webhook - Receives Telegram updates
+        GET  /telegram/health  - Alert system health check
     """
     server = app.server
 
@@ -42,6 +43,33 @@ def register_webhook_route(app):
 
         # Always return 200 to Telegram so it doesn't retry
         return jsonify({"ok": True})
+
+    @server.route("/telegram/health", methods=["GET"])
+    def telegram_health():
+        """Health check endpoint for the alert system."""
+        health = {"ok": True, "service": "telegram_alerts"}
+        try:
+            from notifications.db import get_subscription_stats, get_last_alert_check
+            from notifications.telegram_sender import get_bot_token
+
+            stats = get_subscription_stats()
+            last_check = get_last_alert_check()
+            has_token = bool(get_bot_token())
+
+            health["bot_configured"] = has_token
+            health["subscribers"] = {
+                "total": stats.get("total", 0),
+                "active": stats.get("active", 0),
+            }
+            health["last_alert_check"] = last_check.isoformat() if last_check else None
+            health["total_alerts_sent"] = stats.get("total_alerts_sent", 0)
+        except Exception as e:
+            health["ok"] = False
+            health["error"] = str(e)
+            logger.error(f"Health check failed: {e}")
+
+        status_code = 200 if health["ok"] else 503
+        return jsonify(health), status_code
 
 
 def serve_app():

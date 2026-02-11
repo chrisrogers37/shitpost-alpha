@@ -74,7 +74,8 @@ def create_tables():
         Prediction,
         MarketMovement,
         Subscriber,
-        LLMFeedback
+        LLMFeedback,
+        TelegramSubscription,
     )
     from shit.market_data.models import MarketPrice, PredictionOutcome, TickerRegistry
 

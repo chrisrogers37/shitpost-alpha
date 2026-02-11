@@ -152,6 +152,76 @@ class TestFormatTelegramAlert:
         assert len(result) < 1500
 
 
+class TestParseMode:
+    """Test that the default parse_mode is MarkdownV2."""
+
+    @patch("notifications.telegram_sender.get_bot_token")
+    @patch("notifications.telegram_sender.requests.post")
+    def test_default_parse_mode_is_markdownv2(self, mock_post, mock_token):
+        """Default parse_mode should be MarkdownV2."""
+        mock_token.return_value = "test_token"
+        mock_post.return_value = MagicMock(json=lambda: {"ok": True})
+
+        send_telegram_message("123456", "Test")
+        call_kwargs = mock_post.call_args
+        payload = call_kwargs[1]["json"]
+        assert payload["parse_mode"] == "MarkdownV2"
+
+    @patch("notifications.telegram_sender.get_bot_token")
+    @patch("notifications.telegram_sender.requests.post")
+    def test_explicit_markdown_v1_override(self, mock_post, mock_token):
+        """Can explicitly override to Markdown v1."""
+        mock_token.return_value = "test_token"
+        mock_post.return_value = MagicMock(json=lambda: {"ok": True})
+
+        send_telegram_message("123456", "Test", parse_mode="Markdown")
+        call_kwargs = mock_post.call_args
+        payload = call_kwargs[1]["json"]
+        assert payload["parse_mode"] == "Markdown"
+
+
+class TestFormatAlertMarkdownV2:
+    """Test that format_telegram_alert produces valid MarkdownV2."""
+
+    def test_escapes_parentheses(self):
+        """Parentheses in the template are escaped for MarkdownV2."""
+        alert = {
+            "sentiment": "bullish",
+            "confidence": 0.85,
+            "assets": ["AAPL"],
+            "text": "Test post.",
+            "thesis": "Test thesis.",
+        }
+        message = format_telegram_alert(alert)
+        assert "\\(" in message
+        assert "\\)" in message
+
+    def test_escapes_dots_in_disclaimer(self):
+        """Dots in the disclaimer are escaped for MarkdownV2."""
+        alert = {
+            "sentiment": "bullish",
+            "confidence": 0.85,
+            "assets": ["AAPL"],
+            "text": "Test.",
+            "thesis": "Test.",
+        }
+        message = format_telegram_alert(alert)
+        assert "advice\\." in message
+        assert "only\\." in message
+
+    def test_escapes_special_chars_in_assets(self):
+        """Asset strings with special chars are escaped."""
+        alert = {
+            "sentiment": "bullish",
+            "confidence": 0.85,
+            "assets": ["BTC-USD"],
+            "text": "Test.",
+            "thesis": "Test.",
+        }
+        message = format_telegram_alert(alert)
+        assert "BTC\\-USD" in message
+
+
 class TestEscapeMarkdown:
     """Test Markdown escaping."""
 

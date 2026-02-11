@@ -29,6 +29,11 @@
       "source": ".",
       "startCommand": "python -m shit.market_data auto-pipeline --days-back 7",
       "cronSchedule": "*/15 * * * *"
+    },
+    "notifications": {
+      "source": ".",
+      "startCommand": "python -m notifications check-alerts",
+      "cronSchedule": "*/2 * * * *"
     }
   }
 }
