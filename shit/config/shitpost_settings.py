@@ -35,8 +35,10 @@ class Settings(BaseSettings):
     # LLM Configuration
     OPENAI_API_KEY: Optional[str] = Field(default=None, env="OPENAI_API_KEY")
     ANTHROPIC_API_KEY: Optional[str] = Field(default=None, env="ANTHROPIC_API_KEY")
-    LLM_PROVIDER: str = Field(default="openai", env="LLM_PROVIDER")  # openai, anthropic
+    XAI_API_KEY: Optional[str] = Field(default=None, env="XAI_API_KEY")
+    LLM_PROVIDER: str = Field(default="openai", env="LLM_PROVIDER")  # openai, anthropic, grok
     LLM_MODEL: str = Field(default="gpt-4", env="LLM_MODEL")
+    LLM_BASE_URL: Optional[str] = Field(default=None, env="LLM_BASE_URL")  # Custom base URL for OpenAI-compatible APIs
 
     # Truth Social Shitpost Configuration
     TRUTH_SOCIAL_USERNAME: str = Field(
@@ -125,8 +127,26 @@ class Settings(BaseSettings):
                     "ANTHROPIC_API_KEY is required when LLM_PROVIDER is 'anthropic'"
                 )
             return self.ANTHROPIC_API_KEY
+        elif self.LLM_PROVIDER == "grok":
+            if not self.XAI_API_KEY:
+                raise ValueError(
+                    "XAI_API_KEY is required when LLM_PROVIDER is 'grok'"
+                )
+            return self.XAI_API_KEY
         else:
             raise ValueError(f"Unsupported LLM provider: {self.LLM_PROVIDER}")
+
+    def get_llm_base_url(self) -> Optional[str]:
+        """Get the base URL for the LLM provider, if applicable.
+
+        Returns:
+            Base URL string for OpenAI-compatible providers, or None for native SDKs.
+        """
+        if self.LLM_BASE_URL:
+            return self.LLM_BASE_URL
+        if self.LLM_PROVIDER == "grok":
+            return "https://api.x.ai/v1"
+        return None
 
     def is_production(self) -> bool:
         """Check if running in production environment."""

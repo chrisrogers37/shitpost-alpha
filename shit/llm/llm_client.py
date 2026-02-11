@@ -21,30 +21,56 @@ logger = llm_logger.logger
 
 
 class LLMClient:
-    """Generic LLM API client for OpenAI and Anthropic services."""
-    
-    def __init__(self, provider: str = None, model: str = None, api_key: str = None):
+    """Generic LLM API client for OpenAI, Anthropic, and Grok services."""
+
+    def __init__(self, provider: str = None, model: str = None, api_key: str = None, base_url: str = None):
         """Initialize LLM client with optional overrides.
-        
+
         Args:
-            provider: LLM provider ('openai' or 'anthropic')
-            model: Model name (e.g., 'gpt-4', 'claude-3-sonnet')
+            provider: LLM provider ('openai', 'anthropic', or 'grok')
+            model: Model name (e.g., 'gpt-4', 'claude-sonnet-4-20250514', 'grok-2')
             api_key: API key (if not provided, uses settings)
+            base_url: Custom base URL for OpenAI-compatible APIs (if not provided, uses settings)
         """
         self.provider = provider or settings.LLM_PROVIDER
         self.model = model or settings.LLM_MODEL
         self.api_key = api_key or settings.get_llm_api_key()
+        self.base_url = base_url or settings.get_llm_base_url()
         self.confidence_threshold = settings.CONFIDENCE_THRESHOLD
-        
-        # Initialize client based on provider
-        if self.provider == "openai":
+
+        # Determine SDK type: grok uses OpenAI-compatible API
+        self._sdk_type = self._get_sdk_type()
+
+        # Initialize client based on SDK type
+        if self._sdk_type == "openai":
             from openai import AsyncOpenAI
-            self.client = AsyncOpenAI(api_key=self.api_key)
-        elif self.provider == "anthropic":
+            client_kwargs = {"api_key": self.api_key}
+            if self.base_url:
+                client_kwargs["base_url"] = self.base_url
+            self.client = AsyncOpenAI(**client_kwargs)
+        elif self._sdk_type == "anthropic":
             import anthropic
             self.client = anthropic.AsyncAnthropic(api_key=self.api_key)
         else:
             raise ValueError(f"Unsupported LLM provider: {self.provider}")
+
+    def _get_sdk_type(self) -> str:
+        """Determine which SDK to use for this provider.
+
+        Returns:
+            'openai' or 'anthropic'
+
+        Raises:
+            ValueError: If provider is not supported
+        """
+        sdk_map = {
+            "openai": "openai",
+            "anthropic": "anthropic",
+            "grok": "openai",  # Grok uses OpenAI-compatible API
+        }
+        if self.provider not in sdk_map:
+            raise ValueError(f"Unsupported LLM provider: {self.provider}")
+        return sdk_map[self.provider]
     
     async def initialize(self):
         """Initialize the LLM client."""
@@ -138,7 +164,7 @@ class LLMClient:
             LLM response text
         """
         try:
-            if self.provider == "openai":
+            if self._sdk_type == "openai":
                 response = await asyncio.wait_for(
                     self.client.chat.completions.create(
                         model=self.model,
@@ -152,8 +178,8 @@ class LLMClient:
                     timeout=30.0  # 30 second timeout
                 )
                 return response.choices[0].message.content
-            
-            elif self.provider == "anthropic":
+
+            elif self._sdk_type == "anthropic":
                 response = await asyncio.wait_for(
                     self.client.messages.create(
                         model=self.model,
