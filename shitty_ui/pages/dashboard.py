@@ -19,6 +19,7 @@ from components.cards import (
 )
 from components.controls import create_filter_controls, get_period_button_styles
 from components.header import create_header, create_footer
+from callbacks.alerts import create_alert_history_panel
 from data import (
     get_recent_signals,
     get_performance_metrics,
