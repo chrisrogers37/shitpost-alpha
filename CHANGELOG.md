@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `test_models.py` (25 tests) — `PredictionOutcome.calculate_return()`, `.is_correct()`, `.calculate_pnl()` with edge cases and boundary values
 
 ### Changed
+- **Layout Decomposition** - Decomposed 5,066-line `shitty_ui/layout.py` god file into focused modules
+  - `constants.py` (15 lines) — COLORS palette and shared constants
+  - `components/cards.py` (1,083 lines) — 9 reusable card/chart builders
+  - `components/controls.py` (75 lines) — filter controls and period button styles
+  - `components/header.py` (174 lines) — header and footer navigation
+  - `pages/dashboard.py` (1,669 lines) — dashboard + performance page layouts and callbacks
+  - `pages/assets.py` (641 lines) — asset deep dive page layout and callbacks
+  - `callbacks/alerts.py` (1,240 lines) — alert configuration panel and all alert callbacks
+  - `layout.py` reduced to 285 lines — app factory, URL routing, and re-exports
 - **Code Deduplication** - Eliminated repeated patterns across orchestrator, dashboard, and notifications
   - Extracted `_execute_subprocess()` + `_build_*_cmd()` helpers in `shitpost_alpha.py`, reducing 3 identical async functions to thin one-line wrappers; dry-run path reuses the same builders (~100 lines saved)
   - Removed dead `get_new_predictions_since()` from `shitty_ui/data.py` (callers already import from `notifications/db.py`)

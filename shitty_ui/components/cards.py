@@ -1,0 +1,1083 @@
+"""Reusable card and chart components for the Shitty UI dashboard."""
+
+from datetime import datetime
+from typing import Dict, Any
+
+from dash import html, dcc
+import dash_bootstrap_components as dbc
+import plotly.graph_objects as go
+
+from constants import COLORS
+
+
+def create_error_card(message: str, details: str = None):
+    """Create an error display card for graceful degradation."""
+    return dbc.Card(
+        [
+            dbc.CardBody(
+                [
+                    html.Div(
+                        [
+                            html.I(
+                                className="fas fa-exclamation-triangle me-2",
+                                style={"color": COLORS["danger"]},
+                            ),
+                            html.Span(
+                                "Error Loading Data",
+                                style={"color": COLORS["danger"], "fontWeight": "bold"},
+                            ),
+                        ],
+                        className="mb-2",
+                    ),
+                    html.P(
+                        message,
+                        style={
+                            "color": COLORS["text_muted"],
+                            "margin": 0,
+                            "fontSize": "0.9rem",
+                        },
+                    ),
+                    html.Small(
+                        details,
+                        style={"color": COLORS["text_muted"], "fontSize": "0.8rem"},
+                    )
+                    if details
+                    else None,
+                ],
+                style={"padding": "15px"},
+            )
+        ],
+        style={
+            "backgroundColor": COLORS["secondary"],
+            "border": f"1px solid {COLORS['danger']}",
+        },
+    )
+
+
+def create_empty_chart(message: str = "No data available"):
+    """Create an empty chart with a message for error states."""
+    fig = go.Figure()
+    fig.add_annotation(
+        text=message, showarrow=False, font=dict(color=COLORS["text_muted"], size=14)
+    )
+    fig.update_layout(
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font_color=COLORS["text_muted"],
+        height=250,
+        xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+        yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+    )
+    return fig
+
+
+def create_hero_signal_card(row) -> html.Div:
+    """Create a hero signal card for a high-confidence prediction."""
+    timestamp = row.get("timestamp")
+    text_content = row.get("text", "")
+    preview = text_content[:200] + "..." if len(text_content) > 200 else text_content
+    confidence = row.get("confidence", 0)
+    assets = row.get("assets", [])
+    market_impact = row.get("market_impact", {})
+    correct_t7 = row.get("correct_t7")
+
+    # Determine sentiment
+    sentiment = "neutral"
+    if isinstance(market_impact, dict) and market_impact:
+        first_sentiment = list(market_impact.values())[0]
+        if isinstance(first_sentiment, str):
+            sentiment = first_sentiment.lower()
+
+    # Format time ago
+    if isinstance(timestamp, datetime):
+        delta = datetime.now() - timestamp
+        if delta.days > 0:
+            time_ago = f"{delta.days}d ago"
+        elif delta.seconds >= 3600:
+            time_ago = f"{delta.seconds // 3600}h ago"
+        else:
+            time_ago = f"{delta.seconds // 60}m ago"
+    else:
+        time_ago = str(timestamp)[:16] if timestamp else ""
+
+    # Asset string
+    asset_str = ", ".join(assets[:4]) if isinstance(assets, list) else str(assets)
+
+    # Sentiment styling
+    sentiment_colors = {
+        "bullish": COLORS["success"],
+        "bearish": COLORS["danger"],
+        "neutral": COLORS["text_muted"],
+    }
+    sentiment_icons = {
+        "bullish": "arrow-trend-up",
+        "bearish": "arrow-trend-down",
+        "neutral": "minus",
+    }
+    s_color = sentiment_colors.get(sentiment, COLORS["text_muted"])
+    s_icon = sentiment_icons.get(sentiment, "minus")
+
+    # Outcome badge
+    if correct_t7 is True:
+        outcome = html.Span(
+            [
+                html.I(className="fas fa-check me-1"),
+                f"+${row.get('pnl_t7', 0):,.0f}" if row.get("pnl_t7") else "Correct",
+            ],
+            style={
+                "color": COLORS["success"],
+                "fontWeight": "600",
+                "fontSize": "0.8rem",
+            },
+        )
+    elif correct_t7 is False:
+        outcome = html.Span(
+            [
+                html.I(className="fas fa-times me-1"),
+                f"${row.get('pnl_t7', 0):,.0f}" if row.get("pnl_t7") else "Incorrect",
+            ],
+            style={
+                "color": COLORS["danger"],
+                "fontWeight": "600",
+                "fontSize": "0.8rem",
+            },
+        )
+    else:
+        outcome = html.Span(
+            [html.I(className="fas fa-clock me-1"), "Pending"],
+            style={
+                "color": COLORS["warning"],
+                "fontWeight": "600",
+                "fontSize": "0.8rem",
+            },
+        )
+
+    return html.Div(
+        [
+            # Top row: time ago + outcome
+            html.Div(
+                [
+                    html.Span(
+                        time_ago,
+                        style={
+                            "color": COLORS["text_muted"],
+                            "fontSize": "0.75rem",
+                        },
+                    ),
+                    outcome,
+                ],
+                style={
+                    "display": "flex",
+                    "justifyContent": "space-between",
+                    "marginBottom": "8px",
+                },
+            ),
+            # Post preview
+            html.P(
+                preview,
+                style={
+                    "fontSize": "0.85rem",
+                    "margin": "0 0 10px 0",
+                    "lineHeight": "1.5",
+                    "color": COLORS["text"],
+                },
+            ),
+            # Bottom row: sentiment badge + assets + confidence
+            html.Div(
+                [
+                    html.Span(
+                        [
+                            html.I(className=f"fas fa-{s_icon} me-1"),
+                            sentiment.upper(),
+                        ],
+                        className="sentiment-badge",
+                        style={
+                            "backgroundColor": f"{s_color}22",
+                            "color": s_color,
+                        },
+                    ),
+                    html.Span(
+                        asset_str,
+                        style={
+                            "color": COLORS["accent"],
+                            "fontSize": "0.8rem",
+                            "fontWeight": "600",
+                        },
+                    ),
+                    html.Span(
+                        f"Conf: {confidence:.0%}",
+                        style={
+                            "color": COLORS["text_muted"],
+                            "fontSize": "0.8rem",
+                        },
+                    ),
+                ],
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "gap": "12px",
+                    "flexWrap": "wrap",
+                },
+            ),
+        ],
+        className="hero-signal-card",
+        style={
+            "padding": "16px",
+            "backgroundColor": COLORS["secondary"],
+            "border": f"1px solid {COLORS['border']}",
+            "borderLeft": f"3px solid {s_color}",
+            "flex": "1 1 0",
+            "minWidth": "280px",
+        },
+    )
+
+
+def create_metric_card(
+    title: str,
+    value: str,
+    subtitle: str = "",
+    icon: str = "chart-line",
+    color: str = None,
+):
+    """Create a metric card component with responsive styling."""
+    color = color or COLORS["accent"]
+    return dbc.Card(
+        [
+            dbc.CardBody(
+                [
+                    html.Div(
+                        [
+                            html.I(
+                                className=f"fas fa-{icon}",
+                                style={"fontSize": "1.5rem", "color": color},
+                            ),
+                        ],
+                        className="mb-2",
+                    ),
+                    html.H3(
+                        value, style={"margin": 0, "color": color, "fontWeight": "bold"}
+                    ),
+                    html.P(
+                        title,
+                        style={
+                            "margin": 0,
+                            "color": COLORS["text_muted"],
+                            "fontSize": "0.85rem",
+                        },
+                    ),
+                    html.Small(subtitle, style={"color": COLORS["text_muted"]})
+                    if subtitle
+                    else None,
+                ],
+                style={"textAlign": "center", "padding": "15px"},
+            )
+        ],
+        className="metric-card",
+        style={
+            "backgroundColor": COLORS["secondary"],
+            "border": f"1px solid {COLORS['border']}",
+        },
+    )
+
+
+def create_signal_card(row):
+    """Create a signal card for recent predictions with time-ago format."""
+    timestamp = row.get("timestamp")
+    text_content = row.get("text", "")
+    preview = text_content[:120] + "..." if len(text_content) > 120 else text_content
+    confidence = row.get("confidence", 0)
+    assets = row.get("assets", [])
+    market_impact = row.get("market_impact", {})
+    correct_t7 = row.get("correct_t7")
+    pnl_t7 = row.get("pnl_t7")
+
+    # Determine sentiment from market_impact
+    sentiment = "neutral"
+    if isinstance(market_impact, dict) and market_impact:
+        first_sentiment = list(market_impact.values())[0]
+        if isinstance(first_sentiment, str):
+            sentiment = first_sentiment.lower()
+
+    # Format time ago
+    if isinstance(timestamp, datetime):
+        delta = datetime.now() - timestamp
+        if delta.days > 7:
+            time_ago = f"{delta.days // 7}w ago"
+        elif delta.days > 0:
+            time_ago = f"{delta.days}d ago"
+        elif delta.seconds >= 3600:
+            time_ago = f"{delta.seconds // 3600}h ago"
+        else:
+            time_ago = f"{max(1, delta.seconds // 60)}m ago"
+    else:
+        time_ago = str(timestamp)[:16] if timestamp else ""
+
+    # Format assets
+    asset_str = ", ".join(assets[:3]) if isinstance(assets, list) else str(assets)
+    if isinstance(assets, list) and len(assets) > 3:
+        asset_str += f" +{len(assets) - 3}"
+
+    # Outcome badge with P&L
+    if correct_t7 is True:
+        pnl_text = f"+${pnl_t7:,.0f}" if pnl_t7 else "Correct"
+        outcome_badge = html.Span(
+            [html.I(className="fas fa-check me-1"), pnl_text],
+            style={
+                "color": COLORS["success"],
+                "fontSize": "0.75rem",
+                "fontWeight": "600",
+            },
+        )
+    elif correct_t7 is False:
+        pnl_text = f"${pnl_t7:,.0f}" if pnl_t7 else "Incorrect"
+        outcome_badge = html.Span(
+            [html.I(className="fas fa-times me-1"), pnl_text],
+            style={
+                "color": COLORS["danger"],
+                "fontSize": "0.75rem",
+                "fontWeight": "600",
+            },
+        )
+    else:
+        outcome_badge = html.Span(
+            [html.I(className="fas fa-clock me-1"), "Pending"],
+            style={
+                "color": COLORS["warning"],
+                "fontSize": "0.75rem",
+                "fontWeight": "600",
+            },
+        )
+
+    # Sentiment styling
+    sentiment_colors = {
+        "bullish": COLORS["success"],
+        "bearish": COLORS["danger"],
+        "neutral": COLORS["text_muted"],
+    }
+    sentiment_icons = {
+        "bullish": "arrow-up",
+        "bearish": "arrow-down",
+        "neutral": "minus",
+    }
+    s_color = sentiment_colors.get(sentiment, COLORS["text_muted"])
+    s_icon = sentiment_icons.get(sentiment, "minus")
+
+    return html.Div(
+        [
+            # Top: time ago + outcome
+            html.Div(
+                [
+                    html.Span(
+                        time_ago,
+                        style={"color": COLORS["text_muted"], "fontSize": "0.75rem"},
+                    ),
+                    outcome_badge,
+                ],
+                className="d-flex justify-content-between align-items-center mb-1",
+            ),
+            # Post preview
+            html.P(
+                preview,
+                style={
+                    "fontSize": "0.82rem",
+                    "margin": "4px 0 8px 0",
+                    "lineHeight": "1.4",
+                    "color": COLORS["text"],
+                },
+            ),
+            # Bottom: sentiment badge + assets + confidence
+            html.Div(
+                [
+                    html.Span(
+                        [
+                            html.I(className=f"fas fa-{s_icon} me-1"),
+                            sentiment.upper(),
+                        ],
+                        className="sentiment-badge",
+                        style={
+                            "backgroundColor": f"{s_color}22",
+                            "color": s_color,
+                            "fontSize": "0.7rem",
+                        },
+                    ),
+                    html.Span(
+                        asset_str,
+                        style={
+                            "color": COLORS["accent"],
+                            "fontSize": "0.78rem",
+                            "fontWeight": "600",
+                        },
+                    ),
+                    html.Span(
+                        f"{confidence:.0%}",
+                        style={
+                            "color": COLORS["text_muted"],
+                            "fontSize": "0.78rem",
+                        },
+                    ),
+                ],
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "gap": "10px",
+                },
+            ),
+        ],
+        style={
+            "padding": "12px",
+            "borderBottom": f"1px solid {COLORS['border']}",
+            "cursor": "pointer",
+        },
+        className="signal-card",
+    )
+
+
+def create_post_card(row):
+    """Create a card for a post in the Latest Posts feed."""
+    timestamp = row.get("timestamp")
+    post_text = row.get("text", "")
+    analysis_status = row.get("analysis_status")
+    assets = row.get("assets", [])
+    market_impact = row.get("market_impact", {})
+    confidence = row.get("confidence")
+    thesis = row.get("thesis", "")
+    replies = row.get("replies_count", 0) or 0
+    reblogs = row.get("reblogs_count", 0) or 0
+    favourites = row.get("favourites_count", 0) or 0
+
+    # Truncate post text for display
+    display_text = post_text[:300] + "..." if len(post_text) > 300 else post_text
+
+    # Determine sentiment from market_impact
+    sentiment = None
+    if isinstance(market_impact, dict) and market_impact:
+        first_sentiment = list(market_impact.values())[0]
+        if isinstance(first_sentiment, str):
+            sentiment = first_sentiment.lower()
+
+    # Build analysis section based on status
+    if analysis_status == "completed" and assets:
+        # Format assets
+        asset_str = ", ".join(assets[:5]) if isinstance(assets, list) else str(assets)
+        if isinstance(assets, list) and len(assets) > 5:
+            asset_str += f" +{len(assets) - 5}"
+
+        sentiment_color = (
+            COLORS["success"]
+            if sentiment == "bullish"
+            else COLORS["danger"]
+            if sentiment == "bearish"
+            else COLORS["text_muted"]
+        )
+        sentiment_icon = (
+            "arrow-up"
+            if sentiment == "bullish"
+            else "arrow-down"
+            if sentiment == "bearish"
+            else "minus"
+        )
+
+        analysis_section = html.Div(
+            [
+                html.Div(
+                    [
+                        html.Span(
+                            [
+                                html.I(className=f"fas fa-{sentiment_icon} me-1"),
+                                (sentiment or "neutral").upper(),
+                            ],
+                            style={
+                                "color": sentiment_color,
+                                "fontSize": "0.85rem",
+                                "fontWeight": "bold",
+                            },
+                        ),
+                        html.Span(
+                            f" | {asset_str}",
+                            style={"color": COLORS["accent"], "fontSize": "0.85rem"},
+                        ),
+                        html.Span(
+                            f" | Confidence: {confidence:.0%}" if confidence else "",
+                            style={
+                                "color": COLORS["text_muted"],
+                                "fontSize": "0.85rem",
+                            },
+                        ),
+                    ],
+                    className="mb-1",
+                ),
+                html.P(
+                    thesis[:200] + "..." if thesis and len(thesis) > 200 else thesis,
+                    style={
+                        "fontSize": "0.8rem",
+                        "color": COLORS["text_muted"],
+                        "fontStyle": "italic",
+                        "margin": 0,
+                    },
+                )
+                if thesis
+                else None,
+            ],
+            style={
+                "padding": "8px",
+                "backgroundColor": COLORS["primary"],
+                "borderRadius": "6px",
+                "marginTop": "8px",
+            },
+        )
+    elif analysis_status == "bypassed":
+        analysis_section = html.Div(
+            [
+                html.Span(
+                    [
+                        html.I(className="fas fa-forward me-1"),
+                        "Bypassed",
+                    ],
+                    className="badge",
+                    style={
+                        "backgroundColor": COLORS["border"],
+                        "color": COLORS["text_muted"],
+                        "fontSize": "0.75rem",
+                    },
+                ),
+                html.Small(
+                    f" {row.get('analysis_comment', '') or ''}",
+                    style={"color": COLORS["text_muted"]},
+                ),
+            ],
+            style={"marginTop": "8px"},
+        )
+    else:
+        analysis_section = html.Div(
+            html.Span(
+                [
+                    html.I(className="fas fa-clock me-1"),
+                    "Pending Analysis",
+                ],
+                className="badge",
+                style={
+                    "backgroundColor": COLORS["warning"],
+                    "color": COLORS["primary"],
+                    "fontSize": "0.75rem",
+                },
+            ),
+            style={"marginTop": "8px"},
+        )
+
+    # Engagement metrics
+    engagement = html.Div(
+        [
+            html.Span(
+                [html.I(className="fas fa-reply me-1"), f"{replies}"],
+                style={
+                    "color": COLORS["text_muted"],
+                    "fontSize": "0.75rem",
+                    "marginRight": "12px",
+                },
+            ),
+            html.Span(
+                [html.I(className="fas fa-retweet me-1"), f"{reblogs}"],
+                style={
+                    "color": COLORS["text_muted"],
+                    "fontSize": "0.75rem",
+                    "marginRight": "12px",
+                },
+            ),
+            html.Span(
+                [html.I(className="fas fa-heart me-1"), f"{favourites}"],
+                style={"color": COLORS["text_muted"], "fontSize": "0.75rem"},
+            ),
+        ],
+        style={"marginTop": "8px"},
+    )
+
+    return html.Div(
+        [
+            # Timestamp
+            html.Div(
+                timestamp.strftime("%b %d, %Y %H:%M")
+                if isinstance(timestamp, datetime)
+                else str(timestamp)[:16],
+                style={
+                    "color": COLORS["text_muted"],
+                    "fontSize": "0.75rem",
+                    "marginBottom": "4px",
+                },
+            ),
+            # Post text
+            html.P(
+                display_text,
+                style={"fontSize": "0.9rem", "margin": "5px 0", "lineHeight": "1.5"},
+            ),
+            # Analysis
+            analysis_section,
+            # Engagement
+            engagement,
+        ],
+        style={
+            "padding": "15px",
+            "borderBottom": f"1px solid {COLORS['border']}",
+        },
+    )
+
+
+def create_prediction_timeline_card(row: dict) -> html.Div:
+    """
+    Create a single prediction card for the timeline.
+
+    Args:
+        row: Dictionary with keys from get_asset_predictions() DataFrame row
+
+    Returns:
+        html.Div component for one timeline entry
+    """
+    prediction_date = row.get("prediction_date")
+    timestamp = row.get("timestamp")
+    tweet_text = row.get("text", "")
+    sentiment = row.get("prediction_sentiment", "neutral")
+    confidence = row.get("prediction_confidence", 0)
+    return_t7 = row.get("return_t7")
+    correct_t7 = row.get("correct_t7")
+    pnl_t7 = row.get("pnl_t7")
+    price_at = row.get("price_at_prediction")
+    price_after = row.get("price_t7")
+
+    # Sentiment styling
+    if sentiment and sentiment.lower() == "bullish":
+        sentiment_color = COLORS["success"]
+        sentiment_icon = "arrow-up"
+    elif sentiment and sentiment.lower() == "bearish":
+        sentiment_color = COLORS["danger"]
+        sentiment_icon = "arrow-down"
+    else:
+        sentiment_color = COLORS["text_muted"]
+        sentiment_icon = "minus"
+
+    # Outcome badge
+    if correct_t7 is True:
+        outcome_badge = html.Span(
+            "Correct",
+            className="badge",
+            style={
+                "backgroundColor": COLORS["success"],
+                "marginLeft": "8px",
+            },
+        )
+    elif correct_t7 is False:
+        outcome_badge = html.Span(
+            "Incorrect",
+            className="badge",
+            style={
+                "backgroundColor": COLORS["danger"],
+                "marginLeft": "8px",
+            },
+        )
+    else:
+        outcome_badge = html.Span(
+            "Pending",
+            className="badge",
+            style={
+                "backgroundColor": COLORS["warning"],
+                "color": "#000",
+                "marginLeft": "8px",
+            },
+        )
+
+    # Format the date
+    if isinstance(prediction_date, datetime):
+        date_str = prediction_date.strftime("%b %d, %Y")
+    elif hasattr(prediction_date, "strftime"):
+        date_str = prediction_date.strftime("%b %d, %Y")
+    else:
+        date_str = str(prediction_date)[:10] if prediction_date else "Unknown"
+
+    # Format timestamp for the tweet time
+    if isinstance(timestamp, datetime):
+        time_str = timestamp.strftime("%H:%M")
+    else:
+        time_str = str(timestamp)[11:16] if timestamp else ""
+
+    # Truncate tweet text
+    display_text = tweet_text[:200] + "..." if len(tweet_text) > 200 else tweet_text
+
+    # Price change display
+    price_info = []
+    if price_at is not None:
+        price_info.append(
+            html.Span(
+                f"Entry: ${price_at:,.2f}",
+                style={"color": COLORS["text_muted"], "fontSize": "0.8rem"},
+            )
+        )
+    if price_after is not None:
+        price_info.append(
+            html.Span(
+                f" -> ${price_after:,.2f} (7d)",
+                style={"color": COLORS["text_muted"], "fontSize": "0.8rem"},
+            )
+        )
+
+    return html.Div(
+        [
+            # Top row: date, sentiment, outcome badge
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.Span(
+                                date_str,
+                                style={
+                                    "fontWeight": "bold",
+                                    "color": COLORS["text"],
+                                    "fontSize": "0.9rem",
+                                },
+                            ),
+                            html.Span(
+                                f" at {time_str}" if time_str else "",
+                                style={
+                                    "color": COLORS["text_muted"],
+                                    "fontSize": "0.8rem",
+                                },
+                            ),
+                            outcome_badge,
+                        ]
+                    ),
+                    html.Div(
+                        [
+                            html.I(
+                                className=f"fas fa-{sentiment_icon} me-1",
+                                style={"color": sentiment_color},
+                            ),
+                            html.Span(
+                                (sentiment or "neutral").upper(),
+                                style={
+                                    "color": sentiment_color,
+                                    "fontWeight": "bold",
+                                    "fontSize": "0.85rem",
+                                },
+                            ),
+                            html.Span(
+                                f" | Confidence: {confidence:.0%}"
+                                if confidence
+                                else "",
+                                style={
+                                    "color": COLORS["text_muted"],
+                                    "fontSize": "0.85rem",
+                                    "marginLeft": "10px",
+                                },
+                            ),
+                        ],
+                        style={"marginTop": "4px"},
+                    ),
+                ]
+            ),
+            # Tweet text
+            html.P(
+                display_text,
+                style={
+                    "fontSize": "0.85rem",
+                    "color": COLORS["text_muted"],
+                    "margin": "8px 0",
+                    "lineHeight": "1.5",
+                    "fontStyle": "italic",
+                    "borderLeft": f"3px solid {sentiment_color}",
+                    "paddingLeft": "12px",
+                },
+            ),
+            # Metrics row: return, P&L, prices
+            html.Div(
+                [
+                    # 7-day return
+                    html.Span(
+                        f"Return (7d): {return_t7:+.2f}%"
+                        if return_t7 is not None
+                        else "Return (7d): --",
+                        style={
+                            "color": (
+                                COLORS["success"]
+                                if return_t7 and return_t7 > 0
+                                else COLORS["danger"]
+                                if return_t7 and return_t7 < 0
+                                else COLORS["text_muted"]
+                            ),
+                            "fontSize": "0.85rem",
+                            "fontWeight": "bold",
+                        },
+                    ),
+                    html.Span(" | ", style={"color": COLORS["border"]}),
+                    # P&L
+                    html.Span(
+                        f"P&L: ${pnl_t7:+,.0f}" if pnl_t7 is not None else "P&L: --",
+                        style={
+                            "color": (
+                                COLORS["success"]
+                                if pnl_t7 and pnl_t7 > 0
+                                else COLORS["danger"]
+                                if pnl_t7 and pnl_t7 < 0
+                                else COLORS["text_muted"]
+                            ),
+                            "fontSize": "0.85rem",
+                        },
+                    ),
+                    html.Span(" | ", style={"color": COLORS["border"]}),
+                    # Price info
+                    *price_info,
+                ],
+                style={"marginBottom": "4px"},
+            ),
+        ],
+        style={
+            "padding": "16px",
+            "borderBottom": f"1px solid {COLORS['border']}",
+        },
+    )
+
+
+def create_related_asset_link(row: dict) -> html.Div:
+    """
+    Create a clickable link for a related asset.
+
+    Args:
+        row: Dictionary with keys: related_symbol, co_occurrence_count, avg_return_t7
+
+    Returns:
+        html.Div component
+    """
+    symbol = row.get("related_symbol", "???")
+    count = row.get("co_occurrence_count", 0)
+    avg_return = row.get("avg_return_t7")
+
+    return_color = COLORS["text_muted"]
+    return_str = "--"
+    if avg_return is not None:
+        return_color = COLORS["success"] if avg_return > 0 else COLORS["danger"]
+        return_str = f"{avg_return:+.2f}%"
+
+    return html.Div(
+        [
+            dcc.Link(
+                html.Span(
+                    symbol,
+                    style={
+                        "fontWeight": "bold",
+                        "color": COLORS["accent"],
+                        "fontSize": "0.95rem",
+                    },
+                ),
+                href=f"/assets/{symbol}",
+                style={"textDecoration": "none"},
+            ),
+            html.Span(
+                f" ({count} shared predictions)",
+                style={
+                    "color": COLORS["text_muted"],
+                    "fontSize": "0.8rem",
+                    "marginLeft": "8px",
+                },
+            ),
+            html.Span(
+                f" | Avg return: {return_str}",
+                style={
+                    "color": return_color,
+                    "fontSize": "0.8rem",
+                    "marginLeft": "8px",
+                },
+            ),
+        ],
+        style={
+            "padding": "10px 0",
+            "borderBottom": f"1px solid {COLORS['border']}",
+        },
+    )
+
+
+def create_performance_summary(stats: Dict[str, Any]) -> html.Div:
+    """
+    Create the performance summary comparing this asset vs overall system.
+
+    Args:
+        stats: Dictionary from get_asset_stats()
+
+    Returns:
+        html.Div with comparison metrics
+    """
+    asset_accuracy = stats.get("accuracy_t7", 0)
+    overall_accuracy = stats.get("overall_accuracy_t7", 0)
+    accuracy_diff = asset_accuracy - overall_accuracy
+
+    asset_return = stats.get("avg_return_t7", 0)
+    overall_return = stats.get("overall_avg_return_t7", 0)
+    return_diff = asset_return - overall_return
+
+    best = stats.get("best_return_t7")
+    worst = stats.get("worst_return_t7")
+
+    return html.Div(
+        [
+            # Accuracy comparison
+            html.Div(
+                [
+                    html.H6(
+                        "Accuracy vs Overall", style={"color": COLORS["text_muted"]}
+                    ),
+                    html.Div(
+                        [
+                            html.Div(
+                                [
+                                    html.Span(
+                                        f"{asset_accuracy:.1f}%",
+                                        style={
+                                            "fontSize": "1.5rem",
+                                            "fontWeight": "bold",
+                                            "color": (
+                                                COLORS["success"]
+                                                if asset_accuracy > 60
+                                                else COLORS["danger"]
+                                            ),
+                                        },
+                                    ),
+                                    html.Span(
+                                        " this asset",
+                                        style={
+                                            "color": COLORS["text_muted"],
+                                            "fontSize": "0.8rem",
+                                        },
+                                    ),
+                                ]
+                            ),
+                            html.Div(
+                                [
+                                    html.Span(
+                                        f"{overall_accuracy:.1f}%",
+                                        style={
+                                            "fontSize": "1rem",
+                                            "color": COLORS["text_muted"],
+                                        },
+                                    ),
+                                    html.Span(
+                                        " overall",
+                                        style={
+                                            "color": COLORS["text_muted"],
+                                            "fontSize": "0.8rem",
+                                        },
+                                    ),
+                                ]
+                            ),
+                            html.Div(
+                                [
+                                    html.Span(
+                                        f"{accuracy_diff:+.1f}pp",
+                                        style={
+                                            "color": (
+                                                COLORS["success"]
+                                                if accuracy_diff > 0
+                                                else COLORS["danger"]
+                                            ),
+                                            "fontWeight": "bold",
+                                            "fontSize": "0.9rem",
+                                        },
+                                    ),
+                                    html.Span(
+                                        " vs average",
+                                        style={
+                                            "color": COLORS["text_muted"],
+                                            "fontSize": "0.8rem",
+                                        },
+                                    ),
+                                ]
+                            ),
+                        ]
+                    ),
+                ],
+                style={
+                    "padding": "12px 0",
+                    "borderBottom": f"1px solid {COLORS['border']}",
+                },
+            ),
+            # Return comparison
+            html.Div(
+                [
+                    html.H6(
+                        "Avg 7-Day Return vs Overall",
+                        style={"color": COLORS["text_muted"]},
+                    ),
+                    html.Div(
+                        [
+                            html.Span(
+                                f"{asset_return:+.2f}%",
+                                style={
+                                    "fontSize": "1.2rem",
+                                    "fontWeight": "bold",
+                                    "color": (
+                                        COLORS["success"]
+                                        if asset_return > 0
+                                        else COLORS["danger"]
+                                    ),
+                                },
+                            ),
+                            html.Span(
+                                f" vs {overall_return:+.2f}% overall",
+                                style={
+                                    "color": COLORS["text_muted"],
+                                    "fontSize": "0.85rem",
+                                    "marginLeft": "10px",
+                                },
+                            ),
+                            html.Span(
+                                f" ({return_diff:+.2f}pp)",
+                                style={
+                                    "color": (
+                                        COLORS["success"]
+                                        if return_diff > 0
+                                        else COLORS["danger"]
+                                    ),
+                                    "fontSize": "0.85rem",
+                                    "marginLeft": "5px",
+                                },
+                            ),
+                        ]
+                    ),
+                ],
+                style={
+                    "padding": "12px 0",
+                    "borderBottom": f"1px solid {COLORS['border']}",
+                },
+            ),
+            # Best/Worst predictions
+            html.Div(
+                [
+                    html.H6(
+                        "Best / Worst Predictions",
+                        style={"color": COLORS["text_muted"]},
+                    ),
+                    html.Div(
+                        [
+                            html.Span(
+                                f"Best: {best:+.2f}%"
+                                if best is not None
+                                else "Best: --",
+                                style={
+                                    "color": COLORS["success"],
+                                    "fontSize": "0.9rem",
+                                    "fontWeight": "bold",
+                                },
+                            ),
+                            html.Span(" | ", style={"color": COLORS["border"]}),
+                            html.Span(
+                                f"Worst: {worst:+.2f}%"
+                                if worst is not None
+                                else "Worst: --",
+                                style={
+                                    "color": COLORS["danger"],
+                                    "fontSize": "0.9rem",
+                                    "fontWeight": "bold",
+                                },
+                            ),
+                        ]
+                    ),
+                ],
+                style={"padding": "12px 0"},
+            ),
+        ]
+    )
+
