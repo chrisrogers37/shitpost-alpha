@@ -257,14 +257,14 @@ class TestPrintFunctions:
         print_harvest_start("incremental", limit=None)
         
         captured = capsys.readouterr()
-        assert "🚀 Starting Truth Social S3 harvesting in incremental mode..." in captured.out
+        assert "Starting Truth Social S3 harvesting in incremental mode..." in captured.out
 
     def test_print_harvest_start_with_limit(self, capsys):
         """Test print_harvest_start with limit."""
         print_harvest_start("backfill", limit=100)
-        
+
         captured = capsys.readouterr()
-        assert "🚀 Starting Truth Social S3 harvesting in backfill mode (limit: 100)..." in captured.out
+        assert "Starting Truth Social S3 harvesting in backfill mode (limit: 100)..." in captured.out
 
     def test_print_harvest_progress(self, capsys):
         """Test print_harvest_progress function."""

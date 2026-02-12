@@ -29,7 +29,8 @@ class TestShitpostAlphaOrchestrator:
                 self.verbose = False
                 self.dry_run = False
                 self.max_id = None
-        
+                self.sources = None
+
         return MockArgs()
 
     @pytest.mark.asyncio
@@ -129,27 +130,34 @@ class TestShitpostAlphaOrchestrator:
             
             assert result is False
 
+    @pytest.fixture
+    def mock_settings(self):
+        """Mock settings for source resolution."""
+        with patch('shit.config.shitpost_settings.settings') as mock_s:
+            mock_s.get_enabled_harvester_names.return_value = ["truth_social"]
+            yield mock_s
+
     @pytest.mark.asyncio
-    async def test_main_successful_pipeline(self, sample_args):
+    async def test_main_successful_pipeline(self, sample_args, mock_settings):
         """Test successful main pipeline execution."""
         with patch('shitpost_alpha.execute_harvesting_cli', return_value=True) as mock_harvest, \
              patch('shitpost_alpha.execute_s3_to_database_cli', return_value=True) as mock_s3, \
              patch('shitpost_alpha.execute_analysis_cli', return_value=True) as mock_analysis, \
              patch('shitpost_alpha.argparse.ArgumentParser') as mock_parser_class:
-            
+
             mock_parser = MagicMock()
             mock_parser.parse_args.return_value = sample_args
             mock_parser_class.return_value = mock_parser
-            
+
             await shitpost_alpha.main()
-            
+
             # Verify all phases were executed
             mock_harvest.assert_called_once_with(sample_args)
             mock_s3.assert_called_once_with(sample_args)
             mock_analysis.assert_called_once_with(sample_args)
 
     @pytest.mark.asyncio
-    async def test_main_harvesting_failure(self, sample_args):
+    async def test_main_harvesting_failure(self, sample_args, mock_settings):
         """Test main pipeline with harvesting failure."""
         with patch('shitpost_alpha.execute_harvesting_cli', return_value=False) as mock_harvest, \
              patch('shitpost_alpha.execute_s3_to_database_cli', return_value=True) as mock_s3, \
@@ -172,7 +180,7 @@ class TestShitpostAlphaOrchestrator:
             mock_analysis.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_main_s3_processing_failure(self, sample_args):
+    async def test_main_s3_processing_failure(self, sample_args, mock_settings):
         """Test main pipeline with S3 processing failure."""
         with patch('shitpost_alpha.execute_harvesting_cli', return_value=True) as mock_harvest, \
              patch('shitpost_alpha.execute_s3_to_database_cli', return_value=False) as mock_s3, \
@@ -195,7 +203,7 @@ class TestShitpostAlphaOrchestrator:
             mock_analysis.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_main_analysis_failure(self, sample_args):
+    async def test_main_analysis_failure(self, sample_args, mock_settings):
         """Test main pipeline with analysis failure."""
         with patch('shitpost_alpha.execute_harvesting_cli', return_value=True) as mock_harvest, \
              patch('shitpost_alpha.execute_s3_to_database_cli', return_value=True) as mock_s3, \
@@ -218,7 +226,7 @@ class TestShitpostAlphaOrchestrator:
             mock_analysis.assert_called_once_with(sample_args)
 
     @pytest.mark.asyncio
-    async def test_main_keyboard_interrupt(self, sample_args):
+    async def test_main_keyboard_interrupt(self, sample_args, mock_settings):
         """Test main pipeline with keyboard interrupt."""
         with patch('shitpost_alpha.execute_harvesting_cli', side_effect=KeyboardInterrupt()) as mock_harvest, \
              patch('shitpost_alpha.execute_s3_to_database_cli', return_value=True) as mock_s3, \
@@ -237,7 +245,7 @@ class TestShitpostAlphaOrchestrator:
             assert exc_info.value.code == 1
 
     @pytest.mark.asyncio
-    async def test_main_general_exception(self, sample_args):
+    async def test_main_general_exception(self, sample_args, mock_settings):
         """Test main pipeline with general exception."""
         with patch('shitpost_alpha.execute_harvesting_cli', side_effect=Exception("General error")) as mock_harvest, \
              patch('shitpost_alpha.execute_s3_to_database_cli', return_value=True) as mock_s3, \
@@ -256,10 +264,10 @@ class TestShitpostAlphaOrchestrator:
             assert exc_info.value.code == 1
 
     @pytest.mark.asyncio
-    async def test_dry_run_mode(self, sample_args):
+    async def test_dry_run_mode(self, sample_args, mock_settings):
         """Test dry run mode execution."""
         sample_args.dry_run = True
-        
+
         with patch('shitpost_alpha.argparse.ArgumentParser') as mock_parser_class:
             
             mock_parser = MagicMock()
@@ -269,10 +277,10 @@ class TestShitpostAlphaOrchestrator:
             await shitpost_alpha.main()
 
     @pytest.mark.asyncio
-    async def test_verbose_logging(self, sample_args):
+    async def test_verbose_logging(self, sample_args, mock_settings):
         """Test verbose logging mode."""
         sample_args.verbose = True
-        
+
         with patch('shitpost_alpha.argparse.ArgumentParser') as mock_parser_class, \
              patch('shitpost_alpha.execute_harvesting_cli', return_value=True) as mock_harvest, \
              patch('shitpost_alpha.execute_s3_to_database_cli', return_value=True) as mock_s3, \

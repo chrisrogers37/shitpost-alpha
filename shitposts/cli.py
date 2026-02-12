@@ -68,11 +68,17 @@ def create_harvester_parser(description: str, epilog: str = None) -> argparse.Ar
         help="Enable verbose logging"
     )
     parser.add_argument(
-        "--max-id", 
+        "--max-id",
         type=str,
         help="Start harvesting from this post ID (for resuming backfill)"
     )
-    
+    parser.add_argument(
+        "--source",
+        type=str,
+        default=None,
+        help="Harvester source name (e.g., truth_social, twitter). Default: all enabled."
+    )
+
     return parser
 
 
@@ -101,15 +107,16 @@ def setup_harvester_logging(verbose: bool = False) -> None:
     setup_centralized_harvester_logging(verbose=verbose)
 
 
-def print_harvest_start(mode: str, limit: Optional[int] = None) -> None:
+def print_harvest_start(mode: str, limit: Optional[int] = None, source: str = "Truth Social") -> None:
     """Print harvester start message.
-    
+
     Args:
         mode: Harvesting mode
         limit: Harvest limit (optional)
+        source: Source name for display (default: Truth Social for backward compat)
     """
     limit_text = f" (limit: {limit})" if limit else ""
-    print_info(f"🚀 Starting Truth Social S3 harvesting in {mode} mode{limit_text}...")
+    print_info(f"Starting {source} S3 harvesting in {mode} mode{limit_text}...")
 
 
 def print_harvest_progress(harvested_count: int, limit: Optional[int] = None) -> None:
@@ -125,14 +132,15 @@ def print_harvest_progress(harvested_count: int, limit: Optional[int] = None) ->
         print_info(f"📊 Progress: {harvested_count} posts harvested")
 
 
-def print_harvest_complete(harvested_count: int, dry_run: bool = False) -> None:
+def print_harvest_complete(harvested_count: int, dry_run: bool = False, source: str = "S3") -> None:
     """Print harvester completion message.
-    
+
     Args:
         harvested_count: Total number of posts harvested
         dry_run: Whether this was a dry run
+        source: Source name for display (default: S3 for backward compat)
     """
-    print_success(f"S3 harvesting completed! Total posts: {harvested_count}")
+    print_success(f"{source} harvesting completed! Total posts: {harvested_count}")
     
     if dry_run:
         print_info("This was a dry run - no data was stored to S3")

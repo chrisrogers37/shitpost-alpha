@@ -104,6 +104,20 @@ class Settings(BaseSettings):
     )
     AWS_REGION: str = Field(default="us-east-1", env="AWS_REGION")
 
+    # Multi-Source Harvester Configuration
+    ENABLED_HARVESTERS: str = Field(
+        default="truth_social",
+        env="ENABLED_HARVESTERS",
+    )  # Comma-separated list of enabled harvester source names
+
+    # Twitter/X Configuration (Future)
+    TWITTER_API_KEY: Optional[str] = Field(default=None, env="TWITTER_API_KEY")
+    TWITTER_API_SECRET: Optional[str] = Field(default=None, env="TWITTER_API_SECRET")
+    TWITTER_BEARER_TOKEN: Optional[str] = Field(default=None, env="TWITTER_BEARER_TOKEN")
+    TWITTER_TARGET_USERS: str = Field(
+        default="", env="TWITTER_TARGET_USERS"
+    )  # Comma-separated Twitter usernames to monitor
+
     # Logging
     LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
     FILE_LOGGING: bool = Field(default=False, env="FILE_LOGGING")
@@ -147,6 +161,10 @@ class Settings(BaseSettings):
         if self.LLM_PROVIDER == "grok":
             return "https://api.x.ai/v1"
         return None
+
+    def get_enabled_harvester_names(self) -> list[str]:
+        """Parse ENABLED_HARVESTERS into a list of source names."""
+        return [h.strip() for h in self.ENABLED_HARVESTERS.split(",") if h.strip()]
 
     def is_production(self) -> bool:
         """Check if running in production environment."""
