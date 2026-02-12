@@ -17,6 +17,7 @@ from shit.market_data.models import MarketPrice
 from shit.market_data.ticker_registry import TickerRegistryService
 from shit.db.sync_session import get_session
 from shitvault.shitpost_models import Prediction
+from shitvault.signal_models import Signal  # noqa: F401 - registers Signal with SQLAlchemy mapper
 from shit.logging import get_service_logger, print_success, print_error, print_info
 
 logger = get_service_logger("auto_backfill")

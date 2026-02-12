@@ -134,6 +134,10 @@ class Settings(BaseSettings):
     FILE_LOGGING: bool = Field(default=False, env="FILE_LOGGING")
     LOG_FILE_PATH: Optional[str] = Field(default=None, env="LOG_FILE_PATH")
 
+    # Neon CLI (used by db-admin tooling, not by application code)
+    NEON_PROJECT_ID: Optional[str] = Field(default=None, env="NEON_PROJECT_ID")
+    NEON_ORG_ID: Optional[str] = Field(default=None, env="NEON_ORG_ID")
+
     class Config:
         env_file = ".env"
         case_sensitive = False

@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Market data pipeline runtime errors** - Fix critical bugs preventing market data CLI from working
+  - Add `Signal` model imports to resolve SQLAlchemy mapper errors in backfill_prices, auto_backfill_service, outcome_calculator, and cli modules
+  - Add `session.rollback()` in `update-all-prices` JSON/JSONB fallback path to prevent transaction poisoning
+  - Add `session.rollback()` in outcome calculator exception handlers to recover from failed transactions
+  - Add failed symbol caching in `OutcomeCalculator` to skip known-bad tickers (avoids ~7s retry delay per invalid ticker per prediction)
+
 ### Added
+- **DB Admin skill** - Claude Code `/db-admin` command for production database administration
+  - Full schema reference, CLI commands, schema drift detection, migration workflows
+  - Neon branching backup integration with tiered safety rules
 - **Market Data Resilience** - Multi-provider fallback with health monitoring
   - `PriceProvider` abstract base class and `ProviderChain` with automatic failover
   - `YFinanceProvider` extracts existing yfinance logic behind provider interface

@@ -14,6 +14,7 @@ from shit.market_data.client import MarketDataClient
 from shit.market_data.outcome_calculator import OutcomeCalculator
 from shit.logging import print_success, print_error, print_info
 from shit.db.sync_session import get_session
+from shitvault.signal_models import Signal  # noqa: F401 - registers Signal with SQLAlchemy mapper
 
 console = Console()
 
@@ -77,6 +78,7 @@ def fetch_prices(symbol: str, days: int, force: bool):
 def update_all_prices(days: int, limit: Optional[int]):
     """Update prices for all assets mentioned in predictions."""
     from shitvault.shitpost_models import Prediction
+    from shitvault.signal_models import Signal  # noqa: F401 - registers Signal with SQLAlchemy mapper
     from sqlalchemy import func, distinct
 
     print_info(f"Finding assets mentioned in predictions (last {days} days)...")
@@ -97,7 +99,8 @@ def update_all_prices(days: int, limit: Optional[int]):
             try:
                 assets = [row[0] for row in query.all()]
             except Exception:
-                # Fallback for SQLite (jsonb_array_elements_text not supported)
+                # Fallback: jsonb_array_elements_text fails when column is JSON (not JSONB)
+                session.rollback()
                 predictions = (
                     session.query(Prediction).filter(Prediction.assets != None).all()
                 )
