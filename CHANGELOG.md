@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.0.0] - 2026-02-12
+
 ### Fixed
 - **7d return calculation anchored to wrong date** - OutcomeCalculator was using `prediction.created_at` (when LLM analysis ran) instead of the original post's publication timestamp to anchor return calculations. All same-batch predictions got identical entry prices and returns regardless of when the actual posts were published. Now uses `shitpost.timestamp` / `signal.published_at` as the anchor date, with `created_at` as fallback.
 - **Market data pipeline runtime errors** - Fix critical bugs preventing market data CLI from working
