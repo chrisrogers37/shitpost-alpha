@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from shit.market_data.client import MarketDataClient
 from shit.market_data.models import MarketPrice
+from shit.market_data.price_provider import ProviderChain, ProviderError, RawPriceRecord
 
 
 @pytest.fixture
@@ -15,14 +16,21 @@ def mock_session():
 
 
 @pytest.fixture
-def client(mock_session):
-    c = MarketDataClient(session=mock_session)
+def mock_chain():
+    chain = MagicMock(spec=ProviderChain)
+    chain.providers = [MagicMock()]
+    return chain
+
+
+@pytest.fixture
+def client(mock_session, mock_chain):
+    c = MarketDataClient(session=mock_session, provider_chain=mock_chain)
     return c
 
 
 class TestMarketDataClientInit:
-    def test_init_with_session(self, mock_session):
-        c = MarketDataClient(session=mock_session)
+    def test_init_with_session(self, mock_session, mock_chain):
+        c = MarketDataClient(session=mock_session, provider_chain=mock_chain)
         assert c.session is mock_session
         assert c._own_session is False
 
@@ -31,18 +39,18 @@ class TestMarketDataClientInit:
         assert c.session is None
         assert c._own_session is True
 
-    def test_context_manager_with_external_session(self, mock_session):
-        c = MarketDataClient(session=mock_session)
+    def test_context_manager_with_external_session(self, mock_session, mock_chain):
+        c = MarketDataClient(session=mock_session, provider_chain=mock_chain)
         with c as ctx:
             assert ctx.session is mock_session
 
     @patch("shit.market_data.client.get_session")
-    def test_context_manager_creates_session_when_none(self, mock_get_session):
+    def test_context_manager_creates_session_when_none(self, mock_get_session, mock_chain):
         mock_sess = MagicMock()
         mock_get_session.return_value.__enter__ = MagicMock(return_value=mock_sess)
         mock_get_session.return_value.__exit__ = MagicMock(return_value=False)
 
-        c = MarketDataClient()
+        c = MarketDataClient(provider_chain=mock_chain)
         with c as ctx:
             assert ctx.session is mock_sess
 
@@ -70,58 +78,170 @@ class TestFetchPriceHistory:
         result = client.fetch_price_history("AAPL", date(2026, 1, 1))
         assert result == existing
 
-    @patch("shit.market_data.client.yf")
-    def test_fetches_from_yfinance_when_no_cache(self, mock_yf, client, mock_session):
+    def test_fetches_from_providers_when_no_cache(self, client, mock_session, mock_chain):
         # No cached data
         mock_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
-        # No existing individual prices
-        mock_session.query.return_value.filter.return_value.first.return_value = None
-
-        # Mock yfinance ticker
-        mock_ticker = MagicMock()
-        mock_yf.Ticker.return_value = mock_ticker
-
-        # Mock empty history
-        mock_hist = MagicMock()
-        mock_hist.empty = True
-        mock_ticker.history.return_value = mock_hist
+        # Provider chain returns empty
+        mock_chain.fetch_with_fallback.return_value = []
 
         result = client.fetch_price_history("AAPL", date(2026, 1, 1))
         assert result == []
-        mock_yf.Ticker.assert_called_once_with("AAPL")
+        mock_chain.fetch_with_fallback.assert_called()
 
-    @patch("shit.market_data.client.yf")
-    def test_force_refresh_skips_cache(self, mock_yf, client, mock_session):
-        # Even with existing data, force_refresh should call yfinance
-        mock_session.query.return_value.filter.return_value.first.return_value = None
-
-        mock_ticker = MagicMock()
-        mock_yf.Ticker.return_value = mock_ticker
-        mock_hist = MagicMock()
-        mock_hist.empty = True
-        mock_ticker.history.return_value = mock_hist
+    def test_force_refresh_skips_cache(self, client, mock_session, mock_chain):
+        mock_chain.fetch_with_fallback.return_value = []
 
         client.fetch_price_history("AAPL", date(2026, 1, 1), force_refresh=True)
-        # yfinance should have been called (cache was bypassed)
-        mock_yf.Ticker.assert_called_once_with("AAPL")
+        mock_chain.fetch_with_fallback.assert_called()
 
     def test_end_date_defaults_to_today(self, client, mock_session):
         existing = [MagicMock(spec=MarketPrice)]
         mock_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = existing
 
         result = client.fetch_price_history("AAPL", date(2026, 1, 1))
-        # Should succeed without passing end_date
         assert len(result) == 1
 
-    @patch("shit.market_data.client.yf")
-    def test_rolls_back_on_error(self, mock_yf, client, mock_session):
+    def test_stores_raw_records(self, client, mock_session, mock_chain):
         mock_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
-        mock_yf.Ticker.side_effect = RuntimeError("API down")
+        mock_session.query.return_value.filter.return_value.first.return_value = None
 
-        with pytest.raises(RuntimeError, match="API down"):
+        records = [
+            RawPriceRecord(
+                symbol="AAPL", date=date(2026, 1, 15),
+                open=150.0, high=155.0, low=149.0, close=153.0,
+                volume=1000000, adjusted_close=153.0, source="yfinance",
+            )
+        ]
+        mock_chain.fetch_with_fallback.return_value = records
+
+        result = client.fetch_price_history("AAPL", date(2026, 1, 1))
+        assert len(result) == 1
+        mock_session.add.assert_called_once()
+        mock_session.commit.assert_called_once()
+
+    def test_rolls_back_on_db_error(self, client, mock_session, mock_chain):
+        mock_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
+        mock_session.query.return_value.filter.return_value.first.return_value = None
+
+        records = [
+            RawPriceRecord(
+                symbol="AAPL", date=date(2026, 1, 15),
+                open=150.0, high=155.0, low=149.0, close=153.0,
+                volume=1000000, adjusted_close=153.0, source="yfinance",
+            )
+        ]
+        mock_chain.fetch_with_fallback.return_value = records
+        mock_session.commit.side_effect = RuntimeError("DB error")
+
+        with pytest.raises(RuntimeError, match="DB error"):
             client.fetch_price_history("AAPL", date(2026, 1, 1))
 
         mock_session.rollback.assert_called_once()
+
+
+class TestFetchWithRetry:
+    @patch("shit.market_data.client.settings")
+    @patch("shit.market_data.client.time")
+    def test_retries_on_provider_error(self, mock_time, mock_settings, client, mock_chain):
+        mock_settings.MARKET_DATA_MAX_RETRIES = 2
+        mock_settings.MARKET_DATA_RETRY_DELAY = 0.01
+        mock_settings.MARKET_DATA_RETRY_BACKOFF = 1.0
+        mock_settings.MARKET_DATA_FAILURE_ALERT_CHAT_ID = None
+
+        records = [RawPriceRecord(
+            symbol="AAPL", date=date(2026, 1, 15),
+            open=150.0, high=155.0, low=149.0, close=153.0,
+            volume=1000000, adjusted_close=153.0, source="test",
+        )]
+
+        mock_chain.fetch_with_fallback.side_effect = [
+            ProviderError("all", "down"),
+            ProviderError("all", "still down"),
+            records,
+        ]
+
+        result = client._fetch_with_retry("AAPL", date(2026, 1, 1), date(2026, 1, 31))
+        assert len(result) == 1
+        assert mock_chain.fetch_with_fallback.call_count == 3
+
+    @patch("shit.market_data.client._send_failure_alert")
+    @patch("shit.market_data.client.settings")
+    @patch("shit.market_data.client.time")
+    def test_sends_alert_after_all_retries_exhausted(self, mock_time, mock_settings, mock_alert, client, mock_chain):
+        mock_settings.MARKET_DATA_MAX_RETRIES = 1
+        mock_settings.MARKET_DATA_RETRY_DELAY = 0.01
+        mock_settings.MARKET_DATA_RETRY_BACKOFF = 1.0
+        mock_settings.MARKET_DATA_FAILURE_ALERT_CHAT_ID = None
+
+        mock_chain.fetch_with_fallback.side_effect = ProviderError("all", "permanently down")
+
+        result = client._fetch_with_retry("AAPL", date(2026, 1, 1), date(2026, 1, 31))
+        assert result == []
+        mock_alert.assert_called_once()
+
+    @patch("shit.market_data.client.settings")
+    def test_no_retry_on_success(self, mock_settings, client, mock_chain):
+        mock_settings.MARKET_DATA_MAX_RETRIES = 3
+        mock_settings.MARKET_DATA_RETRY_DELAY = 0.01
+        mock_settings.MARKET_DATA_RETRY_BACKOFF = 1.0
+
+        records = [MagicMock()]
+        mock_chain.fetch_with_fallback.return_value = records
+
+        result = client._fetch_with_retry("AAPL", date(2026, 1, 1), date(2026, 1, 31))
+        assert len(result) == 1
+        assert mock_chain.fetch_with_fallback.call_count == 1
+
+
+class TestStoreRawRecords:
+    def test_creates_new_price_records(self, client, mock_session):
+        mock_session.query.return_value.filter.return_value.first.return_value = None
+
+        records = [
+            RawPriceRecord(
+                symbol="AAPL", date=date(2026, 1, 15),
+                open=150.0, high=155.0, low=149.0, close=153.0,
+                volume=1000000, adjusted_close=153.0, source="yfinance",
+            ),
+        ]
+
+        result = client._store_raw_records(records)
+        assert len(result) == 1
+        mock_session.add.assert_called_once()
+
+    def test_skips_existing_unless_force(self, client, mock_session):
+        existing = MagicMock(spec=MarketPrice)
+        mock_session.query.return_value.filter.return_value.first.return_value = existing
+
+        records = [
+            RawPriceRecord(
+                symbol="AAPL", date=date(2026, 1, 15),
+                open=150.0, high=155.0, low=149.0, close=153.0,
+                volume=1000000, adjusted_close=153.0, source="yfinance",
+            ),
+        ]
+
+        result = client._store_raw_records(records, force_refresh=False)
+        assert result[0] is existing
+        mock_session.add.assert_not_called()
+
+    def test_updates_existing_on_force(self, client, mock_session):
+        existing = MagicMock(spec=MarketPrice)
+        mock_session.query.return_value.filter.return_value.first.return_value = existing
+
+        records = [
+            RawPriceRecord(
+                symbol="AAPL", date=date(2026, 1, 15),
+                open=160.0, high=165.0, low=159.0, close=163.0,
+                volume=2000000, adjusted_close=163.0, source="alphavantage",
+            ),
+        ]
+
+        result = client._store_raw_records(records, force_refresh=True)
+        assert result[0] is existing
+        assert existing.close == 163.0
+        assert existing.source == "alphavantage"
+        mock_session.add.assert_not_called()  # Updated in-place, no add
 
 
 class TestGetPriceOnDate:
@@ -139,7 +259,6 @@ class TestGetPriceOnDate:
         assert result is None
 
     def test_looks_back_when_market_closed(self, client, mock_session):
-        # First call (exact date) returns None, second call (day before) returns price
         mock_price = MagicMock(spec=MarketPrice)
         mock_session.query.return_value.filter.return_value.first.side_effect = [
             None,  # exact date
@@ -150,12 +269,10 @@ class TestGetPriceOnDate:
         assert result is mock_price
 
     def test_respects_lookback_limit(self, client, mock_session):
-        # All lookback days return None
         mock_session.query.return_value.filter.return_value.first.return_value = None
 
         result = client.get_price_on_date("AAPL", date(2026, 1, 15), lookback_days=3)
         assert result is None
-        # exact date + 3 lookback = 4 calls
         assert mock_session.query.return_value.filter.return_value.first.call_count == 4
 
 
@@ -182,11 +299,9 @@ class TestUpdatePricesForSymbols:
         result = client.update_prices_for_symbols(["AAPL", "TSLA"])
         assert result == {"AAPL": 1, "TSLA": 1}
 
-    @patch("shit.market_data.client.yf")
-    def test_continues_on_error(self, mock_yf, client, mock_session):
-        # First symbol fails, second succeeds
+    def test_continues_on_error(self, client, mock_session, mock_chain):
         mock_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
-        mock_yf.Ticker.side_effect = RuntimeError("API down")
+        mock_chain.fetch_with_fallback.side_effect = ProviderError("all", "down")
 
         result = client.update_prices_for_symbols(["BAD", "ALSO_BAD"])
         assert result["BAD"] == 0
@@ -197,7 +312,6 @@ class TestUpdatePricesForSymbols:
         mock_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = existing
 
         result = client.update_prices_for_symbols(["AAPL"])
-        # Should succeed with default date range
         assert "AAPL" in result
 
 
@@ -209,7 +323,6 @@ class TestGetPriceStats:
         mock_stats.latest_date = date(2026, 1, 31)
         mock_session.query.return_value.filter.return_value.first.return_value = mock_stats
 
-        # Mock get_latest_price via the order_by path
         mock_latest = MagicMock(close=155.0)
         mock_session.query.return_value.filter.return_value.order_by.return_value.first.return_value = mock_latest
 

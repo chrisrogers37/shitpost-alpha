@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Market Data Resilience** - Multi-provider fallback with health monitoring
+  - `PriceProvider` abstract base class and `ProviderChain` with automatic failover
+  - `YFinanceProvider` extracts existing yfinance logic behind provider interface
+  - `AlphaVantageProvider` as free-tier REST API fallback (TIME_SERIES_DAILY endpoint)
+  - `RawPriceRecord` dataclass as provider-agnostic DTO
+  - `ProviderError` exception with provider name tracking and original error chaining
+  - Exponential backoff retry logic (`_fetch_with_retry`) with configurable retries, delay, and backoff multiplier
+  - Health check system: `check_provider_health()`, `check_data_freshness()`, `run_health_check()`
+  - `HealthReport` dataclass with `to_dict()` for JSON serialization
+  - Telegram failure alerts when all providers fail after all retries
+  - `market-data health-check` CLI command with `--providers/--freshness/--alert/--json` flags
+  - 9 new configuration settings for provider selection, retry behavior, and staleness thresholds
 - **Harvester Abstraction Layer** - Multi-source harvesting interface
   - `SignalHarvester` abstract base class with standardized lifecycle (init, connect, harvest, cleanup)
   - `HarvesterRegistry` for config-driven source management with `create_default_registry()`
@@ -34,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dual-FK on Predictions** - `Prediction.signal_id` added alongside legacy `shitpost_id` with `content_id` property
 
 ### Changed
+- **MarketDataClient** refactored to use `ProviderChain` instead of direct yfinance calls
+  - `fetch_price_history()` now routes through `_fetch_with_retry()` and `_store_raw_records()`
+  - Backward-compatible: `provider_chain` parameter is optional (default builds from settings)
+  - All existing public methods unchanged
 - **TruthSocialS3Harvester** now implements `SignalHarvester` interface
   - Backward-compatible: `harvest_shitposts()` still works for existing callers
   - Harvest loop logic moved to shared base class

@@ -356,6 +356,82 @@ def price_stats(symbol: Optional[str]):
         raise click.Abort()
 
 
+@cli.command(name="health-check")
+@click.option("--providers/--no-providers", default=True, help="Check provider connectivity")
+@click.option("--freshness/--no-freshness", default=True, help="Check data freshness")
+@click.option("--alert/--no-alert", default=False, help="Send Telegram alert if unhealthy")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def health_check(providers: bool, freshness: bool, alert: bool, as_json: bool):
+    """Run health check on market data pipeline."""
+    from shit.market_data.health import run_health_check
+
+    print_info("Running market data health check...")
+
+    try:
+        report = run_health_check(
+            check_providers=providers,
+            check_freshness=freshness,
+            send_alert_on_failure=alert,
+        )
+
+        if as_json:
+            import json
+            rprint(json.dumps(report.to_dict(), indent=2, default=str))
+            return
+
+        # Pretty print the report
+        status_icon = "\u2705" if report.overall_healthy else "\u274c"
+        rprint(f"\n{status_icon} [bold]Market Data Health: {'HEALTHY' if report.overall_healthy else 'UNHEALTHY'}[/bold]")
+
+        if report.providers:
+            rprint("\n[bold]Provider Status:[/bold]")
+            provider_table = Table()
+            provider_table.add_column("Provider", style="cyan")
+            provider_table.add_column("Available", justify="center")
+            provider_table.add_column("Can Fetch", justify="center")
+            provider_table.add_column("Latency", justify="right")
+            provider_table.add_column("Error", style="red")
+
+            for p in report.providers:
+                provider_table.add_row(
+                    p.name,
+                    "\u2705" if p.available else "\u274c",
+                    "\u2705" if p.can_fetch else "\u274c",
+                    f"{p.response_time_ms:.0f}ms" if p.response_time_ms else "N/A",
+                    p.error or "",
+                )
+            console.print(provider_table)
+
+        if report.freshness:
+            rprint("\n[bold]Data Freshness:[/bold]")
+            fresh_table = Table()
+            fresh_table.add_column("Symbol", style="cyan")
+            fresh_table.add_column("Latest Date", style="yellow")
+            fresh_table.add_column("Days Stale", justify="right")
+            fresh_table.add_column("Status", justify="center")
+
+            for f in report.freshness:
+                status = "\u2705 Fresh" if not f.is_stale else "\u26a0\ufe0f Stale"
+                fresh_table.add_row(
+                    f.symbol,
+                    str(f.latest_date) if f.latest_date else "No data",
+                    str(f.days_stale),
+                    status,
+                )
+            console.print(fresh_table)
+
+        rprint(f"\n[bold]Summary:[/bold] {report.summary}")
+
+        if not report.overall_healthy:
+            raise SystemExit(1)
+
+    except SystemExit:
+        raise
+    except Exception as e:
+        print_error(f"\u274c Error running health check: {e}")
+        raise click.Abort()
+
+
 @cli.command(name="auto-pipeline")
 @click.option(
     "--days-back",

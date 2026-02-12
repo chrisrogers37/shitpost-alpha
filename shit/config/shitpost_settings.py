@@ -90,6 +90,17 @@ class Settings(BaseSettings):
         default=None, env="TELEGRAM_WEBHOOK_URL"
     )  # For webhook mode (optional)
 
+    # Market Data Resilience Configuration
+    ALPHA_VANTAGE_API_KEY: Optional[str] = Field(default=None, env="ALPHA_VANTAGE_API_KEY")
+    MARKET_DATA_PRIMARY_PROVIDER: str = Field(default="yfinance", env="MARKET_DATA_PRIMARY_PROVIDER")
+    MARKET_DATA_FALLBACK_PROVIDER: str = Field(default="alphavantage", env="MARKET_DATA_FALLBACK_PROVIDER")
+    MARKET_DATA_MAX_RETRIES: int = Field(default=3, env="MARKET_DATA_MAX_RETRIES")
+    MARKET_DATA_RETRY_DELAY: float = Field(default=1.0, env="MARKET_DATA_RETRY_DELAY")  # seconds
+    MARKET_DATA_RETRY_BACKOFF: float = Field(default=2.0, env="MARKET_DATA_RETRY_BACKOFF")  # multiplier
+    MARKET_DATA_STALENESS_THRESHOLD_HOURS: int = Field(default=48, env="MARKET_DATA_STALENESS_THRESHOLD_HOURS")
+    MARKET_DATA_HEALTH_CHECK_SYMBOLS: str = Field(default="SPY,AAPL", env="MARKET_DATA_HEALTH_CHECK_SYMBOLS")
+    MARKET_DATA_FAILURE_ALERT_CHAT_ID: Optional[str] = Field(default=None, env="MARKET_DATA_FAILURE_ALERT_CHAT_ID")
+
     # ScrapeCreators API Configuration
     SCRAPECREATORS_API_KEY: Optional[str] = Field(
         default=None, env="SCRAPECREATORS_API_KEY"
