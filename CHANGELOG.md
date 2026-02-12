@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Harvester Abstraction Layer** - Multi-source harvesting interface
+  - `SignalHarvester` abstract base class with standardized lifecycle (init, connect, harvest, cleanup)
+  - `HarvesterRegistry` for config-driven source management with `create_default_registry()`
+  - Shared data models: `HarvestResult`, `HarvestSummary`, `HarvesterConfig`
+  - Skeleton `TwitterHarvester` as template for future source implementations
+  - `--source` CLI flag for harvester and `--sources` for orchestrator
+  - `ENABLED_HARVESTERS` environment variable for source selection
 - **Signal-Over-Trend Chart View** - New `/trends` page showing prediction signals overlaid on candlestick price charts
   - Sentiment-colored markers (green=bullish, red=bearish, gray=neutral)
   - Marker size scales with prediction confidence
@@ -27,6 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dual-FK on Predictions** - `Prediction.signal_id` added alongside legacy `shitpost_id` with `content_id` property
 
 ### Changed
+- **TruthSocialS3Harvester** now implements `SignalHarvester` interface
+  - Backward-compatible: `harvest_shitposts()` still works for existing callers
+  - Harvest loop logic moved to shared base class
+  - S3 prefix preserved as `truth-social` (hyphenated) for existing data compatibility
+- **Orchestrator** updated to support running multiple harvesters sequentially via `--sources` flag
 - **S3 Processor** - Now accepts `source` parameter and dual-writes to both `signals` and `truth_social_shitposts`
 - **Bypass Service** - `_is_retruth()` now checks `is_repost` flag before legacy `reblog` field
 - **Analyzer** - `_prepare_enhanced_content()` uses generic field names with fallback to legacy names

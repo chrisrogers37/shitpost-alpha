@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime
 
 from shitposts.truth_social_s3_harvester import TruthSocialS3Harvester, main
+from shitposts.harvester_models import HarvestResult
 
 
 class TestTruthSocialS3Harvester:
@@ -22,7 +23,7 @@ class TestTruthSocialS3Harvester:
             "posts": [
                 {
                     "id": "test_post_001",
-                    "content": "Tesla stock is going to the moon! 🚀",
+                    "content": "Tesla stock is going to the moon!",
                     "created_at": "2024-01-15T10:30:00Z",
                     "account": {
                         "id": "107780257626128497",
@@ -52,7 +53,7 @@ class TestTruthSocialS3Harvester:
             mock_settings.AWS_REGION = "us-east-1"
             mock_settings.AWS_ACCESS_KEY_ID = "test_key_id"
             mock_settings.AWS_SECRET_ACCESS_KEY = "test_secret_key"
-            
+
             return TruthSocialS3Harvester(
                 mode="incremental",
                 start_date=None,
@@ -71,9 +72,9 @@ class TestTruthSocialS3Harvester:
             mock_settings.AWS_REGION = "us-east-1"
             mock_settings.AWS_ACCESS_KEY_ID = "test_key_id"
             mock_settings.AWS_SECRET_ACCESS_KEY = "test_secret_key"
-            
+
             harvester = TruthSocialS3Harvester()
-            
+
             assert harvester.mode == "incremental"
             assert harvester.start_date is None
             assert harvester.end_date is None
@@ -92,7 +93,7 @@ class TestTruthSocialS3Harvester:
             mock_settings.AWS_REGION = "us-east-1"
             mock_settings.AWS_ACCESS_KEY_ID = "test_key_id"
             mock_settings.AWS_SECRET_ACCESS_KEY = "test_secret_key"
-            
+
             harvester = TruthSocialS3Harvester(
                 mode="range",
                 start_date="2024-01-01",
@@ -100,7 +101,7 @@ class TestTruthSocialS3Harvester:
                 limit=100,
                 max_id="test_max_id"
             )
-            
+
             assert harvester.mode == "range"
             assert harvester.start_date == "2024-01-01"
             assert harvester.end_date == "2024-01-31"
@@ -111,7 +112,7 @@ class TestTruthSocialS3Harvester:
     def test_initialization_defaults_end_date(self):
         """Test harvester initialization defaults end_date to today."""
         with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings, \
-             patch('shitposts.truth_social_s3_harvester.datetime') as mock_datetime:
+             patch('shitposts.base_harvester.datetime') as mock_datetime:
             mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
             mock_settings.SCRAPECREATORS_API_KEY = "test_key"
             mock_settings.S3_BUCKET_NAME = "test-bucket"
@@ -119,17 +120,34 @@ class TestTruthSocialS3Harvester:
             mock_settings.AWS_REGION = "us-east-1"
             mock_settings.AWS_ACCESS_KEY_ID = "test_key_id"
             mock_settings.AWS_SECRET_ACCESS_KEY = "test_secret_key"
-            
+
             mock_now = datetime(2024, 1, 15, 12, 0, 0)
             mock_datetime.now.return_value = mock_now
-            
+            mock_datetime.fromisoformat = datetime.fromisoformat
+
             harvester = TruthSocialS3Harvester(
                 mode="range",
                 start_date="2024-01-01",
                 end_date=None
             )
-            
+
             assert harvester.end_datetime == mock_now.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+    def test_source_name(self):
+        """Test that get_source_name returns correct value."""
+        with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
+            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+            mock_settings.SCRAPECREATORS_API_KEY = "test_key"
+            harvester = TruthSocialS3Harvester()
+            assert harvester.get_source_name() == "truth_social"
+
+    def test_s3_prefix_backward_compat(self):
+        """Test that S3 prefix uses hyphenated form for backward compatibility."""
+        with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
+            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+            mock_settings.SCRAPECREATORS_API_KEY = "test_key"
+            harvester = TruthSocialS3Harvester()
+            assert harvester._get_s3_prefix() == "truth-social"
 
     @pytest.mark.asyncio
     async def test_initialize(self, harvester):
@@ -143,7 +161,7 @@ class TestTruthSocialS3Harvester:
                 return self
             async def __aexit__(self, *args):
                 pass
-        
+
         class MockSession:
             async def __aenter__(self):
                 return self
@@ -151,16 +169,16 @@ class TestTruthSocialS3Harvester:
                 pass
             def get(self, *args, **kwargs):
                 return MockResponse()
-        
+
         with patch('aiohttp.ClientSession', return_value=MockSession()), \
-             patch('shitposts.truth_social_s3_harvester.S3DataLake') as mock_s3_class:
-            
+             patch('shitposts.base_harvester.S3DataLake') as mock_s3_class:
+
             mock_s3_instance = AsyncMock()
             mock_s3_instance.initialize = AsyncMock()
             mock_s3_class.return_value = mock_s3_instance
-            
+
             await harvester.initialize(dry_run=False)
-            
+
             assert harvester.session is not None
             assert harvester.s3_data_lake is not None
 
@@ -169,12 +187,12 @@ class TestTruthSocialS3Harvester:
         """Test harvester initialization in dry run mode."""
         with patch('aiohttp.ClientSession') as mock_session_class, \
              patch.object(harvester, '_test_connection', new_callable=AsyncMock) as mock_test:
-            
+
             mock_session = AsyncMock()
             mock_session_class.return_value = mock_session
-            
+
             await harvester.initialize(dry_run=True)
-            
+
             mock_test.assert_called_once()
             assert harvester.s3_data_lake is None  # Should not initialize S3 in dry run
 
@@ -184,7 +202,7 @@ class TestTruthSocialS3Harvester:
         # Temporarily set API key to None
         original_key = harvester.api_key
         harvester.api_key = None
-        
+
         try:
             with pytest.raises(ValueError, match="SCRAPECREATORS_API_KEY not configured"):
                 await harvester.initialize()
@@ -209,19 +227,19 @@ class TestTruthSocialS3Harvester:
                 return self
             async def __aexit__(self, *args):
                 pass
-        
+
         class MockSession:
             def get(self, *args, **kwargs):
                 return MockResponse()
-        
+
         harvester.session = MockSession()
-        
+
         # Should not raise exception
         await harvester._test_connection()
 
     @pytest.mark.asyncio
-    async def test_fetch_recent_shitposts_success(self, harvester, sample_api_response):
-        """Test successful fetching of recent shitposts."""
+    async def test_fetch_batch_success(self, harvester, sample_api_response):
+        """Test successful fetching via _fetch_batch."""
         class MockResponse:
             status = 200
             async def json(self):
@@ -230,15 +248,68 @@ class TestTruthSocialS3Harvester:
                 return self
             async def __aexit__(self, *args):
                 pass
-        
+
         class MockSession:
             def get(self, *args, **kwargs):
                 return MockResponse()
-        
+
         harvester.session = MockSession()
-        
+
+        posts, next_cursor = await harvester._fetch_batch()
+
+        assert len(posts) == 2
+        assert posts[0]["id"] == "test_post_001"
+        assert posts[1]["id"] == "test_post_002"
+        assert next_cursor == "test_post_002"
+
+    @pytest.mark.asyncio
+    async def test_fetch_batch_with_cursor(self, harvester, sample_api_response):
+        """Test fetching with cursor parameter."""
+        class MockResponse:
+            status = 200
+            async def json(self):
+                return sample_api_response
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, *args):
+                pass
+
+        class MockSession:
+            def __init__(self):
+                self.get_calls = []
+            def get(self, *args, **kwargs):
+                self.get_calls.append((args, kwargs))
+                return MockResponse()
+
+        harvester.session = MockSession()
+
+        posts, _ = await harvester._fetch_batch(cursor="test_cursor")
+
+        assert len(posts) == 2
+        call_kwargs = harvester.session.get_calls[0][1]
+        assert 'params' in call_kwargs
+        assert call_kwargs['params']['next_max_id'] == "test_cursor"
+
+    @pytest.mark.asyncio
+    async def test_fetch_recent_shitposts_success(self, harvester, sample_api_response):
+        """Test backward-compatible _fetch_recent_shitposts method."""
+        class MockResponse:
+            status = 200
+            async def json(self):
+                return sample_api_response
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, *args):
+                pass
+
+        class MockSession:
+            def get(self, *args, **kwargs):
+                return MockResponse()
+
+        harvester.session = MockSession()
+
         result = await harvester._fetch_recent_shitposts()
-        
+
         assert len(result) == 2
         assert result[0]["id"] == "test_post_001"
         assert result[1]["id"] == "test_post_002"
@@ -254,18 +325,18 @@ class TestTruthSocialS3Harvester:
                 return self
             async def __aexit__(self, *args):
                 pass
-        
+
         class MockSession:
             def __init__(self):
                 self.get_calls = []
             def get(self, *args, **kwargs):
                 self.get_calls.append((args, kwargs))
                 return MockResponse()
-        
+
         harvester.session = MockSession()
-        
+
         result = await harvester._fetch_recent_shitposts("test_max_id")
-        
+
         assert len(result) == 2
         # Verify max_id was used in API call
         assert len(harvester.session.get_calls) > 0
@@ -274,28 +345,29 @@ class TestTruthSocialS3Harvester:
         assert call_kwargs['params']['next_max_id'] == "test_max_id"
 
     @pytest.mark.asyncio
-    async def test_fetch_recent_shitposts_api_error_status(self, harvester):
-        """Test fetching shitposts with API error status."""
+    async def test_fetch_batch_api_error_status(self, harvester):
+        """Test fetching with API error status."""
         class MockResponse:
             status = 500
             async def __aenter__(self):
                 return self
             async def __aexit__(self, *args):
                 pass
-        
+
         class MockSession:
             def get(self, *args, **kwargs):
                 return MockResponse()
-        
+
         harvester.session = MockSession()
-        
-        result = await harvester._fetch_recent_shitposts()
-        
-        assert result == []
+
+        posts, cursor = await harvester._fetch_batch()
+
+        assert posts == []
+        assert cursor is None
 
     @pytest.mark.asyncio
-    async def test_fetch_recent_shitposts_api_error_response(self, harvester):
-        """Test fetching shitposts with API error in response."""
+    async def test_fetch_batch_api_error_response(self, harvester):
+        """Test fetching with API error in response."""
         class MockResponse:
             status = 200
             async def json(self):
@@ -304,163 +376,137 @@ class TestTruthSocialS3Harvester:
                 return self
             async def __aexit__(self, *args):
                 pass
-        
+
         class MockSession:
             def get(self, *args, **kwargs):
                 return MockResponse()
-        
+
         harvester.session = MockSession()
-        
-        result = await harvester._fetch_recent_shitposts()
-        
-        assert result == []
+
+        posts, cursor = await harvester._fetch_batch()
+
+        assert posts == []
+        assert cursor is None
 
     @pytest.mark.asyncio
-    async def test_fetch_recent_shitposts_exception(self, harvester):
-        """Test fetching shitposts with exception."""
+    async def test_fetch_batch_exception(self, harvester):
+        """Test fetching with exception."""
         class MockSession:
             def get(self, *args, **kwargs):
                 raise Exception("Network error")
-        
+
         harvester.session = MockSession()
-        
-        result = await harvester._fetch_recent_shitposts()
-        
-        assert result == []
+
+        posts, cursor = await harvester._fetch_batch()
+
+        assert posts == []
+        assert cursor is None
 
     @pytest.mark.asyncio
-    async def test_harvest_shitposts_incremental_mode(self, harvester):
-        """Test harvesting in incremental mode."""
-        async def mock_generator():
-            yield {"shitpost_id": "test_001", "s3_key": "test-key"}
-        
-        with patch.object(harvester, '_harvest_backfill', return_value=mock_generator()) as mock_harvest:
-            results = []
-            async for result in harvester.harvest_shitposts():
-                results.append(result)
-            
-            assert len(results) == 1
-            mock_harvest.assert_called_once()
-            # For incremental mode: _harvest_backfill(dry_run, incremental_mode=True)
-            call_args = mock_harvest.call_args[0]  # Positional args
-            call_kwargs = mock_harvest.call_args[1]  # Keyword args
-            assert call_args[0] == False  # dry_run
-            assert call_kwargs['incremental_mode'] == True
+    async def test_extract_item_id(self, harvester):
+        """Test item ID extraction."""
+        assert harvester._extract_item_id({"id": "test_123"}) == "test_123"
+        assert harvester._extract_item_id({}) == ""
 
     @pytest.mark.asyncio
-    async def test_harvest_shitposts_backfill_mode(self):
-        """Test harvesting in backfill mode."""
-        with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
-            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
-            mock_settings.SCRAPECREATORS_API_KEY = "test_key"
-            mock_settings.S3_BUCKET_NAME = "test-bucket"
-            mock_settings.S3_PREFIX = "test-prefix"
-            mock_settings.AWS_REGION = "us-east-1"
-            mock_settings.AWS_ACCESS_KEY_ID = "test_key_id"
-            mock_settings.AWS_SECRET_ACCESS_KEY = "test_secret_key"
-            
-            harvester = TruthSocialS3Harvester(mode="backfill")
-            
-            async def mock_generator():
-                yield {"shitpost_id": "test_001", "s3_key": "test-key"}
-            
-            with patch.object(harvester, '_harvest_backfill', return_value=mock_generator()) as mock_harvest:
-                results = []
-                async for result in harvester.harvest_shitposts():
-                    results.append(result)
-                
-            assert len(results) == 1
-            # Arguments are passed positionally: dry_run
-            mock_harvest.assert_called_once()
-            call_args = mock_harvest.call_args[0]  # Positional args
-            assert call_args[0] == False  # dry_run
+    async def test_extract_timestamp(self, harvester):
+        """Test timestamp extraction."""
+        ts = harvester._extract_timestamp({"created_at": "2024-01-15T10:30:00Z"})
+        assert ts == datetime(2024, 1, 15, 10, 30, 0)
+        assert ts.tzinfo is None
 
     @pytest.mark.asyncio
-    async def test_harvest_shitposts_range_mode(self):
-        """Test harvesting in range mode."""
-        with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
-            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
-            mock_settings.SCRAPECREATORS_API_KEY = "test_key"
-            mock_settings.S3_BUCKET_NAME = "test-bucket"
-            mock_settings.S3_PREFIX = "test-prefix"
-            mock_settings.AWS_REGION = "us-east-1"
-            mock_settings.AWS_ACCESS_KEY_ID = "test_key_id"
-            mock_settings.AWS_SECRET_ACCESS_KEY = "test_secret_key"
-            
-            harvester = TruthSocialS3Harvester(
-                mode="range",
-                start_date="2024-01-01",
-                end_date="2024-01-31"
-            )
-            
-            async def mock_generator():
-                yield {"shitpost_id": "test_001", "s3_key": "test-key"}
-            
-            with patch.object(harvester, '_harvest_backfill', return_value=mock_generator()) as mock_harvest:
-                results = []
-                async for result in harvester.harvest_shitposts():
-                    results.append(result)
-                
-            assert len(results) == 1
-            mock_harvest.assert_called_once()
-            # Arguments are passed positionally: dry_run, start_date, end_date
-            call_args = mock_harvest.call_args[0]  # Positional args
-            assert call_args[0] == False  # dry_run
-            assert call_args[1] == harvester.start_datetime  # start_date
-            assert call_args[2] == harvester.end_datetime  # end_date
+    async def test_extract_content_preview(self, harvester):
+        """Test content preview extraction."""
+        assert harvester._extract_content_preview({"content": "Short text"}) == "Short text"
+        assert harvester._extract_content_preview({}) == "No content"
+
+        long_content = "A" * 200
+        preview = harvester._extract_content_preview({"content": long_content})
+        assert len(preview) == 103  # 100 + "..."
+        assert preview.endswith("...")
 
     @pytest.mark.asyncio
-    async def test_harvest_backfill_success(self, harvester, sample_api_response):
-        """Test successful backfill harvesting."""
+    async def test_harvest_shitposts_yields_dicts(self, harvester, sample_api_response):
+        """Test that harvest_shitposts yields backward-compatible dicts."""
         class MockResponse:
             status = 200
-            async def json(self):
+            call_count = 0
+            async def json(self_resp):
+                self_resp.call_count += 1
+                if self_resp.call_count > 1:
+                    return {"success": True, "posts": []}
                 return sample_api_response
             async def __aenter__(self):
                 return self
             async def __aexit__(self, *args):
                 pass
-        
+
+        resp = MockResponse()
+
         class MockSession:
-            get_call_count = 0
             def get(self, *args, **kwargs):
-                self.get_call_count += 1
-                if self.get_call_count > 2:  # Limit iterations
-                    # Return empty response after 2 calls
-                    class EmptyResponse:
-                        status = 200
-                        async def json(self):
-                            return {"success": True, "posts": []}
-                        async def __aenter__(self):
-                            return self
-                        async def __aexit__(self, *args):
-                            pass
-                    return EmptyResponse()
-                return MockResponse()
-        
+                return resp
+
         harvester.session = MockSession()
         harvester.s3_data_lake = AsyncMock()
-        harvester.s3_data_lake.store_raw_data = AsyncMock(side_effect=[
-            "truth-social/raw/2024/01/15/test_post_001.json",
-            "truth-social/raw/2024/01/15/test_post_002.json"
-        ])
-        
+        harvester.s3_data_lake.store_raw_data = AsyncMock(return_value="truth-social/raw/2024/01/15/test.json")
+        harvester.s3_data_lake._generate_s3_key = MagicMock(return_value="truth-social/raw/2024/01/15/test.json")
+        harvester.s3_data_lake.check_object_exists = AsyncMock(return_value=False)
+
         results = []
-        count = 0
-        async for result in harvester._harvest_backfill():
+        async for result in harvester.harvest_shitposts():
             results.append(result)
-            count += 1
-            if count >= 2:  # Limit to prevent infinite loop
-                break
-        
+
         assert len(results) >= 1
-        assert results[0]["shitpost_id"] in ["test_post_001", "test_post_002"]
+        # Verify backward-compatible dict format
+        assert "shitpost_id" in results[0]
+        assert "s3_key" in results[0]
+        assert "timestamp" in results[0]
+        assert "content_preview" in results[0]
+        assert "stored_at" in results[0]
 
     @pytest.mark.asyncio
-    async def test_harvest_backfill_with_limit(self, harvester, sample_api_response):
-        """Test backfill harvesting with limit."""
+    async def test_harvest_yields_harvest_results(self, harvester, sample_api_response):
+        """Test that harvest() yields HarvestResult objects."""
+        class MockResponse:
+            status = 200
+            call_count = 0
+            async def json(self_resp):
+                self_resp.call_count += 1
+                if self_resp.call_count > 1:
+                    return {"success": True, "posts": []}
+                return sample_api_response
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, *args):
+                pass
+
+        resp = MockResponse()
+
+        class MockSession:
+            def get(self, *args, **kwargs):
+                return resp
+
+        harvester.session = MockSession()
+        harvester.s3_data_lake = AsyncMock()
+        harvester.s3_data_lake.store_raw_data = AsyncMock(return_value="truth-social/raw/2024/01/15/test.json")
+        harvester.s3_data_lake._generate_s3_key = MagicMock(return_value="truth-social/raw/2024/01/15/test.json")
+        harvester.s3_data_lake.check_object_exists = AsyncMock(return_value=False)
+
+        results = []
+        async for result in harvester.harvest():
+            results.append(result)
+
+        assert len(results) >= 1
+        assert isinstance(results[0], HarvestResult)
+        assert results[0].source_name == "truth_social"
+
+    @pytest.mark.asyncio
+    async def test_harvest_with_limit(self, harvester, sample_api_response):
+        """Test harvesting with limit."""
         harvester.limit = 1
-        
+
         class MockResponse:
             status = 200
             async def json(self):
@@ -469,67 +515,58 @@ class TestTruthSocialS3Harvester:
                 return self
             async def __aexit__(self, *args):
                 pass
-        
+
         class MockSession:
             def get(self, *args, **kwargs):
                 return MockResponse()
-        
+
         harvester.session = MockSession()
         harvester.s3_data_lake = AsyncMock()
         harvester.s3_data_lake.store_raw_data = AsyncMock(return_value="test-s3-key")
-        
+        harvester.s3_data_lake._generate_s3_key = MagicMock(return_value="test-s3-key")
+        harvester.s3_data_lake.check_object_exists = AsyncMock(return_value=False)
+
         results = []
-        async for result in harvester._harvest_backfill():
+        async for result in harvester.harvest():
             results.append(result)
-        
+
         assert len(results) == 1  # Limited to 1 post
 
     @pytest.mark.asyncio
-    async def test_harvest_backfill_dry_run(self, harvester, sample_api_response):
-        """Test backfill harvesting in dry run mode."""
+    async def test_harvest_dry_run(self, harvester, sample_api_response):
+        """Test harvesting in dry run mode."""
         class MockResponse:
             status = 200
-            async def json(self):
+            call_count = 0
+            async def json(self_resp):
+                self_resp.call_count += 1
+                if self_resp.call_count > 1:
+                    return {"success": True, "posts": []}
                 return sample_api_response
             async def __aenter__(self):
                 return self
             async def __aexit__(self, *args):
                 pass
-        
+
+        resp = MockResponse()
+
         class MockSession:
-            get_call_count = 0
             def get(self, *args, **kwargs):
-                self.get_call_count += 1
-                if self.get_call_count > 1:  # Limit iterations
-                    class EmptyResponse:
-                        status = 200
-                        async def json(self):
-                            return {"success": True, "posts": []}
-                        async def __aenter__(self):
-                            return self
-                        async def __aexit__(self, *args):
-                            pass
-                    return EmptyResponse()
-                return MockResponse()
-        
+                return resp
+
         harvester.session = MockSession()
-        
+
         results = []
-        count = 0
-        async for result in harvester._harvest_backfill(dry_run=True):
+        async for result in harvester.harvest(dry_run=True):
             results.append(result)
-            count += 1
-            if count >= 2:  # Limit to prevent infinite loop
-                break
-        
+
         assert len(results) >= 1
-        # In dry run, S3 should not be called
-        if harvester.s3_data_lake:
-            harvester.s3_data_lake.store_raw_data.assert_not_called()
+        # In dry run, S3 data lake should not be used
+        assert harvester.s3_data_lake is None
 
     @pytest.mark.asyncio
-    async def test_harvest_backfill_incremental_mode_stops_on_existing(self, harvester, sample_api_response):
-        """Test incremental mode stops when encountering existing posts."""
+    async def test_harvest_incremental_stops_on_existing(self, harvester, sample_api_response):
+        """Test incremental mode stops when encountering existing posts in S3."""
         class MockResponse:
             status = 200
             async def json(self):
@@ -538,158 +575,138 @@ class TestTruthSocialS3Harvester:
                 return self
             async def __aexit__(self, *args):
                 pass
-        
+
         class MockSession:
             def get(self, *args, **kwargs):
                 return MockResponse()
-        
+
         harvester.session = MockSession()
         harvester.s3_data_lake = AsyncMock()
         harvester.s3_data_lake.check_object_exists = AsyncMock(return_value=True)  # Post exists
         harvester.s3_data_lake._generate_s3_key = MagicMock(return_value="truth-social/raw/2024/01/15/test_post_001.json")
-        
+
         results = []
-        async for result in harvester._harvest_backfill(incremental_mode=True):
+        async for result in harvester.harvest():
             results.append(result)
-        
+
         # Should stop immediately when finding existing post
         assert len(results) == 0
         harvester.s3_data_lake.check_object_exists.assert_called()
 
     @pytest.mark.asyncio
-    async def test_harvest_backfill_with_date_filtering(self, harvester, sample_api_response):
-        """Test backfill harvesting with date filtering."""
-        class MockResponse:
-            status = 200
-            async def json(self):
-                return sample_api_response
-            async def __aenter__(self):
-                return self
-            async def __aexit__(self, *args):
-                pass
-        
-        class MockSession:
-            get_call_count = 0
-            def get(self, *args, **kwargs):
-                self.get_call_count += 1
-                if self.get_call_count > 1:  # Limit iterations
-                    class EmptyResponse:
-                        status = 200
-                        async def json(self):
-                            return {"success": True, "posts": []}
-                        async def __aenter__(self):
-                            return self
-                        async def __aexit__(self, *args):
-                            pass
-                    return EmptyResponse()
-                return MockResponse()
-        
-        harvester.session = MockSession()
-        harvester.s3_data_lake = AsyncMock()
-        harvester.s3_data_lake.store_raw_data = AsyncMock(return_value="test-s3-key")
-        
-        start_date = datetime(2024, 1, 1).replace(tzinfo=None)
-        end_date = datetime(2024, 1, 31).replace(tzinfo=None)
-        
-        results = []
-        count = 0
-        async for result in harvester._harvest_backfill(start_date=start_date, end_date=end_date):
-            results.append(result)
-            count += 1
-            if count >= 2:  # Limit to prevent infinite loop
-                break
-        
-        # Posts should be filtered by date
-        assert len(results) >= 0  # May be 0 if dates don't match
+    async def test_harvest_range_mode_date_filtering(self):
+        """Test harvesting with date range filtering."""
+        with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
+            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+            mock_settings.SCRAPECREATORS_API_KEY = "test_key"
+
+            harvester = TruthSocialS3Harvester(
+                mode="range",
+                start_date="2024-01-01",
+                end_date="2024-01-31"
+            )
+
+            # Create posts - one in range, one before
+            api_response = {
+                "success": True,
+                "posts": [
+                    {
+                        "id": "in_range",
+                        "content": "In range post",
+                        "created_at": "2024-01-15T10:00:00Z",
+                    },
+                    {
+                        "id": "before_range",
+                        "content": "Before range post",
+                        "created_at": "2023-12-31T23:59:59Z",
+                    }
+                ]
+            }
+
+            class MockResponse:
+                status = 200
+                async def json(self):
+                    return api_response
+                async def __aenter__(self):
+                    return self
+                async def __aexit__(self, *args):
+                    pass
+
+            class MockSession:
+                def get(self, *args, **kwargs):
+                    return MockResponse()
+
+            harvester.session = MockSession()
+            harvester.s3_data_lake = AsyncMock()
+            harvester.s3_data_lake.store_raw_data = AsyncMock(return_value="test-s3-key")
+
+            results = []
+            async for result in harvester.harvest():
+                results.append(result)
+
+            # Should only get the post in range, then stop at the one before
+            assert len(results) == 1
+            assert results[0].source_post_id == "in_range"
 
     @pytest.mark.asyncio
-    async def test_harvest_backfill_stops_before_start_date(self, harvester):
-        """Test backfill stops when reaching posts before start date."""
-        # Create posts with dates before start date
-        old_posts_response = {
-            "success": True,
-            "posts": [{
-                "id": "old_post",
-                "created_at": "2023-12-31T23:59:59Z",
-                "content": "Old content"
-            }]
-        }
-        
-        class MockResponse:
-            status = 200
-            async def json(self):
-                return old_posts_response
-            async def __aenter__(self):
-                return self
-            async def __aexit__(self, *args):
-                pass
-        
-        class MockSession:
-            def get(self, *args, **kwargs):
-                return MockResponse()
-        
-        harvester.session = MockSession()
-        start_date = datetime(2024, 1, 1).replace(tzinfo=None)
-        
-        results = []
-        async for result in harvester._harvest_backfill(start_date=start_date):
-            results.append(result)
-        
-        # Should stop when reaching posts before start date
-        assert len(results) == 0
+    async def test_harvest_stops_before_start_date(self):
+        """Test harvest stops when reaching posts before start date."""
+        with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
+            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+            mock_settings.SCRAPECREATORS_API_KEY = "test_key"
 
-    @pytest.mark.asyncio
-    async def test_harvest_backfill_with_max_id(self, harvester, sample_api_response):
-        """Test backfill harvesting with max_id (resume capability)."""
-        harvester.max_id = "resume_from_here"
-        
-        class MockResponse:
-            status = 200
-            async def json(self):
-                return sample_api_response
-            async def __aenter__(self):
-                return self
-            async def __aexit__(self, *args):
-                pass
-        
-        class MockSession:
-            def __init__(self):
-                self.get_calls = []
-            def get(self, *args, **kwargs):
-                self.get_calls.append((args, kwargs))
-                return MockResponse()
-        
-        harvester.session = MockSession()
-        harvester.s3_data_lake = AsyncMock()
-        harvester.s3_data_lake.store_raw_data = AsyncMock(return_value="test-s3-key")
-        
-        results = []
-        count = 0
-        async for result in harvester._harvest_backfill():
-            results.append(result)
-            count += 1
-            if count >= 2:  # Limit to prevent infinite loop
-                break
-        
-        # Should use max_id for resuming
-        assert len(harvester.session.get_calls) > 0
-        call_kwargs = harvester.session.get_calls[0][1]
-        assert 'params' in call_kwargs
-        assert call_kwargs['params']['next_max_id'] == "resume_from_here"
+            harvester = TruthSocialS3Harvester(
+                mode="range",
+                start_date="2024-01-01",
+                end_date="2024-01-31"
+            )
+
+            old_posts_response = {
+                "success": True,
+                "posts": [{
+                    "id": "old_post",
+                    "created_at": "2023-12-31T23:59:59Z",
+                    "content": "Old content"
+                }]
+            }
+
+            class MockResponse:
+                status = 200
+                async def json(self):
+                    return old_posts_response
+                async def __aenter__(self):
+                    return self
+                async def __aexit__(self, *args):
+                    pass
+
+            class MockSession:
+                def get(self, *args, **kwargs):
+                    return MockResponse()
+
+            harvester.session = MockSession()
+            harvester.s3_data_lake = AsyncMock()
+            harvester.s3_data_lake.store_raw_data = AsyncMock(return_value="test-s3-key")
+
+            results = []
+            async for result in harvester.harvest():
+                results.append(result)
+
+            # Should stop when reaching posts before start date
+            assert len(results) == 0
 
     @pytest.mark.asyncio
     async def test_get_s3_stats(self, harvester):
         """Test getting S3 statistics."""
         harvester.s3_data_lake = AsyncMock()
-        
+
         mock_stats = {
             "total_files": 100,
             "total_size_mb": 50.5
         }
         harvester.s3_data_lake.get_data_stats = AsyncMock(return_value=mock_stats)
-        
+
         result = await harvester.get_s3_stats()
-        
+
         assert result == mock_stats
         harvester.s3_data_lake.get_data_stats.assert_called_once()
 
@@ -697,9 +714,9 @@ class TestTruthSocialS3Harvester:
     async def test_get_s3_stats_not_initialized(self, harvester):
         """Test getting S3 statistics when S3 not initialized."""
         harvester.s3_data_lake = None
-        
+
         result = await harvester.get_s3_stats()
-        
+
         assert result == {'error': 'S3 Data Lake not initialized'}
 
     @pytest.mark.asyncio
@@ -707,12 +724,12 @@ class TestTruthSocialS3Harvester:
         """Test harvester cleanup."""
         harvester.session = AsyncMock()
         harvester.s3_data_lake = AsyncMock()
-        
+
         harvester.session.close = AsyncMock()
         harvester.s3_data_lake.cleanup = AsyncMock()
-        
+
         await harvester.cleanup()
-        
+
         harvester.session.close.assert_called_once()
         harvester.s3_data_lake.cleanup.assert_called_once()
 
@@ -722,9 +739,9 @@ class TestTruthSocialS3Harvester:
         harvester.session = None
         harvester.s3_data_lake = AsyncMock()
         harvester.s3_data_lake.cleanup = AsyncMock()
-        
+
         await harvester.cleanup()
-        
+
         harvester.s3_data_lake.cleanup.assert_called_once()
 
     @pytest.mark.asyncio
@@ -733,7 +750,19 @@ class TestTruthSocialS3Harvester:
         harvester.session = AsyncMock()
         harvester.s3_data_lake = None
         harvester.session.close = AsyncMock()
-        
+
         await harvester.cleanup()
-        
+
         harvester.session.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_summary(self, harvester):
+        """Test get_summary builds correct summary."""
+        from shitposts.harvester_models import HarvesterStatus
+        summary = harvester.get_summary(
+            total_harvested=10,
+            status=HarvesterStatus.SUCCESS,
+        )
+        assert summary.source_name == "truth_social"
+        assert summary.total_harvested == 10
+        assert summary.status == HarvesterStatus.SUCCESS
