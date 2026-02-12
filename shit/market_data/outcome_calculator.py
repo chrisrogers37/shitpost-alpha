@@ -13,6 +13,8 @@ from shit.market_data.models import PredictionOutcome, MarketPrice
 from shit.market_data.client import MarketDataClient
 from shit.db.sync_session import get_session
 from shit.logging import get_service_logger
+from shitvault.shitpost_models import Prediction  # noqa: F401
+from shitvault.signal_models import Signal  # noqa: F401 - registers Signal with SQLAlchemy mapper
 
 logger = get_service_logger("outcome_calculator")
 
@@ -30,6 +32,7 @@ class OutcomeCalculator:
         self.session = session
         self._session_context = None
         self._own_session = session is None
+        self._failed_symbols: set = set()  # Cache of symbols that failed price fetch
 
     def __enter__(self):
         if self._own_session:
@@ -115,6 +118,9 @@ class OutcomeCalculator:
                 if outcome:
                     outcomes.append(outcome)
             except Exception as e:
+                # Rollback to recover from failed transaction state
+                self.session.rollback()
+                self._failed_symbols.add(asset)
                 logger.error(
                     f"Error calculating outcome for {asset} in prediction {prediction_id}: {e}",
                     extra={"prediction_id": prediction_id, "symbol": asset, "error": str(e)},
@@ -133,6 +139,14 @@ class OutcomeCalculator:
         force_refresh: bool = False
     ) -> Optional[PredictionOutcome]:
         """Calculate outcome for a single asset prediction."""
+
+        # Skip symbols that already failed price fetch (avoids repeated 7s+ retry delays)
+        if symbol in self._failed_symbols:
+            logger.debug(
+                f"Skipping known-bad symbol {symbol}",
+                extra={"symbol": symbol, "prediction_id": prediction_id}
+            )
+            return None
 
         # Check if outcome already exists
         existing = self.session.query(PredictionOutcome).filter(
@@ -177,6 +191,7 @@ class OutcomeCalculator:
                 return None
 
         if not price_t0:
+            self._failed_symbols.add(symbol)
             logger.warning(
                 f"No price found for {symbol} on {prediction_date}",
                 extra={"symbol": symbol, "date": str(prediction_date)}
@@ -325,6 +340,7 @@ class OutcomeCalculator:
                         extra={"prediction_id": prediction.id, "outcome_count": len(outcomes)}
                     )
             except Exception as e:
+                self.session.rollback()
                 logger.error(
                     f"Error processing prediction {prediction.id}: {e}",
                     extra={"prediction_id": prediction.id, "error": str(e)},

@@ -8,6 +8,7 @@ from typing import List, Set
 from shit.market_data.client import MarketDataClient
 from shit.db.sync_session import get_session
 from shitvault.shitpost_models import Prediction
+from shitvault.signal_models import Signal  # noqa: F401 - registers Signal with SQLAlchemy mapper
 from shit.logging import print_success, print_error, print_info
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
