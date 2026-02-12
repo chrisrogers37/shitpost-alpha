@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **7d return calculation anchored to wrong date** - OutcomeCalculator was using `prediction.created_at` (when LLM analysis ran) instead of the original post's publication timestamp to anchor return calculations. All same-batch predictions got identical entry prices and returns regardless of when the actual posts were published. Now uses `shitpost.timestamp` / `signal.published_at` as the anchor date, with `created_at` as fallback.
 - **Market data pipeline runtime errors** - Fix critical bugs preventing market data CLI from working
   - Add `Signal` model imports to resolve SQLAlchemy mapper errors in backfill_prices, auto_backfill_service, outcome_calculator, and cli modules
   - Add `session.rollback()` in `update-all-prices` JSON/JSONB fallback path to prevent transaction poisoning

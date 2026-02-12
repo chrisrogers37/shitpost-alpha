@@ -30,6 +30,19 @@ def _make_prediction(**overrides):
     pred.market_impact = overrides.get("market_impact", {"AAPL": "bullish"})
     pred.confidence = overrides.get("confidence", 0.85)
     pred.created_at = overrides.get("created_at", datetime(2025, 6, 15, 10, 0, 0))
+
+    # Source timestamps (shitpost / signal)
+    shitpost = overrides.get("shitpost", MagicMock())
+    if "shitpost" not in overrides:
+        # Default: shitpost.timestamp matches the post publication time
+        shitpost.timestamp = overrides.get(
+            "shitpost_timestamp", datetime(2025, 6, 14, 9, 30, 0)
+        )
+    pred.shitpost = shitpost
+
+    signal = overrides.get("signal", None)
+    pred.signal = signal
+
     return pred
 
 
@@ -90,6 +103,70 @@ class TestExtractSentiment:
         assert result in ("bullish", "bearish")  # dict ordering
 
 
+# ─── _get_source_date ──────────────────────────────────────────────
+
+
+class TestGetSourceDate:
+    """Verify that the anchor date comes from the *post* timestamp, not analysis time."""
+
+    def test_uses_shitpost_timestamp(self, calculator):
+        pred = _make_prediction(
+            shitpost_timestamp=datetime(2025, 6, 14, 9, 30, 0),
+            created_at=datetime(2025, 6, 20, 12, 0, 0),  # analysis ran 6 days later
+        )
+        result = calculator._get_source_date(pred)
+        assert result == date(2025, 6, 14)
+
+    def test_uses_signal_published_at_when_no_shitpost(self, calculator):
+        signal = MagicMock()
+        signal.published_at = datetime(2025, 7, 1, 8, 0, 0)
+
+        pred = _make_prediction(
+            shitpost=None,
+            signal=signal,
+            created_at=datetime(2025, 7, 5, 10, 0, 0),
+        )
+        result = calculator._get_source_date(pred)
+        assert result == date(2025, 7, 1)
+
+    def test_falls_back_to_created_at(self, calculator):
+        pred = _make_prediction(
+            shitpost=None,
+            signal=None,
+            created_at=datetime(2025, 6, 15, 10, 0, 0),
+        )
+        result = calculator._get_source_date(pred)
+        assert result == date(2025, 6, 15)
+
+    def test_returns_none_when_no_timestamps(self, calculator):
+        pred = _make_prediction(shitpost=None, signal=None, created_at=None)
+        result = calculator._get_source_date(pred)
+        assert result is None
+
+    def test_prefers_shitpost_over_signal(self, calculator):
+        signal = MagicMock()
+        signal.published_at = datetime(2025, 7, 1, 8, 0, 0)
+
+        pred = _make_prediction(
+            shitpost_timestamp=datetime(2025, 6, 14, 9, 30, 0),
+            signal=signal,
+            created_at=datetime(2025, 7, 5, 10, 0, 0),
+        )
+        result = calculator._get_source_date(pred)
+        assert result == date(2025, 6, 14)
+
+    def test_shitpost_with_no_timestamp_falls_to_signal(self, calculator):
+        shitpost = MagicMock()
+        shitpost.timestamp = None
+
+        signal = MagicMock()
+        signal.published_at = datetime(2025, 7, 1, 8, 0, 0)
+
+        pred = _make_prediction(shitpost=shitpost, signal=signal)
+        result = calculator._get_source_date(pred)
+        assert result == date(2025, 7, 1)
+
+
 # ─── calculate_outcome_for_prediction ────────────────────────────────
 
 
@@ -117,8 +194,8 @@ class TestCalculateOutcomeForPrediction:
         result = calculator.calculate_outcome_for_prediction(1)
         assert result == []
 
-    def test_no_created_at_returns_empty(self, calculator, mock_session):
-        pred = _make_prediction(created_at=None)
+    def test_no_timestamps_at_all_returns_empty(self, calculator, mock_session):
+        pred = _make_prediction(created_at=None, shitpost=None, signal=None)
         mock_session.query.return_value.filter.return_value.first.return_value = pred
         result = calculator.calculate_outcome_for_prediction(1)
         assert result == []
@@ -155,12 +232,16 @@ class TestCalculateOutcomeForPrediction:
 class TestCalculateSingleOutcome:
     def test_returns_existing_when_not_force_refresh(self, calculator, mock_session):
         existing = MagicMock(spec=PredictionOutcome)
-        mock_session.query.return_value.filter.return_value.first.return_value = existing
+        mock_session.query.return_value.filter.return_value.first.return_value = (
+            existing
+        )
 
         result = calculator._calculate_single_outcome(
-            prediction_id=1, symbol="AAPL",
+            prediction_id=1,
+            symbol="AAPL",
             prediction_date=date(2025, 6, 15),
-            sentiment="bullish", confidence=0.8
+            sentiment="bullish",
+            confidence=0.8,
         )
         assert result is existing
 
@@ -170,9 +251,11 @@ class TestCalculateSingleOutcome:
         calculator.market_client.fetch_price_history.return_value = []
 
         result = calculator._calculate_single_outcome(
-            prediction_id=1, symbol="AAPL",
+            prediction_id=1,
+            symbol="AAPL",
             prediction_date=date(2025, 6, 15),
-            sentiment="bullish", confidence=0.8
+            sentiment="bullish",
+            confidence=0.8,
         )
         assert result is None
 
@@ -199,9 +282,11 @@ class TestCalculateSingleOutcome:
         ]
 
         result = calculator._calculate_single_outcome(
-            prediction_id=1, symbol="AAPL",
+            prediction_id=1,
+            symbol="AAPL",
             prediction_date=date(2025, 6, 15),
-            sentiment="bullish", confidence=0.8
+            sentiment="bullish",
+            confidence=0.8,
         )
 
         assert result is not None
@@ -221,10 +306,12 @@ class TestCalculateSingleOutcome:
         calculator.market_client.fetch_price_history.return_value = []
 
         result = calculator._calculate_single_outcome(
-            prediction_id=1, symbol="AAPL",
+            prediction_id=1,
+            symbol="AAPL",
             prediction_date=date(2025, 6, 15),
-            sentiment="bullish", confidence=0.8,
-            force_refresh=True
+            sentiment="bullish",
+            confidence=0.8,
+            force_refresh=True,
         )
         # Should attempt to recalculate (not just return existing)
         calculator.market_client.get_price_on_date.assert_called()
@@ -236,10 +323,14 @@ class TestCalculateSingleOutcome:
 class TestCalculateOutcomesForAllPredictions:
     def test_returns_stats_dict(self, calculator, mock_session):
         pred = _make_prediction()
-        mock_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = [pred]
+        mock_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = [
+            pred
+        ]
 
         # Mock the per-prediction calculation
-        calculator.calculate_outcome_for_prediction = MagicMock(return_value=[MagicMock()])
+        calculator.calculate_outcome_for_prediction = MagicMock(
+            return_value=[MagicMock()]
+        )
 
         result = calculator.calculate_outcomes_for_all_predictions()
         assert result["total_predictions"] == 1
@@ -249,7 +340,9 @@ class TestCalculateOutcomesForAllPredictions:
 
     def test_counts_errors(self, calculator, mock_session):
         pred = _make_prediction()
-        mock_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = [pred]
+        mock_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = [
+            pred
+        ]
 
         calculator.calculate_outcome_for_prediction = MagicMock(
             side_effect=RuntimeError("boom")
@@ -260,7 +353,9 @@ class TestCalculateOutcomesForAllPredictions:
         assert result["processed"] == 0
 
     def test_applies_limit(self, calculator, mock_session):
-        mock_query = mock_session.query.return_value.filter.return_value.order_by.return_value
+        mock_query = (
+            mock_session.query.return_value.filter.return_value.order_by.return_value
+        )
         mock_query.limit.return_value.all.return_value = []
 
         calculator.calculate_outcomes_for_all_predictions(limit=5)

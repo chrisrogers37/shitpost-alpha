@@ -46,9 +46,7 @@ class OutcomeCalculator:
             self._session_context.__exit__(exc_type, exc_val, exc_tb)
 
     def calculate_outcome_for_prediction(
-        self,
-        prediction_id: int,
-        force_refresh: bool = False
+        self, prediction_id: int, force_refresh: bool = False
     ) -> List[PredictionOutcome]:
         """
         Calculate outcomes for a single prediction.
@@ -63,44 +61,50 @@ class OutcomeCalculator:
         from shitvault.shitpost_models import Prediction
 
         # Get prediction
-        prediction = self.session.query(Prediction).filter(
-            Prediction.id == prediction_id
-        ).first()
+        prediction = (
+            self.session.query(Prediction)
+            .filter(Prediction.id == prediction_id)
+            .first()
+        )
 
         if not prediction:
             logger.warning(
                 f"Prediction {prediction_id} not found",
-                extra={"prediction_id": prediction_id}
+                extra={"prediction_id": prediction_id},
             )
             return []
 
         # Skip if bypassed or no assets
-        if prediction.analysis_status == 'bypassed':
+        if prediction.analysis_status == "bypassed":
             logger.debug(
                 f"Skipping bypassed prediction {prediction_id}",
-                extra={"prediction_id": prediction_id}
+                extra={"prediction_id": prediction_id},
             )
             return []
 
         if not prediction.assets or len(prediction.assets) == 0:
             logger.debug(
                 f"No assets for prediction {prediction_id}",
-                extra={"prediction_id": prediction_id}
+                extra={"prediction_id": prediction_id},
             )
             return []
 
-        # Get prediction date from prediction created_at
-        if not prediction.created_at:
+        # Get prediction date from the original post/signal timestamp
+        # (NOT prediction.created_at, which is when analysis was performed)
+        prediction_date = self._get_source_date(prediction)
+        if prediction_date is None:
             logger.warning(
-                f"Prediction {prediction_id} has no created_at timestamp",
-                extra={"prediction_id": prediction_id}
+                f"Prediction {prediction_id} has no source timestamp",
+                extra={"prediction_id": prediction_id},
             )
             return []
-
-        prediction_date = prediction.created_at.date()
 
         # Get sentiment from market_impact
-        sentiment = self._extract_sentiment(prediction.market_impact) if prediction.market_impact else None
+        sentiment = (
+            self._extract_sentiment(prediction.market_impact)
+            if prediction.market_impact
+            else None
+        )
 
         outcomes = []
 
@@ -113,7 +117,7 @@ class OutcomeCalculator:
                     prediction_date=prediction_date,
                     sentiment=sentiment,
                     confidence=prediction.confidence,
-                    force_refresh=force_refresh
+                    force_refresh=force_refresh,
                 )
                 if outcome:
                     outcomes.append(outcome)
@@ -123,8 +127,12 @@ class OutcomeCalculator:
                 self._failed_symbols.add(asset)
                 logger.error(
                     f"Error calculating outcome for {asset} in prediction {prediction_id}: {e}",
-                    extra={"prediction_id": prediction_id, "symbol": asset, "error": str(e)},
-                    exc_info=True
+                    extra={
+                        "prediction_id": prediction_id,
+                        "symbol": asset,
+                        "error": str(e),
+                    },
+                    exc_info=True,
                 )
 
         return outcomes
@@ -136,7 +144,7 @@ class OutcomeCalculator:
         prediction_date: date,
         sentiment: Optional[str],
         confidence: Optional[float],
-        force_refresh: bool = False
+        force_refresh: bool = False,
     ) -> Optional[PredictionOutcome]:
         """Calculate outcome for a single asset prediction."""
 
@@ -144,32 +152,40 @@ class OutcomeCalculator:
         if symbol in self._failed_symbols:
             logger.debug(
                 f"Skipping known-bad symbol {symbol}",
-                extra={"symbol": symbol, "prediction_id": prediction_id}
+                extra={"symbol": symbol, "prediction_id": prediction_id},
             )
             return None
 
         # Check if outcome already exists
-        existing = self.session.query(PredictionOutcome).filter(
-            and_(
-                PredictionOutcome.prediction_id == prediction_id,
-                PredictionOutcome.symbol == symbol
+        existing = (
+            self.session.query(PredictionOutcome)
+            .filter(
+                and_(
+                    PredictionOutcome.prediction_id == prediction_id,
+                    PredictionOutcome.symbol == symbol,
+                )
             )
-        ).first()
+            .first()
+        )
 
         if existing and not force_refresh:
             logger.debug(
                 f"Outcome already exists for prediction {prediction_id}, symbol {symbol}",
-                extra={"prediction_id": prediction_id, "symbol": symbol}
+                extra={"prediction_id": prediction_id, "symbol": symbol},
             )
             return existing
 
         # Create or update outcome
-        outcome = existing if existing else PredictionOutcome(
-            prediction_id=prediction_id,
-            symbol=symbol,
-            prediction_date=prediction_date,
-            prediction_sentiment=sentiment,
-            prediction_confidence=confidence
+        outcome = (
+            existing
+            if existing
+            else PredictionOutcome(
+                prediction_id=prediction_id,
+                symbol=symbol,
+                prediction_date=prediction_date,
+                prediction_sentiment=sentiment,
+                prediction_confidence=confidence,
+            )
         )
 
         # Get price at prediction time
@@ -180,13 +196,17 @@ class OutcomeCalculator:
                 self.market_client.fetch_price_history(
                     symbol,
                     start_date=prediction_date - timedelta(days=7),
-                    end_date=prediction_date
+                    end_date=prediction_date,
                 )
                 price_t0 = self.market_client.get_price_on_date(symbol, prediction_date)
             except Exception as e:
                 logger.warning(
                     f"Could not fetch price for {symbol} on {prediction_date}: {e}",
-                    extra={"symbol": symbol, "date": str(prediction_date), "error": str(e)}
+                    extra={
+                        "symbol": symbol,
+                        "date": str(prediction_date),
+                        "error": str(e),
+                    },
                 )
                 return None
 
@@ -194,7 +214,7 @@ class OutcomeCalculator:
             self._failed_symbols.add(symbol)
             logger.warning(
                 f"No price found for {symbol} on {prediction_date}",
-                extra={"symbol": symbol, "date": str(prediction_date)}
+                extra={"symbol": symbol, "date": str(prediction_date)},
             )
             return None
 
@@ -202,10 +222,10 @@ class OutcomeCalculator:
 
         # Calculate outcomes for different timeframes
         timeframes = [
-            (1, 'price_t1', 'return_t1', 'correct_t1', 'pnl_t1'),
-            (3, 'price_t3', 'return_t3', 'correct_t3', 'pnl_t3'),
-            (7, 'price_t7', 'return_t7', 'correct_t7', 'pnl_t7'),
-            (30, 'price_t30', 'return_t30', 'correct_t30', 'pnl_t30'),
+            (1, "price_t1", "return_t1", "correct_t1", "pnl_t1"),
+            (3, "price_t3", "return_t3", "correct_t3", "pnl_t3"),
+            (7, "price_t7", "return_t7", "correct_t7", "pnl_t7"),
+            (30, "price_t30", "return_t30", "correct_t30", "pnl_t30"),
         ]
 
         outcome.is_complete = True  # Assume complete until we find missing data
@@ -227,13 +247,13 @@ class OutcomeCalculator:
                     self.market_client.fetch_price_history(
                         symbol,
                         start_date=target_date - timedelta(days=7),
-                        end_date=target_date
+                        end_date=target_date,
                     )
                     price_tn = self.market_client.get_price_on_date(symbol, target_date)
                 except Exception as e:
                     logger.debug(
                         f"Could not fetch price for {symbol} on {target_date}: {e}",
-                        extra={"symbol": symbol, "date": str(target_date)}
+                        extra={"symbol": symbol, "date": str(target_date)},
                     )
 
             if price_tn:
@@ -245,7 +265,9 @@ class OutcomeCalculator:
                 setattr(outcome, return_attr, return_pct)
 
                 # Determine if prediction was correct
-                is_correct = outcome.is_correct(sentiment, return_pct) if sentiment else None
+                is_correct = (
+                    outcome.is_correct(sentiment, return_pct) if sentiment else None
+                )
                 setattr(outcome, correct_attr, is_correct)
 
                 # Calculate P&L for $1000 position
@@ -269,8 +291,8 @@ class OutcomeCalculator:
                 "symbol": symbol,
                 "sentiment": sentiment,
                 "return_t7": outcome.return_t7,
-                "correct_t7": outcome.correct_t7
-            }
+                "correct_t7": outcome.correct_t7,
+            },
         )
 
         return outcome
@@ -279,7 +301,7 @@ class OutcomeCalculator:
         self,
         limit: Optional[int] = None,
         days_back: Optional[int] = None,
-        force_refresh: bool = False
+        force_refresh: bool = False,
     ) -> Dict[str, Any]:
         """
         Calculate outcomes for all predictions (or recent ones).
@@ -295,14 +317,12 @@ class OutcomeCalculator:
         from shitvault.shitpost_models import Prediction
 
         query = self.session.query(Prediction).filter(
-            Prediction.analysis_status == 'completed'
+            Prediction.analysis_status == "completed"
         )
 
         if days_back:
             cutoff_date = date.today() - timedelta(days=days_back)
-            query = query.filter(
-                Prediction.created_at >= cutoff_date
-            )
+            query = query.filter(Prediction.created_at >= cutoff_date)
 
         query = query.order_by(Prediction.created_at.desc())
 
@@ -313,7 +333,7 @@ class OutcomeCalculator:
 
         logger.info(
             f"Processing {len(predictions)} predictions for outcomes",
-            extra={"count": len(predictions), "limit": limit, "days_back": days_back}
+            extra={"count": len(predictions), "limit": limit, "days_back": days_back},
         )
 
         stats = {
@@ -322,14 +342,13 @@ class OutcomeCalculator:
             "outcomes_created": 0,
             "outcomes_updated": 0,
             "errors": 0,
-            "skipped": 0
+            "skipped": 0,
         }
 
         for prediction in predictions:
             try:
                 outcomes = self.calculate_outcome_for_prediction(
-                    prediction.id,
-                    force_refresh=force_refresh
+                    prediction.id, force_refresh=force_refresh
                 )
                 stats["processed"] += 1
                 stats["outcomes_created"] += len(outcomes)
@@ -337,28 +356,26 @@ class OutcomeCalculator:
                 if len(outcomes) > 0:
                     logger.debug(
                         f"Created {len(outcomes)} outcomes for prediction {prediction.id}",
-                        extra={"prediction_id": prediction.id, "outcome_count": len(outcomes)}
+                        extra={
+                            "prediction_id": prediction.id,
+                            "outcome_count": len(outcomes),
+                        },
                     )
             except Exception as e:
                 self.session.rollback()
                 logger.error(
                     f"Error processing prediction {prediction.id}: {e}",
                     extra={"prediction_id": prediction.id, "error": str(e)},
-                    exc_info=True
+                    exc_info=True,
                 )
                 stats["errors"] += 1
 
-        logger.info(
-            f"Completed outcome calculation",
-            extra=stats
-        )
+        logger.info(f"Completed outcome calculation", extra=stats)
 
         return stats
 
     def get_accuracy_stats(
-        self,
-        timeframe: str = 't7',
-        min_confidence: Optional[float] = None
+        self, timeframe: str = "t7", min_confidence: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Get accuracy statistics for predictions.
@@ -373,7 +390,9 @@ class OutcomeCalculator:
         query = self.session.query(PredictionOutcome)
 
         if min_confidence is not None:
-            query = query.filter(PredictionOutcome.prediction_confidence >= min_confidence)
+            query = query.filter(
+                PredictionOutcome.prediction_confidence >= min_confidence
+            )
 
         outcomes = query.all()
 
@@ -383,7 +402,7 @@ class OutcomeCalculator:
                 "correct": 0,
                 "incorrect": 0,
                 "pending": 0,
-                "accuracy": 0.0
+                "accuracy": 0.0,
             }
 
         correct_attr = f"correct_{timeframe}"
@@ -393,15 +412,52 @@ class OutcomeCalculator:
         incorrect = sum(1 for o in outcomes if getattr(o, correct_attr) is False)
         pending = sum(1 for o in outcomes if getattr(o, correct_attr) is None)
 
-        accuracy = (correct / (correct + incorrect) * 100) if (correct + incorrect) > 0 else 0.0
+        accuracy = (
+            (correct / (correct + incorrect) * 100)
+            if (correct + incorrect) > 0
+            else 0.0
+        )
 
         return {
             "total": total,
             "correct": correct,
             "incorrect": incorrect,
             "pending": pending,
-            "accuracy": round(accuracy, 2)
+            "accuracy": round(accuracy, 2),
         }
+
+    def _get_source_date(self, prediction) -> Optional[date]:
+        """Get the correct anchor date for a prediction from the original post timestamp.
+
+        Uses the source content's publication time (when the post appeared on
+        Truth Social / another platform), NOT prediction.created_at (when
+        analysis was performed).  Falls back to created_at only when no source
+        timestamp is available.
+        """
+        # Truth Social shitpost timestamp
+        try:
+            if prediction.shitpost and prediction.shitpost.timestamp:
+                return prediction.shitpost.timestamp.date()
+        except Exception:
+            pass
+
+        # Source-agnostic signal published_at
+        try:
+            if prediction.signal and prediction.signal.published_at:
+                return prediction.signal.published_at.date()
+        except Exception:
+            pass
+
+        # Fallback: prediction creation time (analysis time)
+        if prediction.created_at:
+            logger.debug(
+                f"Prediction {prediction.id}: falling back to created_at "
+                f"(no shitpost/signal timestamp found)",
+                extra={"prediction_id": prediction.id},
+            )
+            return prediction.created_at.date()
+
+        return None
 
     def _extract_sentiment(self, market_impact: Dict[str, Any]) -> Optional[str]:
         """Extract primary sentiment from market_impact dict."""
