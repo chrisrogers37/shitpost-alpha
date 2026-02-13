@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Smart Empty States** - Dashboard chart sections that have no data now display compact (80px) informative messages instead of tall (250px) blank chart boxes
+  - Accuracy Over Time, Accuracy by Confidence, and Performance by Asset on the main dashboard
+  - Accuracy by Confidence and Sentiment Breakdown on the Performance page
+  - Each empty state explains why data is missing and when to expect it
+  - Recovers ~500px of wasted vertical space, keeping real content above the fold
+
 ### Added
 - **Sentiment visual differentiation for all card types** - Added colored background fills to sentiment badges and 3px left-border accents to card wrappers across signal cards, post cards, prediction timeline cards, and feed signal cards. Users can now scan the dashboard and instantly identify bullish (green), bearish (red), and neutral (gray) signals without reading text.
 - **`SENTIMENT_BG_COLORS` constant** - Centralized sentiment background color definitions in `constants.py`

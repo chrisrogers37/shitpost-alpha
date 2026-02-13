@@ -527,6 +527,100 @@ class TestEmptyChart:
         assert fig.layout is not None
 
 
+class TestEmptyStateChart:
+    """Tests for create_empty_state_chart function."""
+
+    def test_returns_figure(self):
+        """Test that function returns a Plotly Figure."""
+        from components.cards import create_empty_state_chart
+        import plotly.graph_objects as go
+
+        fig = create_empty_state_chart("No data available")
+        assert isinstance(fig, go.Figure)
+
+    def test_default_height_is_compact(self):
+        """Test that the default height is 80px, not 250px like create_empty_chart."""
+        from components.cards import create_empty_state_chart
+
+        fig = create_empty_state_chart("No data")
+        assert fig.layout.height == 80
+
+    def test_custom_height(self):
+        """Test that custom height is respected."""
+        from components.cards import create_empty_state_chart
+
+        fig = create_empty_state_chart("No data", height=120)
+        assert fig.layout.height == 120
+
+    def test_includes_message_in_annotation(self):
+        """Test that the primary message appears in the annotation."""
+        from components.cards import create_empty_state_chart
+
+        fig = create_empty_state_chart("Custom empty message")
+        annotations = fig.layout.annotations
+        assert len(annotations) == 1
+        assert "Custom empty message" in annotations[0].text
+
+    def test_includes_hint_in_annotation(self):
+        """Test that the hint text appears in the annotation when provided."""
+        from components.cards import create_empty_state_chart
+
+        fig = create_empty_state_chart("Main message", hint="This is the hint")
+        annotation_text = fig.layout.annotations[0].text
+        assert "This is the hint" in annotation_text
+
+    def test_no_hint_when_omitted(self):
+        """Test that no hint span is added when hint is empty."""
+        from components.cards import create_empty_state_chart
+
+        fig = create_empty_state_chart("Main message")
+        annotation_text = fig.layout.annotations[0].text
+        assert "<br>" not in annotation_text
+
+    def test_icon_is_included(self):
+        """Test that the default info icon is in the annotation."""
+        from components.cards import create_empty_state_chart
+
+        fig = create_empty_state_chart("Test")
+        annotation_text = fig.layout.annotations[0].text
+        # Default icon is the info emoji
+        assert "\u2139" in annotation_text
+
+    def test_custom_icon(self):
+        """Test that a custom icon replaces the default."""
+        from components.cards import create_empty_state_chart
+
+        fig = create_empty_state_chart("Test", icon="\u23f3")
+        annotation_text = fig.layout.annotations[0].text
+        assert "\u23f3" in annotation_text
+
+    def test_no_grid_or_tick_labels(self):
+        """Test that axes have no grid, ticks, or labels."""
+        from components.cards import create_empty_state_chart
+
+        fig = create_empty_state_chart("Test")
+        assert fig.layout.xaxis.showgrid is False
+        assert fig.layout.yaxis.showgrid is False
+        assert fig.layout.xaxis.showticklabels is False
+        assert fig.layout.yaxis.showticklabels is False
+
+    def test_transparent_background(self):
+        """Test that the figure has a transparent background."""
+        from components.cards import create_empty_state_chart
+
+        fig = create_empty_state_chart("Test")
+        assert fig.layout.plot_bgcolor == "rgba(0,0,0,0)"
+        assert fig.layout.paper_bgcolor == "rgba(0,0,0,0)"
+
+    def test_accessible_via_layout_import(self):
+        """Test that the function can be imported from the layout re-export hub."""
+        from layout import create_empty_state_chart
+        import plotly.graph_objects as go
+
+        fig = create_empty_state_chart("Test")
+        assert isinstance(fig, go.Figure)
+
+
 class TestPeriodButtonStyles:
     """Tests for get_period_button_styles function."""
 

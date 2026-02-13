@@ -16,6 +16,7 @@ from constants import COLORS
 from components.cards import (
     create_error_card,
     create_empty_chart,
+    create_empty_state_chart,
     create_feed_signal_card,
     create_hero_signal_card,
     create_metric_card,
