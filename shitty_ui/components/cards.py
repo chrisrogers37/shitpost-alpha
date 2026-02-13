@@ -1,5 +1,6 @@
 """Reusable card and chart components for the Shitty UI dashboard."""
 
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 
@@ -8,6 +9,32 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 
 from constants import COLORS
+
+
+def strip_urls(text: str) -> str:
+    """Remove URLs from text for card preview display.
+
+    Strips http/https URLs from post text so that card previews
+    show meaningful content instead of long URL strings. Collapses
+    any resulting double-spaces and strips leading/trailing whitespace.
+
+    Args:
+        text: Raw post text that may contain URLs.
+
+    Returns:
+        Text with URLs removed. If the text was nothing but URLs,
+        returns "[link]" as a fallback so the card is never empty.
+    """
+    # Match http:// and https:// URLs (greedy, non-whitespace)
+    cleaned = re.sub(r"https?://\S+", "", text)
+    # Collapse multiple spaces left behind by removed URLs
+    cleaned = re.sub(r"  +", " ", cleaned)
+    # Strip leading/trailing whitespace
+    cleaned = cleaned.strip()
+    # If stripping URLs left nothing, show a placeholder
+    if not cleaned:
+        return "[link]"
+    return cleaned
 
 
 def create_error_card(message: str, details: str = None):
@@ -75,6 +102,7 @@ def create_hero_signal_card(row) -> html.Div:
     """Create a hero signal card for a high-confidence prediction."""
     timestamp = row.get("timestamp")
     text_content = row.get("text", "")
+    text_content = strip_urls(text_content)
     preview = text_content[:200] + "..." if len(text_content) > 200 else text_content
     confidence = row.get("confidence", 0)
     assets = row.get("assets", [])
@@ -284,6 +312,7 @@ def create_signal_card(row):
     """Create a signal card for recent predictions with time-ago format."""
     timestamp = row.get("timestamp")
     text_content = row.get("text", "")
+    text_content = strip_urls(text_content)
     preview = text_content[:120] + "..." if len(text_content) > 120 else text_content
     confidence = row.get("confidence", 0)
     assets = row.get("assets", [])
@@ -446,6 +475,7 @@ def create_post_card(row):
     favourites = row.get("favourites_count", 0) or 0
 
     # Truncate post text for display
+    post_text = strip_urls(post_text)
     display_text = post_text[:300] + "..." if len(post_text) > 300 else post_text
 
     # Determine sentiment from market_impact
@@ -698,6 +728,7 @@ def create_prediction_timeline_card(row: dict) -> html.Div:
         time_str = str(timestamp)[11:16] if timestamp else ""
 
     # Truncate tweet text
+    tweet_text = strip_urls(tweet_text)
     display_text = tweet_text[:200] + "..." if len(tweet_text) > 200 else tweet_text
 
     # Price change display
@@ -1169,6 +1200,7 @@ def create_feed_signal_card(row) -> html.Div:
         asset_display = str(assets) if assets else "N/A"
 
     # Truncate text
+    post_text = strip_urls(post_text)
     max_text_len = 250
     display_text = (
         post_text[:max_text_len] + "..." if len(post_text) > max_text_len else post_text
