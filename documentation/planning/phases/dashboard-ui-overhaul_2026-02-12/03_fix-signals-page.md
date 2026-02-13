@@ -1,5 +1,7 @@
 # Phase 03: Fix Broken /signals Page
 
+**Status: COMPLETE -- PR #63**
+
 ## Header
 
 | Field | Value |
