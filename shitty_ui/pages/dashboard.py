@@ -36,6 +36,7 @@ from data import (
     get_accuracy_over_time,
     get_backtest_simulation,
     get_sentiment_accuracy,
+    get_dashboard_kpis,
 )
 
 
@@ -689,33 +690,16 @@ def register_dashboard_callbacks(app: Dash):
 
         # ===== Performance Metrics with error handling =====
         try:
-            perf = get_performance_metrics(days=days)
-            weekly_count = get_weekly_signal_count()
-            hc_metrics = get_high_confidence_metrics(days=days)
-            best_asset = get_best_performing_asset(days=days)
+            kpis = get_dashboard_kpis(days=days)
 
-            # Create redesigned metrics row
+            # Create KPI metrics row
             metrics_row = dbc.Row(
                 [
                     dbc.Col(
                         create_metric_card(
-                            "Overall Accuracy",
-                            f"{perf['accuracy_t7']:.1f}%",
-                            f"{perf['correct_predictions']}/{perf['evaluated_predictions']} correct",
-                            "bullseye",
-                            COLORS["success"]
-                            if perf["accuracy_t7"] > 60
-                            else COLORS["danger"],
-                        ),
-                        xs=6,
-                        sm=6,
-                        md=3,
-                    ),
-                    dbc.Col(
-                        create_metric_card(
-                            "Signals This Week",
-                            f"{weekly_count}",
-                            "completed predictions",
+                            "Total Signals",
+                            f"{kpis['total_signals']}",
+                            "evaluated predictions",
                             "signal",
                             COLORS["accent"],
                         ),
@@ -725,12 +709,12 @@ def register_dashboard_callbacks(app: Dash):
                     ),
                     dbc.Col(
                         create_metric_card(
-                            "High-Conf Win Rate",
-                            f"{hc_metrics['win_rate']:.1f}%",
-                            f"{hc_metrics['correct']}/{hc_metrics['total']} trades",
-                            "trophy",
+                            "Accuracy",
+                            f"{kpis['accuracy_pct']:.1f}%",
+                            "correct at 7 days",
+                            "bullseye",
                             COLORS["success"]
-                            if hc_metrics["win_rate"] > 60
+                            if kpis["accuracy_pct"] > 50
                             else COLORS["danger"],
                         ),
                         xs=6,
@@ -739,13 +723,27 @@ def register_dashboard_callbacks(app: Dash):
                     ),
                     dbc.Col(
                         create_metric_card(
-                            "Best Asset",
-                            f"{best_asset['symbol']}",
-                            f"${best_asset['total_pnl']:,.0f} P&L",
-                            "crown",
+                            "Avg 7-Day Return",
+                            f"{kpis['avg_return_t7']:+.2f}%",
+                            "mean return per signal",
+                            "chart-line",
                             COLORS["success"]
-                            if best_asset["total_pnl"] > 0
-                            else COLORS["text_muted"],
+                            if kpis["avg_return_t7"] > 0
+                            else COLORS["danger"],
+                        ),
+                        xs=6,
+                        sm=6,
+                        md=3,
+                    ),
+                    dbc.Col(
+                        create_metric_card(
+                            "Total P&L",
+                            f"${kpis['total_pnl']:+,.0f}",
+                            "simulated $1,000 trades",
+                            "dollar-sign",
+                            COLORS["success"]
+                            if kpis["total_pnl"] > 0
+                            else COLORS["danger"],
                         ),
                         xs=6,
                         sm=6,

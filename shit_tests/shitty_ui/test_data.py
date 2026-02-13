@@ -264,6 +264,146 @@ class TestGetPerformanceMetrics:
         assert result["accuracy_t7"] == 0.0
 
 
+class TestGetDashboardKpis:
+    """Tests for get_dashboard_kpis function."""
+
+    @patch("data.execute_query")
+    def test_returns_kpis_dict(self, mock_execute):
+        """Test that function returns a dict with all four KPI values."""
+        from data import get_dashboard_kpis
+
+        mock_execute.return_value = (
+            [(80, 48, 2.15, 1720.0)],
+            ["total_signals", "correct_count", "avg_return_t7", "total_pnl"],
+        )
+
+        get_dashboard_kpis.clear_cache()
+        result = get_dashboard_kpis()
+
+        assert isinstance(result, dict)
+        assert result["total_signals"] == 80
+        assert result["accuracy_pct"] == 60.0  # 48/80 = 60%
+        assert result["avg_return_t7"] == 2.15
+        assert result["total_pnl"] == 1720.0
+
+    @patch("data.execute_query")
+    def test_accuracy_calculated_correctly(self, mock_execute):
+        """Test that accuracy percentage is correct."""
+        from data import get_dashboard_kpis
+
+        mock_execute.return_value = (
+            [(200, 130, 1.8, 3200.0)],
+            ["total_signals", "correct_count", "avg_return_t7", "total_pnl"],
+        )
+
+        get_dashboard_kpis.clear_cache()
+        result = get_dashboard_kpis()
+
+        assert result["accuracy_pct"] == 65.0  # 130/200 = 65%
+
+    @patch("data.execute_query")
+    def test_handles_zero_signals(self, mock_execute):
+        """Test that function handles zero evaluated predictions gracefully."""
+        from data import get_dashboard_kpis
+
+        mock_execute.return_value = (
+            [(0, 0, None, 0.0)],
+            ["total_signals", "correct_count", "avg_return_t7", "total_pnl"],
+        )
+
+        get_dashboard_kpis.clear_cache()
+        result = get_dashboard_kpis()
+
+        assert result["total_signals"] == 0
+        assert result["accuracy_pct"] == 0.0
+        assert result["avg_return_t7"] == 0.0
+        assert result["total_pnl"] == 0.0
+
+    @patch("data.execute_query")
+    def test_returns_defaults_on_error(self, mock_execute):
+        """Test that function returns default zeros on database error."""
+        from data import get_dashboard_kpis
+
+        mock_execute.side_effect = Exception("Database error")
+
+        get_dashboard_kpis.clear_cache()
+        result = get_dashboard_kpis()
+
+        assert result["total_signals"] == 0
+        assert result["accuracy_pct"] == 0.0
+        assert result["avg_return_t7"] == 0.0
+        assert result["total_pnl"] == 0.0
+
+    @patch("data.execute_query")
+    def test_passes_date_filter_when_days_specified(self, mock_execute):
+        """Test that the days parameter creates a date filter in the query."""
+        from data import get_dashboard_kpis
+
+        mock_execute.return_value = (
+            [(10, 6, 1.5, 600.0)],
+            ["total_signals", "correct_count", "avg_return_t7", "total_pnl"],
+        )
+
+        get_dashboard_kpis.clear_cache()
+        get_dashboard_kpis(days=30)
+
+        mock_execute.assert_called_once()
+        call_args = mock_execute.call_args[0]
+        params = call_args[1]
+        assert "start_date" in params
+
+    @patch("data.execute_query")
+    def test_no_date_filter_when_days_is_none(self, mock_execute):
+        """Test that no date filter is applied when days is None (all time)."""
+        from data import get_dashboard_kpis
+
+        mock_execute.return_value = (
+            [(500, 300, 2.0, 15000.0)],
+            ["total_signals", "correct_count", "avg_return_t7", "total_pnl"],
+        )
+
+        get_dashboard_kpis.clear_cache()
+        get_dashboard_kpis(days=None)
+
+        mock_execute.assert_called_once()
+        call_args = mock_execute.call_args[0]
+        params = call_args[1]
+        assert "start_date" not in params
+
+    @patch("data.execute_query")
+    def test_negative_pnl_returned_correctly(self, mock_execute):
+        """Test that negative P&L values are returned without modification."""
+        from data import get_dashboard_kpis
+
+        mock_execute.return_value = (
+            [(50, 20, -1.5, -750.0)],
+            ["total_signals", "correct_count", "avg_return_t7", "total_pnl"],
+        )
+
+        get_dashboard_kpis.clear_cache()
+        result = get_dashboard_kpis()
+
+        assert result["total_pnl"] == -750.0
+        assert result["avg_return_t7"] == -1.5
+        assert result["accuracy_pct"] == 40.0  # 20/50 = 40%
+
+    @patch("data.execute_query")
+    def test_handles_null_avg_return(self, mock_execute):
+        """Test that NULL avg_return from database is returned as 0.0."""
+        from data import get_dashboard_kpis
+
+        mock_execute.return_value = (
+            [(0, 0, None, None)],
+            ["total_signals", "correct_count", "avg_return_t7", "total_pnl"],
+        )
+
+        get_dashboard_kpis.clear_cache()
+        result = get_dashboard_kpis()
+
+        assert result["avg_return_t7"] == 0.0
+        assert result["total_pnl"] == 0.0
+
+
 class TestGetAccuracyByConfidence:
     """Tests for get_accuracy_by_confidence function."""
 
