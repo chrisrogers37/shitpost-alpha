@@ -233,7 +233,7 @@ def create_hero_signal_card(row) -> html.Div:
                         },
                     ),
                     html.Span(
-                        f"Conf: {confidence:.0%}",
+                        f"{confidence:.0%}",
                         style={
                             "color": COLORS["text_muted"],
                             "fontSize": "0.8rem",
@@ -527,7 +527,7 @@ def create_post_card(row):
                             style={"color": COLORS["accent"], "fontSize": "0.85rem"},
                         ),
                         html.Span(
-                            f" | Confidence: {confidence:.0%}" if confidence else "",
+                            f" | {confidence:.0%}" if confidence else "",
                             style={
                                 "color": COLORS["text_muted"],
                                 "fontSize": "0.85rem",
@@ -788,7 +788,7 @@ def create_prediction_timeline_card(row: dict) -> html.Div:
                                 },
                             ),
                             html.Span(
-                                f" | Confidence: {confidence:.0%}"
+                                f" | {confidence:.0%}"
                                 if confidence
                                 else "",
                                 style={

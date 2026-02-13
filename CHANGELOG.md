@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Inconsistent confidence display across card types** - Standardized confidence format to bare percentage (e.g., `75%`) across hero signal cards, post cards, and prediction timeline cards. Previously used three different formats: `Conf: 75%`, `75%`, and `Confidence: 75%`.
 - **Countdown timer missing label** - Added "Next refresh" and "Last updated" labels to the header refresh indicator so users understand what the countdown represents
 - **Trends page empty state** - Auto-select the most-predicted asset when /trends loads instead of showing an empty chart
   - Added `get_top_predicted_asset()` data function to identify the asset with the most prediction outcomes
