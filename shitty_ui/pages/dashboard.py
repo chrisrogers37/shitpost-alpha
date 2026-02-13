@@ -20,15 +20,12 @@ from components.cards import (
 )
 from components.controls import create_filter_controls, get_period_button_styles
 from components.header import create_header, create_footer
-from callbacks.alerts import create_alert_history_panel
 from data import (
     get_recent_signals,
     get_performance_metrics,
     get_accuracy_by_confidence,
     get_accuracy_by_asset,
-    get_similar_predictions,
     get_predictions_with_outcomes,
-    get_active_assets_from_db,
     load_recent_posts,
     get_active_signals,
     get_weekly_signal_count,
@@ -115,27 +112,69 @@ def create_dashboard_page() -> html.Div:
                         color=COLORS["accent"],
                         children=html.Div(id="performance-metrics", className="mb-4"),
                     ),
-                    # Performance Chart: Accuracy over time
+                    # ========== Analytics Section: Tabbed Charts ==========
                     dbc.Card(
                         [
                             dbc.CardHeader(
                                 [
                                     html.I(className="fas fa-chart-line me-2"),
-                                    "Prediction Accuracy Over Time",
+                                    "Analytics",
                                 ],
                                 className="fw-bold",
                                 style={"backgroundColor": COLORS["secondary"]},
                             ),
                             dbc.CardBody(
                                 [
-                                    dcc.Loading(
-                                        type="circle",
-                                        color=COLORS["accent"],
-                                        children=dcc.Graph(
-                                            id="accuracy-over-time-chart",
-                                            config={"displayModeBar": False},
-                                        ),
-                                    )
+                                    dbc.Tabs(
+                                        [
+                                            dbc.Tab(
+                                                dcc.Loading(
+                                                    type="circle",
+                                                    color=COLORS["accent"],
+                                                    children=dcc.Graph(
+                                                        id="accuracy-over-time-chart",
+                                                        config={
+                                                            "displayModeBar": False
+                                                        },
+                                                    ),
+                                                ),
+                                                label="Accuracy Over Time",
+                                                tab_id="tab-accuracy",
+                                            ),
+                                            dbc.Tab(
+                                                dcc.Loading(
+                                                    type="circle",
+                                                    color=COLORS["accent"],
+                                                    children=dcc.Graph(
+                                                        id="confidence-accuracy-chart",
+                                                        config={
+                                                            "displayModeBar": False
+                                                        },
+                                                    ),
+                                                ),
+                                                label="By Confidence",
+                                                tab_id="tab-confidence",
+                                            ),
+                                            dbc.Tab(
+                                                dcc.Loading(
+                                                    type="circle",
+                                                    color=COLORS["accent"],
+                                                    children=dcc.Graph(
+                                                        id="asset-accuracy-chart",
+                                                        config={
+                                                            "displayModeBar": False
+                                                        },
+                                                        style={"cursor": "pointer"},
+                                                    ),
+                                                ),
+                                                label="By Asset",
+                                                tab_id="tab-asset",
+                                            ),
+                                        ],
+                                        id="analytics-tabs",
+                                        active_tab="tab-accuracy",
+                                        className="analytics-tabs",
+                                    ),
                                 ],
                                 style={"backgroundColor": COLORS["secondary"]},
                             ),
@@ -143,53 +182,22 @@ def create_dashboard_page() -> html.Div:
                         className="mb-4",
                         style={"backgroundColor": COLORS["secondary"]},
                     ),
-                    # Two column layout: Charts + Recent Signals
+                    # ========== Two Column: Latest Posts + Recent Signals ==========
                     dbc.Row(
                         [
-                            # Left column: Charts
+                            # Left column: Latest Posts (wider, primary content)
                             dbc.Col(
                                 [
-                                    # Accuracy by Confidence Chart
                                     dbc.Card(
                                         [
                                             dbc.CardHeader(
                                                 [
                                                     html.I(
-                                                        className="fas fa-chart-bar me-2"
+                                                        className="fas fa-rss me-2"
                                                     ),
-                                                    "Accuracy by Confidence Level",
-                                                ],
-                                                className="fw-bold",
-                                            ),
-                                            dbc.CardBody(
-                                                [
-                                                    dcc.Loading(
-                                                        type="circle",
-                                                        color=COLORS["accent"],
-                                                        children=dcc.Graph(
-                                                            id="confidence-accuracy-chart",
-                                                            config={
-                                                                "displayModeBar": False
-                                                            },
-                                                        ),
-                                                    )
-                                                ]
-                                            ),
-                                        ],
-                                        className="mb-3",
-                                        style={"backgroundColor": COLORS["secondary"]},
-                                    ),
-                                    # Asset Performance Chart
-                                    dbc.Card(
-                                        [
-                                            dbc.CardHeader(
-                                                [
-                                                    html.I(
-                                                        className="fas fa-coins me-2"
-                                                    ),
-                                                    "Performance by Asset ",
+                                                    "Latest Posts",
                                                     html.Small(
-                                                        "(click bar to view asset page)",
+                                                        " - Trump's posts with LLM analysis",
                                                         style={
                                                             "color": COLORS[
                                                                 "text_muted"
@@ -205,19 +213,20 @@ def create_dashboard_page() -> html.Div:
                                                     dcc.Loading(
                                                         type="circle",
                                                         color=COLORS["accent"],
-                                                        children=dcc.Graph(
-                                                            id="asset-accuracy-chart",
-                                                            config={
-                                                                "displayModeBar": False
+                                                        children=html.Div(
+                                                            id="post-feed-container",
+                                                            style={
+                                                                "maxHeight": "600px",
+                                                                "overflowY": "auto",
                                                             },
-                                                            style={"cursor": "pointer"},
                                                         ),
                                                     )
                                                 ]
                                             ),
                                         ],
-                                        className="mb-3",
-                                        style={"backgroundColor": COLORS["secondary"]},
+                                        style={
+                                            "backgroundColor": COLORS["secondary"]
+                                        },
                                     ),
                                 ],
                                 xs=12,
@@ -226,7 +235,7 @@ def create_dashboard_page() -> html.Div:
                                 lg=7,
                                 xl=7,
                             ),
-                            # Right column: Recent Predictions Table
+                            # Right column: Recent Predictions
                             dbc.Col(
                                 [
                                     dbc.Card(
@@ -248,7 +257,7 @@ def create_dashboard_page() -> html.Div:
                                                         children=html.Div(
                                                             id="recent-signals-list",
                                                             style={
-                                                                "maxHeight": "500px",
+                                                                "maxHeight": "600px",
                                                                 "overflowY": "auto",
                                                             },
                                                         ),
@@ -256,45 +265,9 @@ def create_dashboard_page() -> html.Div:
                                                 ]
                                             ),
                                         ],
-                                        className="mb-3",
-                                        style={"backgroundColor": COLORS["secondary"]},
-                                    ),
-                                    # Asset Deep Dive
-                                    dbc.Card(
-                                        [
-                                            dbc.CardHeader(
-                                                [
-                                                    html.I(
-                                                        className="fas fa-search me-2"
-                                                    ),
-                                                    "Asset Deep Dive",
-                                                ],
-                                                className="fw-bold",
-                                            ),
-                                            dbc.CardBody(
-                                                [
-                                                    dcc.Dropdown(
-                                                        id="asset-selector",
-                                                        placeholder="Select an asset...",
-                                                        className="mb-3",
-                                                        style={
-                                                            "backgroundColor": COLORS[
-                                                                "bg"
-                                                            ],
-                                                            "color": COLORS["text"],
-                                                        },
-                                                    ),
-                                                    dcc.Loading(
-                                                        type="circle",
-                                                        color=COLORS["accent"],
-                                                        children=html.Div(
-                                                            id="asset-drilldown-content"
-                                                        ),
-                                                    ),
-                                                ]
-                                            ),
-                                        ],
-                                        style={"backgroundColor": COLORS["secondary"]},
+                                        style={
+                                            "backgroundColor": COLORS["secondary"]
+                                        },
                                     ),
                                 ],
                                 xs=12,
@@ -303,57 +276,26 @@ def create_dashboard_page() -> html.Div:
                                 lg=5,
                                 xl=5,
                             ),
-                        ]
-                    ),
-                    # Latest Posts Feed
-                    dbc.Card(
-                        [
-                            dbc.CardHeader(
-                                [
-                                    html.I(className="fas fa-rss me-2"),
-                                    "Latest Posts",
-                                    html.Small(
-                                        " - Trump's posts with LLM analysis",
-                                        style={
-                                            "color": COLORS["text_muted"],
-                                            "fontWeight": "normal",
-                                        },
-                                    ),
-                                ],
-                                className="fw-bold",
-                            ),
-                            dbc.CardBody(
-                                [
-                                    dcc.Loading(
-                                        type="circle",
-                                        color=COLORS["accent"],
-                                        children=html.Div(
-                                            id="post-feed-container",
-                                            style={
-                                                "maxHeight": "600px",
-                                                "overflowY": "auto",
-                                            },
-                                        ),
-                                    )
-                                ]
-                            ),
                         ],
-                        className="mt-4",
-                        style={"backgroundColor": COLORS["secondary"]},
+                        className="mb-4",
                     ),
-                    # Collapsible Full Data Table
+                    # ========== Collapsible Full Data Table ==========
                     dbc.Card(
                         [
                             dbc.CardHeader(
                                 [
                                     dbc.Button(
                                         [
+                                            html.I(
+                                                className="fas fa-chevron-right me-2 collapse-chevron",
+                                                id="collapse-table-chevron",
+                                            ),
                                             html.I(className="fas fa-table me-2"),
                                             "Full Prediction Data",
                                         ],
                                         id="collapse-table-button",
                                         color="link",
-                                        className="text-white fw-bold p-0",
+                                        className="text-white fw-bold p-0 collapse-toggle-btn",
                                     ),
                                 ],
                                 className="fw-bold",
@@ -376,11 +318,9 @@ def create_dashboard_page() -> html.Div:
                                 is_open=False,
                             ),
                         ],
-                        className="mt-4",
+                        className="mb-4",
                         style={"backgroundColor": COLORS["secondary"]},
                     ),
-                    # Alert history panel
-                    create_alert_history_panel(),
                     # Footer
                     create_footer(),
                 ],
@@ -593,7 +533,6 @@ def register_dashboard_callbacks(app: Dash):
             Output("confidence-accuracy-chart", "figure"),
             Output("asset-accuracy-chart", "figure"),
             Output("recent-signals-list", "children"),
-            Output("asset-selector", "options"),
             Output("last-update-timestamp", "data"),
         ],
         [
@@ -925,17 +864,6 @@ def register_dashboard_callbacks(app: Dash):
             print(f"Error loading recent signals: {traceback.format_exc()}")
             signal_cards = [create_error_card("Unable to load recent signals", str(e))]
 
-        # ===== Asset Selector Options with error handling =====
-        try:
-            active_assets = get_active_assets_from_db()
-            asset_options = [
-                {"label": asset, "value": asset} for asset in active_assets
-            ]
-        except Exception as e:
-            errors.append(f"Asset options: {e}")
-            print(f"Error loading asset options: {traceback.format_exc()}")
-            asset_options = []
-
         # Log any errors that occurred
         if errors:
             print(f"Dashboard update completed with errors: {errors}")
@@ -947,7 +875,6 @@ def register_dashboard_callbacks(app: Dash):
             conf_fig,
             asset_fig,
             signal_cards,
-            asset_options,
             current_time,
         )
 
@@ -1004,212 +931,6 @@ def register_dashboard_callbacks(app: Dash):
             return no_update
 
     @app.callback(
-        Output("asset-drilldown-content", "children"),
-        [Input("asset-selector", "value")],
-    )
-    def update_asset_drilldown(asset):
-        """Update the asset deep dive section with error handling."""
-        if not asset:
-            return html.P(
-                "Select an asset above to see historical predictions and their outcomes.",
-                style={
-                    "color": COLORS["text_muted"],
-                    "textAlign": "center",
-                    "padding": "20px",
-                },
-            )
-
-        try:
-            similar_df = get_similar_predictions(asset, limit=10)
-
-            if similar_df.empty:
-                return html.P(
-                    f"No historical predictions found for {asset}.",
-                    style={
-                        "color": COLORS["text_muted"],
-                        "textAlign": "center",
-                        "padding": "20px",
-                    },
-                )
-
-            # Calculate summary stats for this asset
-            total = len(similar_df)
-            correct = (
-                similar_df["correct_t7"].sum()
-                if "correct_t7" in similar_df.columns
-                else 0
-            )
-            accuracy = (correct / total * 100) if total > 0 else 0
-            avg_return = (
-                similar_df["return_t7"].mean()
-                if "return_t7" in similar_df.columns
-                else 0
-            )
-            total_pnl = (
-                similar_df["pnl_t7"].sum() if "pnl_t7" in similar_df.columns else 0
-            )
-
-            # Create summary
-            summary = html.Div(
-                [
-                    html.H5(asset, className="mb-2"),
-                    html.Div(
-                        [
-                            html.Span(
-                                "Accuracy: ", style={"color": COLORS["text_muted"]}
-                            ),
-                            html.Span(
-                                f"{accuracy:.0f}%",
-                                style={
-                                    "color": COLORS["success"]
-                                    if accuracy >= 60
-                                    else COLORS["danger"],
-                                    "fontWeight": "bold",
-                                },
-                            ),
-                            html.Span(
-                                " | Avg Return: ", style={"color": COLORS["text_muted"]}
-                            ),
-                            html.Span(
-                                f"{avg_return:+.2f}%",
-                                style={
-                                    "color": COLORS["success"]
-                                    if avg_return > 0
-                                    else COLORS["danger"],
-                                    "fontWeight": "bold",
-                                },
-                            ),
-                            html.Span(
-                                " | P&L: ", style={"color": COLORS["text_muted"]}
-                            ),
-                            html.Span(
-                                f"${total_pnl:,.0f}",
-                                style={
-                                    "color": COLORS["success"]
-                                    if total_pnl > 0
-                                    else COLORS["danger"],
-                                    "fontWeight": "bold",
-                                },
-                            ),
-                        ],
-                        className="mb-3",
-                        style={"fontSize": "0.9rem"},
-                    ),
-                ]
-            )
-
-            # Create prediction timeline
-            predictions = []
-            for _, row in similar_df.iterrows():
-                timestamp = row.get("timestamp")
-                text = (
-                    row.get("text", "")[:100] + "..."
-                    if len(row.get("text", "")) > 100
-                    else row.get("text", "")
-                )
-                sentiment = row.get("prediction_sentiment", "neutral")
-                return_t7 = row.get("return_t7")
-                correct = row.get("correct_t7")
-
-                sentiment_color = (
-                    COLORS["success"]
-                    if sentiment == "bullish"
-                    else COLORS["danger"]
-                    if sentiment == "bearish"
-                    else COLORS["text_muted"]
-                )
-                outcome_icon = (
-                    "check-circle"
-                    if correct
-                    else "times-circle"
-                    if correct is False
-                    else "clock"
-                )
-                outcome_color = (
-                    COLORS["success"]
-                    if correct
-                    else COLORS["danger"]
-                    if correct is False
-                    else COLORS["warning"]
-                )
-
-                predictions.append(
-                    html.Div(
-                        [
-                            html.Div(
-                                [
-                                    html.I(
-                                        className=f"fas fa-{outcome_icon}",
-                                        style={"color": outcome_color},
-                                    ),
-                                    html.Span(
-                                        timestamp.strftime("%b %d")
-                                        if isinstance(timestamp, datetime)
-                                        else str(timestamp)[:10],
-                                        style={
-                                            "marginLeft": "8px",
-                                            "color": COLORS["text_muted"],
-                                            "fontSize": "0.8rem",
-                                        },
-                                    ),
-                                    html.Span(
-                                        f" {sentiment.upper()}",
-                                        style={
-                                            "marginLeft": "8px",
-                                            "color": sentiment_color,
-                                            "fontSize": "0.8rem",
-                                            "fontWeight": "bold",
-                                        },
-                                    ),
-                                    html.Span(
-                                        f" {return_t7:+.1f}%"
-                                        if return_t7 is not None
-                                        else "",
-                                        style={
-                                            "marginLeft": "8px",
-                                            "color": COLORS["success"]
-                                            if return_t7 and return_t7 > 0
-                                            else COLORS["danger"],
-                                            "fontSize": "0.8rem",
-                                        },
-                                    )
-                                    if return_t7 is not None
-                                    else None,
-                                ]
-                            ),
-                            html.P(
-                                text,
-                                style={
-                                    "fontSize": "0.8rem",
-                                    "color": COLORS["text_muted"],
-                                    "margin": "5px 0 0 24px",
-                                    "lineHeight": "1.3",
-                                },
-                            ),
-                        ],
-                        style={
-                            "padding": "10px 0",
-                            "borderBottom": f"1px solid {COLORS['border']}",
-                        },
-                    )
-                )
-
-            return html.Div(
-                [
-                    summary,
-                    html.Div(
-                        predictions, style={"maxHeight": "300px", "overflowY": "auto"}
-                    ),
-                ]
-            )
-
-        except Exception as e:
-            print(
-                f"Error loading asset drilldown for {asset}: {traceback.format_exc()}"
-            )
-            return create_error_card(f"Unable to load data for {asset}", str(e))
-
-    @app.callback(
         Output("collapse-table", "is_open"),
         [Input("collapse-table-button", "n_clicks")],
         [State("collapse-table", "is_open")],
@@ -1219,6 +940,20 @@ def register_dashboard_callbacks(app: Dash):
         if n_clicks:
             return not is_open
         return is_open
+
+    # Chevron rotation for collapsible sections
+    app.clientside_callback(
+        """
+        function(isOpen) {
+            if (isOpen) {
+                return 'fas fa-chevron-right me-2 collapse-chevron rotated';
+            }
+            return 'fas fa-chevron-right me-2 collapse-chevron';
+        }
+        """,
+        Output("collapse-table-chevron", "className"),
+        [Input("collapse-table", "is_open")],
+    )
 
     @app.callback(
         Output("predictions-table-container", "children"),
