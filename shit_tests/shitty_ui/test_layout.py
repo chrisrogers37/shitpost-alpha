@@ -14,6 +14,28 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "shitty_ui"))
 
 
+def _find_text_in_component(component, text):
+    """Recursively search a Dash component tree for a text string.
+
+    Returns True if the text is found as children or within children strings.
+    """
+    if isinstance(component, str):
+        return text in component
+
+    children = getattr(component, "children", None)
+    if children is None:
+        return False
+
+    if isinstance(children, str):
+        return text in children
+
+    if isinstance(children, (list, tuple)):
+        return any(_find_text_in_component(child, text) for child in children)
+
+    # Single component child
+    return _find_text_in_component(children, text)
+
+
 class TestColors:
     """Tests for color palette configuration."""
 
@@ -158,6 +180,42 @@ class TestCreateHeader:
 
         # Check that there's content in the header
         assert len(header.children) > 0
+
+    def test_contains_next_refresh_label(self):
+        """Test that header contains 'Next refresh' label for the countdown timer."""
+        from layout import create_header
+
+        header = create_header()
+
+        found = _find_text_in_component(header, "Next refresh")
+        assert found, "Header should contain 'Next refresh' label"
+
+    def test_contains_last_updated_label(self):
+        """Test that header contains 'Last updated' label for the update time."""
+        from layout import create_header
+
+        header = create_header()
+
+        found = _find_text_in_component(header, "Last updated")
+        assert found, "Header should contain 'Last updated' label"
+
+    def test_countdown_has_default_value(self):
+        """Test that countdown timer has the default '5:00' value."""
+        from layout import create_header
+
+        header = create_header()
+
+        found = _find_text_in_component(header, "5:00")
+        assert found, "Header countdown should default to '5:00'"
+
+    def test_last_update_has_default_value(self):
+        """Test that last update time has the default '--:--' value."""
+        from layout import create_header
+
+        header = create_header()
+
+        found = _find_text_in_component(header, "--:--")
+        assert found, "Header last update time should default to '--:--'"
 
 
 class TestCreateFilterControls:
