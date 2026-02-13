@@ -1,5 +1,8 @@
 # Phase 06: Consistent Confidence Display Format
 
+**Status:** COMPLETE
+**PR:** #64
+
 **PR Title**: `fix(ui): standardize confidence display format across all card types`
 **Risk Level**: Low (cosmetic change only, no data mutation, no calculation changes)
 **Estimated Effort**: Small (1-2 hours implementation + tests)
