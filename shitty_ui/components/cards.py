@@ -119,6 +119,54 @@ def create_empty_chart(message: str = "No data available"):
     return fig
 
 
+def create_empty_state_chart(
+    message: str = "No data available",
+    hint: str = "",
+    icon: str = "\u2139\ufe0f",
+    height: int = 80,
+) -> go.Figure:
+    """Create a compact empty-state chart for sections with no data.
+
+    Unlike create_empty_chart(), this produces a shorter, visually subtle
+    figure designed to minimize wasted vertical space while informing the
+    user why data is missing and when to expect it.
+
+    Args:
+        message: Primary message (e.g., "No accuracy data yet").
+        hint: Secondary hint explaining what needs to happen
+              (e.g., "Predictions need 7+ days to mature").
+        icon: Unicode icon prefix for the message. Default info icon.
+        height: Figure height in pixels. Default 80.
+
+    Returns:
+        A Plotly go.Figure with centered annotation text and minimal chrome.
+    """
+    display_text = f"{icon}  {message}"
+    if hint:
+        display_text += f"<br><span style='font-size:11px; color:{COLORS['border']}'>{hint}</span>"
+
+    fig = go.Figure()
+    fig.add_annotation(
+        text=display_text,
+        showarrow=False,
+        font=dict(color=COLORS["text_muted"], size=13),
+        xref="paper",
+        yref="paper",
+        x=0.5,
+        y=0.5,
+    )
+    fig.update_layout(
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font_color=COLORS["text_muted"],
+        height=height,
+        margin=dict(l=0, r=0, t=10, b=10),
+        xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+        yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+    )
+    return fig
+
+
 def create_hero_signal_card(row) -> html.Div:
     """Create a hero signal card for a high-confidence prediction."""
     timestamp = row.get("timestamp")

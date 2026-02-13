@@ -12,6 +12,7 @@ from constants import COLORS
 from components.cards import (
     create_error_card,
     create_empty_chart,
+    create_empty_state_chart,
     create_hero_signal_card,
     create_metric_card,
     create_signal_card,
@@ -807,7 +808,10 @@ def register_dashboard_callbacks(app: Dash):
                     showlegend=False,
                 )
             else:
-                acc_fig = create_empty_chart("Not enough data to show accuracy trend")
+                acc_fig = create_empty_state_chart(
+                    message="Not enough weekly data to chart accuracy trend",
+                    hint="Requires 2+ weeks of evaluated predictions",
+                )
         except Exception as e:
             errors.append(f"Accuracy over time: {e}")
             print(f"Error loading accuracy over time: {traceback.format_exc()}")
@@ -845,8 +849,9 @@ def register_dashboard_callbacks(app: Dash):
                     height=250,
                 )
             else:
-                conf_fig = create_empty_chart(
-                    "No outcome data available for this period"
+                conf_fig = create_empty_state_chart(
+                    message="No accuracy data for this period",
+                    hint="Predictions need 7+ trading days to mature before accuracy is measured",
                 )
         except Exception as e:
             errors.append(f"Confidence chart: {e}")
@@ -888,8 +893,9 @@ def register_dashboard_callbacks(app: Dash):
                     hovermode="x unified",
                 )
             else:
-                asset_fig = create_empty_chart(
-                    "No outcome data available for this period"
+                asset_fig = create_empty_state_chart(
+                    message="No asset performance data for this period",
+                    hint="Asset accuracy appears after prediction outcomes are evaluated",
                 )
         except Exception as e:
             errors.append(f"Asset chart: {e}")
@@ -1506,7 +1512,10 @@ def register_dashboard_callbacks(app: Dash):
                     height=300,
                 )
             else:
-                conf_fig = create_empty_chart("No confidence data available")
+                conf_fig = create_empty_state_chart(
+                    message="No confidence breakdown available yet",
+                    hint="Appears after predictions have evaluated outcomes",
+                )
         except Exception as e:
             errors.append(f"Confidence chart: {e}")
             conf_fig = create_empty_chart(f"Error: {str(e)[:50]}")
@@ -1568,7 +1577,10 @@ def register_dashboard_callbacks(app: Dash):
                     ),
                 )
             else:
-                sent_fig = create_empty_chart("No sentiment data available")
+                sent_fig = create_empty_state_chart(
+                    message="No sentiment breakdown available yet",
+                    hint="Appears after predictions with sentiment labels are evaluated",
+                )
         except Exception as e:
             errors.append(f"Sentiment chart: {e}")
             sent_fig = create_empty_chart(f"Error: {str(e)[:50]}")
