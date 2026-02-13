@@ -2435,3 +2435,43 @@ class TestGetSignalFeedCsv:
             asset_filter="AAPL",
             outcome_filter="correct",
         )
+
+
+class TestGetTopPredictedAsset:
+    """Tests for get_top_predicted_asset function."""
+
+    @patch("data.execute_query")
+    def test_returns_top_asset(self, mock_execute):
+        """Test that function returns the symbol with most predictions."""
+        from data import get_top_predicted_asset
+
+        get_top_predicted_asset.clear_cache()
+        mock_execute.return_value = (
+            [("TSLA", 42)],
+            ["symbol", "prediction_count"],
+        )
+
+        result = get_top_predicted_asset()
+        assert result == "TSLA"
+
+    @patch("data.execute_query")
+    def test_returns_none_when_empty(self, mock_execute):
+        """Test that function returns None when no assets exist."""
+        from data import get_top_predicted_asset
+
+        get_top_predicted_asset.clear_cache()
+        mock_execute.return_value = ([], ["symbol", "prediction_count"])
+
+        result = get_top_predicted_asset()
+        assert result is None
+
+    @patch("data.execute_query")
+    def test_returns_none_on_error(self, mock_execute):
+        """Test that function returns None on database error."""
+        from data import get_top_predicted_asset
+
+        get_top_predicted_asset.clear_cache()
+        mock_execute.side_effect = Exception("DB connection failed")
+
+        result = get_top_predicted_asset()
+        assert result is None
