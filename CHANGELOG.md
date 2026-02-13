@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Dashboard KPIs showing all zeros** - Main dashboard KPI cards now pull from the same `prediction_outcomes` data source as the Performance page
+  - New `get_dashboard_kpis()` function queries only evaluated predictions (`correct_t7 IS NOT NULL`), preventing zeros from unevaluated predictions
+  - KPI cards changed to: Total Signals, Accuracy (7-day), Avg 7-Day Return, Total P&L
+  - Reduced dashboard KPI queries from 4 database calls to 1
+
+### Fixed
 - **Inconsistent confidence display across card types** - Standardized confidence format to bare percentage (e.g., `75%`) across hero signal cards, post cards, and prediction timeline cards. Previously used three different formats: `Conf: 75%`, `75%`, and `Confidence: 75%`.
 - **Duplicate hero signal cards on dashboard** - Posts mentioning multiple tickers (e.g., RTX, LMT, NOC, GD) no longer produce duplicate identical cards in the Active Signals hero section
   - Rewrite `get_active_signals()` query to GROUP BY prediction, aggregating outcome data across all tickers

@@ -441,6 +441,70 @@ def get_performance_metrics(days: int = None) -> Dict[str, Any]:
 
 
 @ttl_cache(ttl_seconds=300)  # Cache for 5 minutes
+def get_dashboard_kpis(days: int = None) -> Dict[str, Any]:
+    """
+    Get the four key metrics for the main dashboard KPI cards.
+
+    Returns only evaluated predictions (where correct_t7 is not NULL),
+    which ensures metrics reflect real outcomes, not pending predictions.
+    Matches the same data source used by the Performance page.
+
+    Args:
+        days: Number of days to look back (None = all time).
+              Note: uses prediction_date, so a 7-day window returns
+              predictions made 7 days ago that have since been evaluated.
+
+    Returns:
+        Dict with keys:
+            total_signals: int - count of evaluated prediction-outcome rows
+            accuracy_pct: float - percentage of correct_t7 = true
+            avg_return_t7: float - mean 7-day return (percentage)
+            total_pnl: float - sum of pnl_t7 (dollar amount)
+    """
+    date_filter = ""
+    params: Dict[str, Any] = {}
+
+    if days is not None:
+        date_filter = "AND prediction_date >= :start_date"
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
+        SELECT
+            COUNT(*) as total_signals,
+            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct_count,
+            AVG(return_t7) as avg_return_t7,
+            SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END) as total_pnl
+        FROM prediction_outcomes
+        WHERE correct_t7 IS NOT NULL
+        {date_filter}
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        if rows and rows[0]:
+            row = rows[0]
+            total = row[0] or 0
+            correct = row[1] or 0
+            accuracy = (correct / total * 100) if total > 0 else 0.0
+
+            return {
+                "total_signals": total,
+                "accuracy_pct": round(accuracy, 1),
+                "avg_return_t7": round(float(row[2]), 2) if row[2] else 0.0,
+                "total_pnl": round(float(row[3]), 2) if row[3] else 0.0,
+            }
+    except Exception as e:
+        logger.error(f"Error loading dashboard KPIs: {e}")
+
+    return {
+        "total_signals": 0,
+        "accuracy_pct": 0.0,
+        "avg_return_t7": 0.0,
+        "total_pnl": 0.0,
+    }
+
+
+@ttl_cache(ttl_seconds=300)  # Cache for 5 minutes
 def get_accuracy_by_confidence(days: int = None) -> pd.DataFrame:
     """
     Get prediction accuracy broken down by confidence level.
@@ -1033,6 +1097,7 @@ def clear_all_caches() -> None:
     get_high_confidence_metrics.clear_cache()  # type: ignore
     get_best_performing_asset.clear_cache()  # type: ignore
     get_backtest_simulation.clear_cache()  # type: ignore
+    get_dashboard_kpis.clear_cache()  # type: ignore
     get_top_predicted_asset.clear_cache()  # type: ignore
 
 
