@@ -8,7 +8,7 @@ import dash_bootstrap_components as dbc
 from constants import COLORS
 from components.cards import create_error_card
 from components.charts import build_signal_over_trend_chart, build_empty_signal_chart
-from data import get_price_with_signals, get_active_assets_from_db
+from data import get_price_with_signals, get_active_assets_from_db, get_top_predicted_asset
 
 
 def create_trends_page() -> html.Div:
@@ -124,7 +124,7 @@ def create_trends_page() -> html.Div:
                             color=COLORS["accent"],
                             children=dcc.Graph(
                                 id="trends-signal-chart",
-                                config={"displayModeBar": True, "displaylogo": False},
+                                config={"displayModeBar": "hover", "displaylogo": False},
                             ),
                         ),
                     ),
@@ -147,14 +147,23 @@ def register_trends_callbacks(app: Dash):
     """Register all /trends page callbacks."""
 
     @app.callback(
-        Output("trends-asset-selector", "options"),
+        [
+            Output("trends-asset-selector", "options"),
+            Output("trends-asset-selector", "value"),
+        ],
         [Input("url", "pathname")],
     )
     def populate_trends_assets(pathname):
         if pathname != "/trends":
-            return no_update
+            return no_update, no_update
         assets = get_active_assets_from_db()
-        return [{"label": a, "value": a} for a in assets]
+        options = [{"label": a, "value": a} for a in assets]
+
+        # Auto-select the most-predicted asset as default
+        top_asset = get_top_predicted_asset()
+        default_value = top_asset if top_asset and top_asset in assets else (assets[0] if assets else None)
+
+        return options, default_value
 
     @app.callback(
         [
@@ -174,9 +183,23 @@ def register_trends_callbacks(app: Dash):
     def update_trends_chart(symbol, n30, n90, n180, n1y, options):
         if not symbol:
             return (
-                build_empty_signal_chart("Select an asset to view the chart"),
-                "Select an asset to view chart",
-                html.Div(),
+                build_empty_signal_chart(
+                    "No assets with prediction data available yet"
+                ),
+                "No Asset Data Available",
+                html.Div(
+                    html.P(
+                        "Predictions need to be analyzed and validated before "
+                        "trend charts can be displayed. Check back after the "
+                        "pipeline has processed some posts.",
+                        style={
+                            "color": COLORS["text_muted"],
+                            "textAlign": "center",
+                            "padding": "20px",
+                            "fontSize": "0.9rem",
+                        },
+                    )
+                ),
             )
 
         ctx = callback_context

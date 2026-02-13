@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Countdown timer missing label** - Added "Next refresh" and "Last updated" labels to the header refresh indicator so users understand what the countdown represents
+- **Trends page empty state** - Auto-select the most-predicted asset when /trends loads instead of showing an empty chart
+  - Added `get_top_predicted_asset()` data function to identify the asset with the most prediction outcomes
+  - Changed Plotly modebar from always-visible to hover-only for cleaner appearance
+  - Improved empty state messaging when no assets with prediction data exist
 
 ## [v1.0.0] - 2026-02-12
 

@@ -752,6 +752,35 @@ def get_active_assets_from_db() -> List[str]:
         return []
 
 
+@ttl_cache(ttl_seconds=600)  # Cache for 10 minutes (same as get_active_assets_from_db)
+def get_top_predicted_asset() -> Optional[str]:
+    """
+    Get the asset with the most prediction outcomes.
+
+    Used to auto-select a default asset on the /trends page.
+
+    Returns:
+        Ticker symbol string (e.g., 'TSLA'), or None if no assets exist.
+    """
+    query = text("""
+        SELECT symbol, COUNT(*) as prediction_count
+        FROM prediction_outcomes
+        WHERE symbol IS NOT NULL
+        GROUP BY symbol
+        ORDER BY prediction_count DESC
+        LIMIT 1
+    """)
+
+    try:
+        rows, columns = execute_query(query)
+        if rows and rows[0]:
+            return rows[0][0]
+        return None
+    except Exception as e:
+        logger.error(f"Error loading top predicted asset: {e}")
+        return None
+
+
 # =============================================================================
 # New Aggregate Functions for Performance Dashboard
 # =============================================================================
@@ -1004,6 +1033,7 @@ def clear_all_caches() -> None:
     get_high_confidence_metrics.clear_cache()  # type: ignore
     get_best_performing_asset.clear_cache()  # type: ignore
     get_backtest_simulation.clear_cache()  # type: ignore
+    get_top_predicted_asset.clear_cache()  # type: ignore
 
 
 # =============================================================================

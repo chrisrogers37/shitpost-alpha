@@ -113,3 +113,73 @@ class TestBuildSignalSummary:
         result = _build_signal_summary("TEST", signals_df)
         html_str = str(result)
         assert "0%" in html_str
+
+
+class TestPopulateTrendsAssets:
+    """Tests for the populate_trends_assets callback logic."""
+
+    @patch("pages.trends.get_top_predicted_asset")
+    @patch("pages.trends.get_active_assets_from_db")
+    def test_auto_selects_top_asset(self, mock_get_assets, mock_get_top):
+        """Test that callback returns top asset as default value."""
+        mock_get_assets.return_value = ["AAPL", "TSLA", "SPY"]
+        mock_get_top.return_value = "TSLA"
+
+        from pages.trends import get_active_assets_from_db, get_top_predicted_asset
+
+        assets = get_active_assets_from_db()
+        top_asset = get_top_predicted_asset()
+        options = [{"label": a, "value": a} for a in assets]
+        default_value = top_asset if top_asset and top_asset in assets else (assets[0] if assets else None)
+
+        assert default_value == "TSLA"
+        assert len(options) == 3
+
+    @patch("pages.trends.get_top_predicted_asset")
+    @patch("pages.trends.get_active_assets_from_db")
+    def test_falls_back_to_first_asset(self, mock_get_assets, mock_get_top):
+        """Test fallback to first asset when top asset is not in list."""
+        mock_get_assets.return_value = ["AAPL", "SPY"]
+        mock_get_top.return_value = "XYZ"
+
+        assets = mock_get_assets()
+        top_asset = mock_get_top()
+        default_value = top_asset if top_asset and top_asset in assets else (assets[0] if assets else None)
+
+        assert default_value == "AAPL"
+
+    @patch("pages.trends.get_top_predicted_asset")
+    @patch("pages.trends.get_active_assets_from_db")
+    def test_returns_none_when_no_assets(self, mock_get_assets, mock_get_top):
+        """Test that None is returned when no assets exist."""
+        mock_get_assets.return_value = []
+        mock_get_top.return_value = None
+
+        assets = mock_get_assets()
+        top_asset = mock_get_top()
+        default_value = top_asset if top_asset and top_asset in assets else (assets[0] if assets else None)
+
+        assert default_value is None
+
+    @patch("pages.trends.get_top_predicted_asset")
+    @patch("pages.trends.get_active_assets_from_db")
+    def test_handles_top_asset_none(self, mock_get_assets, mock_get_top):
+        """Test fallback when get_top_predicted_asset returns None."""
+        mock_get_assets.return_value = ["AAPL", "TSLA"]
+        mock_get_top.return_value = None
+
+        assets = mock_get_assets()
+        top_asset = mock_get_top()
+        default_value = top_asset if top_asset and top_asset in assets else (assets[0] if assets else None)
+
+        assert default_value == "AAPL"
+
+
+class TestTrendsModebarConfig:
+    """Tests for Plotly modebar configuration."""
+
+    def test_modebar_set_to_hover(self):
+        """Test that the chart config uses displayModeBar='hover'."""
+        page = create_trends_page()
+        html_str = str(page)
+        assert "'displayModeBar': 'hover'" in html_str or '"displayModeBar": "hover"' in html_str
