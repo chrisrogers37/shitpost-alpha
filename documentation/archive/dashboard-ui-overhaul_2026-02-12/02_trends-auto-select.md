@@ -1,7 +1,9 @@
 # Phase 02: Trends Page Auto-Select Top Asset
 
-**Status:** 🔧 IN PROGRESS
+**Status:** ✅ COMPLETE
 **Started:** 2026-02-12
+**Completed:** 2026-02-12
+**PR:** #61
 
 ## PR Title
 `fix(ui): auto-select top asset on /trends page and hide Plotly modebar`
