@@ -1326,14 +1326,17 @@ def get_related_assets(symbol: str, limit: int = 8) -> pd.DataFrame:
 
 def get_active_signals(min_confidence: float = 0.75, hours: int = 48) -> pd.DataFrame:
     """
-    Get recent high-confidence signals for the hero section.
+    Get recent high-confidence signals for the hero section, deduplicated by post.
+
+    Each post produces one card, regardless of how many tickers it mentions.
+    Outcome data is aggregated across all ticker outcomes for the prediction.
 
     Args:
         min_confidence: Minimum confidence threshold
         hours: How many hours back to look
 
     Returns:
-        DataFrame with recent high-confidence predictions and their outcomes
+        DataFrame with one row per unique post, with aggregated outcome data
     """
     params: Dict[str, Any] = {
         "min_confidence": min_confidence,
@@ -1350,12 +1353,12 @@ def get_active_signals(min_confidence: float = 0.75, hours: int = 48) -> pd.Data
             p.market_impact,
             p.confidence,
             p.thesis,
-            po.symbol,
-            po.prediction_sentiment,
-            po.return_t7,
-            po.correct_t7,
-            po.pnl_t7,
-            po.is_complete
+            COUNT(po.id) AS outcome_count,
+            COUNT(CASE WHEN po.correct_t7 = true THEN 1 END) AS correct_count,
+            COUNT(CASE WHEN po.correct_t7 = false THEN 1 END) AS incorrect_count,
+            AVG(po.return_t7) AS avg_return_t7,
+            SUM(po.pnl_t7) AS total_pnl_t7,
+            BOOL_AND(po.is_complete) AS is_complete
         FROM truth_social_shitposts tss
         INNER JOIN predictions p ON tss.shitpost_id = p.shitpost_id
         LEFT JOIN prediction_outcomes po ON p.id = po.prediction_id
@@ -1365,6 +1368,8 @@ def get_active_signals(min_confidence: float = 0.75, hours: int = 48) -> pd.Data
             AND p.assets IS NOT NULL
             AND p.assets::jsonb <> '[]'::jsonb
             AND tss.timestamp >= :since
+        GROUP BY tss.timestamp, tss.text, tss.shitpost_id,
+                 p.id, p.assets, p.market_impact, p.confidence, p.thesis
         ORDER BY tss.timestamp DESC
         LIMIT 5
     """)

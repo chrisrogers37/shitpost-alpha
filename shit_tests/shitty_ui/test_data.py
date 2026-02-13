@@ -1538,7 +1538,7 @@ class TestGetActiveSignals:
 
     @patch("data.execute_query")
     def test_returns_dataframe(self, mock_execute):
-        """Test that function returns a pandas DataFrame."""
+        """Test that function returns a pandas DataFrame with aggregated columns."""
         from data import get_active_signals
 
         mock_execute.return_value = (
@@ -1548,16 +1548,16 @@ class TestGetActiveSignals:
                     "test post text",
                     "post123",
                     1,
-                    ["AAPL"],
-                    {"AAPL": "bullish"},
+                    ["AAPL", "GOOGL"],
+                    {"AAPL": "bullish", "GOOGL": "bullish"},
                     0.85,
                     "thesis text",
-                    "AAPL",
-                    "bullish",
-                    3.0,
-                    True,
-                    30.0,
-                    True,
+                    2,       # outcome_count
+                    2,       # correct_count
+                    0,       # incorrect_count
+                    3.5,     # avg_return_t7
+                    70.0,    # total_pnl_t7
+                    True,    # is_complete
                 )
             ],
             [
@@ -1569,11 +1569,11 @@ class TestGetActiveSignals:
                 "market_impact",
                 "confidence",
                 "thesis",
-                "symbol",
-                "prediction_sentiment",
-                "return_t7",
-                "correct_t7",
-                "pnl_t7",
+                "outcome_count",
+                "correct_count",
+                "incorrect_count",
+                "avg_return_t7",
+                "total_pnl_t7",
                 "is_complete",
             ],
         )
@@ -1583,6 +1583,57 @@ class TestGetActiveSignals:
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 1
         assert result.iloc[0]["confidence"] == 0.85
+        assert result.iloc[0]["outcome_count"] == 2
+        assert result.iloc[0]["correct_count"] == 2
+
+    @patch("data.execute_query")
+    def test_returns_one_row_per_post_not_per_ticker(self, mock_execute):
+        """Test that multi-ticker posts produce one row, not one per ticker."""
+        from data import get_active_signals
+
+        # Simulate a post with 4 tickers -- should be ONE row after GROUP BY
+        mock_execute.return_value = (
+            [
+                (
+                    datetime.now(),
+                    "Pentagon spending post about defense stocks",
+                    "post_defense_456",
+                    42,
+                    ["RTX", "LMT", "NOC", "GD"],
+                    {"RTX": "bullish", "LMT": "bullish", "NOC": "bullish", "GD": "bullish"},
+                    0.75,
+                    "Defense spending thesis",
+                    4,       # outcome_count (4 tickers)
+                    3,       # correct_count
+                    1,       # incorrect_count
+                    2.1,     # avg_return_t7
+                    84.0,    # total_pnl_t7 (sum across 4 tickers)
+                    True,    # is_complete
+                )
+            ],
+            [
+                "timestamp",
+                "text",
+                "shitpost_id",
+                "prediction_id",
+                "assets",
+                "market_impact",
+                "confidence",
+                "thesis",
+                "outcome_count",
+                "correct_count",
+                "incorrect_count",
+                "avg_return_t7",
+                "total_pnl_t7",
+                "is_complete",
+            ],
+        )
+
+        result = get_active_signals(min_confidence=0.75, hours=72)
+
+        assert len(result) == 1  # One row, not 4
+        assert result.iloc[0]["outcome_count"] == 4
+        assert result.iloc[0]["total_pnl_t7"] == 84.0
 
     @patch("data.execute_query")
     def test_returns_empty_on_error(self, mock_execute):
@@ -1608,6 +1659,102 @@ class TestGetActiveSignals:
         mock_execute.assert_called_once()
         call_args = mock_execute.call_args[0]
         assert call_args[1]["min_confidence"] == 0.8
+
+    @patch("data.execute_query")
+    def test_no_outcomes_shows_pending(self, mock_execute):
+        """Test that a post with zero outcomes shows zero counts."""
+        from data import get_active_signals
+
+        mock_execute.return_value = (
+            [
+                (
+                    datetime.now(),
+                    "Fresh post with no outcomes yet",
+                    "post_new_789",
+                    99,
+                    ["TSLA"],
+                    {"TSLA": "bearish"},
+                    0.90,
+                    "Bearish thesis",
+                    0,       # outcome_count (no outcomes yet)
+                    0,       # correct_count
+                    0,       # incorrect_count
+                    None,    # avg_return_t7 (NULL from AVG of nothing)
+                    None,    # total_pnl_t7 (NULL from SUM of nothing)
+                    None,    # is_complete (NULL from BOOL_AND of nothing)
+                )
+            ],
+            [
+                "timestamp",
+                "text",
+                "shitpost_id",
+                "prediction_id",
+                "assets",
+                "market_impact",
+                "confidence",
+                "thesis",
+                "outcome_count",
+                "correct_count",
+                "incorrect_count",
+                "avg_return_t7",
+                "total_pnl_t7",
+                "is_complete",
+            ],
+        )
+
+        result = get_active_signals(min_confidence=0.75, hours=72)
+
+        assert len(result) == 1
+        assert result.iloc[0]["outcome_count"] == 0
+        assert result.iloc[0]["total_pnl_t7"] is None
+
+    @patch("data.execute_query")
+    def test_single_ticker_post(self, mock_execute):
+        """Test that a single-ticker post works correctly."""
+        from data import get_active_signals
+
+        mock_execute.return_value = (
+            [
+                (
+                    datetime.now(),
+                    "Just talking about Tesla",
+                    "post_single_111",
+                    50,
+                    ["TSLA"],
+                    {"TSLA": "bullish"},
+                    0.80,
+                    "Bull thesis on TSLA",
+                    1,       # outcome_count
+                    1,       # correct_count
+                    0,       # incorrect_count
+                    5.2,     # avg_return_t7
+                    52.0,    # total_pnl_t7
+                    True,    # is_complete
+                )
+            ],
+            [
+                "timestamp",
+                "text",
+                "shitpost_id",
+                "prediction_id",
+                "assets",
+                "market_impact",
+                "confidence",
+                "thesis",
+                "outcome_count",
+                "correct_count",
+                "incorrect_count",
+                "avg_return_t7",
+                "total_pnl_t7",
+                "is_complete",
+            ],
+        )
+
+        result = get_active_signals(min_confidence=0.75, hours=72)
+
+        assert len(result) == 1
+        assert result.iloc[0]["outcome_count"] == 1
+        assert result.iloc[0]["total_pnl_t7"] == 52.0
 
 
 class TestGetWeeklySignalCount:

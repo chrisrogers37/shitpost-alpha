@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Duplicate hero signal cards on dashboard** - Posts mentioning multiple tickers (e.g., RTX, LMT, NOC, GD) no longer produce duplicate identical cards in the Active Signals hero section
+  - Rewrite `get_active_signals()` query to GROUP BY prediction, aggregating outcome data across all tickers
+  - Signal count now reflects unique posts, not per-ticker outcome rows
+  - P&L badge shows total P&L across all tickers for the prediction
 - **Countdown timer missing label** - Added "Next refresh" and "Last updated" labels to the header refresh indicator so users understand what the countdown represents
 - **Trends page empty state** - Auto-select the most-predicted asset when /trends loads instead of showing an empty chart
   - Added `get_top_predicted_asset()` data function to identify the asset with the most prediction outcomes
