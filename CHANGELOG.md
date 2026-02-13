@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Sentiment visual differentiation for all card types** - Added colored background fills to sentiment badges and 3px left-border accents to card wrappers across signal cards, post cards, prediction timeline cards, and feed signal cards. Users can now scan the dashboard and instantly identify bullish (green), bearish (red), and neutral (gray) signals without reading text.
+- **`SENTIMENT_BG_COLORS` constant** - Centralized sentiment background color definitions in `constants.py`
+- **`get_sentiment_style()` helper** - Centralized sentiment color/icon/background lookup in `cards.py`, eliminating duplicated inline dictionaries
+
 ### Fixed
 - **Inconsistent confidence display across card types** - Standardized confidence format to bare percentage (e.g., `75%`) across hero signal cards, post cards, and prediction timeline cards. Previously used three different formats: `Conf: 75%`, `75%`, and `Confidence: 75%`.
 - **Duplicate hero signal cards on dashboard** - Posts mentioning multiple tickers (e.g., RTX, LMT, NOC, GD) no longer produce duplicate identical cards in the Active Signals hero section

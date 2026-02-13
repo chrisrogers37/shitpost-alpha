@@ -8,7 +8,7 @@ from dash import html, dcc
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 
-from constants import COLORS
+from constants import COLORS, SENTIMENT_COLORS, SENTIMENT_BG_COLORS
 
 
 def strip_urls(text: str) -> str:
@@ -35,6 +35,27 @@ def strip_urls(text: str) -> str:
     if not cleaned:
         return "[link]"
     return cleaned
+
+
+def get_sentiment_style(sentiment: str) -> dict:
+    """Return color, icon, and background for a sentiment value.
+
+    Args:
+        sentiment: One of 'bullish', 'bearish', or 'neutral'.
+
+    Returns:
+        Dict with keys: color, icon, bg_color.
+    """
+    sentiment = (sentiment or "neutral").lower()
+    return {
+        "color": SENTIMENT_COLORS.get(sentiment, SENTIMENT_COLORS["neutral"]),
+        "icon": {
+            "bullish": "arrow-up",
+            "bearish": "arrow-down",
+            "neutral": "minus",
+        }.get(sentiment, "minus"),
+        "bg_color": SENTIMENT_BG_COLORS.get(sentiment, SENTIMENT_BG_COLORS["neutral"]),
+    }
 
 
 def create_error_card(message: str, details: str = None):
@@ -146,18 +167,15 @@ def create_hero_signal_card(row) -> html.Div:
     asset_str = ", ".join(assets[:4]) if isinstance(assets, list) else str(assets)
 
     # Sentiment styling
-    sentiment_colors = {
-        "bullish": COLORS["success"],
-        "bearish": COLORS["danger"],
-        "neutral": COLORS["text_muted"],
-    }
-    sentiment_icons = {
+    s_style = get_sentiment_style(sentiment)
+    s_color = s_style["color"]
+    s_bg = s_style["bg_color"]
+    # Hero cards use trend icons (different from standard arrow icons)
+    s_icon = {
         "bullish": "arrow-trend-up",
         "bearish": "arrow-trend-down",
         "neutral": "minus",
-    }
-    s_color = sentiment_colors.get(sentiment, COLORS["text_muted"])
-    s_icon = sentiment_icons.get(sentiment, "minus")
+    }.get(sentiment, "minus")
 
     # Outcome badge -- uses aggregated P&L when available
     pnl_display = total_pnl_t7 if total_pnl_t7 is not None else row.get("pnl_t7")
@@ -235,7 +253,7 @@ def create_hero_signal_card(row) -> html.Div:
                         ],
                         className="sentiment-badge",
                         style={
-                            "backgroundColor": f"{s_color}22",
+                            "backgroundColor": s_bg,
                             "color": s_color,
                         },
                     ),
@@ -393,18 +411,10 @@ def create_signal_card(row):
         )
 
     # Sentiment styling
-    sentiment_colors = {
-        "bullish": COLORS["success"],
-        "bearish": COLORS["danger"],
-        "neutral": COLORS["text_muted"],
-    }
-    sentiment_icons = {
-        "bullish": "arrow-up",
-        "bearish": "arrow-down",
-        "neutral": "minus",
-    }
-    s_color = sentiment_colors.get(sentiment, COLORS["text_muted"])
-    s_icon = sentiment_icons.get(sentiment, "minus")
+    s_style = get_sentiment_style(sentiment)
+    s_color = s_style["color"]
+    s_icon = s_style["icon"]
+    s_bg = s_style["bg_color"]
 
     return html.Div(
         [
@@ -439,7 +449,7 @@ def create_signal_card(row):
                         ],
                         className="sentiment-badge",
                         style={
-                            "backgroundColor": f"{s_color}22",
+                            "backgroundColor": s_bg,
                             "color": s_color,
                             "fontSize": "0.7rem",
                         },
@@ -470,6 +480,7 @@ def create_signal_card(row):
         style={
             "padding": "12px",
             "borderBottom": f"1px solid {COLORS['border']}",
+            "borderLeft": f"3px solid {s_color}",
             "cursor": "pointer",
         },
         className="signal-card",
@@ -500,6 +511,9 @@ def create_post_card(row):
         if isinstance(first_sentiment, str):
             sentiment = first_sentiment.lower()
 
+    # Card border color based on sentiment (defaults to neutral for bypassed/pending)
+    card_border_color = SENTIMENT_COLORS.get(sentiment or "neutral", SENTIMENT_COLORS["neutral"])
+
     # Build analysis section based on status
     if analysis_status == "completed" and assets:
         # Format assets
@@ -507,20 +521,10 @@ def create_post_card(row):
         if isinstance(assets, list) and len(assets) > 5:
             asset_str += f" +{len(assets) - 5}"
 
-        sentiment_color = (
-            COLORS["success"]
-            if sentiment == "bullish"
-            else COLORS["danger"]
-            if sentiment == "bearish"
-            else COLORS["text_muted"]
-        )
-        sentiment_icon = (
-            "arrow-up"
-            if sentiment == "bullish"
-            else "arrow-down"
-            if sentiment == "bearish"
-            else "minus"
-        )
+        s_style = get_sentiment_style(sentiment or "neutral")
+        sentiment_color = s_style["color"]
+        sentiment_icon = s_style["icon"]
+        sentiment_bg = s_style["bg_color"]
 
         analysis_section = html.Div(
             [
@@ -533,6 +537,9 @@ def create_post_card(row):
                             ],
                             style={
                                 "color": sentiment_color,
+                                "backgroundColor": sentiment_bg,
+                                "padding": "2px 8px",
+                                "borderRadius": "4px",
                                 "fontSize": "0.85rem",
                                 "fontWeight": "bold",
                             },
@@ -662,6 +669,7 @@ def create_post_card(row):
         style={
             "padding": "15px",
             "borderBottom": f"1px solid {COLORS['border']}",
+            "borderLeft": f"3px solid {card_border_color}",
         },
     )
 
@@ -688,15 +696,10 @@ def create_prediction_timeline_card(row: dict) -> html.Div:
     price_after = row.get("price_t7")
 
     # Sentiment styling
-    if sentiment and sentiment.lower() == "bullish":
-        sentiment_color = COLORS["success"]
-        sentiment_icon = "arrow-up"
-    elif sentiment and sentiment.lower() == "bearish":
-        sentiment_color = COLORS["danger"]
-        sentiment_icon = "arrow-down"
-    else:
-        sentiment_color = COLORS["text_muted"]
-        sentiment_icon = "minus"
+    s_style = get_sentiment_style(sentiment)
+    sentiment_color = s_style["color"]
+    sentiment_icon = s_style["icon"]
+    sentiment_bg = s_style["bg_color"]
 
     # Outcome badge
     if correct_t7 is True:
@@ -798,6 +801,9 @@ def create_prediction_timeline_card(row: dict) -> html.Div:
                                 (sentiment or "neutral").upper(),
                                 style={
                                     "color": sentiment_color,
+                                    "backgroundColor": sentiment_bg,
+                                    "padding": "2px 8px",
+                                    "borderRadius": "4px",
                                     "fontWeight": "bold",
                                     "fontSize": "0.85rem",
                                 },
@@ -875,6 +881,7 @@ def create_prediction_timeline_card(row: dict) -> html.Div:
         style={
             "padding": "16px",
             "borderBottom": f"1px solid {COLORS['border']}",
+            "borderLeft": f"3px solid {sentiment_color}",
         },
     )
 
@@ -1189,20 +1196,10 @@ def create_feed_signal_card(row) -> html.Div:
         if isinstance(first_val, str):
             sentiment = first_val.lower()
 
-    sentiment_color = (
-        COLORS["success"]
-        if sentiment == "bullish"
-        else COLORS["danger"]
-        if sentiment == "bearish"
-        else COLORS["text_muted"]
-    )
-    sentiment_icon = (
-        "arrow-up"
-        if sentiment == "bullish"
-        else "arrow-down"
-        if sentiment == "bearish"
-        else "minus"
-    )
+    s_style = get_sentiment_style(sentiment)
+    sentiment_color = s_style["color"]
+    sentiment_icon = s_style["icon"]
+    sentiment_bg = s_style["bg_color"]
 
     # Format asset display
     if symbol:
@@ -1399,10 +1396,11 @@ def create_feed_signal_card(row) -> html.Div:
                         html.I(className=f"fas fa-{sentiment_icon} me-1"),
                         sentiment.upper(),
                     ],
+                    className="sentiment-badge",
                     style={
+                        "backgroundColor": sentiment_bg,
                         "color": sentiment_color,
                         "fontSize": "0.8rem",
-                        "fontWeight": "bold",
                         "marginRight": "12px",
                     },
                 ),
@@ -1455,6 +1453,7 @@ def create_feed_signal_card(row) -> html.Div:
             "padding": "16px",
             "backgroundColor": COLORS["secondary"],
             "border": f"1px solid {COLORS['border']}",
+            "borderLeft": f"3px solid {sentiment_color}",
             "borderRadius": "8px",
             "marginBottom": "12px",
         },
