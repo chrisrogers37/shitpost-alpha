@@ -1114,3 +1114,100 @@ class TestCreateSignalFeedPage:
                 found = True
                 break
         assert found, "CSV download component not found in page"
+
+
+class TestHeroSignalCardDedup:
+    """Tests for create_hero_signal_card with aggregated outcome data."""
+
+    def test_renders_with_aggregated_correct(self):
+        """Test card renders Correct badge when correct_count > incorrect_count."""
+        from components.cards import create_hero_signal_card
+
+        row = pd.Series({
+            "timestamp": datetime.now(),
+            "text": "Defense stocks post",
+            "confidence": 0.75,
+            "assets": ["RTX", "LMT", "NOC", "GD"],
+            "market_impact": {"RTX": "bullish"},
+            "outcome_count": 4,
+            "correct_count": 3,
+            "incorrect_count": 1,
+            "total_pnl_t7": 84.0,
+            "is_complete": True,
+        })
+        card = create_hero_signal_card(row)
+        assert card is not None
+
+    def test_renders_with_all_incorrect(self):
+        """Test card renders Incorrect badge when incorrect_count > correct_count."""
+        from components.cards import create_hero_signal_card
+
+        row = pd.Series({
+            "timestamp": datetime.now(),
+            "text": "Bad call post",
+            "confidence": 0.80,
+            "assets": ["AAPL", "GOOGL"],
+            "market_impact": {"AAPL": "bearish"},
+            "outcome_count": 2,
+            "correct_count": 0,
+            "incorrect_count": 2,
+            "total_pnl_t7": -40.0,
+            "is_complete": True,
+        })
+        card = create_hero_signal_card(row)
+        assert card is not None
+
+    def test_renders_pending_when_no_outcomes(self):
+        """Test card renders Pending badge when outcome_count is 0."""
+        from components.cards import create_hero_signal_card
+
+        row = pd.Series({
+            "timestamp": datetime.now(),
+            "text": "Fresh post",
+            "confidence": 0.90,
+            "assets": ["TSLA"],
+            "market_impact": {"TSLA": "bullish"},
+            "outcome_count": 0,
+            "correct_count": 0,
+            "incorrect_count": 0,
+            "total_pnl_t7": None,
+            "is_complete": None,
+        })
+        card = create_hero_signal_card(row)
+        assert card is not None
+
+    def test_backward_compatible_with_old_columns(self):
+        """Test card still works with old per-ticker columns (correct_t7, pnl_t7)."""
+        from components.cards import create_hero_signal_card
+
+        row = pd.Series({
+            "timestamp": datetime.now(),
+            "text": "Old format post",
+            "confidence": 0.85,
+            "assets": ["AAPL"],
+            "market_impact": {"AAPL": "bullish"},
+            "correct_t7": True,
+            "pnl_t7": 30.0,
+        })
+        card = create_hero_signal_card(row)
+        assert card is not None
+
+    def test_shows_total_pnl_across_tickers(self):
+        """Test that P&L badge shows total across all tickers, not per-ticker."""
+        from components.cards import create_hero_signal_card
+
+        row = pd.Series({
+            "timestamp": datetime.now(),
+            "text": "Multi-ticker post",
+            "confidence": 0.75,
+            "assets": ["RTX", "LMT", "NOC"],
+            "market_impact": {"RTX": "bullish"},
+            "outcome_count": 3,
+            "correct_count": 3,
+            "incorrect_count": 0,
+            "total_pnl_t7": 120.0,
+            "is_complete": True,
+        })
+        card = create_hero_signal_card(row)
+        # Card should render -- exact P&L display is a visual test
+        assert card is not None

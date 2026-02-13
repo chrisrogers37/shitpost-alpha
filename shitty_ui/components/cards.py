@@ -107,7 +107,21 @@ def create_hero_signal_card(row) -> html.Div:
     confidence = row.get("confidence", 0)
     assets = row.get("assets", [])
     market_impact = row.get("market_impact", {})
-    correct_t7 = row.get("correct_t7")
+    # Derive outcome from aggregated counts (new dedup columns)
+    # Fall back to correct_t7 for backward compatibility
+    outcome_count = row.get("outcome_count", 0) or 0
+    correct_count = row.get("correct_count", 0) or 0
+    incorrect_count = row.get("incorrect_count", 0) or 0
+    total_pnl_t7 = row.get("total_pnl_t7")
+
+    if outcome_count > 0 and correct_count + incorrect_count > 0:
+        # At least some outcomes evaluated -- majority wins
+        correct_t7 = correct_count > incorrect_count
+    elif "correct_t7" in row.index if hasattr(row, "index") else "correct_t7" in row:
+        # Backward compatibility: use single correct_t7 if available
+        correct_t7 = row.get("correct_t7")
+    else:
+        correct_t7 = None  # Pending
 
     # Determine sentiment
     sentiment = "neutral"
@@ -145,12 +159,13 @@ def create_hero_signal_card(row) -> html.Div:
     s_color = sentiment_colors.get(sentiment, COLORS["text_muted"])
     s_icon = sentiment_icons.get(sentiment, "minus")
 
-    # Outcome badge
+    # Outcome badge -- uses aggregated P&L when available
+    pnl_display = total_pnl_t7 if total_pnl_t7 is not None else row.get("pnl_t7")
     if correct_t7 is True:
         outcome = html.Span(
             [
                 html.I(className="fas fa-check me-1"),
-                f"+${row.get('pnl_t7', 0):,.0f}" if row.get("pnl_t7") else "Correct",
+                f"+${pnl_display:,.0f}" if pnl_display else "Correct",
             ],
             style={
                 "color": COLORS["success"],
@@ -162,7 +177,7 @@ def create_hero_signal_card(row) -> html.Div:
         outcome = html.Span(
             [
                 html.I(className="fas fa-times me-1"),
-                f"${row.get('pnl_t7', 0):,.0f}" if row.get("pnl_t7") else "Incorrect",
+                f"${pnl_display:,.0f}" if pnl_display else "Incorrect",
             ],
             style={
                 "color": COLORS["danger"],
