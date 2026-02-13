@@ -1,5 +1,8 @@
 # Phase 04: Fix Duplicate Signal Cards (Deduplicate by Post)
 
+**Status:** COMPLETE
+**PR:** #65
+
 ## Header
 
 | Field | Value |
