@@ -49,3 +49,41 @@ TIMEFRAME_COLORS = {
     "t7": "rgba(245, 158, 11, 0.04)",   # Amber, very light
     "t30": "rgba(245, 158, 11, 0.02)",
 }
+
+# Typography scale - consistent font sizes across all UI components
+# Based on a 1.25 ratio (Major Third) scale with 1rem = 16px base
+FONT_SIZES = {
+    "page_title": "1.75rem",   # 28px - Top-level page headers (H1)
+    "section_header": "1.15rem",  # ~18px - Section headers within pages (H2/H3)
+    "card_title": "0.95rem",   # ~15px - Card header titles
+    "body": "0.9rem",          # ~14px - Standard body text
+    "label": "0.8rem",         # ~13px - Form labels, metadata labels
+    "meta": "0.75rem",         # 12px - Timestamps, badges, footnotes
+    "small": "0.7rem",         # ~11px - Fine print, subordinate labels
+}
+
+# Font weights - semantic weight names for consistent emphasis
+FONT_WEIGHTS = {
+    "bold": "700",       # Page titles, hero elements
+    "semibold": "600",   # Section headers, card titles, emphasis
+    "medium": "500",     # Navigation links, active elements
+    "normal": "400",     # Body text, descriptions
+}
+
+# Spacing tokens - consistent padding and margins (in px)
+# Named xs through xl for predictable rhythm
+SPACING = {
+    "xs": "4px",    # Tight gaps (between icon and label)
+    "sm": "8px",    # Small gaps (between inline elements)
+    "md": "16px",   # Standard padding (card bodies, section gaps)
+    "lg": "24px",   # Larger gaps (between major sections)
+    "xl": "32px",   # Page-level padding (top/bottom of page content)
+    "xxl": "48px",  # Major visual breaks (before footer)
+}
+
+# Section header accent line - used by CSS class .section-header
+SECTION_ACCENT = {
+    "width": "3px",
+    "color": COLORS["accent"],
+    "radius": "2px",
+}
