@@ -21,6 +21,14 @@ SENTIMENT_COLORS = {
     "neutral": "#94a3b8",   # Slate 400 (same as COLORS["text_muted"])
 }
 
+# Pre-computed sentiment badge background colors (hex + alpha suffix)
+# Used by card components for consistent badge and border styling
+SENTIMENT_BG_COLORS = {
+    "bullish": "#10b98126",   # Emerald 500 at ~15% opacity
+    "bearish": "#ef444426",   # Red 500 at ~15% opacity
+    "neutral": "#94a3b826",   # Slate 400 at ~15% opacity
+}
+
 # Marker configuration for signal overlays
 MARKER_CONFIG = {
     "min_size": 8,          # Minimum marker size (pixels)

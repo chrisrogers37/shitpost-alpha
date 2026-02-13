@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Sentiment visual differentiation for all card types** - Added colored background fills to sentiment badges and 3px left-border accents to card wrappers across signal cards, post cards, prediction timeline cards, and feed signal cards. Users can now scan the dashboard and instantly identify bullish (green), bearish (red), and neutral (gray) signals without reading text.
+- **`SENTIMENT_BG_COLORS` constant** - Centralized sentiment background color definitions in `constants.py`
+- **`get_sentiment_style()` helper** - Centralized sentiment color/icon/background lookup in `cards.py`, eliminating duplicated inline dictionaries
+
 ### Fixed
 - **Dashboard KPIs showing all zeros** - Main dashboard KPI cards now pull from the same `prediction_outcomes` data source as the Performance page
   - New `get_dashboard_kpis()` function queries only evaluated predictions (`correct_t7 IS NOT NULL`), preventing zeros from unevaluated predictions

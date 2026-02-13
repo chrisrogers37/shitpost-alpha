@@ -16,7 +16,9 @@ from components.cards import (
     create_post_card,
     create_prediction_timeline_card,
     create_feed_signal_card,
+    get_sentiment_style,
 )
+from constants import SENTIMENT_COLORS, SENTIMENT_BG_COLORS
 
 
 def _extract_text(component) -> str:
@@ -235,3 +237,191 @@ class TestConfidenceDisplayConsistency:
         text = _extract_text(card)
         # When confidence is 0 (falsy), the conditional hides it entirely
         assert "Confidence:" not in text
+
+
+class TestGetSentimentStyle:
+    """Tests for the get_sentiment_style helper function."""
+
+    def test_bullish_returns_green(self):
+        style = get_sentiment_style("bullish")
+        assert style["color"] == SENTIMENT_COLORS["bullish"]
+        assert style["bg_color"] == SENTIMENT_BG_COLORS["bullish"]
+        assert style["icon"] == "arrow-up"
+
+    def test_bearish_returns_red(self):
+        style = get_sentiment_style("bearish")
+        assert style["color"] == SENTIMENT_COLORS["bearish"]
+        assert style["bg_color"] == SENTIMENT_BG_COLORS["bearish"]
+        assert style["icon"] == "arrow-down"
+
+    def test_neutral_returns_gray(self):
+        style = get_sentiment_style("neutral")
+        assert style["color"] == SENTIMENT_COLORS["neutral"]
+        assert style["bg_color"] == SENTIMENT_BG_COLORS["neutral"]
+        assert style["icon"] == "minus"
+
+    def test_none_defaults_to_neutral(self):
+        style = get_sentiment_style(None)
+        assert style["color"] == SENTIMENT_COLORS["neutral"]
+
+    def test_case_insensitive(self):
+        style = get_sentiment_style("BULLISH")
+        assert style["color"] == SENTIMENT_COLORS["bullish"]
+
+    def test_unknown_defaults_to_neutral(self):
+        style = get_sentiment_style("confused")
+        assert style["color"] == SENTIMENT_COLORS["neutral"]
+
+
+class TestSentimentLeftBorder:
+    """Verify all card types have a sentiment-colored left border."""
+
+    def test_hero_card_has_left_border_bullish(self):
+        card = create_hero_signal_card(_make_row(market_impact={"AAPL": "bullish"}))
+        assert "borderLeft" in card.style
+        assert SENTIMENT_COLORS["bullish"] in card.style["borderLeft"]
+
+    def test_hero_card_has_left_border_bearish(self):
+        card = create_hero_signal_card(_make_row(market_impact={"AAPL": "bearish"}))
+        assert "borderLeft" in card.style
+        assert SENTIMENT_COLORS["bearish"] in card.style["borderLeft"]
+
+    def test_signal_card_has_left_border_bullish(self):
+        card = create_signal_card(_make_row(market_impact={"AAPL": "bullish"}))
+        assert "borderLeft" in card.style
+        assert SENTIMENT_COLORS["bullish"] in card.style["borderLeft"]
+
+    def test_signal_card_has_left_border_bearish(self):
+        card = create_signal_card(_make_row(market_impact={"AAPL": "bearish"}))
+        assert "borderLeft" in card.style
+        assert SENTIMENT_COLORS["bearish"] in card.style["borderLeft"]
+
+    def test_post_card_has_left_border_bullish(self):
+        card = create_post_card(_make_row(market_impact={"AAPL": "bullish"}))
+        assert "borderLeft" in card.style
+        assert SENTIMENT_COLORS["bullish"] in card.style["borderLeft"]
+
+    def test_post_card_has_left_border_bearish(self):
+        card = create_post_card(_make_row(market_impact={"AAPL": "bearish"}))
+        assert "borderLeft" in card.style
+        assert SENTIMENT_COLORS["bearish"] in card.style["borderLeft"]
+
+    def test_post_card_has_left_border_neutral_when_bypassed(self):
+        card = create_post_card(_make_row(analysis_status="bypassed", market_impact={}))
+        assert "borderLeft" in card.style
+        assert SENTIMENT_COLORS["neutral"] in card.style["borderLeft"]
+
+    def test_prediction_timeline_card_has_left_border_bullish(self):
+        card = create_prediction_timeline_card(
+            _make_timeline_row(prediction_sentiment="bullish")
+        )
+        assert "borderLeft" in card.style
+        assert SENTIMENT_COLORS["bullish"] in card.style["borderLeft"]
+
+    def test_prediction_timeline_card_has_left_border_bearish(self):
+        card = create_prediction_timeline_card(
+            _make_timeline_row(prediction_sentiment="bearish")
+        )
+        assert "borderLeft" in card.style
+        assert SENTIMENT_COLORS["bearish"] in card.style["borderLeft"]
+
+    def test_feed_signal_card_has_left_border_bullish(self):
+        card = create_feed_signal_card(_make_row(market_impact={"AAPL": "bullish"}))
+        assert "borderLeft" in card.style
+        assert SENTIMENT_COLORS["bullish"] in card.style["borderLeft"]
+
+    def test_feed_signal_card_has_left_border_bearish(self):
+        card = create_feed_signal_card(_make_row(market_impact={"AAPL": "bearish"}))
+        assert "borderLeft" in card.style
+        assert SENTIMENT_COLORS["bearish"] in card.style["borderLeft"]
+
+    def test_left_border_format_is_3px(self):
+        """All left borders should be 3px solid."""
+        card = create_signal_card(_make_row(market_impact={"AAPL": "bullish"}))
+        assert card.style["borderLeft"].startswith("3px solid")
+
+
+class TestSentimentBadgeBackground:
+    """Verify sentiment badges have background fill colors."""
+
+    def _extract_text(self, component) -> str:
+        """Recursively extract all text from a Dash component."""
+        parts = []
+        if isinstance(component, str):
+            return component
+        if hasattr(component, "children"):
+            children = component.children
+            if isinstance(children, str):
+                parts.append(children)
+            elif isinstance(children, list):
+                for child in children:
+                    if child is not None:
+                        parts.append(self._extract_text(child))
+            elif children is not None:
+                parts.append(self._extract_text(children))
+        return " ".join(parts)
+
+    def _find_sentiment_badge(self, component):
+        """Find the deepest component containing the sentiment text with backgroundColor.
+
+        Searches depth-first and returns the deepest (most specific) match,
+        avoiding false positives from outer wrapper divs that also contain
+        the sentiment text as descendants.
+        """
+        if not hasattr(component, "children"):
+            return None
+
+        # First, search children for a deeper match
+        children = component.children
+        if isinstance(children, list):
+            for child in children:
+                if child is not None and not isinstance(child, str):
+                    result = self._find_sentiment_badge(child)
+                    if result:
+                        return result
+        elif children is not None and not isinstance(children, str):
+            result = self._find_sentiment_badge(children)
+            if result:
+                return result
+
+        # No deeper match found -- check this component
+        text = self._extract_text(component)
+        if hasattr(component, "style") and isinstance(component.style, dict):
+            if any(s in text for s in ["BULLISH", "BEARISH", "NEUTRAL"]):
+                if "backgroundColor" in component.style:
+                    return component
+        return None
+
+    def test_hero_card_badge_has_background(self):
+        card = create_hero_signal_card(_make_row(market_impact={"AAPL": "bullish"}))
+        badge = self._find_sentiment_badge(card)
+        assert badge is not None, "Sentiment badge with backgroundColor not found"
+        assert SENTIMENT_BG_COLORS["bullish"] in badge.style["backgroundColor"]
+
+    def test_signal_card_badge_has_background(self):
+        card = create_signal_card(_make_row(market_impact={"AAPL": "bearish"}))
+        badge = self._find_sentiment_badge(card)
+        assert badge is not None, "Sentiment badge with backgroundColor not found"
+        assert SENTIMENT_BG_COLORS["bearish"] in badge.style["backgroundColor"]
+
+    def test_post_card_badge_has_background(self):
+        card = create_post_card(_make_row(market_impact={"AAPL": "bullish"}))
+        badge = self._find_sentiment_badge(card)
+        assert badge is not None, "Sentiment badge with backgroundColor not found"
+
+    def test_prediction_timeline_badge_has_background(self):
+        card = create_prediction_timeline_card(
+            _make_timeline_row(prediction_sentiment="bearish")
+        )
+        badge = self._find_sentiment_badge(card)
+        assert badge is not None, "Sentiment badge with backgroundColor not found"
+
+    def test_feed_signal_card_badge_has_background(self):
+        card = create_feed_signal_card(_make_row(market_impact={"AAPL": "bullish"}))
+        badge = self._find_sentiment_badge(card)
+        assert badge is not None, "Sentiment badge with backgroundColor not found"
+
+    def test_neutral_badge_has_background(self):
+        card = create_signal_card(_make_row(market_impact={"AAPL": "neutral"}))
+        badge = self._find_sentiment_badge(card)
+        assert badge is not None, "Neutral sentiment badge should also have backgroundColor"
