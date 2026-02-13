@@ -115,6 +115,13 @@ def create_header():
                                         style={"color": COLORS["accent"]},
                                     ),
                                     html.Span(
+                                        "Last updated ",
+                                        style={
+                                            "color": COLORS["text_muted"],
+                                            "fontSize": "0.7rem",
+                                        },
+                                    ),
+                                    html.Span(
                                         id="last-update-time",
                                         children="--:--",
                                         style={"color": COLORS["text"]},
@@ -124,6 +131,13 @@ def create_header():
                             ),
                             html.Div(
                                 [
+                                    html.Span(
+                                        "Next refresh ",
+                                        style={
+                                            "color": COLORS["text_muted"],
+                                            "fontSize": "0.7rem",
+                                        },
+                                    ),
                                     html.Span(
                                         id="next-update-countdown",
                                         children="5:00",

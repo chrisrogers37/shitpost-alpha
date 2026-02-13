@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Countdown timer missing label** - Added "Next refresh" and "Last updated" labels to the header refresh indicator so users understand what the countdown represents
+
 ## [v1.0.0] - 2026-02-12
 
 ### Fixed
