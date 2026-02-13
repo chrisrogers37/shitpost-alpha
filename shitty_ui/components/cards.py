@@ -1082,6 +1082,26 @@ def create_performance_summary(stats: Dict[str, Any]) -> html.Div:
     )
 
 
+def _safe_get(row, key, default=None):
+    """
+    NaN-safe field extraction from a Pandas Series or dict.
+
+    Pandas Series.get() returns NaN (not the default) when the key exists
+    but the value is NaN. This helper normalizes NaN to the provided default.
+    """
+    value = row.get(key, default)
+    if value is None:
+        return default
+    try:
+        import math
+
+        if isinstance(value, float) and math.isnan(value):
+            return default
+    except (TypeError, ValueError):
+        pass
+    return value
+
+
 def create_feed_signal_card(row) -> html.Div:
     """
     Create a signal card for the /signals feed page.
@@ -1095,17 +1115,17 @@ def create_feed_signal_card(row) -> html.Div:
     Returns:
         html.Div containing the rendered card.
     """
-    timestamp = row.get("timestamp")
-    post_text = row.get("text", "")
-    confidence = row.get("confidence", 0) or 0
-    assets = row.get("assets", [])
-    market_impact = row.get("market_impact", {})
-    symbol = row.get("symbol")
-    prediction_sentiment = row.get("prediction_sentiment")
-    return_t7 = row.get("return_t7")
-    correct_t7 = row.get("correct_t7")
-    pnl_t7 = row.get("pnl_t7")
-    thesis = row.get("thesis", "")
+    timestamp = _safe_get(row, "timestamp")
+    post_text = _safe_get(row, "text", "")
+    confidence = _safe_get(row, "confidence", 0) or 0
+    assets = _safe_get(row, "assets", [])
+    market_impact = _safe_get(row, "market_impact", {})
+    symbol = _safe_get(row, "symbol")
+    prediction_sentiment = _safe_get(row, "prediction_sentiment")
+    return_t7 = _safe_get(row, "return_t7")
+    correct_t7 = _safe_get(row, "correct_t7")
+    pnl_t7 = _safe_get(row, "pnl_t7")
+    thesis = _safe_get(row, "thesis", "")
 
     # Determine if "New" badge should show (post < 24 hours old)
     is_new = False

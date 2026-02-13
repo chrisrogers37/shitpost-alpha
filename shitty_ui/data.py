@@ -1868,10 +1868,10 @@ def get_signal_feed_csv(
     export_df["Timestamp"] = pd.to_datetime(df["timestamp"]).dt.strftime(
         "%Y-%m-%d %H:%M:%S"
     )
-    export_df["Post Text"] = df["text"]
+    export_df["Post Text"] = df["text"].fillna("")
     export_df["Asset"] = df["symbol"].fillna(
         df["assets"].apply(
-            lambda x: ", ".join(x) if isinstance(x, list) else str(x)
+            lambda x: ", ".join(x) if isinstance(x, list) else (str(x) if pd.notna(x) else "N/A")
         )
     )
     export_df["Sentiment"] = df["prediction_sentiment"].fillna("N/A")

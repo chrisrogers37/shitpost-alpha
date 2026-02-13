@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `get_top_predicted_asset()` data function to identify the asset with the most prediction outcomes
   - Changed Plotly modebar from always-visible to hover-only for cleaner appearance
   - Improved empty state messaging when no assets with prediction data exist
+- **Broken /signals page stuck on "Loading signals..."** - Fix silent callback crash caused by NaN values from LEFT JOIN on prediction_outcomes table
+  - Add NaN-safe field extraction helper (`_safe_get`) in card components to normalize `float('nan')` to proper defaults
+  - Wrap all six signal feed callbacks in try/except with meaningful error states instead of permanent loading indicators
+  - Fix CSV export NaN handling for asset and text columns
+  - Change initial count label from "Loading signals..." to empty (spinner provides feedback)
 
 ## [v1.0.0] - 2026-02-12
 
