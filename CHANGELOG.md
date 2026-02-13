@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Recovers ~500px of wasted vertical space, keeping real content above the fold
 
 ### Added
+- **Typography scale & spacing tokens** - Added `FONT_SIZES`, `FONT_WEIGHTS`, `SPACING`, and `SECTION_ACCENT` dictionaries to `constants.py` for consistent visual hierarchy across the dashboard
+- **CSS typography classes** - Added `.page-title`, `.section-header`, `.section-label`, `.text-body-default`, `.text-label`, and `.text-meta` CSS classes to the app stylesheet for reusable text styling
+- **Card header typography override** - Global `.card-header` CSS now enforces consistent 0.95rem/600 weight across all card headers, creating clear differentiation from body text
+- **Active navigation state** - Nav links now show a blue accent underline on the active page, with clientside callback for route-based highlighting
+
+### Added
 - **Sentiment visual differentiation for all card types** - Added colored background fills to sentiment badges and 3px left-border accents to card wrappers across signal cards, post cards, prediction timeline cards, and feed signal cards. Users can now scan the dashboard and instantly identify bullish (green), bearish (red), and neutral (gray) signals without reading text.
 - **`SENTIMENT_BG_COLORS` constant** - Centralized sentiment background color definitions in `constants.py`
 - **`get_sentiment_style()` helper** - Centralized sentiment color/icon/background lookup in `cards.py`, eliminating duplicated inline dictionaries

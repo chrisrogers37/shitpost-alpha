@@ -118,18 +118,34 @@ def create_app() -> Dash:
                 letter-spacing: 0.05em;
             }
 
-            /* Nav links */
+            /* Nav links with active state accent */
             .nav-link-custom {
                 color: #94a3b8 !important;
                 text-decoration: none !important;
                 padding: 8px 16px;
                 border-radius: 8px;
                 font-weight: 500;
+                font-size: 0.9rem;
                 transition: all 0.15s ease;
+                position: relative;
             }
-            .nav-link-custom:hover, .nav-link-custom.active {
+            .nav-link-custom:hover {
                 color: #f1f5f9 !important;
                 background-color: #334155;
+            }
+            .nav-link-custom.active {
+                color: #f1f5f9 !important;
+                background-color: transparent;
+            }
+            .nav-link-custom.active::after {
+                content: '';
+                position: absolute;
+                bottom: -2px;
+                left: 16px;
+                right: 16px;
+                height: 2px;
+                background-color: #3b82f6;
+                border-radius: 1px;
             }
 
             /* Mobile-specific styles */
@@ -184,6 +200,93 @@ def create_app() -> Dash:
             ::-webkit-scrollbar-track { background: #0F172A; }
             ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
             ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+            /* ======================================
+               Typography hierarchy classes
+               ====================================== */
+
+            /* Page title - used for top-level page headers */
+            .page-title {
+                font-size: 1.75rem;
+                font-weight: 700;
+                color: #f1f5f9;
+                margin: 0 0 4px 0;
+                line-height: 1.2;
+            }
+            .page-title .page-subtitle {
+                display: block;
+                font-size: 0.8rem;
+                font-weight: 400;
+                color: #94a3b8;
+                margin-top: 4px;
+            }
+
+            /* Section header - major sections within a page */
+            .section-header {
+                font-size: 1.15rem;
+                font-weight: 600;
+                color: #f1f5f9;
+                margin: 0;
+                padding-bottom: 8px;
+                border-bottom: 2px solid #3b82f6;
+                margin-bottom: 16px;
+                display: inline-block;
+            }
+
+            /* Card header title override - consistent sizing for all card headers */
+            .card-header {
+                font-size: 0.95rem !important;
+                font-weight: 600 !important;
+                color: #f1f5f9 !important;
+                letter-spacing: 0.01em;
+            }
+            .card-header .card-header-subtitle {
+                font-size: 0.8rem;
+                font-weight: 400;
+                color: #94a3b8;
+                margin-left: 8px;
+            }
+
+            /* Body text class for standard content */
+            .text-body-default {
+                font-size: 0.9rem;
+                font-weight: 400;
+                color: #f1f5f9;
+                line-height: 1.5;
+            }
+
+            /* Label text for form labels and metadata labels */
+            .text-label {
+                font-size: 0.8rem;
+                font-weight: 500;
+                color: #94a3b8;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+
+            /* Metadata text for timestamps, IDs, fine print */
+            .text-meta {
+                font-size: 0.75rem;
+                font-weight: 400;
+                color: #94a3b8;
+                line-height: 1.4;
+            }
+
+            /* Active signals section header (uppercase label style) */
+            .section-label {
+                font-size: 0.85rem;
+                font-weight: 700;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                color: #f1f5f9;
+            }
+            .section-label .section-label-muted {
+                font-weight: 400;
+                text-transform: none;
+                letter-spacing: normal;
+                color: #94a3b8;
+                font-size: 0.8rem;
+            }
         </style>
     </head>
     <body>
@@ -289,6 +392,34 @@ def register_callbacks(app: Dash):
             return create_trends_page()
 
         return create_dashboard_page()
+
+    # Active nav link highlighting
+    app.clientside_callback(
+        """
+        function(pathname) {
+            var links = {
+                '/': 'nav-link-dashboard',
+                '/signals': 'nav-link-signals',
+                '/trends': 'nav-link-trends',
+                '/performance': 'nav-link-performance'
+            };
+            var classes = [];
+            for (var path in links) {
+                var isActive = (pathname === path) ||
+                    (path === '/' && (pathname === '' || pathname === null));
+                classes.push(isActive ? 'nav-link-custom active' : 'nav-link-custom');
+            }
+            return classes;
+        }
+        """,
+        [
+            Output("nav-link-dashboard", "className"),
+            Output("nav-link-signals", "className"),
+            Output("nav-link-trends", "className"),
+            Output("nav-link-performance", "className"),
+        ],
+        [Input("url", "pathname")],
+    )
 
     # Delegate to page/callback modules
     register_dashboard_callbacks(app)

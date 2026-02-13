@@ -50,6 +50,7 @@ def create_header():
                                 [html.I(className="fas fa-home me-1"), "Dashboard"],
                                 href="/",
                                 className="nav-link-custom",
+                                id="nav-link-dashboard",
                             ),
                             dcc.Link(
                                 [
@@ -58,6 +59,7 @@ def create_header():
                                 ],
                                 href="/signals",
                                 className="nav-link-custom",
+                                id="nav-link-signals",
                             ),
                             dcc.Link(
                                 [
@@ -66,6 +68,7 @@ def create_header():
                                 ],
                                 href="/trends",
                                 className="nav-link-custom",
+                                id="nav-link-trends",
                             ),
                             dcc.Link(
                                 [
@@ -74,6 +77,7 @@ def create_header():
                                 ],
                                 href="/performance",
                                 className="nav-link-custom",
+                                id="nav-link-performance",
                             ),
                         ],
                         style={"display": "flex", "gap": "8px", "alignItems": "center"},

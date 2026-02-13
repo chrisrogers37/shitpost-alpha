@@ -36,6 +36,41 @@ def _find_text_in_component(component, text):
     return _find_text_in_component(children, text)
 
 
+def _find_component_ids(component):
+    """Recursively collect all component IDs from a Dash component tree."""
+    ids = set()
+    comp_id = getattr(component, "id", None)
+    if comp_id:
+        ids.add(comp_id)
+
+    children = getattr(component, "children", None)
+    if children is None:
+        return ids
+    if isinstance(children, (list, tuple)):
+        for child in children:
+            ids.update(_find_component_ids(child))
+    elif hasattr(children, "children"):
+        ids.update(_find_component_ids(children))
+    return ids
+
+
+def _find_components_by_type(component, comp_type):
+    """Recursively find all components of a given type in a Dash component tree."""
+    found = []
+    if isinstance(component, comp_type):
+        found.append(component)
+
+    children = getattr(component, "children", None)
+    if children is None:
+        return found
+    if isinstance(children, (list, tuple)):
+        for child in children:
+            found.extend(_find_components_by_type(child, comp_type))
+    elif hasattr(children, "children"):
+        found.extend(_find_components_by_type(children, comp_type))
+    return found
+
+
 class TestColors:
     """Tests for color palette configuration."""
 
@@ -1305,3 +1340,201 @@ class TestHeroSignalCardDedup:
         card = create_hero_signal_card(row)
         # Card should render -- exact P&L display is a visual test
         assert card is not None
+
+
+class TestTypographyConstants:
+    """Tests for typography scale and spacing token constants."""
+
+    def test_font_sizes_dict_exists(self):
+        """Test that FONT_SIZES dictionary is defined with all required keys."""
+        from constants import FONT_SIZES
+
+        assert isinstance(FONT_SIZES, dict)
+        required_keys = ["page_title", "section_header", "card_title", "body", "label", "meta", "small"]
+        for key in required_keys:
+            assert key in FONT_SIZES, f"FONT_SIZES missing key: {key}"
+
+    def test_font_sizes_are_rem_values(self):
+        """Test that all font size values end with 'rem'."""
+        from constants import FONT_SIZES
+
+        for name, size in FONT_SIZES.items():
+            assert size.endswith("rem"), f"FONT_SIZES['{name}'] should be a rem value, got: {size}"
+
+    def test_font_sizes_hierarchy(self):
+        """Test that font sizes follow a decreasing hierarchy."""
+        from constants import FONT_SIZES
+
+        # Parse rem values to floats for comparison
+        def parse_rem(s):
+            return float(s.replace("rem", ""))
+
+        assert parse_rem(FONT_SIZES["page_title"]) > parse_rem(FONT_SIZES["section_header"])
+        assert parse_rem(FONT_SIZES["section_header"]) > parse_rem(FONT_SIZES["card_title"])
+        assert parse_rem(FONT_SIZES["card_title"]) > parse_rem(FONT_SIZES["body"])
+        assert parse_rem(FONT_SIZES["body"]) > parse_rem(FONT_SIZES["label"])
+        assert parse_rem(FONT_SIZES["label"]) > parse_rem(FONT_SIZES["meta"])
+        assert parse_rem(FONT_SIZES["meta"]) > parse_rem(FONT_SIZES["small"])
+
+    def test_font_weights_dict_exists(self):
+        """Test that FONT_WEIGHTS dictionary is defined with all required keys."""
+        from constants import FONT_WEIGHTS
+
+        assert isinstance(FONT_WEIGHTS, dict)
+        required_keys = ["bold", "semibold", "medium", "normal"]
+        for key in required_keys:
+            assert key in FONT_WEIGHTS, f"FONT_WEIGHTS missing key: {key}"
+
+    def test_font_weights_are_numeric_strings(self):
+        """Test that all font weight values are valid CSS numeric weight strings."""
+        from constants import FONT_WEIGHTS
+
+        for name, weight in FONT_WEIGHTS.items():
+            assert weight.isdigit(), f"FONT_WEIGHTS['{name}'] should be numeric, got: {weight}"
+            assert 100 <= int(weight) <= 900, f"FONT_WEIGHTS['{name}'] should be 100-900, got: {weight}"
+
+    def test_spacing_dict_exists(self):
+        """Test that SPACING dictionary is defined with all required keys."""
+        from constants import SPACING
+
+        assert isinstance(SPACING, dict)
+        required_keys = ["xs", "sm", "md", "lg", "xl", "xxl"]
+        for key in required_keys:
+            assert key in SPACING, f"SPACING missing key: {key}"
+
+    def test_spacing_values_are_px(self):
+        """Test that all spacing values end with 'px'."""
+        from constants import SPACING
+
+        for name, value in SPACING.items():
+            assert value.endswith("px"), f"SPACING['{name}'] should be a px value, got: {value}"
+
+    def test_spacing_values_increase(self):
+        """Test that spacing values increase from xs to xxl."""
+        from constants import SPACING
+
+        def parse_px(s):
+            return int(s.replace("px", ""))
+
+        order = ["xs", "sm", "md", "lg", "xl", "xxl"]
+        for i in range(len(order) - 1):
+            assert parse_px(SPACING[order[i]]) < parse_px(SPACING[order[i + 1]]), (
+                f"SPACING['{order[i]}'] should be less than SPACING['{order[i + 1]}']"
+            )
+
+    def test_section_accent_dict_exists(self):
+        """Test that SECTION_ACCENT dictionary is defined."""
+        from constants import SECTION_ACCENT
+
+        assert isinstance(SECTION_ACCENT, dict)
+        assert "width" in SECTION_ACCENT
+        assert "color" in SECTION_ACCENT
+        assert "radius" in SECTION_ACCENT
+
+
+class TestNavLinkIds:
+    """Tests for nav link IDs in the header component."""
+
+    def test_nav_links_have_ids(self):
+        """Test that all four navigation links have unique IDs."""
+        from components.header import create_header
+
+        header = create_header()
+
+        expected_ids = [
+            "nav-link-dashboard",
+            "nav-link-signals",
+            "nav-link-trends",
+            "nav-link-performance",
+        ]
+        found_ids = _find_component_ids(header)
+        for nav_id in expected_ids:
+            assert nav_id in found_ids, f"Nav link ID '{nav_id}' not found in header"
+
+    def test_nav_links_have_nav_link_custom_class(self):
+        """Test that all nav links use the nav-link-custom class."""
+        from components.header import create_header
+        from dash import dcc
+
+        header = create_header()
+        nav_links = _find_components_by_type(header, dcc.Link)
+        for link in nav_links:
+            if hasattr(link, "id") and link.id and str(link.id).startswith("nav-link-"):
+                assert "nav-link-custom" in (link.className or ""), (
+                    f"Nav link {link.id} should have nav-link-custom class"
+                )
+
+
+class TestCSSClasses:
+    """Tests for CSS classes in the app index string."""
+
+    @patch("data.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_index_string_contains_section_header_class(
+        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
+    ):
+        """Test that app index_string contains .section-header CSS class."""
+        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
+        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+
+        from layout import create_app
+        app = create_app()
+
+        assert ".section-header" in app.index_string
+        assert ".page-title" in app.index_string
+        assert ".text-label" in app.index_string
+        assert ".text-meta" in app.index_string
+        assert ".section-label" in app.index_string
+
+    @patch("data.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_index_string_contains_active_nav_pseudo_element(
+        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
+    ):
+        """Test that app index_string contains nav-link active ::after pseudo-element."""
+        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
+        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+
+        from layout import create_app
+        app = create_app()
+
+        assert ".nav-link-custom.active::after" in app.index_string
+
+    @patch("data.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_card_header_has_font_size_override(
+        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
+    ):
+        """Test that .card-header CSS includes font-size override."""
+        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
+        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+
+        from layout import create_app
+        app = create_app()
+
+        # Verify the card-header override includes font-size
+        assert "0.95rem" in app.index_string
