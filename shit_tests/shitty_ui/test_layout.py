@@ -48,10 +48,33 @@ def _find_component_ids(component):
         return ids
     if isinstance(children, (list, tuple)):
         for child in children:
-            ids.update(_find_component_ids(child))
-    elif hasattr(children, "children"):
+            if hasattr(child, "children") or hasattr(child, "id"):
+                ids.update(_find_component_ids(child))
+    elif hasattr(children, "children") or hasattr(children, "id"):
         ids.update(_find_component_ids(children))
     return ids
+
+
+def _find_component_by_id(component, target_id):
+    """Recursively find a component by its ID in a Dash component tree."""
+    comp_id = getattr(component, "id", None)
+    if comp_id == target_id:
+        return component
+
+    children = getattr(component, "children", None)
+    if children is None:
+        return None
+    if isinstance(children, (list, tuple)):
+        for child in children:
+            if hasattr(child, "children") or hasattr(child, "id"):
+                result = _find_component_by_id(child, target_id)
+                if result is not None:
+                    return result
+    elif hasattr(children, "children") or hasattr(children, "id"):
+        result = _find_component_by_id(children, target_id)
+        if result is not None:
+            return result
+    return None
 
 
 def _find_components_by_type(component, comp_type):
@@ -1538,3 +1561,178 @@ class TestCSSClasses:
 
         # Verify the card-header override includes font-size
         assert "0.95rem" in app.index_string
+
+
+class TestDashboardPageStructure:
+    """Tests for the restructured dashboard page layout."""
+
+    def test_create_dashboard_page_returns_div(self):
+        """Test that create_dashboard_page returns an html.Div."""
+        from pages.dashboard import create_dashboard_page
+        from dash import html
+
+        page = create_dashboard_page()
+        assert isinstance(page, html.Div)
+
+    def test_dashboard_contains_analytics_tabs(self):
+        """Test that dashboard contains dbc.Tabs with id 'analytics-tabs'."""
+        from pages.dashboard import create_dashboard_page
+
+        page = create_dashboard_page()
+        found_ids = _find_component_ids(page)
+        assert "analytics-tabs" in found_ids, "analytics-tabs not found in dashboard page"
+
+    def test_dashboard_contains_three_chart_ids(self):
+        """Test that all three chart graph IDs are present in the tabbed layout."""
+        from pages.dashboard import create_dashboard_page
+
+        page = create_dashboard_page()
+        found_ids = _find_component_ids(page)
+        assert "accuracy-over-time-chart" in found_ids
+        assert "confidence-accuracy-chart" in found_ids
+        assert "asset-accuracy-chart" in found_ids
+
+    def test_dashboard_does_not_contain_asset_selector(self):
+        """Test that the Asset Deep Dive dropdown has been removed."""
+        from pages.dashboard import create_dashboard_page
+
+        page = create_dashboard_page()
+        found_ids = _find_component_ids(page)
+        assert "asset-selector" not in found_ids, (
+            "asset-selector should be removed from dashboard"
+        )
+
+    def test_dashboard_does_not_contain_asset_drilldown(self):
+        """Test that the asset drilldown content area has been removed."""
+        from pages.dashboard import create_dashboard_page
+
+        page = create_dashboard_page()
+        found_ids = _find_component_ids(page)
+        assert "asset-drilldown-content" not in found_ids, (
+            "asset-drilldown-content should be removed from dashboard"
+        )
+
+    def test_dashboard_does_not_contain_alert_history(self):
+        """Test that the alert history panel has been removed from dashboard."""
+        from pages.dashboard import create_dashboard_page
+
+        page = create_dashboard_page()
+        found_ids = _find_component_ids(page)
+        assert "collapse-alert-history" not in found_ids, (
+            "Alert history collapse should be removed from dashboard"
+        )
+        assert "collapse-alert-history-button" not in found_ids, (
+            "Alert history button should be removed from dashboard"
+        )
+
+    def test_dashboard_contains_post_feed(self):
+        """Test that post-feed-container is present in the dashboard."""
+        from pages.dashboard import create_dashboard_page
+
+        page = create_dashboard_page()
+        found_ids = _find_component_ids(page)
+        assert "post-feed-container" in found_ids
+
+    def test_dashboard_contains_recent_signals(self):
+        """Test that recent-signals-list is present in the dashboard."""
+        from pages.dashboard import create_dashboard_page
+
+        page = create_dashboard_page()
+        found_ids = _find_component_ids(page)
+        assert "recent-signals-list" in found_ids
+
+    def test_dashboard_contains_collapse_chevron(self):
+        """Test that the collapse section has a chevron icon."""
+        from pages.dashboard import create_dashboard_page
+
+        page = create_dashboard_page()
+        found_ids = _find_component_ids(page)
+        assert "collapse-table-chevron" in found_ids, (
+            "collapse-table-chevron not found in dashboard page"
+        )
+
+    def test_collapse_chevron_has_correct_initial_class(self):
+        """Test that the chevron starts with collapse-chevron class (not rotated)."""
+        from pages.dashboard import create_dashboard_page
+
+        page = create_dashboard_page()
+        chevron = _find_component_by_id(page, "collapse-table-chevron")
+        assert chevron is not None, "Could not find collapse-table-chevron component"
+        assert "collapse-chevron" in (chevron.className or "")
+        assert "rotated" not in (chevron.className or "")
+
+    def test_dashboard_preserves_hero_signals_section(self):
+        """Test that hero-signals-section is still present."""
+        from pages.dashboard import create_dashboard_page
+
+        page = create_dashboard_page()
+        found_ids = _find_component_ids(page)
+        assert "hero-signals-section" in found_ids
+
+    def test_dashboard_preserves_performance_metrics(self):
+        """Test that performance-metrics is still present."""
+        from pages.dashboard import create_dashboard_page
+
+        page = create_dashboard_page()
+        found_ids = _find_component_ids(page)
+        assert "performance-metrics" in found_ids
+
+    def test_dashboard_preserves_collapse_table(self):
+        """Test that the collapsible data table is still present."""
+        from pages.dashboard import create_dashboard_page
+
+        page = create_dashboard_page()
+        found_ids = _find_component_ids(page)
+        assert "collapse-table" in found_ids
+        assert "collapse-table-button" in found_ids
+        assert "predictions-table-container" in found_ids
+
+
+class TestAnalyticsTabsCSS:
+    """Tests for analytics tab CSS in the app stylesheet."""
+
+    @patch("data.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_index_string_contains_analytics_tabs_css(
+        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
+    ):
+        """Test that app index_string contains .analytics-tabs CSS."""
+        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
+        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+
+        from layout import create_app
+        app = create_app()
+
+        assert ".analytics-tabs" in app.index_string
+        assert ".collapse-chevron" in app.index_string
+        assert ".collapse-chevron.rotated" in app.index_string
+
+    @patch("data.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_index_string_contains_collapse_toggle_css(
+        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
+    ):
+        """Test that app index_string contains .collapse-toggle-btn CSS."""
+        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
+        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+
+        from layout import create_app
+        app = create_app()
+
+        assert ".collapse-toggle-btn" in app.index_string

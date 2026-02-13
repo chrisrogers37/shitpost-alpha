@@ -287,6 +287,54 @@ def create_app() -> Dash:
                 color: #94a3b8;
                 font-size: 0.8rem;
             }
+
+            /* ======================================
+               Analytics tab interface
+               ====================================== */
+            .analytics-tabs .nav-tabs {
+                border-bottom: 1px solid #334155;
+                background-color: transparent;
+            }
+            .analytics-tabs .nav-link {
+                color: #94a3b8 !important;
+                border: none !important;
+                border-bottom: 2px solid transparent !important;
+                background-color: transparent !important;
+                padding: 10px 20px;
+                font-size: 0.9rem;
+                font-weight: 500;
+                transition: all 0.15s ease;
+            }
+            .analytics-tabs .nav-link:hover {
+                color: #f1f5f9 !important;
+                border-bottom-color: #475569 !important;
+            }
+            .analytics-tabs .nav-link.active {
+                color: #3b82f6 !important;
+                border-bottom-color: #3b82f6 !important;
+                background-color: transparent !important;
+            }
+            .analytics-tabs .tab-content {
+                padding-top: 16px;
+            }
+
+            /* ======================================
+               Collapsible section chevrons
+               ====================================== */
+            .collapse-toggle-btn {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                width: 100%;
+                text-align: left;
+            }
+            .collapse-chevron {
+                transition: transform 0.2s ease;
+                font-size: 0.8rem;
+            }
+            .collapse-chevron.rotated {
+                transform: rotate(90deg);
+            }
         </style>
     </head>
     <body>

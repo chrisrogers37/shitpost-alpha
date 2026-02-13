@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Dashboard information architecture redesign** - Streamlined the main dashboard layout for faster scanning and reduced information overload
+  - Consolidated three separate chart sections (Accuracy Over Time, Accuracy by Confidence, Performance by Asset) into a single tabbed "Analytics" card with three switchable views
+  - Moved "Latest Posts" feed up to a prominent side-by-side position with "Recent Predictions," visible without excessive scrolling
+  - Added chevron icons with rotation animation to collapsible sections for clear expand/collapse affordance
+
+### Removed
+- **Asset Deep Dive section** from the main dashboard (functionality lives on the dedicated `/assets/<ticker>` page; users can click any asset bar chart to navigate there)
+- **Alert History panel** from the main dashboard (accessible via the alert configuration bell icon panel)
+
+### Changed
 - **Smart Empty States** - Dashboard chart sections that have no data now display compact (80px) informative messages instead of tall (250px) blank chart boxes
   - Accuracy Over Time, Accuracy by Confidence, and Performance by Asset on the main dashboard
   - Accuracy by Confidence and Sentiment Breakdown on the Performance page
