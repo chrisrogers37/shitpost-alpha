@@ -1,5 +1,7 @@
 # Phase 05: Strip URLs from Card Previews
 
+**Status**: COMPLETE (PR #62)
+
 **PR Title**: `fix: strip raw URLs from card text previews to improve readability`
 **Risk Level**: Low (cosmetic change, preview-only, no data mutation)
 **Estimated Effort**: Small (1-2 hours implementation + tests)
