@@ -234,7 +234,7 @@ def create_signal_feed_page() -> html.Div:
                 [
                     html.Span(
                         id="signal-feed-count-label",
-                        children="Loading signals...",
+                        children="",
                         style={
                             "color": COLORS["text_muted"],
                             "fontSize": "0.85rem",
@@ -318,37 +318,37 @@ def register_signal_callbacks(app: Dash):
         """Load or reload the signal feed with current filter values."""
         from data import get_signal_feed, get_signal_feed_count
 
-        # Normalize filter values
-        sentiment_val = sentiment if sentiment != "all" else None
-        outcome_val = outcome if outcome != "all" else None
-        conf_min = confidence_range[0] if confidence_range else None
-        conf_max = confidence_range[1] if confidence_range else None
+        try:
+            # Normalize filter values
+            sentiment_val = sentiment if sentiment != "all" else None
+            outcome_val = outcome if outcome != "all" else None
+            conf_min = confidence_range[0] if confidence_range else None
+            conf_max = confidence_range[1] if confidence_range else None
 
-        if conf_min == 0 and conf_max == 1:
-            conf_min = None
-            conf_max = None
+            if conf_min == 0 and conf_max == 1:
+                conf_min = None
+                conf_max = None
 
-        df = get_signal_feed(
-            limit=PAGE_SIZE,
-            offset=0,
-            sentiment_filter=sentiment_val,
-            confidence_min=conf_min,
-            confidence_max=conf_max,
-            asset_filter=asset,
-            outcome_filter=outcome_val,
-        )
+            df = get_signal_feed(
+                limit=PAGE_SIZE,
+                offset=0,
+                sentiment_filter=sentiment_val,
+                confidence_min=conf_min,
+                confidence_max=conf_max,
+                asset_filter=asset,
+                outcome_filter=outcome_val,
+            )
 
-        total_count = get_signal_feed_count(
-            sentiment_filter=sentiment_val,
-            confidence_min=conf_min,
-            confidence_max=conf_max,
-            asset_filter=asset,
-            outcome_filter=outcome_val,
-        )
+            total_count = get_signal_feed_count(
+                sentiment_filter=sentiment_val,
+                confidence_min=conf_min,
+                confidence_max=conf_max,
+                asset_filter=asset,
+                outcome_filter=outcome_val,
+            )
 
-        if df.empty:
-            cards = [
-                html.Div(
+            if df.empty:
+                empty_card = html.Div(
                     [
                         html.I(
                             className="fas fa-inbox",
@@ -367,23 +367,51 @@ def register_signal_callbacks(app: Dash):
                     ],
                     style={"textAlign": "center", "padding": "40px"},
                 )
-            ]
-            return cards, "No signals found", 0, None, {"display": "none"}
+                return [empty_card], "No signals found", 0, None, {"display": "none"}
 
-        cards = [create_feed_signal_card(row) for _, row in df.iterrows()]
-        count_label = f"Showing {len(df)} of {total_count} signals"
+            cards = [create_feed_signal_card(row) for _, row in df.iterrows()]
+            count_label = f"Showing {len(df)} of {total_count} signals"
 
-        newest_ts = df["timestamp"].iloc[0]
-        if isinstance(newest_ts, datetime):
-            last_seen_ts = newest_ts.isoformat()
-        else:
-            last_seen_ts = str(newest_ts)
+            newest_ts = df["timestamp"].iloc[0]
+            if isinstance(newest_ts, datetime):
+                last_seen_ts = newest_ts.isoformat()
+            else:
+                last_seen_ts = str(newest_ts)
 
-        load_more_style = (
-            {"display": "block"} if total_count > PAGE_SIZE else {"display": "none"}
-        )
+            load_more_style = (
+                {"display": "block"}
+                if total_count > PAGE_SIZE
+                else {"display": "none"}
+            )
 
-        return cards, count_label, PAGE_SIZE, last_seen_ts, load_more_style
+            return cards, count_label, PAGE_SIZE, last_seen_ts, load_more_style
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error loading signal feed: {e}", exc_info=True)
+
+            error_card = html.Div(
+                [
+                    html.I(
+                        className="fas fa-exclamation-triangle",
+                        style={
+                            "fontSize": "2rem",
+                            "color": COLORS["danger"],
+                        },
+                    ),
+                    html.P(
+                        "Failed to load signals. Please try refreshing the page.",
+                        style={
+                            "color": COLORS["text_muted"],
+                            "marginTop": "10px",
+                        },
+                    ),
+                ],
+                style={"textAlign": "center", "padding": "40px"},
+            )
+            return [error_card], "Error loading signals", 0, None, {"display": "none"}
 
     # 3.2 Load More Button
     @app.callback(
@@ -425,54 +453,68 @@ def register_signal_callbacks(app: Dash):
         if not n_clicks:
             raise PreventUpdate
 
-        sentiment_val = sentiment if sentiment != "all" else None
-        outcome_val = outcome if outcome != "all" else None
-        conf_min = confidence_range[0] if confidence_range else None
-        conf_max = confidence_range[1] if confidence_range else None
+        try:
+            sentiment_val = sentiment if sentiment != "all" else None
+            outcome_val = outcome if outcome != "all" else None
+            conf_min = confidence_range[0] if confidence_range else None
+            conf_max = confidence_range[1] if confidence_range else None
 
-        if conf_min == 0 and conf_max == 1:
-            conf_min = None
-            conf_max = None
+            if conf_min == 0 and conf_max == 1:
+                conf_min = None
+                conf_max = None
 
-        df = get_signal_feed(
-            limit=PAGE_SIZE,
-            offset=current_offset,
-            sentiment_filter=sentiment_val,
-            confidence_min=conf_min,
-            confidence_max=conf_max,
-            asset_filter=asset,
-            outcome_filter=outcome_val,
-        )
+            df = get_signal_feed(
+                limit=PAGE_SIZE,
+                offset=current_offset,
+                sentiment_filter=sentiment_val,
+                confidence_min=conf_min,
+                confidence_max=conf_max,
+                asset_filter=asset,
+                outcome_filter=outcome_val,
+            )
 
-        total_count = get_signal_feed_count(
-            sentiment_filter=sentiment_val,
-            confidence_min=conf_min,
-            confidence_max=conf_max,
-            asset_filter=asset,
-            outcome_filter=outcome_val,
-        )
+            total_count = get_signal_feed_count(
+                sentiment_filter=sentiment_val,
+                confidence_min=conf_min,
+                confidence_max=conf_max,
+                asset_filter=asset,
+                outcome_filter=outcome_val,
+            )
 
-        if df.empty:
+            if df.empty:
+                return (
+                    existing_cards,
+                    current_offset,
+                    f"Showing all {current_offset} signals",
+                    {"display": "none"},
+                )
+
+            new_cards = [create_feed_signal_card(row) for _, row in df.iterrows()]
+            updated_cards = (existing_cards or []) + new_cards
+
+            new_offset = current_offset + len(df)
+            count_label = f"Showing {new_offset} of {total_count} signals"
+
+            load_more_style = (
+                {"display": "block"}
+                if new_offset < total_count
+                else {"display": "none"}
+            )
+
+            return updated_cards, new_offset, count_label, load_more_style
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error loading more signals: {e}", exc_info=True)
+
             return (
                 existing_cards,
                 current_offset,
-                f"Showing all {current_offset} signals",
+                "Error loading more signals",
                 {"display": "none"},
             )
-
-        new_cards = [create_feed_signal_card(row) for _, row in df.iterrows()]
-        updated_cards = (existing_cards or []) + new_cards
-
-        new_offset = current_offset + len(df)
-        count_label = f"Showing {new_offset} of {total_count} signals"
-
-        load_more_style = (
-            {"display": "block"}
-            if new_offset < total_count
-            else {"display": "none"}
-        )
-
-        return updated_cards, new_offset, count_label, load_more_style
 
     # 3.3 New-Signals Polling
     @app.callback(
@@ -490,12 +532,15 @@ def register_signal_callbacks(app: Dash):
         if not last_seen_ts:
             return [], {"display": "none"}
 
-        new_count = get_new_signals_since(last_seen_ts)
+        try:
+            new_count = get_new_signals_since(last_seen_ts)
 
-        if new_count > 0:
-            banner = create_new_signals_banner(new_count)
-            return [banner], {"display": "block"}
-        else:
+            if new_count > 0:
+                banner = create_new_signals_banner(new_count)
+                return [banner], {"display": "block"}
+            else:
+                return [], {"display": "none"}
+        except Exception:
             return [], {"display": "none"}
 
     # 3.4 Show New Signals Button — triggers feed reload via refresh store
@@ -532,28 +577,36 @@ def register_signal_callbacks(app: Dash):
         if not n_clicks:
             raise PreventUpdate
 
-        sentiment_val = sentiment if sentiment != "all" else None
-        outcome_val = outcome if outcome != "all" else None
-        conf_min = confidence_range[0] if confidence_range else None
-        conf_max = confidence_range[1] if confidence_range else None
+        try:
+            sentiment_val = sentiment if sentiment != "all" else None
+            outcome_val = outcome if outcome != "all" else None
+            conf_min = confidence_range[0] if confidence_range else None
+            conf_max = confidence_range[1] if confidence_range else None
 
-        if conf_min == 0 and conf_max == 1:
-            conf_min = None
-            conf_max = None
+            if conf_min == 0 and conf_max == 1:
+                conf_min = None
+                conf_max = None
 
-        export_df = get_signal_feed_csv(
-            sentiment_filter=sentiment_val,
-            confidence_min=conf_min,
-            confidence_max=conf_max,
-            asset_filter=asset,
-            outcome_filter=outcome_val,
-        )
+            export_df = get_signal_feed_csv(
+                sentiment_filter=sentiment_val,
+                confidence_min=conf_min,
+                confidence_max=conf_max,
+                asset_filter=asset,
+                outcome_filter=outcome_val,
+            )
 
-        if export_df.empty:
+            if export_df.empty:
+                return None
+
+            filename = f"shitpost_alpha_signals_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            return dcc.send_data_frame(export_df.to_csv, filename, index=False)
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error exporting signal feed CSV: {e}", exc_info=True)
             return None
-
-        filename = f"shitpost_alpha_signals_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-        return dcc.send_data_frame(export_df.to_csv, filename, index=False)
 
     # 3.6 Asset Filter Dropdown Population
     @app.callback(
@@ -564,5 +617,8 @@ def register_signal_callbacks(app: Dash):
         """Populate the asset filter dropdown with assets from the database."""
         from data import get_active_assets_from_db
 
-        assets = get_active_assets_from_db()
-        return [{"label": a, "value": a} for a in assets]
+        try:
+            assets = get_active_assets_from_db()
+            return [{"label": a, "value": a} for a in assets]
+        except Exception:
+            return []

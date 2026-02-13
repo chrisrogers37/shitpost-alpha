@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Changed Plotly modebar from always-visible to hover-only for cleaner appearance
   - Improved empty state messaging when no assets with prediction data exist
 - **Raw URLs cluttering card previews** - Strip http/https URLs from text previews in all card components (hero signal, signal, post, feed signal, prediction timeline). URLs consumed 50-100+ characters of limited preview space, making cards unreadable. Cards now show meaningful post content instead of URL strings.
+- **Broken /signals page stuck on "Loading signals..."** - Fix silent callback crash caused by NaN values from LEFT JOIN on prediction_outcomes table
+  - Add NaN-safe field extraction helper (`_safe_get`) in card components to normalize `float('nan')` to proper defaults
+  - Wrap all six signal feed callbacks in try/except with meaningful error states instead of permanent loading indicators
+  - Fix CSV export NaN handling for asset and text columns
+  - Change initial count label from "Loading signals..." to empty (spinner provides feedback)
 
 ## [v1.0.0] - 2026-02-12
 
