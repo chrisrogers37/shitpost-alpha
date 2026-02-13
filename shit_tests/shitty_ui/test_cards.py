@@ -9,7 +9,70 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "shitty_u
 import pytest
 from datetime import datetime
 
-from components.cards import strip_urls
+from components.cards import (
+    strip_urls,
+    create_hero_signal_card,
+    create_signal_card,
+    create_post_card,
+    create_prediction_timeline_card,
+    create_feed_signal_card,
+)
+
+
+def _extract_text(component) -> str:
+    """Recursively extract all text content from a Dash component tree."""
+    parts = []
+    if isinstance(component, str):
+        return component
+    if hasattr(component, "children"):
+        children = component.children
+        if isinstance(children, str):
+            parts.append(children)
+        elif isinstance(children, list):
+            for child in children:
+                if child is not None:
+                    parts.append(_extract_text(child))
+        elif children is not None:
+            parts.append(_extract_text(children))
+    return " ".join(parts)
+
+
+def _make_row(**overrides):
+    """Create a minimal row dict for card rendering."""
+    base = {
+        "timestamp": datetime(2025, 6, 15, 10, 30),
+        "text": "Big announcement about tariffs today",
+        "confidence": 0.75,
+        "assets": ["AAPL", "TSLA"],
+        "market_impact": {"AAPL": "bullish"},
+        "correct_t7": None,
+        "pnl_t7": None,
+        "analysis_status": "completed",
+        "thesis": "Tariffs expected to boost domestic production",
+        "replies_count": 10,
+        "reblogs_count": 5,
+        "favourites_count": 20,
+    }
+    base.update(overrides)
+    return base
+
+
+def _make_timeline_row(**overrides):
+    """Create a minimal row dict for prediction timeline card."""
+    base = {
+        "prediction_date": datetime(2025, 6, 15),
+        "timestamp": datetime(2025, 6, 15, 10, 30),
+        "text": "Trade deal announcement",
+        "prediction_sentiment": "bullish",
+        "prediction_confidence": 0.75,
+        "return_t7": 2.5,
+        "correct_t7": True,
+        "pnl_t7": 250.0,
+        "price_at_prediction": 150.0,
+        "price_t7": 153.75,
+    }
+    base.update(overrides)
+    return base
 
 
 class TestStripUrls:
@@ -100,3 +163,75 @@ class TestStripUrls:
         """Test that newlines in text are preserved."""
         text = "First line\nhttps://url.com\nThird line"
         assert strip_urls(text) == "First line\n\nThird line"
+
+
+class TestConfidenceDisplayConsistency:
+    """Verify all card types display confidence in standardized format."""
+
+    def test_hero_signal_card_no_conf_label(self):
+        """Hero signal card should show '75%' not 'Conf: 75%'."""
+        card = create_hero_signal_card(_make_row(confidence=0.75))
+        text = _extract_text(card)
+        assert "75%" in text
+        assert "Conf:" not in text
+        assert "Confidence:" not in text
+
+    def test_signal_card_bare_percentage(self):
+        """Signal card should show bare percentage."""
+        card = create_signal_card(_make_row(confidence=0.80))
+        text = _extract_text(card)
+        assert "80%" in text
+        assert "Conf:" not in text
+        assert "Confidence:" not in text
+
+    def test_post_card_no_confidence_label(self):
+        """Post card should show '| 75%' not '| Confidence: 75%'."""
+        card = create_post_card(_make_row(confidence=0.75))
+        text = _extract_text(card)
+        assert "75%" in text
+        assert "Confidence:" not in text
+
+    def test_prediction_timeline_card_no_confidence_label(self):
+        """Prediction timeline card should show '| 75%' not '| Confidence: 75%'."""
+        card = create_prediction_timeline_card(
+            _make_timeline_row(prediction_confidence=0.75)
+        )
+        text = _extract_text(card)
+        assert "75%" in text
+        assert "Confidence:" not in text
+
+    def test_feed_signal_card_bare_percentage(self):
+        """Feed signal card should show bare percentage."""
+        card = create_feed_signal_card(_make_row(confidence=0.85))
+        text = _extract_text(card)
+        assert "85%" in text
+        assert "Conf:" not in text
+        assert "Confidence:" not in text
+
+    def test_confidence_zero_renders(self):
+        """0% confidence should still render, not be suppressed."""
+        card = create_hero_signal_card(_make_row(confidence=0.0))
+        text = _extract_text(card)
+        assert "0%" in text
+
+    def test_confidence_one_hundred_renders(self):
+        """100% confidence should render correctly."""
+        card = create_signal_card(_make_row(confidence=1.0))
+        text = _extract_text(card)
+        assert "100%" in text
+
+    def test_post_card_no_confidence_when_none(self):
+        """Post card should render empty string when confidence is None."""
+        card = create_post_card(_make_row(confidence=None))
+        text = _extract_text(card)
+        assert "Confidence:" not in text
+        # Should not crash
+
+    def test_prediction_timeline_no_confidence_when_zero(self):
+        """Prediction timeline card hides confidence when falsy (0)."""
+        card = create_prediction_timeline_card(
+            _make_timeline_row(prediction_confidence=0)
+        )
+        text = _extract_text(card)
+        # When confidence is 0 (falsy), the conditional hides it entirely
+        assert "Confidence:" not in text
