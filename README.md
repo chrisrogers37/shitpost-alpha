@@ -26,15 +26,18 @@ This software is for educational and research purposes only. Trading decisions s
 - **✅ Production Deployment** - Live on Railway with automated 5-minute cron scheduling
 - **✅ Neon PostgreSQL Database** - Serverless PostgreSQL with real-time data updates
 - **✅ S3 Data Lake** - Scalable raw data storage with organized structure
-- **✅ LLM-Powered Analysis** - GPT-4 financial sentiment analysis
+- **✅ Multi-LLM Analysis** - GPT-4, Claude, and Grok/xAI with provider comparison CLI
 - **✅ Market Sentiment Detection** - Identifies bullish/bearish signals for specific assets
+- **✅ Market Data Tracking** - Price fetching (yfinance + Alpha Vantage fallback), outcome calculation, and prediction accuracy scoring
+- **✅ Telegram Alerts** - Real-time prediction alerts via Telegram bot with subscriber management
+- **✅ Performance Dashboard** - Multi-page Dash app with signal-over-trend charts, KPIs, and asset deep dives
+- **✅ Source-Agnostic Signal Model** - Platform-independent data model ready for multi-source expansion
+- **✅ Harvester Abstraction** - Pluggable harvester framework with registry and skeleton Twitter template
 - **✅ Retruth Detection** - Automatically bypasses retweets to focus on original content
-- **✅ Categorical Tracking** - Tracks all posts including those bypassed by analysis
 - **✅ Multiple Processing Modes** - Incremental, backfill, and date range processing
-- **✅ Unified Orchestration** - Single entry point for complete pipeline execution
-- **✅ Modular Architecture** - Easy to extend and maintain
-- **✅ Comprehensive Logging** - Beautiful console output with persistent file logs for debugging
-- **✅ Production-Ready Logging** - Service-specific timestamped logs with visual sectioning
+- **✅ Unified Orchestration** - Single entry point with multi-source support
+- **✅ Comprehensive Logging** - Service-specific timestamped logs with visual sectioning
+- **✅ Market Data Resilience** - Multi-provider fallback, exponential backoff retry, health monitoring
 
 
 ## 🏗 System Architecture
@@ -93,28 +96,56 @@ shitpost_alpha/
 │   └── utils/              # Error handling utilities
 ├── shitvault/              # Data persistence & S3 processing
 │   ├── cli.py              # Database CLI operations
-│   ├── prediction_operations.py  # Prediction CRUD operations
-│   ├── s3_processor.py     # S3 → Database processor
 │   ├── shitpost_models.py  # Domain-specific SQLAlchemy models
 │   ├── shitpost_operations.py  # Shitpost CRUD operations
+│   ├── signal_models.py    # Source-agnostic Signal model
+│   ├── signal_operations.py  # Signal CRUD operations
+│   ├── prediction_operations.py  # Prediction CRUD operations
+│   ├── s3_processor.py     # S3 → Database processor (dual-write)
 │   └── statistics.py       # Database statistics & analytics
 ├── shitposts/              # Content harvesting
-│   ├── truth_social_s3_harvester.py  # API → S3 harvester
+│   ├── base_harvester.py   # Abstract SignalHarvester base class
+│   ├── harvester_registry.py  # Config-driven harvester management
+│   ├── harvester_models.py # Harvest result/config data models
+│   ├── truth_social_s3_harvester.py  # Truth Social → S3 harvester
+│   ├── twitter_harvester.py  # Skeleton Twitter/X harvester
 │   └── cli.py              # Harvesting CLI functionality
 ├── shitpost_ai/            # AI analysis engine
 │   ├── shitpost_analyzer.py # Analysis orchestrator
+│   ├── compare_cli.py      # Multi-provider comparison CLI
 │   └── cli.py              # Analysis CLI utilities
 ├── shitty_ui/              # Prediction performance dashboard
-│   ├── app.py              # Dash application entry point
-│   ├── layout.py           # Dashboard layout, components & callbacks
-│   └── data.py             # Database query functions for dashboard
-└── shit_tests/             # Comprehensive test suite (973+ tests)
+│   ├── app.py              # Dash application & Flask endpoints
+│   ├── layout.py           # App factory, router & callback registration
+│   ├── data.py             # Database query functions (2000+ lines)
+│   ├── constants.py        # Colors, typography, spacing tokens
+│   ├── pages/              # Page modules
+│   │   ├── dashboard.py    # Main dashboard (tabbed analytics)
+│   │   ├── signals.py      # Signal feed with filtering
+│   │   ├── trends.py       # Signal-over-trend charts
+│   │   └── assets.py       # Asset deep dive page
+│   ├── components/         # Reusable UI components
+│   │   ├── cards.py        # Signal, prediction & metric cards
+│   │   ├── charts.py       # Candlestick & overlay charts
+│   │   ├── controls.py     # Filter & period controls
+│   │   └── header.py       # Navigation header
+│   └── callbacks/          # Callback groups
+│       └── alerts.py       # Alert configuration panel
+├── notifications/          # Alert dispatch & Telegram bot
+│   ├── alert_engine.py     # Alert check-and-dispatch loop
+│   ├── dispatcher.py       # Multi-channel delivery
+│   ├── telegram_bot.py     # Telegram command handlers
+│   ├── telegram_sender.py  # Telegram API integration
+│   ├── db.py               # Subscription & alert DB operations
+│   └── __main__.py         # CLI (check-alerts, set-webhook, etc.)
+└── shit_tests/             # Comprehensive test suite (1400+ tests)
     ├── conftest.py          # Shared fixtures & test configuration
     ├── shit/                # Core infrastructure tests
     ├── shitposts/           # Harvesting module tests
     ├── shitvault/           # Database module tests
     ├── shitpost_ai/         # AI analysis tests
     ├── shitty_ui/           # Dashboard tests
+    ├── notifications/       # Alert system tests
     ├── integration/         # End-to-end pipeline tests
     └── fixtures/            # Test data & mock responses
 ```
@@ -127,8 +158,8 @@ shitpost_alpha/
 - **Database**: Neon PostgreSQL with real-time updates
 - **Storage**: AWS S3 data lake with organized structure
 - **Uptime**: Railway deployment running every 5 minutes
-- **Test Suite**: 973+ passing tests with comprehensive coverage
-- **Latest Version**: v0.18.0 (Comprehensive Test Coverage)
+- **Test Suite**: 1400+ tests with comprehensive coverage
+- **Latest Version**: v1.0.0
 
 ## 📚 Technical Documentation
 
@@ -152,10 +183,25 @@ For comprehensive information about each component, see the detailed README file
 - Database CLI operations
 
 ### 🧠 [AI Analysis](shitpost_ai/README.md)
-- LLM client and analysis engine
+- Multi-LLM client (GPT-4, Claude, Grok/xAI) with provider comparison
 - Prompt engineering
 - Enhanced context analysis
 - Bypass functionality for unanalyzable content
+
+### 📊 [Performance Dashboard](shitty_ui/README.md)
+- Multi-page Dash app (Dashboard, Signals, Trends, Assets)
+- Signal-over-trend candlestick charts with prediction overlays
+- Performance KPIs and analytics
+
+### 🔔 [Notifications](documentation/TELEGRAM_SETUP_GUIDE.md)
+- Telegram bot with subscriber management
+- Alert engine with configurable thresholds
+- Browser push alerts via dashboard
+
+### 📈 [Market Data](documentation/MARKET_DATA_ARCHITECTURE.md)
+- Multi-provider price fetching (yfinance + Alpha Vantage)
+- Prediction outcome tracking and accuracy scoring
+- Health monitoring and resilience
 
 ## 📋 Recent Updates
 
@@ -172,37 +218,41 @@ For detailed version history and recent improvements, see [CHANGELOG.md](CHANGEL
 - [x] Production deployment on Railway with Neon PostgreSQL
 - [x] Comprehensive error handling and logging
 - [x] Centralized bypass service for content filtering
-- [x] 973+ passing tests with comprehensive coverage
 
-### Phase 2: Market Data & Prediction Validation 🚧 **IN PROGRESS**
-- [x] **Market Data Module** - `shit/market_data/` with yfinance integration
+### Phase 2: Market Data & Prediction Validation ✅ **COMPLETED**
+- [x] **Market Data Module** - `shit/market_data/` with yfinance + Alpha Vantage fallback
 - [x] **Price Storage** - `market_prices` table with OHLCV data
 - [x] **Outcome Tracking** - `prediction_outcomes` table with T+1/3/7/30 returns
 - [x] **Outcome Calculator** - Automated accuracy/P&L calculation
 - [x] **Price Backfill** - CLI tools for historical price backfilling
-- [ ] **Full Asset Coverage** - Backfill prices for all 187+ mentioned assets
-- [ ] **Automated Daily Updates** - Scheduled price fetching and outcome calculation
+- [x] **Reactive Ticker Lifecycle** - Auto-backfill when new tickers appear in predictions
+- [x] **Market Data Resilience** - Multi-provider fallback, retry with exponential backoff, health monitoring
+- [x] **Automated Updates** - Railway cron every 15 minutes for price fetching and outcome calculation
 
-### Phase 3: Dashboard & Visualization 🚧 **IN PROGRESS**
-- [x] **Dash-based Dashboard** - `shitty_ui/` with Plotly + Bootstrap
-- [x] **Performance Metrics** - Accuracy, P&L, average return at a glance
-- [x] **Accuracy by Confidence** - Chart showing calibration by confidence level
-- [x] **Performance by Asset** - Chart showing per-asset accuracy
-- [x] **Recent Signals** - Latest predictions with outcomes
-- [x] **Asset Deep Dive** - Historical predictions for any selected asset
-- [x] **Dark Theme** - Professional trading platform design
-- [ ] **Loading States & Error Handling** - Graceful degradation
-- [ ] **Time Period Filtering** - 7d/30d/90d/All selector
-- [ ] **Mobile Responsiveness** - Optimized mobile layout
+### Phase 3: Dashboard & Visualization ✅ **COMPLETED**
+- [x] **Multi-page Dash App** - `shitty_ui/` with Plotly + Bootstrap (Dashboard, Signals, Trends, Assets)
+- [x] **Performance Metrics** - Accuracy, P&L, average return KPIs
+- [x] **Tabbed Analytics** - Accuracy by confidence, performance by asset, accuracy over time
+- [x] **Signal Feed** - Filterable signal cards with sentiment colors and confidence badges
+- [x] **Signal-Over-Trend Charts** - Candlestick price charts with prediction marker overlays
+- [x] **Asset Deep Dive** - Historical predictions on dedicated `/assets/<ticker>` page
+- [x] **Dark Theme** - Professional trading platform design with typography scale
+- [x] **Smart Empty States** - Compact informative messages when data is missing
 
-### Phase 4: Real-Time Alerting 📋 **PLANNED**
-- [ ] **Telegram Bot** - Real-time prediction alerts
-- [ ] **Alert Rules Engine** - Confidence threshold, asset filters
-- [ ] **Subscriber Management** - Subscription and preference management
-- [ ] **Rate Limiting** - Max alerts per hour/day per user
+### Phase 4: Real-Time Alerting ✅ **COMPLETED**
+- [x] **Telegram Bot** - Real-time prediction alerts with subscriber commands
+- [x] **Alert Rules Engine** - Confidence threshold, asset filters, per-subscriber preferences
+- [x] **Subscriber Management** - Multi-tenant subscription via Telegram
+- [x] **Browser Alerts** - Dashboard alert panel with localStorage preferences
+- [x] **Production Deployment** - Railway cron every 2 minutes, webhook endpoint, health check
 
-### Phase 5: Advanced Features 🔮 **FUTURE**
-- [ ] **Multi-Source Aggregation** - Additional data sources beyond Truth Social
+### Phase 5: System Evolution ✅ **COMPLETED**
+- [x] **Multi-LLM Support** - GPT-4, Claude, Grok/xAI with provider comparison CLI
+- [x] **Source-Agnostic Signal Model** - Platform-independent data model with dual-FK migration
+- [x] **Harvester Abstraction** - Pluggable base class, registry, skeleton Twitter template
+
+### Phase 6: Future 🔮 **PLANNED**
+- [ ] **Multi-Source Aggregation** - Twitter/X, RSS, and other data sources
 - [ ] **Ensemble Models** - Multiple LLMs with aggregated predictions
 - [ ] **Public API** - REST API for external integrations
 - [ ] **Monetization** - Tiered access (free/premium/pro)

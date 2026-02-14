@@ -255,7 +255,8 @@ python -m shitposts --mode backfill --from 2024-01-01 --to 2024-12-31
 
 **`predictions`** - LLM analysis results
 - `id` (integer, auto-increment primary key)
-- `shitpost_id` (string, foreign key → truth_social_shitposts.shitpost_id)
+- `shitpost_id` (string, nullable FK → truth_social_shitposts.shitpost_id)
+- `signal_id` (string, nullable FK → signals.signal_id) -- Dual-FK: one of shitpost_id or signal_id will be set
 - `assets` (JSON) -- List of asset tickers, e.g. ["AAPL", "TSLA"]
 - `market_impact` (JSON) -- Dict of asset → sentiment, e.g. {"AAPL": "bullish"}
 - `confidence` (float, nullable) -- 0.0-1.0, null for bypassed posts
@@ -287,6 +288,16 @@ python -m shitposts --mode backfill --from 2024-01-01 --to 2024-12-31
 - P&L simulation: `pnl_t1`, `pnl_t3`, `pnl_t7`, `pnl_t30` ($1000 position)
 - `is_complete` (boolean) -- All timeframes tracked?
 
+**`signals`** - Source-agnostic content model for multi-platform support
+- `id`, `signal_id` (string, unique) -- Platform-specific content ID
+- `source` (string) -- Platform identifier (e.g., "truth_social", "twitter")
+- `author_username` (string), `published_at` (datetime)
+- `content` (text), `text` (text) -- HTML and plain text content
+- Engagement: `likes_count`, `shares_count`, `replies_count`, `views_count`
+- Flags: `is_repost`, `is_reply`, `is_quote` (boolean)
+- `platform_data` (JSON) -- Platform-specific fields stored as JSON
+- Properties: `total_engagement`, `engagement_rate` (computed)
+
 **`ticker_registry`** - Registry of all tracked ticker symbols
 - `id`, `symbol` (unique), `first_seen_date`
 - `source_prediction_id` (FK → predictions.id)
@@ -294,10 +305,16 @@ python -m shitposts --mode backfill --from 2024-01-01 --to 2024-12-31
 - `last_price_update`, `price_data_start`, `price_data_end`, `total_price_records`
 - `asset_type`, `exchange`
 
+**`telegram_subscriptions`** - Telegram bot subscribers
+- `id`, `chat_id` (bigint, unique), `username`, `first_name`
+- `is_active` (boolean), `alert_preferences` (JSON)
+- `consecutive_errors` (int), `last_alert_sent_at`, `alerts_sent_count`
+
 **`subscribers`** - SMS alert subscribers (schema defined, not yet active)
 **`llm_feedback`** - LLM performance feedback (schema defined, not yet active)
 
 **Indexes**:
+- `signals`: (`signal_id` unique), (`source`, `published_at`)
 - `ticker_registry`: (`symbol` unique), (`status`), (`first_seen_date`)
 - `truth_social_shitposts`: (`shitpost_id` unique), (`timestamp`)
 - `predictions`: (`shitpost_id`)

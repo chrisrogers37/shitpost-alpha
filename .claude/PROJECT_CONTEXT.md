@@ -6,14 +6,15 @@
 
 ## What This Project Does
 
-Shitpost Alpha monitors Donald Trump's Truth Social posts in real-time, analyzes them with GPT-4 to predict financial market impacts, and provides trading alerts.
+Shitpost Alpha monitors Donald Trump's Truth Social posts in real-time, analyzes them with LLMs (GPT-4, Claude, Grok/xAI) to predict financial market impacts, and sends trading alerts via Telegram.
 
 **Pipeline Flow**:
 1. Truth Social API fetches new posts every 5 minutes (Railway cron)
 2. Posts are stored in S3 data lake (organized by date)
-3. S3 processor loads posts into PostgreSQL (Neon serverless)
+3. S3 processor loads posts into PostgreSQL (Neon serverless) — dual-writes to both `truth_social_shitposts` and `signals` tables
 4. LLM analyzer processes posts for financial sentiment
-5. Predictions are stored back in database with confidence scores
+5. Predictions stored in database; reactive ticker lifecycle auto-backfills market prices
+6. Telegram alerts dispatched to subscribers (Railway cron every 2 minutes)
 
 **Real-world use case**: Catching market-moving posts like "CHINA TARIFFS!" or "BIG ANNOUNCEMENT!" in real-time to trade ahead of the crowd.
 
@@ -39,7 +40,7 @@ Shitpost Alpha monitors Donald Trump's Truth Social posts in real-time, analyzes
 ┌───────────────▼─────────────────────┐
 │  shitpost_ai/ (Analysis)            │
 │  • ShitpostAnalyzer                 │
-│  • GPT-4 financial sentiment        │
+│  • Multi-LLM (GPT-4/Claude/Grok)   │
 │  • Structured predictions           │
 └───────────────┬─────────────────────┘
                 │
@@ -48,17 +49,26 @@ Shitpost Alpha monitors Donald Trump's Truth Social posts in real-time, analyzes
 │  • config/ - Environment management │
 │  • content/ - Bypass service        │
 │  • db/ - Database client & models   │
-│  • llm/ - OpenAI API wrapper        │
+│  • llm/ - Multi-provider LLM client │
 │  • logging/ - Service-specific logs │
-│  • market_data/ - Price tracking    │
+│  • market_data/ - Price tracking,   │
+│    outcome calc, health monitoring  │
 │  • s3/ - AWS S3 operations          │
 └───────────────┬─────────────────────┘
                 │
 ┌───────────────▼─────────────────────┐
 │  shitty_ui/ (Dashboard)             │
-│  • Dash + Plotly + Bootstrap        │
-│  • Performance metrics & charts     │
-│  • Asset deep dive & signal feed    │
+│  • 4-page Dash app (Dashboard,      │
+│    Signals, Trends, Assets)         │
+│  • Signal-over-trend charts         │
+│  • Telegram alert integration       │
+└───────────────┬─────────────────────┘
+                │
+┌───────────────▼─────────────────────┐
+│  notifications/ (Alerts)            │
+│  • Telegram bot & sender            │
+│  • Alert engine & dispatcher        │
+│  • Subscriber management            │
 └─────────────────────────────────────┘
 ```
 
@@ -70,11 +80,14 @@ Shitpost Alpha monitors Donald Trump's Truth Social posts in real-time, analyzes
 
 | Table | Purpose | Key Fields |
 |-------|---------|------------|
-| `truth_social_shitposts` | All posts (source of truth) | `shitpost_id` (unique), `content`, `text`, `timestamp`, `username`, `reblog` (JSON) |
-| `predictions` | LLM analysis results | `shitpost_id` (FK), `assets` (JSON), `market_impact` (JSON), `confidence` (float), `thesis`, `analysis_status` |
+| `truth_social_shitposts` | All posts (legacy, source of truth) | `shitpost_id` (unique), `content`, `text`, `timestamp`, `username`, `reblog` (JSON) |
+| `signals` | Source-agnostic content model | `signal_id` (unique), `source`, `author_username`, `published_at`, `platform_data` (JSON) |
+| `predictions` | LLM analysis results | `shitpost_id` (FK, nullable), `signal_id` (FK, nullable), `assets` (JSON), `market_impact` (JSON), `confidence`, `thesis`, `analysis_status` |
 | `market_prices` | Historical OHLCV price data | `symbol`, `date`, `close`, `volume` |
 | `prediction_outcomes` | Validated prediction accuracy | `prediction_id` (FK), `symbol`, `return_t7`, `correct_t7`, `pnl_t7` |
+| `ticker_registry` | Tracked ticker symbols | `symbol` (unique), `status`, `first_seen_date`, `source_prediction_id` (FK) |
 | `market_movements` | Market movements after predictions | `prediction_id` (FK), `asset`, `movement_24h`, `movement_72h` |
+| `telegram_subscriptions` | Telegram bot subscribers | `chat_id` (unique), `is_active`, `alert_preferences` (JSON) |
 
 **Important Indexes**:
 - Posts by ID: `truth_social_shitposts(shitpost_id)` unique
@@ -120,14 +133,23 @@ api_key = settings.OPENAI_API_KEY
 | `shitpost_alpha.py` | Main orchestrator (CLI entry point) |
 | `shit/db/database_client.py` | Database session management |
 | `shit/config/shitpost_settings.py` | Pydantic Settings configuration |
-| `shit/llm/llm_client.py` | OpenAI API wrapper with retries |
+| `shit/llm/llm_client.py` | Multi-provider LLM client (GPT-4/Claude/Grok) |
+| `shit/llm/provider_config.py` | Provider registry and model configurations |
 | `shit/s3/s3_client.py` | S3 upload/download operations |
 | `shit/content/bypass_service.py` | Unified bypass logic for post filtering |
-| `shit/market_data/client.py` | Market price data fetcher (yfinance) |
-| `shitvault/shitpost_models.py` | SQLAlchemy models (TruthSocialShitpost, Prediction) |
-| `shitposts/truth_social_s3_harvester.py` | API harvesting logic |
+| `shit/market_data/client.py` | Market price data fetcher (yfinance + Alpha Vantage) |
+| `shit/market_data/ticker_registry.py` | Reactive ticker lifecycle management |
+| `shit/market_data/health.py` | Market data health monitoring |
+| `shitvault/shitpost_models.py` | SQLAlchemy models (TruthSocialShitpost, Prediction, etc.) |
+| `shitvault/signal_models.py` | Source-agnostic Signal model |
+| `shitvault/signal_operations.py` | Signal CRUD operations |
+| `shitposts/base_harvester.py` | Abstract SignalHarvester base class |
+| `shitposts/harvester_registry.py` | Config-driven harvester management |
+| `shitposts/truth_social_s3_harvester.py` | Truth Social harvesting logic |
 | `shitpost_ai/shitpost_analyzer.py` | LLM analysis orchestrator |
 | `shitty_ui/app.py` | Dashboard entry point (Dash + Plotly) |
+| `notifications/alert_engine.py` | Alert check-and-dispatch loop |
+| `notifications/telegram_bot.py` | Telegram bot command handlers |
 
 ---
 
@@ -152,13 +174,13 @@ api_key = settings.OPENAI_API_KEY
 
 ## Current Status: Production on Railway
 
-- **Deployment**: Railway cron job (every 5 minutes)
+- **Deployment**: Railway cron jobs (orchestrator every 5 min, market data every 15 min, alerts every 2 min)
 - **Database**: Neon PostgreSQL (serverless, auto-scaling)
 - **Storage**: AWS S3 (organized by date)
-- **LLM**: OpenAI GPT-4 (financial analysis)
-- **Posts Processed**: ~28,000+ historical
-- **Analyzed Posts**: ~700+ with LLM
-- **Version**: v0.18.0 (Comprehensive Test Coverage)
+- **LLM**: Multi-provider (GPT-4, Claude, Grok/xAI) with comparison CLI
+- **Alerts**: Telegram bot with subscriber management
+- **Dashboard**: 4-page Dash app (Dashboard, Signals, Trends, Assets)
+- **Version**: v1.0.0
 
 ---
 
@@ -206,19 +228,19 @@ api_key = settings.OPENAI_API_KEY
 
 ## Current Development Focus
 
-**Recently completed**:
-- Market data module (`shit/market_data/`) with yfinance integration
-- Prediction outcome tracking and accuracy calculation at T+1/3/7/30
-- Dashboard redesign (`shitty_ui/`) with performance metrics focus
-- 973+ passing tests with comprehensive coverage
-
-**In progress**:
-- Full asset price backfill for all 187+ predicted assets
-- Dashboard loading states, time period filtering, mobile responsiveness
+**Completed (v1.0.0)**:
+- Multi-provider LLM support (GPT-4, Claude, Grok/xAI) with comparison CLI
+- Source-agnostic Signal model with dual-FK migration
+- Harvester abstraction layer with registry and skeleton Twitter template
+- Market data resilience (yfinance + Alpha Vantage fallback, health monitoring)
+- Reactive ticker lifecycle with auto-backfill on prediction creation
+- Telegram alert system deployed to production
+- Dashboard UI overhaul (11 phases: signals page, trends page, tabbed analytics, smart empty states, etc.)
+- 1400+ tests with comprehensive coverage
 
 **Planned**:
-- Real-time alerting system (Telegram bot)
-- Multi-source signal aggregation
+- Multi-source signal aggregation (Twitter/X, RSS)
+- Ensemble models with multiple LLMs
 - Monetization features
 
-See [CHANGELOG.md](../CHANGELOG.md) for full roadmap.
+See [CHANGELOG.md](../CHANGELOG.md) for version history.

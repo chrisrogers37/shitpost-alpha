@@ -5,10 +5,12 @@ This directory contains the database layer for the Shitpost-Alpha project, respo
 ## 📁 Contents
 
 ### Core Files
-- **`shitpost_models.py`** - Domain-specific SQLAlchemy models and schema definitions
-- **`shitpost_operations.py`** - Shitpost-specific database operations
-- **`prediction_operations.py`** - Prediction-specific database operations
-- **`s3_processor.py`** - S3 to database processing operations
+- **`shitpost_models.py`** - Domain-specific SQLAlchemy models (TruthSocialShitpost, Prediction, TelegramSubscription, etc.)
+- **`signal_models.py`** - Source-agnostic Signal model for multi-platform support
+- **`shitpost_operations.py`** - Shitpost-specific database operations (deprecated — use signal_operations for new code)
+- **`signal_operations.py`** - Signal CRUD operations (store_signal, get_unprocessed_signals)
+- **`prediction_operations.py`** - Prediction-specific database operations (supports both shitpost_id and signal_id FKs)
+- **`s3_processor.py`** - S3 to database processing with dual-write (shitposts + signals tables)
 - **`statistics.py`** - Statistics generation operations
 - **`cli.py`** - Command-line interface for database operations
 - **`__main__.py`** - CLI entry point (`python -m shitvault`)
@@ -21,11 +23,13 @@ The database layer follows a modular architecture with clear separation of conce
 ```
 shitvault/                           # Domain-specific operations
 ├── __main__.py                      # CLI entry point
-├── shitpost_operations.py           # Shitpost CRUD operations
-├── prediction_operations.py         # Prediction CRUD operations
-├── s3_processor.py                  # S3 → Database processing
+├── shitpost_models.py               # Domain-specific models (legacy + Prediction)
+├── signal_models.py                 # Source-agnostic Signal model
+├── shitpost_operations.py           # Shitpost CRUD (deprecated)
+├── signal_operations.py             # Signal CRUD operations
+├── prediction_operations.py         # Prediction CRUD (dual-FK support)
+├── s3_processor.py                  # S3 → Database processing (dual-write)
 ├── statistics.py                    # Statistics generation
-├── shitpost_models.py               # Domain-specific models
 └── cli.py                           # CLI interface
 
 shit/db/                             # Generic database infrastructure

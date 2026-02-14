@@ -184,6 +184,10 @@ CREATE TABLE prediction_outcomes (
     -- Status tracking
     is_complete BOOLEAN,       -- All timeframes have data?
     last_price_update DATE,
+    prediction_timeframe_days INTEGER, -- Predicted timeframe in days
+    market_volatility FLOAT,   -- Market volatility at prediction time
+    sector VARCHAR(50),        -- Sector classification
+    notes TEXT,                -- Additional notes
 
     created_at TIMESTAMP,
     updated_at TIMESTAMP

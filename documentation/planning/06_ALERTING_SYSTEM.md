@@ -1,6 +1,14 @@
-# Alerting System Specification [PARTIALLY COMPLETE]
+# Alerting System Specification [MOSTLY COMPLETE]
 
-> **STATUS: PARTIALLY COMPLETE** (as of 2026-02-10) — Browser alert panel (config + history + checking callbacks) is fully implemented in `callbacks/alerts.py`. Telegram bot is live (webhook mode, multi-tenant subscriptions) in `notifications/telegram_bot.py`. Email (SMTP) and SMS (Twilio) channels are coded but not configured in production. Remaining work is primarily ops/config (env vars, Twilio account, SMTP setup) rather than new code.
+> **STATUS: MOSTLY COMPLETE** (as of 2026-02-13)
+>
+> **✅ Telegram Bot** — Fully operational in production. Webhook mode, multi-tenant subscriptions, deployed on Railway (cron every 2 min). Files: `notifications/telegram_bot.py`, `notifications/telegram_sender.py`, `notifications/alert_engine.py`, `notifications/dispatcher.py`, `notifications/db.py`. Health check at `/telegram/health`.
+>
+> **✅ Browser Alerts** — Alert panel (config + history + checking callbacks) fully implemented in `callbacks/alerts.py` with localStorage preferences.
+>
+> **⏳ Email (SMTP)** — Code exists in `notifications/dispatcher.py` but not configured in production. Needs SMTP/SendGrid env vars.
+>
+> **⏳ SMS (Twilio)** — Code exists but not enabled. Needs Twilio account setup and env vars.
 
 ## Implementation Context for Engineering Team
 

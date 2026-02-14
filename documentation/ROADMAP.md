@@ -2,8 +2,8 @@
 
 **Project Vision**: Transform from portfolio demo to validated trading signal generator with potential revenue generation while minimizing costs and maximizing learning.
 
-**Last Updated**: 2026-02-10
-**Current Version**: v0.19.0+
+**Last Updated**: 2026-02-13
+**Current Version**: v1.0.0
 
 ---
 
@@ -21,17 +21,19 @@
 
 ### What's Working
 - ✅ Complete data pipeline (API → S3 → Database → LLM → Analysis)
-- ✅ Production deployment on Railway (5-minute cron)
-- ✅ ~28,000 historical posts harvested
-- ✅ ~700 posts analyzed with LLM
-- ✅ Interactive dashboard for visualization
-- ✅ 973 passing tests, comprehensive documentation
+- ✅ Production deployment on Railway (orchestrator every 5 min, market data every 15 min, alerts every 2 min)
+- ✅ ~28,000 historical posts harvested, ~700 analyzed with LLM
+- ✅ Multi-LLM support (GPT-4, Claude, Grok/xAI) with provider comparison
+- ✅ Market data tracking with prediction outcome validation (T+1/3/7/30)
+- ✅ 4-page interactive dashboard (Dashboard, Signals, Trends, Assets)
+- ✅ Telegram bot with real-time prediction alerts
+- ✅ Source-agnostic Signal model and harvester abstraction layer
+- ✅ Market data resilience (yfinance + Alpha Vantage fallback)
+- ✅ 1400+ passing tests, comprehensive documentation
 
 ### Critical Pain Points
-- ❌ **No validation** - Don't know if predictions actually work (TOP PRIORITY)
 - ❌ **No monetization** - Purely a cost center
-- ❌ **Single source** - Only Truth Social, limited signal coverage
-- ❌ **Manual monitoring** - No real-time alerts for actionable signals
+- ❌ **Single source** - Only Truth Social (architecture ready for expansion)
 - ⚠️ **Hosting costs** - ScrapeCreators API dependency (acceptable for now)
 
 ### Financial Reality Check
@@ -485,7 +487,7 @@ Numbers: Tabular nums for alignment
 
 ---
 
-### **Phase 1: Real-Time Alerting System** 📲 — 🔧 PARTIALLY COMPLETE
+### **Phase 1: Real-Time Alerting System** 📲 — ✅ COMPLETE
 **Priority**: HIGH
 **Timeline**: 1-2 weeks
 **Goal**: Make signals actionable for real trading
@@ -505,15 +507,15 @@ Numbers: Tabular nums for alignment
 - Email (SendGrid free tier for backup notifications)
 
 **Implementation:**
-- [ ] Install python-telegram-bot library
-- [ ] Create `shit/notifications/` module
-- [ ] Build Telegram bot with BotFather
-- [ ] Implement bot commands: /start, /subscribe, /unsubscribe, /settings
-- [ ] Add alert rules engine (confidence threshold, asset filters)
-- [ ] Implement rate limiting (max N alerts/hour per user)
-- [ ] Add subscription management (store chat_ids in database)
-- [ ] Create alert history/audit log
-- [ ] Support both private messages and channel posts
+- [x] Install python-telegram-bot library
+- [x] Create `notifications/` module (alert_engine, dispatcher, telegram_bot, telegram_sender, db)
+- [x] Build Telegram bot with BotFather
+- [x] Implement bot commands: /start, /stop, /status, /settings, /stats, /latest, /help
+- [x] Add alert rules engine (confidence threshold, asset filters, per-subscriber preferences)
+- [x] Implement rate limiting (consecutive error tracking, max alerts)
+- [x] Add subscription management (TelegramSubscription table with chat_ids)
+- [x] Create alert history/audit log
+- [x] Deploy to Railway (cron every 2 minutes, webhook endpoint, health check)
 
 **Alert Criteria:**
 ```python

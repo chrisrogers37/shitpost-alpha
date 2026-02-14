@@ -1,154 +1,118 @@
 # Shitpost Alpha - Prediction Performance Dashboard
 
-**Focus on what matters: How well are our predictions performing?**
+**Multi-page Dash application for visualizing prediction performance, market signals, and trading analytics.**
 
 ## Overview
 
-The redesigned Shitpost Alpha dashboard shifts focus from raw data display to actionable prediction performance insights. Instead of a table-first approach, the dashboard now leads with key metrics, performance charts, and the ability to drill down into similar historical predictions.
+The Shitpost Alpha dashboard is a 4-page single-page application built with Plotly Dash and Bootstrap. It provides real-time prediction performance monitoring, signal-over-trend market charts, and asset-level deep dives with a professional dark-themed trading platform design.
+
+## Pages
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/` | Dashboard | KPI cards, tabbed analytics (accuracy, confidence, asset performance), recent predictions & posts |
+| `/signals` | Signals | Filterable signal feed with sentiment-colored cards and confidence badges |
+| `/trends` | Trends | Candlestick price charts with prediction signal overlays and time range controls |
+| `/assets/<symbol>` | Asset Deep Dive | Per-asset prediction history with price chart and outcome tracking |
+
+## Directory Structure
+
+```
+shitty_ui/
+├── app.py              # Dash app entry point, Flask server & endpoints
+├── layout.py           # App factory, URL router & callback registration
+├── data.py             # Database query functions (2000+ lines)
+├── constants.py        # Colors, typography, spacing tokens, sentiment config
+├── alerts.py           # Alert preference defaults
+├── telegram_bot.py     # Telegram bot integration
+├── pages/              # Page layout modules
+│   ├── dashboard.py    # Main dashboard with tabbed analytics
+│   ├── signals.py      # Signal feed with filtering
+│   ├── trends.py       # Signal-over-trend candlestick charts
+│   └── assets.py       # Asset deep dive page
+├── components/         # Reusable UI components
+│   ├── cards.py        # Signal, prediction, metric & feed cards
+│   ├── charts.py       # Candlestick charts with prediction overlays
+│   ├── controls.py     # Period selector & filter controls
+│   └── header.py       # Navigation header with active link highlighting
+└── callbacks/          # Callback groups
+    └── alerts.py       # Alert configuration panel & checking
+```
 
 ## Key Features
 
-- **Performance Metrics** - Accuracy rate, total P&L, average return at a glance
-- **Accuracy by Confidence** - See how high-confidence vs low-confidence predictions perform
-- **Performance by Asset** - Which assets are we best at predicting?
-- **Recent Signals** - Latest predictions with their outcomes (correct/incorrect/pending)
-- **Asset Deep Dive** - Select any asset to see all historical predictions and their results
-- **Collapsible Data Table** - Full data still available, but not the primary focus
-- **Dark Theme** - Professional, clean design inspired by modern trading platforms
+- **Dashboard KPIs** - Accuracy rate, total P&L, average return, evaluated predictions count
+- **Tabbed Analytics** - Accuracy over time, accuracy by confidence, performance by asset (switchable views)
+- **Signal Feed** - Sentiment-colored cards (green=bullish, red=bearish, gray=neutral) with 3px left borders
+- **Signal-Over-Trend Charts** - Plotly candlestick charts with prediction markers scaled by confidence
+- **Asset Deep Dive** - Click any asset bar chart to navigate to `/assets/<ticker>` for full history
+- **Smart Empty States** - Compact 80px informative messages when data is missing
+- **Collapsible Sections** - Chevron icons with rotation animation for expand/collapse
+- **Telegram Alerts** - Alert configuration panel with subscriber management
+- **Auto-refresh** - 5-minute polling interval
+- **Dark Theme** - Professional design with consistent typography scale and spacing tokens
 
 ## Setup
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.13+
 - Access to the Shitpost Alpha PostgreSQL database
 - Market data and prediction outcomes populated
 
-### Installation
+### Running Locally
 
-1. **Install dependencies** (from project root):
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+# From project root
+source venv/bin/activate
+cd shitty_ui && python app.py
+# Open http://localhost:8050
+```
 
-2. **Ensure environment variables are set:**
-   The dashboard uses settings from `shit/config/shitpost_settings.py`.
-   Make sure `DATABASE_URL` is set in your `.env` file.
+### Deployment on Railway
 
-3. **Run the dashboard:**
-   ```bash
-   cd shitty_ui && python app.py
-   ```
+The dashboard runs as a Railway service. Environment variables required:
+- `DATABASE_URL` - Neon PostgreSQL connection string
 
-4. **Open your browser:**
-   Visit `http://localhost:8050`
+Live at: `https://shitpost-alpha-dash.up.railway.app`
 
-## Dashboard Components
+## Architecture
 
-### Performance Metrics Row
-- **Prediction Accuracy** - Overall accuracy rate (7-day outcomes)
-- **Total P&L** - Simulated profit/loss based on $1,000 positions
-- **Avg Return** - Average 7-day return across predictions
-- **Predictions Evaluated** - Count of predictions with outcome data
-
-### Accuracy by Confidence Chart
-Bar chart showing how accuracy varies by confidence level:
-- Low (<60%): Typically lower accuracy
-- Medium (60-75%): Moderate accuracy
-- High (>75%): Should have highest accuracy if model is well-calibrated
-
-### Performance by Asset Chart
-Bar chart showing accuracy for each asset ticker, helping identify:
-- Which assets we predict well
-- Which assets have poor track records
-
-### Recent Signals
-List of recent predictions with:
-- Tweet preview
-- Sentiment (bullish/bearish)
-- Confidence score
-- Outcome (Correct/Incorrect/Pending)
-- Actual return if available
-
-### Asset Deep Dive
-Select any asset from the dropdown to see:
-- Overall accuracy for that asset
-- Average return and total P&L
-- Timeline of all historical predictions with outcomes
-- The actual tweet text for context
-
-### Full Data Table (Collapsible)
-Click to expand the traditional data table with:
-- All predictions
-- Filtering by confidence and date
-- Sortable columns
-
-## Deployment on Railway
-
-The dashboard is designed for easy deployment on Railway:
-
-1. **Add as new service** in your Railway project
-2. **Point to shitty_ui directory**
-3. **Set environment variables:**
-   - `DATABASE_URL` - Your Neon PostgreSQL connection string
-4. **Deploy** - Railway will auto-detect Python and install dependencies
-
-The dashboard will be available at `https://<service-name>.up.railway.app`
-
-## Technical Details
-
-### Architecture
-- **Frontend**: Plotly Dash with Bootstrap components (dark theme)
+- **Frontend**: Plotly Dash with Dash Bootstrap Components (dark theme)
 - **Backend**: Synchronous SQLAlchemy with PostgreSQL
-- **Data Source**:
-  - `truth_social_shitposts` - Posts table
-  - `predictions` - LLM analysis results
-  - `prediction_outcomes` - Validated outcomes with returns
-- **Refresh Rate**: 5 minutes (auto-refresh)
+- **Server**: Flask (Dash's underlying server) with additional endpoints:
+  - `POST /telegram/webhook` - Telegram bot webhook
+  - `GET /telegram/health` - Telegram system health check
+- **Data Tables**: `truth_social_shitposts`, `predictions`, `prediction_outcomes`, `market_prices`, `signals`
 
-### Key Files
-- `app.py` - Main entry point and server configuration
-- `layout.py` - Dashboard layout, components, and callbacks
-- `data.py` - Database connection and query functions
+### Key Data Functions (`data.py`)
 
-### Database Queries
-The dashboard queries:
-- `get_performance_metrics()` - Overall accuracy and P&L
-- `get_accuracy_by_confidence()` - Breakdown by confidence level
-- `get_accuracy_by_asset()` - Breakdown by ticker
-- `get_recent_signals()` - Recent predictions with outcomes
-- `get_similar_predictions()` - Historical predictions for a specific asset
-- `get_predictions_with_outcomes()` - Full data for the table
+| Function | Used By | Description |
+|----------|---------|-------------|
+| `get_dashboard_kpis()` | Dashboard | Evaluated prediction metrics |
+| `get_performance_metrics()` | Dashboard | Accuracy and P&L summary |
+| `get_accuracy_by_confidence()` | Dashboard, Performance | Calibration by confidence level |
+| `get_accuracy_by_asset()` | Dashboard | Per-ticker accuracy |
+| `get_recent_signals()` | Dashboard, Signals | Latest predictions with outcomes |
+| `get_price_with_signals()` | Trends, Assets | OHLCV prices joined with prediction signals |
+| `get_similar_predictions()` | Assets | Historical predictions for a specific asset |
+
+### Component Patterns
+
+**Cards** (`components/cards.py`): All card types use sentiment-aware styling via `get_sentiment_style()` helper. Backgrounds and left-border accents are driven by `SENTIMENT_BG_COLORS` in `constants.py`.
+
+**Charts** (`components/charts.py`): `build_signal_over_trend_chart()` is shared between the Trends page and Asset page. Markers are color-coded by sentiment and sized by confidence (8-22px).
+
+**Constants** (`constants.py`): Centralized `COLORS`, `FONT_SIZES`, `FONT_WEIGHTS`, `SPACING`, `SENTIMENT_COLORS`, `MARKER_CONFIG`, and `TIMEFRAME_COLORS` dictionaries.
 
 ## Troubleshooting
 
-### Common Issues
+1. **No Performance Data** - Run market data backfill: `python -m shit.market_data auto-pipeline --days-back 30`
+2. **Charts Empty** - Verify `prediction_outcomes` has records with `correct_t7` populated
+3. **Database Connection** - Check `DATABASE_URL` in `.env`
 
-1. **Database Connection Error**
-   - Verify `DATABASE_URL` is set in `.env`
-   - Check database credentials and network access
+## Related Documentation
 
-2. **No Performance Data Showing**
-   - Ensure you have run the market data backfill:
-     ```bash
-     python shit/market_data/backfill_prices.py
-     python -m shit.market_data calculate-outcomes --days 365
-     ```
-   - The `prediction_outcomes` table must have data
-
-3. **Charts Empty**
-   - Verify `prediction_outcomes` table has records with `correct_t7` populated
-   - Check that market prices have been backfilled
-
-### Debug Mode
-Run with debug enabled for development:
-```bash
-cd shitty_ui && python app.py --debug
-```
-
-## Support
-
-For issues:
-- Check the main [README](../README.md)
-- Review the [ROADMAP](../documentation/ROADMAP.md) for planned features
-- Review the [Market Data Architecture](../documentation/MARKET_DATA_ARCHITECTURE.md) for data setup
+- [Market Data Architecture](../documentation/MARKET_DATA_ARCHITECTURE.md)
+- [Telegram Setup Guide](../documentation/TELEGRAM_SETUP_GUIDE.md)
+- [CHANGELOG](../CHANGELOG.md)

@@ -5,9 +5,10 @@ This directory contains the AI-powered analysis engine for the Shitpost-Alpha pr
 ## 📁 Contents
 
 ### Core Files
-- **`shitpost_analyzer.py`** - Business logic orchestrator
+- **`shitpost_analyzer.py`** - Business logic orchestrator (with reactive market data backfill)
+- **`compare_cli.py`** - Multi-provider comparison CLI (side-by-side GPT-4 vs Claude vs Grok analysis)
 - **`cli.py`** - Shared CLI utilities
-- **`__main__.py`** - CLI entry point
+- **`__main__.py`** - CLI entry point (`python -m shitpost_ai analyze` or `compare`)
 - **`README.md`** - This documentation file
 
 ## 🏗️ Architecture
@@ -17,11 +18,14 @@ The AI engine follows a clean separation of concerns:
 ```
 shitpost_ai/
 ├── shitpost_analyzer.py  # Business logic & orchestration
+├── compare_cli.py        # Multi-provider comparison CLI
 ├── cli.py               # Shared CLI utilities
 └── __main__.py          # CLI entry point
 
 shit/llm/                # Base LLM utilities (shared across project)
-├── llm_client.py        # Generic LLM API interaction
+├── llm_client.py        # Multi-provider LLM client (GPT-4/Claude/Grok)
+├── provider_config.py   # Provider registry & model configs
+├── compare_providers.py # ProviderComparator with agreement metrics
 └── prompts.py          # Modular prompt templates
 ```
 

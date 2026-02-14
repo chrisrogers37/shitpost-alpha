@@ -24,14 +24,16 @@
 ## Architecture (Modular Pipeline)
 
 ```
-Truth Social API → S3 Data Lake → PostgreSQL → GPT-4 Analysis → Database
+Truth Social API → S3 Data Lake → PostgreSQL → LLM Analysis → Database → Telegram Alerts
 ```
 
 **STRICT MODULARITY**: Each directory is a self-contained module
-- `shit/` - Core infrastructure (config, db, llm, s3, logging, utils)
-- `shitposts/` - Harvesting (API → S3)
-- `shitvault/` - Persistence (S3 → Database)
-- `shitpost_ai/` - Analysis (LLM processing)
+- `shit/` - Core infrastructure (config, db, llm, s3, logging, market_data, utils)
+- `shitposts/` - Harvesting (API → S3) with pluggable harvester registry
+- `shitvault/` - Persistence (S3 → Database) with source-agnostic Signal model
+- `shitpost_ai/` - Analysis (multi-LLM: GPT-4, Claude, Grok/xAI)
+- `shitty_ui/` - 4-page dashboard (Dashboard, Signals, Trends, Assets)
+- `notifications/` - Telegram alerts, subscriber management, alert engine
 
 ---
 
@@ -45,12 +47,13 @@ Truth Social API → S3 Data Lake → PostgreSQL → GPT-4 Analysis → Database
 | `shit/s3/` | S3 client & data lake |
 | `shit/logging/` | Centralized logging |
 | `shit/content/` | Content processing (bypass service) |
-| `shit/market_data/` | Market price data & outcome calculation |
-| `shitvault/` | Database operations & models |
-| `shitposts/` | Truth Social harvesting |
-| `shitpost_ai/` | LLM analysis engine |
-| `shitty_ui/` | Prediction performance dashboard |
-| `shit_tests/` | Comprehensive test suite (973+ tests) |
+| `shit/market_data/` | Market price data, outcome calculation, health monitoring |
+| `shitvault/` | Database operations, models (shitpost + signal) |
+| `shitposts/` | Harvesting with abstract base class & registry |
+| `shitpost_ai/` | Multi-LLM analysis engine & provider comparison |
+| `shitty_ui/` | 4-page dashboard (Dashboard, Signals, Trends, Assets) |
+| `notifications/` | Telegram alerts, subscriber management, alert engine |
+| `shit_tests/` | Comprehensive test suite (1400+ tests) |
 | `logs/` | Service-specific log files |
 
 ---
@@ -74,10 +77,13 @@ Truth Social API → S3 Data Lake → PostgreSQL → GPT-4 Analysis → Database
 
 | Table | Purpose |
 |-------|---------|
-| `truth_social_shitposts` | All posts with full API data |
-| `predictions` | LLM analysis results (assets, market_impact, confidence, thesis) |
-| `market_prices` | Historical OHLCV price data (yfinance) |
+| `truth_social_shitposts` | All posts with full API data (legacy) |
+| `signals` | Source-agnostic content model (platform-independent) |
+| `predictions` | LLM analysis results (dual-FK: shitpost_id + signal_id) |
+| `market_prices` | Historical OHLCV price data (yfinance + Alpha Vantage) |
 | `prediction_outcomes` | Validated prediction accuracy with returns |
+| `ticker_registry` | Tracked ticker symbols with lifecycle management |
+| `telegram_subscriptions` | Telegram bot subscribers and preferences |
 | `market_movements` | Market movements after predictions |
 
 **Key Indexes**:
@@ -92,7 +98,10 @@ Truth Social API → S3 Data Lake → PostgreSQL → GPT-4 Analysis → Database
 **Environment Variables** (.env):
 - `SCRAPECREATORS_API_KEY` - Truth Social API
 - `OPENAI_API_KEY` - OpenAI GPT-4
+- `ANTHROPIC_API_KEY` - Claude (optional)
+- `XAI_API_KEY` - Grok/xAI (optional)
 - `DATABASE_URL` - Neon PostgreSQL
+- `TELEGRAM_BOT_TOKEN` - Telegram alerts (optional)
 - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` - S3 credentials
 - `FILE_LOGGING=true` - Enable service-specific logs
 
@@ -111,14 +120,18 @@ from shit.config.shitpost_settings import settings
 | `shitpost_alpha.py` | Main orchestrator CLI |
 | `shit/db/database_client.py` | Database session management |
 | `shit/config/shitpost_settings.py` | Pydantic Settings configuration |
-| `shit/llm/llm_client.py` | OpenAI API wrapper |
+| `shit/llm/llm_client.py` | Multi-provider LLM client |
+| `shit/llm/provider_config.py` | Provider registry & model configs |
 | `shit/s3/s3_client.py` | S3 operations |
 | `shit/logging/__init__.py` | Logging utilities |
 | `shit/content/bypass_service.py` | Unified bypass logic |
 | `shitvault/shitpost_models.py` | SQLAlchemy models |
 | `shitposts/truth_social_s3_harvester.py` | Harvesting logic |
 | `shitpost_ai/shitpost_analyzer.py` | Analysis orchestrator |
-| `shitty_ui/layout.py` | Dashboard components & callbacks |
+| `shitvault/signal_models.py` | Source-agnostic Signal model |
+| `shitposts/base_harvester.py` | Abstract harvester base class |
+| `shitty_ui/layout.py` | Dashboard router & callback registration |
+| `notifications/alert_engine.py` | Alert check-and-dispatch loop |
 
 ---
 

@@ -21,8 +21,8 @@ The `shit/` directory serves as the **supporting infrastructure layer** of the S
 
 - **Configuration management** - Environment variables and settings
 - **Content analysis** - Bypass filtering to skip unanalyzable posts
-- **Database infrastructure** - Generic database client, models, and operations
-- **LLM integration** - Client and prompt management for AI analysis
+- **Database infrastructure** - Generic database client, models, signal utilities, and operations
+- **LLM integration** - Multi-provider client (GPT-4, Claude, Grok/xAI), provider comparison
 - **Logging system** - Centralized, beautiful logging with file support
 - **Market data** - Stock price fetching, prediction outcome calculation
 - **S3 storage** - Cloud storage client and data lake management
@@ -46,7 +46,9 @@ shit/
 │   ├── database_utils.py    # Database utilities
 │   └── sync_session.py      # Synchronous session for CLI/dashboard
 ├── llm/                     # LLM integration
-│   ├── llm_client.py        # LLM client for OpenAI/Anthropic
+│   ├── llm_client.py        # Multi-provider LLM client (GPT-4/Claude/Grok)
+│   ├── provider_config.py   # Provider registry & model configurations
+│   ├── compare_providers.py # Side-by-side provider comparison
 │   └── prompts.py           # Prompt engineering
 ├── logging/                 # Centralized logging system
 │   ├── cli_logging.py       # CLI logging setup
@@ -55,11 +57,16 @@ shit/
 │   ├── progress_tracker.py  # Progress tracking utilities
 │   └── service_loggers.py   # Service-specific loggers
 ├── market_data/             # Market price & outcome tracking
-│   ├── auto_backfill_service.py # Automatic price backfill
+│   ├── auto_backfill_service.py # Reactive price backfill on prediction
 │   ├── backfill_prices.py   # Manual price backfill script
-│   ├── cli.py               # Market data CLI
-│   ├── client.py            # Market data API client
-│   ├── models.py            # MarketPrice & PredictionOutcome models
+│   ├── cli.py               # Market data CLI (health-check, ticker-registry, etc.)
+│   ├── client.py            # Market data client with provider chain + retry
+│   ├── models.py            # MarketPrice, PredictionOutcome, TickerRegistry models
+│   ├── price_provider.py    # Abstract PriceProvider interface & ProviderChain
+│   ├── yfinance_provider.py # yfinance price provider implementation
+│   ├── alphavantage_provider.py # Alpha Vantage fallback provider
+│   ├── ticker_registry.py   # Reactive ticker lifecycle management
+│   ├── health.py            # Data freshness & provider health monitoring
 │   └── outcome_calculator.py # Prediction outcome calculation
 ├── s3/                      # S3 cloud storage
 │   ├── s3_client.py         # S3 client wrapper

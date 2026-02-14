@@ -176,6 +176,75 @@ python shitpost_alpha.py --help
 
 ---
 
+### 5. Market Data - `python -m shit.market_data`
+
+Manages market price data, prediction outcomes, ticker registry, and health monitoring.
+
+**Key Subcommands:**
+```bash
+# Fetch prices for a specific symbol
+python -m shit.market_data fetch-prices --symbol AAPL --days 30
+
+# Update prices for all tracked symbols
+python -m shit.market_data update-all-prices --days 7
+
+# Calculate prediction outcomes
+python -m shit.market_data calculate-outcomes --days 365
+
+# Show accuracy report
+python -m shit.market_data accuracy-report -t t7
+
+# Show price statistics
+python -m shit.market_data price-stats
+
+# Run full auto pipeline (fetch + calculate)
+python -m shit.market_data auto-pipeline --days-back 7
+
+# Auto-backfill prices for predictions missing data
+python -m shit.market_data auto-backfill --days 7
+
+# Backfill all missing prices
+python -m shit.market_data backfill-all-missing
+
+# Check provider health and data freshness
+python -m shit.market_data health-check
+python -m shit.market_data health-check --json
+python -m shit.market_data health-check --alert  # Send Telegram alert if unhealthy
+
+# View ticker registry
+python -m shit.market_data ticker-registry
+python -m shit.market_data ticker-registry --status active
+
+# Manually register tickers
+python -m shit.market_data register-tickers AAPL TSLA GOOGL
+```
+
+---
+
+### 6. Notifications - `python -m notifications`
+
+Manages Telegram alerts, subscriber management, and alert dispatch.
+
+**Key Subcommands:**
+```bash
+# Check for new predictions and send alerts
+python -m notifications check-alerts
+
+# Set Telegram webhook URL
+python -m notifications set-webhook
+
+# Send a test alert to a specific chat
+python -m notifications test-alert --chat-id 123456789
+
+# List all active subscribers
+python -m notifications list-subscribers
+
+# Show subscription statistics
+python -m notifications stats
+```
+
+---
+
 ## Notes
 
 - All CLIs support `--verbose` for detailed debug logging

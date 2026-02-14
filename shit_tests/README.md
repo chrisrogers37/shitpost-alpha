@@ -1,7 +1,7 @@
 # 🧪 Shitpost Alpha Test Suite
 
-**Status**: ✅ **973 passing tests** - Complete test coverage for all critical functionality  
-**Application**: 354 tests | **Infrastructure**: 619 tests
+**Status**: ✅ **1400+ tests** - Comprehensive coverage for all modules
+**Includes**: Core infrastructure, harvesting, analysis, database, dashboard, notifications, market data, integration
 
 ---
 
@@ -27,24 +27,26 @@ python -m pytest shit_tests/test_setup_verification.py -v
 
 ## 📊 Test Coverage
 
-### Main Application Modules (354 tests) ✅
-- **shitposts**: 79 tests - Truth Social S3 harvesting
-- **shitpost_ai**: 102 tests - AI analysis and processing
-- **shitvault**: 153 tests - Database operations, S3 processing, statistics
-- **test_shitpost_alpha.py**: 20 tests - Main orchestrator pipeline
+### Main Application Modules ✅
+- **shitposts/**: Harvesting (base harvester, registry, Truth Social, Twitter skeleton)
+- **shitpost_ai/**: AI analysis, provider comparison
+- **shitvault/**: Database operations, S3 processing, signal models, statistics
+- **shitty_ui/**: Dashboard pages, cards, charts, alerts, trends
+- **notifications/**: Telegram bot, alert engine, dispatcher, sender
+- **test_shitpost_alpha.py**: Main orchestrator pipeline
 
-### Infrastructure Layer (619 tests) ✅
-- **Database (shit/db)**: 101 tests - Config, client, operations, utils, models
-- **S3 (shit/s3)**: 109 tests - Client, data lake, models, config
-- **LLM (shit/llm)**: 82 tests - Client, prompts
-- **Logging (shit/logging)**: 162 tests - CLI logging, service loggers, formatters
-- **Config (shit/config)**: 46 tests - Settings, configuration
-- **Utils (shit/utils)**: 62 tests - Error handling
+### Infrastructure Layer ✅
+- **shit/db/**: Config, client, operations, utils, models, signal_utils
+- **shit/s3/**: Client, data lake, models, config
+- **shit/llm/**: Multi-provider client, provider config, comparison
+- **shit/logging/**: CLI logging, service loggers, formatters
+- **shit/config/**: Settings, configuration
+- **shit/market_data/**: Client, providers, health, ticker registry, outcome calculator
+- **shit/utils/**: Error handling
 
-### Integration & Performance (32 tests) ✅
-- **Integration**: 16 tests - End-to-end pipeline workflows
-- **Performance**: 8 tests - Database performance benchmarks
-- **Setup Verification**: 8 tests - Test environment validation
+### Integration & Performance ✅
+- **Integration**: End-to-end pipeline workflows
+- **Performance**: Database performance benchmarks
 
 ---
 
