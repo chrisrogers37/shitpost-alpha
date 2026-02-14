@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Event-driven ETL architecture** - PostgreSQL-backed event queue for decoupling pipeline services
+  - New `shit/events/` package with Event model, producer, worker base class, cleanup, and CLI
+  - Event types: `posts_harvested`, `signals_stored`, `prediction_created`, `prices_backfilled`
+  - Write-time fan-out: `prediction_created` delivers to both `market_data` and `notifications` consumers
+  - Claim-based processing with `SELECT ... FOR UPDATE SKIP LOCKED` to prevent double-processing
+  - Exponential backoff retry (30s * 2^attempt, max 1hr) with dead-letter handling after max attempts
+  - Event emission integrated into harvester, S3 processor, analyzer, and market data services (dual-write, non-blocking)
+  - 4 event consumer workers: `shitvault.event_consumer`, `shitpost_ai.event_consumer`, `shit.market_data.event_consumer`, `notifications.event_consumer`
+  - CLI tools: `python -m shit.events queue-stats|list|retry-dead-letter|cleanup`
+  - Railway deployment config for all workers as `*/2` cron jobs with `--once` drain mode
+  - 41 new tests covering models, producer, worker, cleanup, and integration
+
 ### Changed
 - **Dashboard information architecture redesign** - Streamlined the main dashboard layout for faster scanning and reduced information overload
   - Consolidated three separate chart sections (Accuracy Over Time, Accuracy by Confidence, Performance by Asset) into a single tabbed "Analytics" card with three switchable views

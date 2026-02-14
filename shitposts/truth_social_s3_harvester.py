@@ -213,6 +213,7 @@ async def main():
         print("Starting harvest process...")
         logger.info("Starting harvest process")
         harvested_count = 0
+        collected_s3_keys: list[str] = []
 
         async for result in harvester.harvest_shitposts(dry_run=args.dry_run):
             if args.dry_run:
@@ -222,6 +223,7 @@ async def main():
                 print(f"Stored: {result['shitpost_id']} - {result['content_preview']}")
                 print(f"   S3 Key: {result['s3_key']}")
                 logger.info(f"Stored post: {result['shitpost_id']} to S3 key: {result['s3_key']}")
+                collected_s3_keys.append(result['s3_key'])
 
             harvested_count += 1
 
@@ -245,6 +247,25 @@ async def main():
             stats = await harvester.get_s3_stats()
             print_s3_stats(stats)
             logger.info(f"S3 storage stats: {stats}")
+
+        # Emit event for downstream consumers
+        if collected_s3_keys and not args.dry_run:
+            try:
+                from shit.events.producer import emit_event
+                from shit.events.event_types import EventType
+
+                emit_event(
+                    event_type=EventType.POSTS_HARVESTED,
+                    payload={
+                        "s3_keys": collected_s3_keys,
+                        "source": harvester.get_source_name(),
+                        "count": len(collected_s3_keys),
+                        "mode": args.mode,
+                    },
+                    source_service="harvester",
+                )
+            except Exception as e:
+                logger.warning(f"Failed to emit posts_harvested event: {e}")
 
     except KeyboardInterrupt:
         print_harvest_interrupted()

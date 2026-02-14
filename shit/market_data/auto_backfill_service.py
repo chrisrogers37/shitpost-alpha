@@ -234,6 +234,25 @@ class AutoBackfillService:
                         extra={"prediction_id": prediction_id, "error": str(e)}
                     )
 
+            # Emit event (terminal — no downstream consumers, but useful for audit)
+            if assets_backfilled > 0 or outcomes_calculated > 0:
+                try:
+                    from shit.events.producer import emit_event
+                    from shit.events.event_types import EventType
+
+                    emit_event(
+                        event_type=EventType.PRICES_BACKFILLED,
+                        payload={
+                            "symbols": list(prediction.assets),
+                            "prediction_id": prediction_id,
+                            "assets_backfilled": assets_backfilled,
+                            "outcomes_calculated": outcomes_calculated,
+                        },
+                        source_service="market_data",
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Failed to emit prices_backfilled event: {e}")
+
             return (assets_backfilled, outcomes_calculated)
 
     def process_new_predictions(

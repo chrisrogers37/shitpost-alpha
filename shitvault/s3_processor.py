@@ -89,7 +89,8 @@ class S3Processor:
                 'total_processed': 0,
                 'successful': 0,
                 'failed': 0,
-                'skipped': 0
+                'skipped': 0,
+                'signal_ids': [],
             }
             
             # Process S3 data (use filtered keys if in incremental mode)
@@ -123,8 +124,27 @@ class S3Processor:
                 logger.info(f"  Failed: {stats['failed']}")
                 logger.info(f"  Skipped: {stats['skipped']}")
             
+            # Emit event for downstream consumers
+            signal_ids = stats.pop('signal_ids', [])
+            if signal_ids and not dry_run:
+                try:
+                    from shit.events.producer import emit_event
+                    from shit.events.event_types import EventType
+
+                    emit_event(
+                        event_type=EventType.SIGNALS_STORED,
+                        payload={
+                            "signal_ids": signal_ids,
+                            "source": self.source,
+                            "count": len(signal_ids),
+                        },
+                        source_service="s3_processor",
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to emit signals_stored event: {e}")
+
             return stats
-            
+
         except Exception as e:
             logger.error(f"Error in S3 to Database processing: {e}")
             raise
@@ -200,6 +220,10 @@ class S3Processor:
 
                 if result:
                     stats['successful'] += 1
+                    # Collect signal_id for event emission
+                    signal_id = signal_data.get("signal_id")
+                    if signal_id and 'signal_ids' in stats:
+                        stats['signal_ids'].append(signal_id)
                 else:
                     stats['skipped'] += 1  # Already exists
 

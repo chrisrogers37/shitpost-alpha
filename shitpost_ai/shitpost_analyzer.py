@@ -391,8 +391,30 @@ class ShitpostAnalyzer:
                 if analysis_id:
                     logger.debug(f"Stored analysis for shitpost {shitpost_id}")
 
-                    # Reactively trigger market data backfill for new tickers
+                    # Emit event for downstream consumers
                     assets = enhanced_analysis.get("assets", [])
+                    confidence = enhanced_analysis.get("confidence", 0.0)
+                    analysis_status = enhanced_analysis.get("analysis_status", "completed")
+                    try:
+                        from shit.events.producer import emit_event
+                        from shit.events.event_types import EventType
+
+                        emit_event(
+                            event_type=EventType.PREDICTION_CREATED,
+                            payload={
+                                "prediction_id": int(analysis_id),
+                                "shitpost_id": shitpost_id,
+                                "signal_id": None,
+                                "assets": assets,
+                                "confidence": confidence,
+                                "analysis_status": analysis_status,
+                            },
+                            source_service="analyzer",
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to emit prediction_created event: {e}")
+
+                    # Reactively trigger market data backfill for new tickers
                     if assets:
                         try:
                             pred_id = int(analysis_id)
