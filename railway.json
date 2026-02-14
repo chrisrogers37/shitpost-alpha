@@ -34,6 +34,31 @@
       "source": ".",
       "startCommand": "python -m notifications check-alerts",
       "cronSchedule": "*/2 * * * *"
+    },
+    "s3-processor-worker": {
+      "source": ".",
+      "startCommand": "python -m shitvault.event_consumer --once",
+      "cronSchedule": "*/2 * * * *"
+    },
+    "analyzer-worker": {
+      "source": ".",
+      "startCommand": "python -m shitpost_ai.event_consumer --once",
+      "cronSchedule": "*/2 * * * *"
+    },
+    "market-data-worker": {
+      "source": ".",
+      "startCommand": "python -m shit.market_data.event_consumer --once",
+      "cronSchedule": "*/2 * * * *"
+    },
+    "notifications-worker": {
+      "source": ".",
+      "startCommand": "python -m notifications.event_consumer --once",
+      "cronSchedule": "*/2 * * * *"
+    },
+    "event-cleanup": {
+      "source": ".",
+      "startCommand": "python -m shit.events cleanup",
+      "cronSchedule": "0 3 * * *"
     }
   }
 }

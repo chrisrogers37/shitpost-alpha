@@ -79,5 +79,6 @@ def create_tables():
     )
     from shit.market_data.models import MarketPrice, PredictionOutcome, TickerRegistry
     from shitvault.signal_models import Signal
+    from shit.events.models import Event  # noqa: F401
 
     Base.metadata.create_all(engine)
