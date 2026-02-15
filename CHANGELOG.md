@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Monolith → Microservices cutover** - Replaced `shitpost-alpha` orchestrator with standalone `harvester` cron service
+  - New `harvester` service runs `python -m shitposts --mode incremental` every 5 minutes
+  - Event pipeline handles all downstream processing (S3 load → analysis → market data → notifications)
+  - Old monolith (`shitpost_alpha.py --mode incremental`) disabled (sleeping, not deleted)
+
+### Fixed
+- **Analyzer session error** - `ShitpostAnalyzer.initialize()` now correctly creates an `AsyncSession` and wraps it in `DatabaseOperations` before passing to `ShitpostOperations`/`PredictionOperations`, fixing `'DatabaseClient' object has no attribute 'session'` in the analyzer event worker
+
 ## [v1.1.0] - 2026-02-15
 
 ### Added
