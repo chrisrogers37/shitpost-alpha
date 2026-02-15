@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.0] - 2026-02-15
+
 ### Added
 - **Event-driven ETL architecture** - PostgreSQL-backed event queue for decoupling pipeline services
   - New `shit/events/` package with Event model, producer, worker base class, cleanup, and CLI
@@ -17,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Event emission integrated into harvester, S3 processor, analyzer, and market data services (dual-write, non-blocking)
   - 4 event consumer workers: `shitvault.event_consumer`, `shitpost_ai.event_consumer`, `shit.market_data.event_consumer`, `notifications.event_consumer`
   - CLI tools: `python -m shit.events queue-stats|list|retry-dead-letter|cleanup`
-  - Railway deployment config for all workers as `*/2` cron jobs with `--once` drain mode
+  - Railway deployment: 5 new services (`s3-processor-worker`, `analyzer-worker`, `market-data-worker`, `notifications-worker`, `event-cleanup`) as `*/5` cron jobs with `--once` drain mode
+  - Production `events` table created in Neon PostgreSQL with 7 indexes (claimable, type_status, completed_at, etc.)
   - 41 new tests covering models, producer, worker, cleanup, and integration
 
 ### Changed
