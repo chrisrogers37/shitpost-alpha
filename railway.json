@@ -17,23 +17,10 @@
     "restartPolicyMaxRetries": 10
   },
   "services": {
-    "shitpost-alpha": {
+    "harvester": {
       "source": ".",
-      "startCommand": "python shitpost_alpha.py --mode incremental"
-    },
-    "shitpost-alpha-dash": {
-      "source": ".",
-      "startCommand": "cd shitty_ui && python app.py"
-    },
-    "market-data": {
-      "source": ".",
-      "startCommand": "python -m shit.market_data auto-pipeline --days-back 7",
-      "cronSchedule": "*/15 * * * *"
-    },
-    "notifications": {
-      "source": ".",
-      "startCommand": "python -m notifications check-alerts",
-      "cronSchedule": "*/2 * * * *"
+      "startCommand": "python -m shitposts --mode incremental",
+      "cronSchedule": "*/5 * * * *"
     },
     "s3-processor-worker": {
       "source": ".",
@@ -59,6 +46,10 @@
       "source": ".",
       "startCommand": "python -m shit.events cleanup",
       "cronSchedule": "0 3 * * *"
+    },
+    "shitpost-alpha-dash": {
+      "source": ".",
+      "startCommand": "cd shitty_ui && python app.py"
     }
   }
 }
