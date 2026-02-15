@@ -126,13 +126,16 @@ class TestShitpostAnalyzer:
         analyzer.shitpost_ops = None
         analyzer.prediction_ops = None
 
+        mock_session = MagicMock()
         with patch.object(analyzer.db_client, 'initialize', new_callable=AsyncMock) as mock_db_init, \
+             patch.object(analyzer.db_client, 'get_session', return_value=mock_session), \
              patch.object(analyzer.llm_client, 'initialize', new_callable=AsyncMock) as mock_llm_init:
 
             await analyzer.initialize()
 
             mock_db_init.assert_called_once()
             mock_llm_init.assert_called_once()
+            assert analyzer.session is mock_session
             assert analyzer.db_ops is not None
             assert analyzer.shitpost_ops is not None
             assert analyzer.prediction_ops is not None
@@ -140,9 +143,11 @@ class TestShitpostAnalyzer:
     @pytest.mark.asyncio
     async def test_cleanup(self, analyzer):
         """Test analyzer cleanup."""
+        analyzer.session = AsyncMock()
         with patch.object(analyzer.db_client, 'cleanup', new_callable=AsyncMock) as mock_cleanup:
             await analyzer.cleanup()
-            
+
+            analyzer.session.close.assert_called_once()
             mock_cleanup.assert_called_once()
 
     @pytest.mark.asyncio

@@ -37,6 +37,7 @@ class ShitpostAnalyzer:
         # Initialize database components
         self.db_config = DatabaseConfig(database_url=settings.DATABASE_URL)
         self.db_client = DatabaseClient(self.db_config)
+        self.session = None  # Will be initialized in initialize()
         self.db_ops = None  # Will be initialized in initialize()
         self.shitpost_ops = None  # Will be initialized in initialize()
         self.prediction_ops = None  # Will be initialized in initialize()
@@ -70,13 +71,14 @@ class ShitpostAnalyzer:
         logger.info("═══════════════════════════════════════════════════════════")
         logger.info("Initializing Shitpost Analyzer...")
 
-        # Initialize database client
+        # Initialize database client and create a session
         await self.db_client.initialize()
+        self.session = self.db_client.get_session()
 
-        # Initialize operation classes with the database client
-        self.db_ops = DatabaseOperations(self.db_client)
-        self.shitpost_ops = ShitpostOperations(self.db_client)
-        self.prediction_ops = PredictionOperations(self.db_client)
+        # Initialize operation classes with DatabaseOperations wrapping the session
+        self.db_ops = DatabaseOperations(self.session)
+        self.shitpost_ops = ShitpostOperations(self.db_ops)
+        self.prediction_ops = PredictionOperations(self.db_ops)
 
         # Initialize LLM client
         await self.llm_client.initialize()
@@ -551,6 +553,8 @@ class ShitpostAnalyzer:
 
     async def cleanup(self):
         """Cleanup analyzer resources."""
+        if hasattr(self, 'session') and self.session:
+            await self.session.close()
         if self.db_client:
             await self.db_client.cleanup()
         logger.info("Shitpost Analyzer cleanup completed")
