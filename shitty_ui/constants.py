@@ -87,3 +87,69 @@ SECTION_ACCENT = {
     "color": COLORS["accent"],
     "radius": "2px",
 }
+
+# ============================================================
+# Chart configuration — shared base for all Plotly figures
+# ============================================================
+
+# Base layout applied to every chart via apply_chart_layout()
+CHART_LAYOUT = {
+    "plot_bgcolor": "rgba(0,0,0,0)",
+    "paper_bgcolor": "rgba(0,0,0,0)",
+    "font": {
+        "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        "color": "#f1f5f9",  # COLORS["text"]
+        "size": 12,
+    },
+    "margin": {"l": 48, "r": 16, "t": 24, "b": 40},
+    "xaxis": {
+        "gridcolor": "rgba(51, 65, 85, 0.5)",  # COLORS["border"] at 50%
+        "gridwidth": 1,
+        "zeroline": False,
+        "showline": False,
+    },
+    "yaxis": {
+        "gridcolor": "rgba(51, 65, 85, 0.5)",
+        "gridwidth": 1,
+        "zeroline": False,
+        "showline": False,
+    },
+    "hoverlabel": {
+        "bgcolor": "#1e293b",  # COLORS["secondary"]
+        "bordercolor": "#334155",  # COLORS["border"]
+        "font": {
+            "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+            "color": "#f1f5f9",
+            "size": 13,
+        },
+    },
+    "showlegend": False,
+}
+
+# Standardized dcc.Graph config dict — suppresses modebar & Plotly logo
+CHART_CONFIG = {
+    "displayModeBar": False,
+    "displaylogo": False,
+    "scrollZoom": False,
+}
+
+# Extended candlestick-specific colors (override Plotly defaults)
+CHART_COLORS = {
+    "candle_up": "#10b981",       # Emerald 500 — matches COLORS["success"]
+    "candle_down": "#ef4444",     # Red 500 — matches COLORS["danger"]
+    "candle_up_fill": "#10b981",  # Solid fill for up candles
+    "candle_down_fill": "#ef4444",
+    "volume_up": "rgba(16, 185, 129, 0.3)",   # Emerald at 30%
+    "volume_down": "rgba(239, 68, 68, 0.3)",  # Red at 30%
+    "line_accent": "#3b82f6",     # Blue 500 — COLORS["accent"]
+    "line_accent_fill": "rgba(59, 130, 246, 0.08)",  # Subtler area fill
+    "bar_palette": [              # Ordered palette for multi-bar charts
+        "#3b82f6",  # Blue 500
+        "#10b981",  # Emerald 500
+        "#f59e0b",  # Amber 500
+        "#ef4444",  # Red 500
+        "#8b5cf6",  # Violet 500
+        "#ec4899",  # Pink 500
+    ],
+    "reference_line": "rgba(148, 163, 184, 0.3)",  # Slate 400 at 30%
+}

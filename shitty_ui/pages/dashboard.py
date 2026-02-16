@@ -8,7 +8,7 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import pandas as pd
 
-from constants import COLORS
+from constants import COLORS, CHART_COLORS, CHART_CONFIG
 from components.cards import (
     create_error_card,
     create_empty_chart,
@@ -18,6 +18,7 @@ from components.cards import (
     create_signal_card,
     create_post_card,
 )
+from components.charts import apply_chart_layout
 from components.controls import create_filter_controls, get_period_button_styles
 from components.header import create_header, create_footer
 from data import (
@@ -135,9 +136,7 @@ def create_dashboard_page() -> html.Div:
                                                     color=COLORS["accent"],
                                                     children=dcc.Graph(
                                                         id="accuracy-over-time-chart",
-                                                        config={
-                                                            "displayModeBar": False
-                                                        },
+                                                        config=CHART_CONFIG,
                                                     ),
                                                 ),
                                                 label="Accuracy Over Time",
@@ -149,9 +148,7 @@ def create_dashboard_page() -> html.Div:
                                                     color=COLORS["accent"],
                                                     children=dcc.Graph(
                                                         id="confidence-accuracy-chart",
-                                                        config={
-                                                            "displayModeBar": False
-                                                        },
+                                                        config=CHART_CONFIG,
                                                     ),
                                                 ),
                                                 label="By Confidence",
@@ -163,9 +160,7 @@ def create_dashboard_page() -> html.Div:
                                                     color=COLORS["accent"],
                                                     children=dcc.Graph(
                                                         id="asset-accuracy-chart",
-                                                        config={
-                                                            "displayModeBar": False
-                                                        },
+                                                        config=CHART_CONFIG,
                                                         style={"cursor": "pointer"},
                                                     ),
                                                 ),
@@ -370,9 +365,7 @@ def create_performance_page() -> html.Div:
                                                         color=COLORS["accent"],
                                                         children=dcc.Graph(
                                                             id="perf-confidence-chart",
-                                                            config={
-                                                                "displayModeBar": False
-                                                            },
+                                                            config=CHART_CONFIG,
                                                         ),
                                                     )
                                                 ]
@@ -400,9 +393,7 @@ def create_performance_page() -> html.Div:
                                                         color=COLORS["accent"],
                                                         children=dcc.Graph(
                                                             id="perf-sentiment-chart",
-                                                            config={
-                                                                "displayModeBar": False
-                                                            },
+                                                            config=CHART_CONFIG,
                                                         ),
                                                     )
                                                 ]
@@ -725,23 +716,31 @@ def register_dashboard_callbacks(app: Dash):
                         y=acc_df["accuracy"],
                         mode="lines+markers",
                         name="Weekly Accuracy",
-                        line=dict(color=COLORS["accent"], width=2),
-                        marker=dict(size=6, color=COLORS["accent"]),
+                        line=dict(
+                            color=CHART_COLORS["line_accent"],
+                            width=2.5,
+                            shape="spline",
+                        ),
+                        marker=dict(
+                            size=7,
+                            color=CHART_COLORS["line_accent"],
+                            line=dict(width=1.5, color=COLORS["bg"]),
+                        ),
                         fill="tozeroy",
-                        fillcolor="rgba(59, 130, 246, 0.1)",
+                        fillcolor=CHART_COLORS["line_accent_fill"],
                         hovertemplate=(
-                            "<b>%{x|%b %d, %Y}</b><br>"
-                            "Accuracy: %{y:.1f}%<br>"
+                            "<b>Week of %{x|%b %d, %Y}</b><br>"
+                            "Accuracy: <b>%{y:.1f}%</b><br>"
                             "<extra></extra>"
                         ),
                     )
                 )
-                # Add 50% reference line
+                # 50% reference line
                 acc_fig.add_hline(
                     y=50,
-                    line_dash="dash",
-                    line_color=COLORS["text_muted"],
-                    opacity=0.3,
+                    line_dash="dot",
+                    line_color=CHART_COLORS["reference_line"],
+                    line_width=1,
                     annotation_text="50% baseline",
                     annotation_position="bottom right",
                     annotation_font_color=COLORS["text_muted"],
@@ -758,19 +757,10 @@ def register_dashboard_callbacks(app: Dash):
                         x=0.5,
                         y=1.05,
                     )
-                acc_fig.update_layout(
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    font_color=COLORS["text"],
-                    margin=dict(l=40, r=40, t=20 if not acc_chart_note else 35, b=40),
-                    yaxis=dict(
-                        range=[0, 105],
-                        title="Accuracy %",
-                        gridcolor=COLORS["border"],
-                    ),
-                    xaxis=dict(gridcolor=COLORS["border"]),
+                apply_chart_layout(
+                    acc_fig,
                     height=280,
-                    showlegend=False,
+                    yaxis={"range": [0, 105], "title": "Accuracy %"},
                 )
             else:
                 acc_fig = create_empty_state_chart(
@@ -793,25 +783,33 @@ def register_dashboard_callbacks(app: Dash):
                         y=conf_df["accuracy"],
                         text=conf_df["accuracy"].apply(lambda x: f"{x:.1f}%"),
                         textposition="outside",
-                        marker_color=[
-                            COLORS["danger"],
-                            COLORS["warning"],
-                            COLORS["success"],
-                        ],
-                        hovertemplate="<b>%{x}</b><br>Accuracy: %{y:.1f}%<br>Total: %{customdata}<extra></extra>",
+                        textfont=dict(
+                            color=COLORS["text"],
+                            size=12,
+                        ),
+                        marker=dict(
+                            color=[
+                                COLORS["danger"],
+                                COLORS["warning"],
+                                COLORS["success"],
+                            ],
+                            line=dict(width=0),
+                        ),
+                        hovertemplate=(
+                            "<b>%{x}</b><br>"
+                            "Accuracy: <b>%{y:.1f}%</b><br>"
+                            "Predictions: <b>%{customdata}</b>"
+                            "<extra></extra>"
+                        ),
                         customdata=conf_df["total"],
                     )
                 )
-                conf_fig.update_layout(
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    font_color=COLORS["text"],
-                    margin=dict(l=40, r=40, t=20, b=40),
-                    yaxis=dict(
-                        range=[0, 100], title="Accuracy %", gridcolor=COLORS["border"]
-                    ),
-                    xaxis=dict(title=""),
+                apply_chart_layout(
+                    conf_fig,
                     height=250,
+                    yaxis={"range": [0, 100], "title": "Accuracy %"},
+                    xaxis={"title": ""},
+                    bargap=0.35,
                 )
             else:
                 conf_fig = create_empty_state_chart(
@@ -838,24 +836,34 @@ def register_dashboard_callbacks(app: Dash):
                         y=asset_df["accuracy"],
                         text=asset_df["accuracy"].apply(lambda x: f"{x:.0f}%"),
                         textposition="outside",
-                        marker_color=colors,
-                        hovertemplate="<b>%{x}</b><br>Accuracy: %{y:.1f}%<br>Predictions: %{customdata[0]}<br>Total P&L: $%{customdata[1]:,.0f}<br><i>Click to drill down</i><extra></extra>",
+                        textfont=dict(
+                            color=COLORS["text"],
+                            size=12,
+                        ),
+                        marker=dict(
+                            color=colors,
+                            line=dict(width=0),
+                        ),
+                        hovertemplate=(
+                            "<b>%{x}</b><br>"
+                            "Accuracy: <b>%{y:.1f}%</b><br>"
+                            "Predictions: <b>%{customdata[0]}</b><br>"
+                            "Total P&L: <b>$%{customdata[1]:,.0f}</b><br>"
+                            "<i>Click to drill down</i>"
+                            "<extra></extra>"
+                        ),
                         customdata=list(
                             zip(asset_df["total_predictions"], asset_df["total_pnl"])
                         ),
                     )
                 )
-                asset_fig.update_layout(
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    font_color=COLORS["text"],
-                    margin=dict(l=40, r=40, t=20, b=40),
-                    yaxis=dict(
-                        range=[0, 100], title="Accuracy %", gridcolor=COLORS["border"]
-                    ),
-                    xaxis=dict(title=""),
+                apply_chart_layout(
+                    asset_fig,
                     height=250,
-                    hovermode="x unified",
+                    yaxis={"range": [0, 100], "title": "Accuracy %"},
+                    xaxis={"title": ""},
+                    hovermode="closest",
+                    bargap=0.3,
                 )
             else:
                 asset_fig = create_empty_state_chart(
@@ -1251,29 +1259,30 @@ def register_dashboard_callbacks(app: Dash):
                         y=conf_df["accuracy"],
                         text=conf_df["accuracy"].apply(lambda x: f"{x:.1f}%"),
                         textposition="outside",
-                        marker_color=colors[: len(conf_df)],
+                        textfont=dict(
+                            color=COLORS["text"],
+                            size=12,
+                        ),
+                        marker=dict(
+                            color=colors[: len(conf_df)],
+                            line=dict(width=0),
+                        ),
                         hovertemplate=(
                             "<b>%{x}</b><br>"
-                            "Accuracy: %{y:.1f}%<br>"
-                            "Total: %{customdata[0]}<br>"
-                            "Correct: %{customdata[1]}<br>"
+                            "Accuracy: <b>%{y:.1f}%</b><br>"
+                            "Predictions: <b>%{customdata[0]}</b><br>"
+                            "Correct: <b>%{customdata[1]}</b>"
                             "<extra></extra>"
                         ),
                         customdata=list(zip(conf_df["total"], conf_df["correct"])),
                     )
                 )
-                conf_fig.update_layout(
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    font_color=COLORS["text"],
-                    margin=dict(l=40, r=40, t=20, b=40),
-                    yaxis=dict(
-                        range=[0, 100],
-                        title="Accuracy %",
-                        gridcolor=COLORS["border"],
-                    ),
-                    xaxis=dict(title=""),
+                apply_chart_layout(
+                    conf_fig,
                     height=300,
+                    yaxis={"range": [0, 100], "title": "Accuracy %"},
+                    xaxis={"title": ""},
+                    bargap=0.35,
                 )
             else:
                 conf_fig = create_empty_state_chart(
@@ -1303,39 +1312,38 @@ def register_dashboard_callbacks(app: Dash):
                         labels=sent_df["sentiment"].str.capitalize(),
                         values=sent_df["total"],
                         hole=0.55,
-                        marker=dict(colors=colors_list),
+                        marker=dict(
+                            colors=colors_list,
+                            line=dict(color=COLORS["bg"], width=2),
+                        ),
                         textinfo="label+percent",
-                        textfont=dict(color=COLORS["text"]),
+                        textfont=dict(color=COLORS["text"], size=12),
                         hovertemplate=(
                             "<b>%{label}</b><br>"
-                            "Count: %{value}<br>"
-                            "Share: %{percent}<br>"
-                            "Accuracy: %{customdata:.1f}%<br>"
+                            "Count: <b>%{value}</b><br>"
+                            "Share: <b>%{percent}</b><br>"
+                            "Accuracy: <b>%{customdata:.1f}%</b>"
                             "<extra></extra>"
                         ),
                         customdata=sent_df["accuracy"],
                     )
                 )
                 # Center annotation
-                total_acc = 0.0
                 total_count = sent_df["total"].sum()
                 total_correct = sent_df["correct"].sum()
-                if total_count > 0:
-                    total_acc = round(total_correct / total_count * 100, 1)
+                total_acc = round(total_correct / total_count * 100, 1) if total_count > 0 else 0.0
                 sent_fig.add_annotation(
-                    text=f"<b>{total_acc:.0f}%</b><br>Overall",
+                    text=f"<b>{total_acc:.0f}%</b><br><span style='font-size:11px'>Overall</span>",
                     showarrow=False,
-                    font=dict(size=16, color=COLORS["text"]),
+                    font=dict(size=18, color=COLORS["text"]),
                 )
-                sent_fig.update_layout(
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    font_color=COLORS["text"],
-                    margin=dict(l=20, r=20, t=20, b=20),
+                apply_chart_layout(
+                    sent_fig,
                     height=300,
-                    showlegend=True,
+                    show_legend=True,
+                    margin={"l": 20, "r": 20, "t": 20, "b": 20},
                     legend=dict(
-                        font=dict(color=COLORS["text"]),
+                        font=dict(color=COLORS["text"], size=12),
                         orientation="h",
                         y=-0.1,
                     ),

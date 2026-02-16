@@ -5,7 +5,7 @@ import traceback
 from dash import Dash, html, dcc, Input, Output, callback_context, no_update
 import dash_bootstrap_components as dbc
 
-from constants import COLORS
+from constants import COLORS, CHART_CONFIG
 from components.cards import create_error_card
 from components.charts import build_signal_over_trend_chart, build_empty_signal_chart
 from data import get_price_with_signals, get_active_assets_from_db, get_top_predicted_asset
@@ -124,7 +124,7 @@ def create_trends_page() -> html.Div:
                             color=COLORS["accent"],
                             children=dcc.Graph(
                                 id="trends-signal-chart",
-                                config={"displayModeBar": "hover", "displaylogo": False},
+                                config=CHART_CONFIG,
                             ),
                         ),
                     ),

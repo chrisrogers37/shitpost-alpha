@@ -178,8 +178,8 @@ class TestPopulateTrendsAssets:
 class TestTrendsModebarConfig:
     """Tests for Plotly modebar configuration."""
 
-    def test_modebar_set_to_hover(self):
-        """Test that the chart config uses displayModeBar='hover'."""
+    def test_modebar_hidden(self):
+        """Test that the chart config uses CHART_CONFIG (modebar hidden)."""
         page = create_trends_page()
         html_str = str(page)
-        assert "'displayModeBar': 'hover'" in html_str or '"displayModeBar": "hover"' in html_str
+        assert "'displayModeBar': False" in html_str or '"displayModeBar": false' in html_str

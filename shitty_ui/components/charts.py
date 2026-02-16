@@ -5,7 +5,51 @@ from datetime import timedelta
 import pandas as pd
 import plotly.graph_objects as go
 
-from constants import COLORS, SENTIMENT_COLORS, MARKER_CONFIG, TIMEFRAME_COLORS
+from constants import (
+    COLORS,
+    SENTIMENT_COLORS,
+    MARKER_CONFIG,
+    TIMEFRAME_COLORS,
+    CHART_LAYOUT,
+    CHART_COLORS,
+)
+
+
+def apply_chart_layout(
+    fig: go.Figure,
+    height: int = 300,
+    show_legend: bool = False,
+    **overrides,
+) -> go.Figure:
+    """Apply the shared chart layout to a Plotly figure.
+
+    Merges CHART_LAYOUT base with caller-specific overrides.
+    Always call this LAST, after adding traces, so it can override
+    any trace-level defaults that Plotly might have set on the layout.
+
+    Args:
+        fig: The Plotly figure to style.
+        height: Chart height in pixels.
+        show_legend: Whether to show the legend.
+        **overrides: Additional layout keys to override (e.g.,
+            yaxis=dict(title="Accuracy %", range=[0, 105])).
+
+    Returns:
+        The same figure, mutated in place (also returned for chaining).
+    """
+    layout = {**CHART_LAYOUT}
+    layout["height"] = height
+    layout["showlegend"] = show_legend
+
+    for axis_key in ("xaxis", "yaxis"):
+        if axis_key in overrides:
+            base_axis = {**layout.get(axis_key, {})}
+            base_axis.update(overrides.pop(axis_key))
+            layout[axis_key] = base_axis
+
+    layout.update(overrides)
+    fig.update_layout(**layout)
+    return fig
 
 
 def build_signal_over_trend_chart(
@@ -42,8 +86,10 @@ def build_signal_over_trend_chart(
                 low=prices_df["low"],
                 close=prices_df["close"],
                 name=symbol or "Price",
-                increasing_line_color=COLORS["success"],
-                decreasing_line_color=COLORS["danger"],
+                increasing_line_color=CHART_COLORS["candle_up"],
+                decreasing_line_color=CHART_COLORS["candle_down"],
+                increasing_fillcolor=CHART_COLORS["candle_up_fill"],
+                decreasing_fillcolor=CHART_COLORS["candle_down_fill"],
                 showlegend=False,
             )
         )
@@ -132,22 +178,14 @@ def build_signal_over_trend_chart(
                 _add_timeframe_window(fig, pred_date)
 
     # --- Layout ---
-    fig.update_layout(
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        font_color=COLORS["text"],
-        margin=dict(l=50, r=20, t=30, b=40),
-        xaxis=dict(
-            gridcolor=COLORS["border"],
-            rangeslider=dict(visible=False),
-        ),
-        yaxis=dict(
-            gridcolor=COLORS["border"],
-            title="Price ($)",
-        ),
+    apply_chart_layout(
+        fig,
         height=chart_height,
-        showlegend=False,
+        show_legend=False,
         hovermode="closest",
+        margin={"l": 50, "r": 20, "t": 30, "b": 40},
+        xaxis={"rangeslider": {"visible": False}},
+        yaxis={"title": "Price ($)"},
     )
 
     # Add a custom legend for sentiment markers
@@ -207,12 +245,10 @@ def build_empty_signal_chart(message: str = "No data available") -> go.Figure:
         showarrow=False,
         font=dict(color=COLORS["text_muted"], size=14),
     )
-    fig.update_layout(
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        font_color=COLORS["text_muted"],
+    apply_chart_layout(
+        fig,
         height=400,
-        xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
-        yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+        xaxis={"showgrid": False, "showticklabels": False, "zeroline": False},
+        yaxis={"showgrid": False, "showticklabels": False, "zeroline": False},
     )
     return fig
