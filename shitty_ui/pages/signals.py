@@ -196,6 +196,10 @@ def create_signal_feed_page() -> html.Div:
                                                         "value": "all",
                                                     },
                                                     {
+                                                        "label": "Evaluated (has outcome)",
+                                                        "value": "evaluated",
+                                                    },
+                                                    {
                                                         "label": "Correct",
                                                         "value": "correct",
                                                     },
