@@ -2762,3 +2762,187 @@ class TestGetTopPredictedAsset:
 
         result = get_top_predicted_asset()
         assert result is None
+
+
+class TestGetDashboardKpisWithFallback:
+    """Tests for get_dashboard_kpis_with_fallback function."""
+
+    @patch("data.get_dashboard_kpis")
+    def test_returns_period_data_when_available(self, mock_kpis):
+        """When period has evaluated signals, return without fallback."""
+        from data import get_dashboard_kpis_with_fallback
+
+        mock_kpis.return_value = {
+            "total_signals": 10,
+            "accuracy_pct": 60.0,
+            "avg_return_t7": 1.5,
+            "total_pnl": 500.0,
+        }
+        result = get_dashboard_kpis_with_fallback(days=7)
+        assert result["total_signals"] == 10
+        assert result["is_fallback"] is False
+        assert result["fallback_label"] == ""
+        mock_kpis.assert_called_once_with(days=7)
+
+    @patch("data.get_dashboard_kpis")
+    def test_falls_back_to_alltime_when_period_empty(self, mock_kpis):
+        """When period returns zero signals, fall back to all-time."""
+        from data import get_dashboard_kpis_with_fallback
+
+        mock_kpis.side_effect = [
+            {"total_signals": 0, "accuracy_pct": 0.0, "avg_return_t7": 0.0, "total_pnl": 0.0},
+            {"total_signals": 80, "accuracy_pct": 55.0, "avg_return_t7": 1.2, "total_pnl": 1000.0},
+        ]
+        result = get_dashboard_kpis_with_fallback(days=7)
+        assert result["total_signals"] == 80
+        assert result["is_fallback"] is True
+        assert result["fallback_label"] == "All-time"
+        assert mock_kpis.call_count == 2
+        mock_kpis.assert_any_call(days=7)
+        mock_kpis.assert_any_call(days=None)
+
+    @patch("data.get_dashboard_kpis")
+    def test_no_fallback_when_days_is_none(self, mock_kpis):
+        """When days=None (already all-time), never fall back."""
+        from data import get_dashboard_kpis_with_fallback
+
+        mock_kpis.return_value = {
+            "total_signals": 0,
+            "accuracy_pct": 0.0,
+            "avg_return_t7": 0.0,
+            "total_pnl": 0.0,
+        }
+        result = get_dashboard_kpis_with_fallback(days=None)
+        assert result["is_fallback"] is False
+        mock_kpis.assert_called_once_with(days=None)
+
+    @patch("data.get_dashboard_kpis")
+    def test_preserves_all_original_keys(self, mock_kpis):
+        """Fallback result contains all original keys plus is_fallback and fallback_label."""
+        from data import get_dashboard_kpis_with_fallback
+
+        mock_kpis.return_value = {
+            "total_signals": 5,
+            "accuracy_pct": 70.0,
+            "avg_return_t7": 2.0,
+            "total_pnl": 300.0,
+        }
+        result = get_dashboard_kpis_with_fallback(days=30)
+        assert "total_signals" in result
+        assert "accuracy_pct" in result
+        assert "avg_return_t7" in result
+        assert "total_pnl" in result
+        assert "is_fallback" in result
+        assert "fallback_label" in result
+
+
+class TestGetActiveSignalsWithFallback:
+    """Tests for get_active_signals_with_fallback progressive fallback."""
+
+    @patch("data.get_active_signals")
+    def test_returns_72h_when_available(self, mock_signals):
+        """Strategy 1: returns 72h high confidence signals when available."""
+        from data import get_active_signals_with_fallback
+
+        mock_signals.return_value = pd.DataFrame({"confidence": [0.85]})
+        df, label = get_active_signals_with_fallback()
+        assert len(df) == 1
+        assert "72h" in label
+        mock_signals.assert_called_once_with(min_confidence=0.75, hours=72)
+
+    @patch("data.get_active_signals")
+    def test_falls_back_to_7d(self, mock_signals):
+        """Strategy 2: falls back to 7 days when 72h is empty."""
+        from data import get_active_signals_with_fallback
+
+        mock_signals.side_effect = [
+            pd.DataFrame(),  # 72h empty
+            pd.DataFrame({"confidence": [0.80]}),  # 7d has data
+        ]
+        df, label = get_active_signals_with_fallback()
+        assert len(df) == 1
+        assert "week" in label
+        assert mock_signals.call_count == 2
+
+    @patch("data.get_active_signals")
+    def test_falls_back_to_30d(self, mock_signals):
+        """Strategy 3: falls back to 30 days when 7d is empty."""
+        from data import get_active_signals_with_fallback
+
+        mock_signals.side_effect = [
+            pd.DataFrame(),  # 72h empty
+            pd.DataFrame(),  # 7d empty
+            pd.DataFrame({"confidence": [0.76]}),  # 30d has data
+        ]
+        df, label = get_active_signals_with_fallback()
+        assert len(df) == 1
+        assert "month" in label
+        assert mock_signals.call_count == 3
+
+    @patch("data.get_active_signals")
+    def test_falls_back_to_lower_confidence(self, mock_signals):
+        """Strategy 4: falls back to medium confidence when high confidence is empty."""
+        from data import get_active_signals_with_fallback
+
+        mock_signals.side_effect = [
+            pd.DataFrame(),  # 72h high conf
+            pd.DataFrame(),  # 7d high conf
+            pd.DataFrame(),  # 30d high conf
+            pd.DataFrame({"confidence": [0.65]}),  # 30d medium conf
+        ]
+        df, label = get_active_signals_with_fallback()
+        assert len(df) == 1
+        assert "60%" in label
+        assert mock_signals.call_count == 4
+
+    @patch("data.get_active_signals")
+    def test_returns_empty_when_all_strategies_fail(self, mock_signals):
+        """Returns empty DataFrame when all 4 strategies find nothing."""
+        from data import get_active_signals_with_fallback
+
+        mock_signals.return_value = pd.DataFrame()
+        df, label = get_active_signals_with_fallback()
+        assert df.empty
+        assert label == ""
+        assert mock_signals.call_count == 4
+
+
+class TestSignalFeedEvaluatedSort:
+    """Tests for evaluated-first sort order and evaluated filter in signal feed."""
+
+    @patch("data.execute_query")
+    def test_sort_order_has_evaluated_first(self, mock_execute):
+        """Signal feed sorts evaluated outcomes before pending ones."""
+        from data import get_signal_feed
+
+        mock_execute.return_value = ([], [])
+        get_signal_feed()
+
+        call_args = mock_execute.call_args[0]
+        query_str = str(call_args[0])
+        assert "CASE WHEN po.correct_t7 IS NOT NULL THEN 0 ELSE 1 END" in query_str
+
+    @patch("data.execute_query")
+    def test_evaluated_filter_in_signal_feed(self, mock_execute):
+        """Outcome filter 'evaluated' adds IS NOT NULL clause."""
+        from data import get_signal_feed
+
+        mock_execute.return_value = ([], [])
+        get_signal_feed(outcome_filter="evaluated")
+
+        call_args = mock_execute.call_args[0]
+        query_str = str(call_args[0])
+        assert "correct_t7 IS NOT NULL" in query_str
+
+    @patch("data.execute_query")
+    def test_evaluated_filter_in_signal_feed_count(self, mock_execute):
+        """Outcome filter 'evaluated' adds IS NOT NULL clause in count function."""
+        from data import get_signal_feed_count
+
+        mock_execute.return_value = ([(5,)], ["total"])
+        result = get_signal_feed_count(outcome_filter="evaluated")
+
+        call_args = mock_execute.call_args[0]
+        query_str = str(call_args[0])
+        assert "correct_t7 IS NOT NULL" in query_str
+        assert result == 5
