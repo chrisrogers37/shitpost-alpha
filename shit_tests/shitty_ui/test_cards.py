@@ -17,6 +17,7 @@ from components.cards import (
     create_prediction_timeline_card,
     create_feed_signal_card,
     get_sentiment_style,
+    _build_expandable_thesis,
 )
 from constants import SENTIMENT_COLORS, SENTIMENT_BG_COLORS
 
@@ -425,3 +426,195 @@ class TestSentimentBadgeBackground:
         card = create_signal_card(_make_row(market_impact={"AAPL": "neutral"}))
         badge = self._find_sentiment_badge(card)
         assert badge is not None, "Neutral sentiment badge should also have backgroundColor"
+
+
+def _find_component_by_pattern_id(component, type_str, index):
+    """Recursively find a component whose id matches {"type": type_str, "index": index}."""
+    comp_id = getattr(component, "id", None)
+    if (
+        isinstance(comp_id, dict)
+        and comp_id.get("type") == type_str
+        and comp_id.get("index") == index
+    ):
+        return component
+
+    children = getattr(component, "children", None)
+    if children is None:
+        return None
+    if isinstance(children, (list, tuple)):
+        for child in children:
+            if child is not None and not isinstance(child, str):
+                result = _find_component_by_pattern_id(child, type_str, index)
+                if result:
+                    return result
+    elif not isinstance(children, str):
+        result = _find_component_by_pattern_id(children, type_str, index)
+        if result:
+            return result
+    return None
+
+
+class TestExpandableThesis:
+    """Tests for expandable thesis rendering in signal feed cards."""
+
+    def test_short_thesis_no_toggle(self):
+        """Short thesis (<= 120 chars) should render as plain text, no toggle."""
+        short_thesis = "Tariffs will boost domestic steel production."
+        card = create_feed_signal_card(
+            _make_row(thesis=short_thesis), card_index=0
+        )
+        text = _extract_text(card)
+        assert short_thesis in text
+        assert "Show full thesis" not in text
+
+    def test_long_thesis_shows_truncated_preview(self):
+        """Long thesis (> 120 chars) should show truncated preview by default."""
+        long_thesis = "A" * 200
+        card = create_feed_signal_card(
+            _make_row(thesis=long_thesis), card_index=1
+        )
+        text = _extract_text(card)
+        assert "A" * 120 + "..." in text
+        assert "Show full thesis" in text
+
+    def test_long_thesis_contains_full_text_hidden(self):
+        """Long thesis should have the full text in a hidden element."""
+        long_thesis = "B" * 300
+        card = create_feed_signal_card(
+            _make_row(thesis=long_thesis), card_index=2
+        )
+        full_el = _find_component_by_pattern_id(card, "thesis-full", 2)
+        assert full_el is not None
+        assert full_el.style.get("display") == "none"
+        assert full_el.children == long_thesis
+
+    def test_toggle_has_pattern_matching_id(self):
+        """Toggle div should have pattern-matching ID with correct index."""
+        card = create_feed_signal_card(
+            _make_row(thesis="X" * 200), card_index=42
+        )
+        toggle = _find_component_by_pattern_id(card, "thesis-toggle", 42)
+        assert toggle is not None
+        assert toggle.id == {"type": "thesis-toggle", "index": 42}
+        assert toggle.n_clicks == 0
+
+    def test_empty_thesis_no_expand_section(self):
+        """Empty thesis should not render any thesis section."""
+        card = create_feed_signal_card(
+            _make_row(thesis=""), card_index=0
+        )
+        text = _extract_text(card)
+        assert "Show full thesis" not in text
+
+    def test_none_thesis_no_expand_section(self):
+        """None thesis should not render any thesis section."""
+        card = create_feed_signal_card(
+            _make_row(thesis=None), card_index=0
+        )
+        text = _extract_text(card)
+        assert "Show full thesis" not in text
+
+    def test_thesis_exactly_at_boundary_no_toggle(self):
+        """Thesis exactly 120 chars should NOT show toggle."""
+        thesis_120 = "C" * 120
+        card = create_feed_signal_card(
+            _make_row(thesis=thesis_120), card_index=0
+        )
+        text = _extract_text(card)
+        assert "Show full thesis" not in text
+        assert thesis_120 in text
+
+    def test_thesis_one_over_boundary_shows_toggle(self):
+        """Thesis at 121 chars should show toggle."""
+        thesis_121 = "D" * 121
+        card = create_feed_signal_card(
+            _make_row(thesis=thesis_121), card_index=0
+        )
+        text = _extract_text(card)
+        assert "Show full thesis" in text
+
+    def test_card_index_default_zero(self):
+        """Card should render without explicit card_index (defaults to 0)."""
+        card = create_feed_signal_card(
+            _make_row(thesis="E" * 200)
+        )
+        toggle = _find_component_by_pattern_id(card, "thesis-toggle", 0)
+        assert toggle is not None
+
+    def test_backward_compatible_without_card_index(self):
+        """Existing callers that don't pass card_index should still work."""
+        card = create_feed_signal_card(_make_row(thesis="Short"))
+        assert card is not None
+
+
+class TestExpandableThesisPostCard:
+    """Tests for expandable thesis in create_post_card()."""
+
+    def test_post_card_short_thesis_no_toggle(self):
+        """Post card with short thesis (<=200 chars) shows full text, no toggle."""
+        card = create_post_card(
+            _make_row(thesis="Short thesis text"), card_index=0
+        )
+        text = _extract_text(card)
+        assert "Short thesis text" in text
+        assert "Show full thesis" not in text
+
+    def test_post_card_long_thesis_shows_toggle(self):
+        """Post card with long thesis (>200 chars) shows truncated preview + toggle."""
+        long_thesis = "F" * 300
+        card = create_post_card(
+            _make_row(thesis=long_thesis), card_index=0
+        )
+        text = _extract_text(card)
+        assert "F" * 200 + "..." in text
+        assert "Show full thesis" in text
+
+    def test_post_card_uses_post_thesis_prefix(self):
+        """Post card toggle should use 'post-thesis' prefix for ID types."""
+        card = create_post_card(
+            _make_row(thesis="G" * 250), card_index=5
+        )
+        toggle = _find_component_by_pattern_id(card, "post-thesis-toggle", 5)
+        assert toggle is not None
+
+    def test_post_card_backward_compatible(self):
+        """create_post_card() without card_index should still work."""
+        card = create_post_card(_make_row(thesis="G" * 250))
+        assert card is not None
+
+
+class TestBuildExpandableThesisHelper:
+    """Tests for the _build_expandable_thesis() helper function."""
+
+    def test_short_text_returns_plain_p(self):
+        """Text under threshold returns a plain html.P."""
+        from dash import html
+
+        result = _build_expandable_thesis("Short", card_index=0, truncate_len=120)
+        assert isinstance(result, html.P)
+        assert result.children == "Short"
+
+    def test_long_text_returns_div_with_three_children(self):
+        """Text over threshold returns html.Div with preview, full, toggle."""
+        from dash import html
+
+        result = _build_expandable_thesis("H" * 200, card_index=5, truncate_len=120)
+        assert isinstance(result, html.Div)
+        assert len(result.children) == 3
+
+    def test_custom_truncate_len(self):
+        """Custom truncate_len is respected."""
+        result = _build_expandable_thesis("I" * 60, card_index=0, truncate_len=50)
+        from dash import html
+
+        assert isinstance(result, html.Div)
+        preview = result.children[0]
+        assert preview.children == "I" * 50 + "..."
+
+    def test_custom_id_prefix(self):
+        """Custom id_prefix changes the component ID types."""
+        result = _build_expandable_thesis(
+            "J" * 200, card_index=3, id_prefix="post-thesis"
+        )
+        toggle = result.children[2]
+        assert toggle.id == {"type": "post-thesis-toggle", "index": 3}

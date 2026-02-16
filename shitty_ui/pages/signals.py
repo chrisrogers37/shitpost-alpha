@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from dash import Dash, html, dcc, Input, Output, State
+from dash import Dash, html, dcc, Input, Output, State, MATCH
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
@@ -373,7 +373,10 @@ def register_signal_callbacks(app: Dash):
                 )
                 return [empty_card], "No signals found", 0, None, {"display": "none"}
 
-            cards = [create_feed_signal_card(row) for _, row in df.iterrows()]
+            cards = [
+                create_feed_signal_card(row, card_index=idx)
+                for idx, (_, row) in enumerate(df.iterrows())
+            ]
             count_label = f"Showing {len(df)} of {total_count} signals"
 
             newest_ts = df["timestamp"].iloc[0]
@@ -493,7 +496,10 @@ def register_signal_callbacks(app: Dash):
                     {"display": "none"},
                 )
 
-            new_cards = [create_feed_signal_card(row) for _, row in df.iterrows()]
+            new_cards = [
+                create_feed_signal_card(row, card_index=current_offset + idx)
+                for idx, (_, row) in enumerate(df.iterrows())
+            ]
             updated_cards = (existing_cards or []) + new_cards
 
             new_offset = current_offset + len(df)
@@ -626,3 +632,42 @@ def register_signal_callbacks(app: Dash):
             return [{"label": a, "value": a} for a in assets]
         except Exception:
             return []
+
+    # 3.7 Thesis Expand/Collapse — clientside callback for zero-latency toggling
+    app.clientside_callback(
+        """
+        function(n_clicks) {
+            if (!n_clicks || n_clicks === 0) {
+                return [
+                    {"display": "block"},
+                    {"display": "none"},
+                    "Show full thesis",
+                    {"fontSize": "0.65rem", "transition": "transform 0.2s ease", "transform": "rotate(0deg)"}
+                ];
+            }
+            var isExpanded = (n_clicks % 2) === 1;
+            if (isExpanded) {
+                return [
+                    {"display": "none"},
+                    {"display": "block"},
+                    "Hide thesis",
+                    {"fontSize": "0.65rem", "transition": "transform 0.2s ease", "transform": "rotate(180deg)"}
+                ];
+            } else {
+                return [
+                    {"display": "block"},
+                    {"display": "none"},
+                    "Show full thesis",
+                    {"fontSize": "0.65rem", "transition": "transform 0.2s ease", "transform": "rotate(0deg)"}
+                ];
+            }
+        }
+        """,
+        [
+            Output({"type": "thesis-preview", "index": MATCH}, "style"),
+            Output({"type": "thesis-full", "index": MATCH}, "style"),
+            Output({"type": "thesis-toggle-text", "index": MATCH}, "children"),
+            Output({"type": "thesis-chevron", "index": MATCH}, "style"),
+        ],
+        [Input({"type": "thesis-toggle", "index": MATCH}, "n_clicks")],
+    )

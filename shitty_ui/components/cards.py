@@ -546,7 +546,7 @@ def create_signal_card(row):
     )
 
 
-def create_post_card(row):
+def create_post_card(row, card_index: int = 0):
     """Create a card for a post in the Latest Posts feed."""
     timestamp = row.get("timestamp")
     post_text = row.get("text", "")
@@ -617,14 +617,11 @@ def create_post_card(row):
                     ],
                     className="mb-1",
                 ),
-                html.P(
-                    thesis[:200] + "..." if thesis and len(thesis) > 200 else thesis,
-                    style={
-                        "fontSize": "0.8rem",
-                        "color": COLORS["text_muted"],
-                        "fontStyle": "italic",
-                        "margin": 0,
-                    },
+                _build_expandable_thesis(
+                    thesis,
+                    card_index=card_index,
+                    truncate_len=200,
+                    id_prefix="post-thesis",
                 )
                 if thesis
                 else None,
@@ -1214,7 +1211,87 @@ def _safe_get(row, key, default=None):
     return value
 
 
-def create_feed_signal_card(row) -> html.Div:
+def _build_expandable_thesis(
+    thesis: str,
+    card_index: int,
+    truncate_len: int = 120,
+    id_prefix: str = "thesis",
+) -> html.Div:
+    """Build an expandable thesis container with toggle.
+
+    If the thesis is shorter than truncate_len, returns a simple paragraph.
+    If longer, returns a collapsible container with preview/full text and
+    a clickable toggle that works with a MATCH clientside callback.
+
+    Args:
+        thesis: Full thesis text.
+        card_index: Unique index for pattern-matching callback IDs.
+        truncate_len: Character count before truncation kicks in.
+        id_prefix: Prefix for component IDs to avoid collisions between
+                   different card types using the same callback.
+
+    Returns:
+        html.Div or html.P containing the thesis display.
+    """
+    thesis_style_base = {
+        "fontSize": "0.8rem",
+        "color": COLORS["text_muted"],
+        "margin": "0",
+        "fontStyle": "italic",
+        "lineHeight": "1.4",
+    }
+
+    thesis_is_long = len(thesis) > truncate_len
+    if not thesis_is_long:
+        return html.P(thesis, style=thesis_style_base)
+
+    thesis_preview = thesis[:truncate_len] + "..."
+
+    # Collapsed preview (visible by default)
+    preview_el = html.P(
+        thesis_preview,
+        id={"type": f"{id_prefix}-preview", "index": card_index},
+        style={**thesis_style_base, "display": "block"},
+    )
+    # Full thesis (hidden by default)
+    full_el = html.P(
+        thesis,
+        id={"type": f"{id_prefix}-full", "index": card_index},
+        style={**thesis_style_base, "display": "none"},
+    )
+    # Toggle button
+    toggle_el = html.Div(
+        [
+            html.Span(
+                [
+                    html.I(
+                        className="fas fa-chevron-down me-1",
+                        id={"type": f"{id_prefix}-chevron", "index": card_index},
+                        style={
+                            "fontSize": "0.65rem",
+                            "transition": "transform 0.2s ease",
+                        },
+                    ),
+                    "Show full thesis",
+                ],
+                id={"type": f"{id_prefix}-toggle-text", "index": card_index},
+            ),
+        ],
+        id={"type": f"{id_prefix}-toggle", "index": card_index},
+        n_clicks=0,
+        style={
+            "color": COLORS["accent"],
+            "fontSize": "0.75rem",
+            "cursor": "pointer",
+            "marginTop": "4px",
+            "userSelect": "none",
+        },
+    )
+
+    return html.Div([preview_el, full_el, toggle_el])
+
+
+def create_feed_signal_card(row, card_index: int = 0) -> html.Div:
     """
     Create a signal card for the /signals feed page.
 
@@ -1491,18 +1568,17 @@ def create_feed_signal_card(row) -> html.Div:
             html.Div(metrics_children, style={"marginTop": "8px"})
         )
 
-    # Row 5: Thesis preview
+    # Row 5: Thesis — expandable if long, static if short
     if thesis:
         children.append(
-            html.P(
-                thesis[:120] + "..." if len(thesis) > 120 else thesis,
-                style={
-                    "fontSize": "0.8rem",
-                    "color": COLORS["text_muted"],
-                    "margin": "8px 0 0 0",
-                    "fontStyle": "italic",
-                    "lineHeight": "1.4",
-                },
+            html.Div(
+                _build_expandable_thesis(
+                    thesis,
+                    card_index=card_index,
+                    truncate_len=120,
+                    id_prefix="thesis",
+                ),
+                style={"marginTop": "8px"},
             )
         )
 

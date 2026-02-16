@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Expandable thesis cards** -- Signal feed and post feed cards now show a "Show full thesis" toggle when the LLM investment reasoning exceeds the preview length, allowing users to read the full analysis without navigating away
+  - Feed signal cards expand at 120 characters, post cards at 200 characters
+  - Click-to-expand uses clientside callbacks for zero-latency toggling
+  - Chevron icon animates on expand/collapse
+  - Short theses display in full without a toggle
+
 ### Fixed
 - **Dashboard KPIs show zeros** -- Added smart fallback to all-time data when selected time period has no evaluated predictions, with visual indicator
 - **Signal feed buries evaluated outcomes** -- Changed sort order to show Correct/Incorrect signals before Pending ones; added "Evaluated" filter option
