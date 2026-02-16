@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added Flask catch-all routes that serve the Dash SPA index for all client-side routes
 
 ### Changed
+- **Chart restyling** -- Unified all Plotly chart styling through shared `CHART_LAYOUT` base config and `apply_chart_layout()` helper
+  - Consistent dark hoverlabel styling, system font stack, and transparent backgrounds across all charts
+  - Candlestick charts use solid fill colors matching the app's emerald/red palette (no more default Plotly half-fills)
+  - Accuracy line chart uses spline curves, subtler area fill, and dot-style reference line
+  - Bar charts get wider gaps (`bargap`) and explicit text label styling
+  - Sentiment donut gets slice separators and enlarged center annotation
+  - All `dcc.Graph` components use standardized `CHART_CONFIG` (modebar hidden everywhere, no Plotly logo)
 - **Monolith → Microservices cutover** - Replaced `shitpost-alpha` orchestrator with standalone `harvester` cron service
   - New `harvester` service runs `python -m shitposts --mode incremental` every 5 minutes
   - Event pipeline handles all downstream processing (S3 load → analysis → market data → notifications)

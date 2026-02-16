@@ -7,7 +7,7 @@ from dash import Dash, html, dcc, Input, Output, State, callback_context
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 
-from constants import COLORS
+from constants import COLORS, CHART_CONFIG
 from components.charts import build_signal_over_trend_chart, build_empty_signal_chart
 from components.cards import (
     create_error_card,
@@ -117,9 +117,7 @@ def create_asset_page(symbol: str) -> html.Div:
                                                         color=COLORS["accent"],
                                                         children=dcc.Graph(
                                                             id="asset-price-chart",
-                                                            config={
-                                                                "displayModeBar": False
-                                                            },
+                                                            config=CHART_CONFIG,
                                                         ),
                                                     )
                                                 ]

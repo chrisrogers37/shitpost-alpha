@@ -11,7 +11,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
 
-from components.charts import build_signal_over_trend_chart, build_empty_signal_chart
+from components.charts import build_signal_over_trend_chart, build_empty_signal_chart, apply_chart_layout
+from constants import CHART_LAYOUT, CHART_COLORS, CHART_CONFIG, COLORS
 
 
 def _make_prices_df():
@@ -217,3 +218,173 @@ class TestBuildEmptySignalChart:
         """Test that the default message is 'No data available'."""
         fig = build_empty_signal_chart()
         assert fig.layout.annotations[0].text == "No data available"
+
+
+class TestApplyChartLayout:
+    """Tests for the shared apply_chart_layout() helper."""
+
+    def test_sets_transparent_backgrounds(self):
+        """Base layout must set transparent plot and paper backgrounds."""
+        fig = go.Figure()
+        apply_chart_layout(fig)
+        assert fig.layout.plot_bgcolor == "rgba(0,0,0,0)"
+        assert fig.layout.paper_bgcolor == "rgba(0,0,0,0)"
+
+    def test_sets_height(self):
+        """Height parameter is applied to the figure layout."""
+        fig = go.Figure()
+        apply_chart_layout(fig, height=450)
+        assert fig.layout.height == 450
+
+    def test_default_height_is_300(self):
+        """Default height should be 300 if not specified."""
+        fig = go.Figure()
+        apply_chart_layout(fig)
+        assert fig.layout.height == 300
+
+    def test_show_legend_false_by_default(self):
+        """Legend should be hidden by default."""
+        fig = go.Figure()
+        apply_chart_layout(fig)
+        assert fig.layout.showlegend is False
+
+    def test_show_legend_override(self):
+        """show_legend=True enables the legend."""
+        fig = go.Figure()
+        apply_chart_layout(fig, show_legend=True)
+        assert fig.layout.showlegend is True
+
+    def test_yaxis_override_preserves_gridcolor(self):
+        """Overriding yaxis title should not lose gridcolor from base."""
+        fig = go.Figure()
+        apply_chart_layout(fig, yaxis={"title": "Accuracy %"})
+        assert fig.layout.yaxis.title.text == "Accuracy %"
+        assert fig.layout.yaxis.gridcolor is not None
+        assert "51, 65, 85" in fig.layout.yaxis.gridcolor
+
+    def test_xaxis_override_preserves_gridcolor(self):
+        """Overriding xaxis should not lose gridcolor from base."""
+        fig = go.Figure()
+        apply_chart_layout(fig, xaxis={"rangeslider": {"visible": False}})
+        assert fig.layout.xaxis.gridcolor is not None
+
+    def test_hoverlabel_styling(self):
+        """Base layout must set dark hoverlabel with matching font."""
+        fig = go.Figure()
+        apply_chart_layout(fig)
+        assert fig.layout.hoverlabel.bgcolor == "#1e293b"
+        assert fig.layout.hoverlabel.bordercolor == "#334155"
+        assert fig.layout.hoverlabel.font.color == "#f1f5f9"
+
+    def test_font_family_set(self):
+        """Base layout must set system font stack."""
+        fig = go.Figure()
+        apply_chart_layout(fig)
+        assert "apple-system" in fig.layout.font.family
+
+    def test_arbitrary_overrides(self):
+        """Extra kwargs are passed through to update_layout."""
+        fig = go.Figure()
+        apply_chart_layout(fig, hovermode="closest", bargap=0.3)
+        assert fig.layout.hovermode == "closest"
+        assert fig.layout.bargap == 0.3
+
+    def test_returns_same_figure(self):
+        """Function returns the same figure object for chaining."""
+        fig = go.Figure()
+        result = apply_chart_layout(fig)
+        assert result is fig
+
+
+class TestChartConstants:
+    """Tests for the chart constant dicts in constants.py."""
+
+    def test_chart_layout_has_required_keys(self):
+        """CHART_LAYOUT must contain all essential layout keys."""
+        required = [
+            "plot_bgcolor", "paper_bgcolor", "font", "margin",
+            "xaxis", "yaxis", "hoverlabel", "showlegend",
+        ]
+        for key in required:
+            assert key in CHART_LAYOUT, f"Missing key: {key}"
+
+    def test_chart_config_disables_modebar(self):
+        """CHART_CONFIG must suppress the modebar."""
+        assert CHART_CONFIG["displayModeBar"] is False
+        assert CHART_CONFIG["displaylogo"] is False
+
+    def test_chart_colors_has_candle_colors(self):
+        """CHART_COLORS must have candlestick color keys."""
+        for key in ["candle_up", "candle_down", "candle_up_fill", "candle_down_fill"]:
+            assert key in CHART_COLORS, f"Missing key: {key}"
+
+    def test_chart_colors_match_app_palette(self):
+        """Candle colors must match COLORS success/danger."""
+        assert CHART_COLORS["candle_up"] == COLORS["success"]
+        assert CHART_COLORS["candle_down"] == COLORS["danger"]
+
+    def test_bar_palette_has_minimum_colors(self):
+        """Bar palette must have at least 4 colors for multi-series charts."""
+        assert len(CHART_COLORS["bar_palette"]) >= 4
+
+
+class TestCandlestickChartRestyled:
+    """Tests that build_signal_over_trend_chart uses new chart colors."""
+
+    def test_candlestick_uses_chart_colors(self):
+        """Candlestick trace must use CHART_COLORS instead of COLORS."""
+        fig = build_signal_over_trend_chart(
+            prices_df=_make_prices_df(),
+            signals_df=pd.DataFrame(),
+            symbol="TEST",
+        )
+        candle_trace = [t for t in fig.data if isinstance(t, go.Candlestick)]
+        assert len(candle_trace) == 1
+        assert candle_trace[0].increasing.line.color == CHART_COLORS["candle_up"]
+        assert candle_trace[0].decreasing.line.color == CHART_COLORS["candle_down"]
+
+    def test_candlestick_has_explicit_fill_colors(self):
+        """Candlestick fill colors must be explicitly set (not Plotly defaults)."""
+        fig = build_signal_over_trend_chart(
+            prices_df=_make_prices_df(),
+            signals_df=pd.DataFrame(),
+            symbol="TEST",
+        )
+        candle_trace = [t for t in fig.data if isinstance(t, go.Candlestick)][0]
+        assert candle_trace.increasing.fillcolor == CHART_COLORS["candle_up_fill"]
+        assert candle_trace.decreasing.fillcolor == CHART_COLORS["candle_down_fill"]
+
+    def test_layout_uses_apply_chart_layout(self):
+        """Chart layout must have hoverlabel styling from shared base."""
+        fig = build_signal_over_trend_chart(
+            prices_df=_make_prices_df(),
+            signals_df=pd.DataFrame(),
+            symbol="TEST",
+        )
+        assert fig.layout.hoverlabel.bgcolor == "#1e293b"
+
+    def test_rangeslider_hidden(self):
+        """Candlestick range slider must be hidden."""
+        fig = build_signal_over_trend_chart(
+            prices_df=_make_prices_df(),
+            signals_df=pd.DataFrame(),
+            symbol="TEST",
+        )
+        assert fig.layout.xaxis.rangeslider.visible is False
+
+
+class TestEmptyChartRestyled:
+    """Tests that build_empty_signal_chart uses apply_chart_layout."""
+
+    def test_empty_chart_has_hoverlabel(self):
+        """Empty chart must have hoverlabel styling from shared base."""
+        fig = build_empty_signal_chart("test message")
+        assert fig.layout.hoverlabel.bgcolor == "#1e293b"
+
+    def test_empty_chart_hides_gridlines(self):
+        """Empty chart must hide all gridlines and tick labels."""
+        fig = build_empty_signal_chart()
+        assert fig.layout.xaxis.showgrid is False
+        assert fig.layout.yaxis.showgrid is False
+        assert fig.layout.xaxis.showticklabels is False
+        assert fig.layout.yaxis.showticklabels is False
