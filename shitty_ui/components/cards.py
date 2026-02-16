@@ -8,7 +8,7 @@ from dash import html, dcc
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 
-from constants import COLORS, SENTIMENT_COLORS, SENTIMENT_BG_COLORS
+from constants import COLORS, FONT_SIZES, SENTIMENT_COLORS, SENTIMENT_BG_COLORS
 
 
 def strip_urls(text: str) -> str:
@@ -347,6 +347,7 @@ def create_metric_card(
     subtitle: str = "",
     icon: str = "chart-line",
     color: str = None,
+    note: str = "",
 ):
     """Create a metric card component with responsive styling."""
     color = color or COLORS["accent"]
@@ -376,6 +377,16 @@ def create_metric_card(
                     ),
                     html.Small(subtitle, style={"color": COLORS["text_muted"]})
                     if subtitle
+                    else None,
+                    html.Div(
+                        note,
+                        style={
+                            "color": COLORS["warning"],
+                            "fontSize": FONT_SIZES["small"],
+                            "marginTop": "4px",
+                        },
+                    )
+                    if note
                     else None,
                 ],
                 style={"textAlign": "center", "padding": "15px"},

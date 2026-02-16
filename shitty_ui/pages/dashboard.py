@@ -28,6 +28,7 @@ from data import (
     get_predictions_with_outcomes,
     load_recent_posts,
     get_active_signals,
+    get_active_signals_with_fallback,
     get_weekly_signal_count,
     get_high_confidence_metrics,
     get_best_performing_asset,
@@ -35,6 +36,7 @@ from data import (
     get_backtest_simulation,
     get_sentiment_accuracy,
     get_dashboard_kpis,
+    get_dashboard_kpis_with_fallback,
 )
 
 
@@ -553,7 +555,7 @@ def register_dashboard_callbacks(app: Dash):
 
         # ===== Hero Section: Active High-Confidence Signals =====
         try:
-            active_df = get_active_signals(min_confidence=0.75, hours=72)
+            active_df, hero_label = get_active_signals_with_fallback()
             if not active_df.empty:
                 signal_count = len(active_df)
                 hero_cards = [
@@ -576,7 +578,7 @@ def register_dashboard_callbacks(app: Dash):
                                     },
                                 ),
                                 html.Span(
-                                    " - High confidence predictions in last 72h",
+                                    f" - {hero_label}",
                                     style={
                                         "color": COLORS["text_muted"],
                                         "fontSize": "0.8rem",
@@ -606,7 +608,7 @@ def register_dashboard_callbacks(app: Dash):
                                     style={"color": COLORS["text_muted"]},
                                 ),
                                 html.Span(
-                                    "No high-confidence signals in the last 72 hours",
+                                    "No signals with confidence >= 60% in the last 30 days",
                                     style={
                                         "color": COLORS["text_muted"],
                                         "fontSize": "0.9rem",
@@ -630,7 +632,8 @@ def register_dashboard_callbacks(app: Dash):
 
         # ===== Performance Metrics with error handling =====
         try:
-            kpis = get_dashboard_kpis(days=days)
+            kpis = get_dashboard_kpis_with_fallback(days=days)
+            fallback_note = kpis["fallback_label"] if kpis["is_fallback"] else ""
 
             # Create KPI metrics row
             metrics_row = dbc.Row(
@@ -642,6 +645,7 @@ def register_dashboard_callbacks(app: Dash):
                             "evaluated predictions",
                             "signal",
                             COLORS["accent"],
+                            note=fallback_note,
                         ),
                         xs=6,
                         sm=6,
@@ -656,6 +660,7 @@ def register_dashboard_callbacks(app: Dash):
                             COLORS["success"]
                             if kpis["accuracy_pct"] > 50
                             else COLORS["danger"],
+                            note=fallback_note,
                         ),
                         xs=6,
                         sm=6,
@@ -670,6 +675,7 @@ def register_dashboard_callbacks(app: Dash):
                             COLORS["success"]
                             if kpis["avg_return_t7"] > 0
                             else COLORS["danger"],
+                            note=fallback_note,
                         ),
                         xs=6,
                         sm=6,
@@ -684,6 +690,7 @@ def register_dashboard_callbacks(app: Dash):
                             COLORS["success"]
                             if kpis["total_pnl"] > 0
                             else COLORS["danger"],
+                            note=fallback_note,
                         ),
                         xs=6,
                         sm=6,
@@ -702,7 +709,15 @@ def register_dashboard_callbacks(app: Dash):
         # ===== Accuracy Over Time Chart =====
         try:
             acc_df = get_accuracy_over_time(days=days)
-            if not acc_df.empty and len(acc_df) > 1:
+
+            # If period has no data and we're not already showing all-time, fall back
+            if acc_df.empty and days is not None:
+                acc_df = get_accuracy_over_time(days=None)
+                acc_chart_note = "Showing all-time data (no evaluated predictions in selected period)"
+            else:
+                acc_chart_note = ""
+
+            if not acc_df.empty and len(acc_df) >= 1:
                 acc_fig = go.Figure()
                 acc_fig.add_trace(
                     go.Scatter(
@@ -732,11 +747,22 @@ def register_dashboard_callbacks(app: Dash):
                     annotation_font_color=COLORS["text_muted"],
                     annotation_font_size=10,
                 )
+                # Add fallback note as subtitle annotation if applicable
+                if acc_chart_note:
+                    acc_fig.add_annotation(
+                        text=acc_chart_note,
+                        showarrow=False,
+                        font=dict(color=COLORS["warning"], size=10),
+                        xref="paper",
+                        yref="paper",
+                        x=0.5,
+                        y=1.05,
+                    )
                 acc_fig.update_layout(
                     plot_bgcolor="rgba(0,0,0,0)",
                     paper_bgcolor="rgba(0,0,0,0)",
                     font_color=COLORS["text"],
-                    margin=dict(l=40, r=40, t=10, b=40),
+                    margin=dict(l=40, r=40, t=20 if not acc_chart_note else 35, b=40),
                     yaxis=dict(
                         range=[0, 105],
                         title="Accuracy %",
@@ -748,8 +774,8 @@ def register_dashboard_callbacks(app: Dash):
                 )
             else:
                 acc_fig = create_empty_state_chart(
-                    message="Not enough weekly data to chart accuracy trend",
-                    hint="Requires 2+ weeks of evaluated predictions",
+                    message="No evaluated predictions yet",
+                    hint="Predictions need 7+ trading days to mature before accuracy is measured",
                 )
         except Exception as e:
             errors.append(f"Accuracy over time: {e}")

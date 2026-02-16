@@ -504,6 +504,33 @@ def get_dashboard_kpis(days: int = None) -> Dict[str, Any]:
     }
 
 
+def get_dashboard_kpis_with_fallback(days: int | None = 90) -> dict:
+    """Get dashboard KPIs with automatic fallback to all-time data.
+
+    When the selected time period has no evaluated predictions (total_signals == 0),
+    falls back to all-time data and marks the result so the UI can display a note.
+
+    Args:
+        days: Number of days to filter. None = all time.
+
+    Returns:
+        Dict with KPI values plus is_fallback (bool) and fallback_label (str).
+    """
+    kpis = get_dashboard_kpis(days=days)
+
+    # If period has evaluated signals, return as-is
+    if kpis["total_signals"] > 0 or days is None:
+        kpis["is_fallback"] = False
+        kpis["fallback_label"] = ""
+        return kpis
+
+    # Fall back to all-time
+    kpis = get_dashboard_kpis(days=None)
+    kpis["is_fallback"] = True
+    kpis["fallback_label"] = "All-time"
+    return kpis
+
+
 @ttl_cache(ttl_seconds=300)  # Cache for 5 minutes
 def get_accuracy_by_confidence(days: int = None) -> pd.DataFrame:
     """
@@ -1448,6 +1475,42 @@ def get_active_signals(min_confidence: float = 0.75, hours: int = 48) -> pd.Data
         return pd.DataFrame()
 
 
+def get_active_signals_with_fallback() -> tuple:
+    """Get hero signals with progressive fallback for wider time windows.
+
+    Tries these strategies in order:
+    1. High confidence (>=0.75) in last 72 hours
+    2. High confidence (>=0.75) in last 7 days
+    3. High confidence (>=0.75) in last 30 days
+    4. Medium confidence (>=0.60) in last 30 days
+
+    Returns:
+        Tuple of (DataFrame, label_str) where label_str describes the data shown.
+    """
+    # Strategy 1: Last 72 hours, high confidence
+    df = get_active_signals(min_confidence=0.75, hours=72)
+    if not df.empty:
+        return df, "High confidence predictions in last 72h"
+
+    # Strategy 2: Last 7 days, high confidence
+    df = get_active_signals(min_confidence=0.75, hours=168)
+    if not df.empty:
+        return df, "Top signals this week"
+
+    # Strategy 3: Last 30 days, high confidence
+    df = get_active_signals(min_confidence=0.75, hours=720)
+    if not df.empty:
+        return df, "Top signals this month"
+
+    # Strategy 4: Last 30 days, medium confidence
+    df = get_active_signals(min_confidence=0.60, hours=720)
+    if not df.empty:
+        return df, "Recent signals (30d, confidence >= 60%)"
+
+    # Nothing at all
+    return pd.DataFrame(), ""
+
+
 def get_weekly_signal_count() -> int:
     """Get count of completed predictions this week."""
     params: Dict[str, Any] = {
@@ -1789,10 +1852,17 @@ def get_signal_feed(
         base_query += " AND po.correct_t7 = true"
     elif outcome_filter == "incorrect":
         base_query += " AND po.correct_t7 = false"
+    elif outcome_filter == "evaluated":
+        base_query += " AND po.correct_t7 IS NOT NULL"
     elif outcome_filter == "pending":
         base_query += " AND po.correct_t7 IS NULL"
 
-    base_query += " ORDER BY tss.timestamp DESC LIMIT :limit OFFSET :offset"
+    base_query += """
+        ORDER BY
+            CASE WHEN po.correct_t7 IS NOT NULL THEN 0 ELSE 1 END,
+            tss.timestamp DESC
+        LIMIT :limit OFFSET :offset
+    """
 
     try:
         rows, columns = execute_query(text(base_query), params)
@@ -1856,6 +1926,8 @@ def get_signal_feed_count(
         base_query += " AND po.correct_t7 = true"
     elif outcome_filter == "incorrect":
         base_query += " AND po.correct_t7 = false"
+    elif outcome_filter == "evaluated":
+        base_query += " AND po.correct_t7 IS NOT NULL"
     elif outcome_filter == "pending":
         base_query += " AND po.correct_t7 IS NULL"
 

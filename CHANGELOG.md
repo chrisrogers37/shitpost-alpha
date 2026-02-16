@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Dashboard KPIs show zeros** -- Added smart fallback to all-time data when selected time period has no evaluated predictions, with visual indicator
+- **Signal feed buries evaluated outcomes** -- Changed sort order to show Correct/Incorrect signals before Pending ones; added "Evaluated" filter option
+- **Accuracy chart requires 2+ weeks** -- Lowered threshold to 1 week; added all-time fallback when period has no data
+- **Hero signals often empty** -- Added progressive time window fallback (72h -> 7d -> 30d -> lower confidence) with dynamic labels
+
 ### Changed
 - **Monolith → Microservices cutover** - Replaced `shitpost-alpha` orchestrator with standalone `harvester` cron service
   - New `harvester` service runs `python -m shitposts --mode incremental` every 5 minutes
