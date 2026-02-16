@@ -13,6 +13,7 @@ from components.cards import (
     create_error_card,
     create_empty_chart,
     create_empty_state_chart,
+    create_empty_state_html,
     create_hero_signal_card,
     create_metric_card,
     create_signal_card,
@@ -38,6 +39,7 @@ from data import (
     get_sentiment_accuracy,
     get_dashboard_kpis,
     get_dashboard_kpis_with_fallback,
+    get_empty_state_context,
 )
 
 
@@ -590,29 +592,19 @@ def register_dashboard_callbacks(app: Dash):
                     ]
                 )
             else:
+                try:
+                    ctx = get_empty_state_context()
+                    hc = ctx["total_high_confidence"]
+                    hc_line = f"{hc} high-confidence signal{'s' if hc != 1 else ''} all-time" if hc > 0 else ""
+                except Exception:
+                    hc_line = ""
                 hero_section = html.Div(
                     [
-                        html.Div(
-                            [
-                                html.I(
-                                    className="fas fa-moon me-2",
-                                    style={"color": COLORS["text_muted"]},
-                                ),
-                                html.Span(
-                                    "No signals with confidence >= 60% in the last 30 days",
-                                    style={
-                                        "color": COLORS["text_muted"],
-                                        "fontSize": "0.9rem",
-                                    },
-                                ),
-                            ],
-                            style={
-                                "padding": "24px",
-                                "textAlign": "center",
-                                "backgroundColor": COLORS["secondary"],
-                                "borderRadius": "12px",
-                                "border": f"1px solid {COLORS['border']}",
-                            },
+                        create_empty_state_html(
+                            message="No signals with confidence \u2265 60% in the last 30 days",
+                            context_line=hc_line,
+                            action_text="View all on Performance page",
+                            action_href="/performance",
                         )
                     ]
                 )
@@ -763,9 +755,19 @@ def register_dashboard_callbacks(app: Dash):
                     yaxis={"range": [0, 105], "title": "Accuracy %"},
                 )
             else:
+                try:
+                    ctx = get_empty_state_context()
+                    total_eval = ctx["total_evaluated"]
+                    ctx_line = f"{total_eval} evaluated trade{'s' if total_eval != 1 else ''} all-time" if total_eval > 0 else ""
+                    act_text = "Try expanding to All" if total_eval > 0 and days is not None else ""
+                except Exception:
+                    ctx_line = ""
+                    act_text = ""
                 acc_fig = create_empty_state_chart(
                     message="No evaluated predictions yet",
                     hint="Predictions need 7+ trading days to mature before accuracy is measured",
+                    context_line=ctx_line,
+                    action_text=act_text,
                 )
         except Exception as e:
             errors.append(f"Accuracy over time: {e}")
@@ -812,9 +814,19 @@ def register_dashboard_callbacks(app: Dash):
                     bargap=0.35,
                 )
             else:
+                try:
+                    ctx = get_empty_state_context()
+                    total_eval = ctx["total_evaluated"]
+                    ctx_line = f"{total_eval} evaluated trade{'s' if total_eval != 1 else ''} all-time" if total_eval > 0 else ""
+                    act_text = "Try expanding to All" if total_eval > 0 and days is not None else ""
+                except Exception:
+                    ctx_line = ""
+                    act_text = ""
                 conf_fig = create_empty_state_chart(
                     message="No accuracy data for this period",
                     hint="Predictions need 7+ trading days to mature before accuracy is measured",
+                    context_line=ctx_line,
+                    action_text=act_text,
                 )
         except Exception as e:
             errors.append(f"Confidence chart: {e}")
@@ -866,9 +878,19 @@ def register_dashboard_callbacks(app: Dash):
                     bargap=0.3,
                 )
             else:
+                try:
+                    ctx = get_empty_state_context()
+                    total_eval = ctx["total_evaluated"]
+                    ctx_line = f"{total_eval} evaluated trade{'s' if total_eval != 1 else ''} all-time" if total_eval > 0 else ""
+                    act_text = "Try expanding to All" if total_eval > 0 and days is not None else ""
+                except Exception:
+                    ctx_line = ""
+                    act_text = ""
                 asset_fig = create_empty_state_chart(
                     message="No asset performance data for this period",
                     hint="Asset accuracy appears after prediction outcomes are evaluated",
+                    context_line=ctx_line,
+                    action_text=act_text,
                 )
         except Exception as e:
             errors.append(f"Asset chart: {e}")
@@ -883,14 +905,19 @@ def register_dashboard_callbacks(app: Dash):
                     create_signal_card(row) for _, row in signals_df.iterrows()
                 ]
             else:
+                try:
+                    ctx = get_empty_state_context()
+                    total_eval = ctx["total_evaluated"]
+                    ctx_line = f"{total_eval} signal{'s' if total_eval != 1 else ''} all-time" if total_eval > 0 else ""
+                except Exception:
+                    ctx_line = ""
                 signal_cards = [
-                    html.P(
-                        "No recent signals for this period",
-                        style={
-                            "color": COLORS["text_muted"],
-                            "textAlign": "center",
-                            "padding": "20px",
-                        },
+                    create_empty_state_html(
+                        message="No recent signals for this period",
+                        context_line=ctx_line,
+                        action_text="View all signals",
+                        action_href="/signals",
+                        icon_class="fas fa-satellite-dish",
                     )
                 ]
         except Exception as e:
@@ -1285,9 +1312,16 @@ def register_dashboard_callbacks(app: Dash):
                     bargap=0.35,
                 )
             else:
+                try:
+                    ctx = get_empty_state_context()
+                    pending = ctx["total_pending"]
+                    ctx_line = f"{pending} prediction{'s' if pending != 1 else ''} awaiting evaluation" if pending > 0 else ""
+                except Exception:
+                    ctx_line = ""
                 conf_fig = create_empty_state_chart(
                     message="No confidence breakdown available yet",
                     hint="Appears after predictions have evaluated outcomes",
+                    context_line=ctx_line,
                 )
         except Exception as e:
             errors.append(f"Confidence chart: {e}")
@@ -1349,9 +1383,16 @@ def register_dashboard_callbacks(app: Dash):
                     ),
                 )
             else:
+                try:
+                    ctx = get_empty_state_context()
+                    pending = ctx["total_pending"]
+                    ctx_line = f"{pending} prediction{'s' if pending != 1 else ''} awaiting evaluation" if pending > 0 else ""
+                except Exception:
+                    ctx_line = ""
                 sent_fig = create_empty_state_chart(
                     message="No sentiment breakdown available yet",
                     hint="Appears after predictions with sentiment labels are evaluated",
+                    context_line=ctx_line,
                 )
         except Exception as e:
             errors.append(f"Sentiment chart: {e}")

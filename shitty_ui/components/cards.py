@@ -124,6 +124,8 @@ def create_empty_state_chart(
     hint: str = "",
     icon: str = "\u2139\ufe0f",
     height: int = 80,
+    context_line: str = "",
+    action_text: str = "",
 ) -> go.Figure:
     """Create a compact empty-state chart for sections with no data.
 
@@ -137,6 +139,8 @@ def create_empty_state_chart(
               (e.g., "Predictions need 7+ days to mature").
         icon: Unicode icon prefix for the message. Default info icon.
         height: Figure height in pixels. Default 80.
+        context_line: Data-driven secondary line (e.g., "74 evaluated trades all-time").
+        action_text: Navigation hint (e.g., "Try expanding to All").
 
     Returns:
         A Plotly go.Figure with centered annotation text and minimal chrome.
@@ -144,6 +148,14 @@ def create_empty_state_chart(
     display_text = f"{icon}  {message}"
     if hint:
         display_text += f"<br><span style='font-size:11px; color:{COLORS['border']}'>{hint}</span>"
+    if context_line:
+        display_text += f"<br><span style='font-size:11px; color:{COLORS['text_muted']}'>{context_line}</span>"
+    if action_text:
+        display_text += f"<br><span style='font-size:11px; color:{COLORS['accent']}'>{action_text}</span>"
+
+    extra_lines = sum(1 for x in [context_line, action_text] if x)
+    if extra_lines > 0 and height == 80:
+        height = 80 + (extra_lines * 18)
 
     fig = go.Figure()
     fig.add_annotation(
@@ -165,6 +177,66 @@ def create_empty_state_chart(
         yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
     )
     return fig
+
+
+def create_empty_state_html(
+    message: str,
+    hint: str = "",
+    context_line: str = "",
+    action_text: str = "",
+    action_href: str = "",
+    icon_class: str = "fas fa-moon",
+) -> html.Div:
+    """Create an HTML empty-state card with contextual guidance.
+
+    For sections that render Dash components (hero section, signal lists)
+    rather than Plotly figures.
+
+    Args:
+        message: Primary message.
+        hint: Secondary hint in muted border color.
+        context_line: Data-driven secondary line.
+        action_text: Navigation hint text.
+        action_href: If provided, wraps action_text in a dcc.Link.
+        icon_class: Font Awesome icon class.
+
+    Returns:
+        html.Div styled as a centered empty state card.
+    """
+    children = [
+        html.I(className=f"{icon_class} me-2", style={"color": COLORS["text_muted"]}),
+        html.Span(message, style={"color": COLORS["text_muted"], "fontSize": "0.9rem"}),
+    ]
+
+    sub_children = []
+    if hint:
+        sub_children.append(html.Div(hint, style={
+            "color": COLORS["border"], "fontSize": "0.8rem", "marginTop": "6px",
+        }))
+    if context_line:
+        sub_children.append(html.Div(context_line, style={
+            "color": COLORS["text_muted"], "fontSize": "0.8rem", "marginTop": "4px",
+        }))
+    if action_text:
+        action_content = (
+            dcc.Link(action_text, href=action_href, style={
+                "color": COLORS["accent"], "fontSize": "0.8rem", "textDecoration": "none",
+            })
+            if action_href
+            else html.Span(action_text, style={
+                "color": COLORS["accent"], "fontSize": "0.8rem",
+            })
+        )
+        sub_children.append(html.Div(action_content, style={"marginTop": "4px"}))
+
+    return html.Div(
+        [html.Div(children), *sub_children],
+        style={
+            "padding": "24px", "textAlign": "center",
+            "backgroundColor": COLORS["secondary"], "borderRadius": "12px",
+            "border": f"1px solid {COLORS['border']}",
+        },
+    )
 
 
 def create_hero_signal_card(row) -> html.Div:

@@ -2946,3 +2946,56 @@ class TestSignalFeedEvaluatedSort:
         query_str = str(call_args[0])
         assert "correct_t7 IS NOT NULL" in query_str
         assert result == 5
+
+
+class TestGetEmptyStateContext:
+    """Tests for get_empty_state_context function."""
+
+    @patch("data.execute_query")
+    def test_returns_expected_keys(self, mock_execute):
+        """Test that the return dict has all expected keys."""
+        from data import get_empty_state_context
+
+        get_empty_state_context.clear_cache()
+        mock_execute.return_value = ([(10, 5, 3)], ["total_evaluated", "total_pending", "total_high_confidence"])
+        result = get_empty_state_context()
+        assert set(result.keys()) == {"total_evaluated", "total_pending", "total_high_confidence"}
+        assert result["total_evaluated"] == 10
+        assert result["total_pending"] == 5
+        assert result["total_high_confidence"] == 3
+
+    @patch("data.execute_query")
+    def test_handles_all_zeros(self, mock_execute):
+        """Test that zero values are returned correctly."""
+        from data import get_empty_state_context
+
+        get_empty_state_context.clear_cache()
+        mock_execute.return_value = ([(0, 0, 0)], ["total_evaluated", "total_pending", "total_high_confidence"])
+        result = get_empty_state_context()
+        assert result["total_evaluated"] == 0
+        assert result["total_pending"] == 0
+        assert result["total_high_confidence"] == 0
+
+    @patch("data.execute_query")
+    def test_handles_null_values(self, mock_execute):
+        """Test that NULL values from the DB are treated as 0."""
+        from data import get_empty_state_context
+
+        get_empty_state_context.clear_cache()
+        mock_execute.return_value = ([(None, None, None)], ["total_evaluated", "total_pending", "total_high_confidence"])
+        result = get_empty_state_context()
+        assert result["total_evaluated"] == 0
+        assert result["total_pending"] == 0
+        assert result["total_high_confidence"] == 0
+
+    @patch("data.execute_query")
+    def test_handles_query_error(self, mock_execute):
+        """Test that query errors return safe fallback dict."""
+        from data import get_empty_state_context
+
+        get_empty_state_context.clear_cache()
+        mock_execute.side_effect = Exception("DB connection failed")
+        result = get_empty_state_context()
+        assert result["total_evaluated"] == 0
+        assert result["total_pending"] == 0
+        assert result["total_high_confidence"] == 0
