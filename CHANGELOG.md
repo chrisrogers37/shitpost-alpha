@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Signal feed buries evaluated outcomes** -- Changed sort order to show Correct/Incorrect signals before Pending ones; added "Evaluated" filter option
 - **Accuracy chart requires 2+ weeks** -- Lowered threshold to 1 week; added all-time fallback when period has no data
 - **Hero signals often empty** -- Added progressive time window fallback (72h -> 7d -> 30d -> lower confidence) with dynamic labels
+- **Direct URL access 404** -- Fixed `/assets/<symbol>`, `/signals`, `/trends`, and `/performance` returning Flask 404 on direct URL access (browser refresh, new tab, shared links)
+  - Added Flask catch-all routes that serve the Dash SPA index for all client-side routes
 
 ### Changed
 - **Monolith → Microservices cutover** - Replaced `shitpost-alpha` orchestrator with standalone `harvester` cron service

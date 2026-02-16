@@ -1736,3 +1736,90 @@ class TestAnalyticsTabsCSS:
         app = create_app()
 
         assert ".collapse-toggle-btn" in app.index_string
+
+
+class TestClientSideRoutes:
+    """Tests for direct URL access to client-side routes (SPA routing fix).
+
+    Dash's /<path:path> catch-all already serves the SPA index for /signals,
+    /trends, /performance. The only route that needs special handling is
+    /assets/<symbol>, because Dash's static file handler (/assets/<path:filename>)
+    intercepts it before the catch-all. register_client_routes() adds a
+    before_request hook to serve the SPA index for /assets/<symbol> requests.
+    """
+
+    _mock_stats = {
+        "total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0,
+        "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0,
+    }
+    _mock_perf = {
+        "total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0,
+        "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0,
+        "total_pnl_t7": 0.0, "avg_confidence": 0.0,
+    }
+
+    @patch("data.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def _create_test_app(self, mock_assets, mock_signals, mock_asset_acc,
+                         mock_conf_acc, mock_perf, mock_stats):
+        """Create a Dash app with callbacks and client routes for testing."""
+        mock_stats.return_value = self._mock_stats
+        mock_perf.return_value = self._mock_perf
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+
+        from layout import create_app, register_callbacks
+        from app import register_client_routes
+
+        app = create_app()
+        register_callbacks(app)
+        register_client_routes(app)
+        return app
+
+    def test_asset_route_returns_200(self):
+        app = self._create_test_app()
+        response = app.server.test_client().get("/assets/LMT")
+        assert response.status_code == 200
+
+    def test_asset_route_different_symbols(self):
+        app = self._create_test_app()
+        client = app.server.test_client()
+        for symbol in ["AAPL", "TSLA", "SPY", "BTC-USD"]:
+            response = client.get(f"/assets/{symbol}")
+            assert response.status_code == 200, f"/assets/{symbol} returned {response.status_code}"
+
+    def test_asset_route_serves_dash_index(self):
+        app = self._create_test_app()
+        response = app.server.test_client().get("/assets/LMT")
+        html_content = response.data.decode("utf-8")
+        assert "dash-renderer" in html_content or "_dash-app-content" in html_content
+
+    def test_static_file_extensions_not_intercepted(self):
+        """Requests for actual static files (e.g. .css, .js) should NOT be intercepted."""
+        app = self._create_test_app()
+        response = app.server.test_client().get("/assets/style.css")
+        # Static file doesn't exist, so Dash's handler returns 404 (not our SPA index)
+        assert response.status_code == 404
+
+    def test_signals_route_returns_200(self):
+        """Dash's catch-all already handles /signals."""
+        app = self._create_test_app()
+        response = app.server.test_client().get("/signals")
+        assert response.status_code == 200
+
+    def test_performance_route_returns_200(self):
+        """Dash's catch-all already handles /performance."""
+        app = self._create_test_app()
+        response = app.server.test_client().get("/performance")
+        assert response.status_code == 200
+
+    def test_root_route_still_works(self):
+        app = self._create_test_app()
+        response = app.server.test_client().get("/")
+        assert response.status_code == 200

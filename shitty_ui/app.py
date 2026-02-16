@@ -72,11 +72,39 @@ def register_webhook_route(app):
         return jsonify(health), status_code
 
 
+_STATIC_EXTENSIONS = frozenset((
+    ".css", ".js", ".json", ".png", ".jpg", ".jpeg", ".gif",
+    ".ico", ".svg", ".woff", ".woff2", ".ttf", ".map", ".gz",
+))
+
+
+def register_client_routes(app):
+    """Register a before_request hook to serve the Dash SPA for /assets/<symbol>.
+
+    Dash registers /assets/<path:filename> for static file serving, which
+    shadows client-side /assets/<symbol> routes. Other SPA routes (/signals,
+    /trends, /performance) are already handled by Dash's /<path:path> catch-all.
+
+    This before_request hook intercepts /assets/ requests that aren't static
+    files (no file extension) and serves the SPA index, allowing dcc.Location
+    to handle routing on the client side.
+    """
+    server = app.server
+
+    @server.before_request
+    def serve_asset_routes():
+        path = request.path
+        if path.startswith("/assets/") and len(path) > len("/assets/"):
+            if not any(path.endswith(ext) for ext in _STATIC_EXTENSIONS):
+                return app.index()
+
+
 def serve_app():
     """Serve the Dash application."""
     app = create_app()
     register_callbacks(app)
     register_webhook_route(app)
+    register_client_routes(app)
 
     # Get port from environment (Railway provides this)
     port = int(os.environ.get("PORT", 8050))
