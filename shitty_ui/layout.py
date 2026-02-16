@@ -335,6 +335,17 @@ def create_app() -> Dash:
             .collapse-chevron.rotated {
                 transform: rotate(90deg);
             }
+
+            /* ======================================
+               Thesis expand/collapse
+               ====================================== */
+            .thesis-toggle-area {
+                cursor: pointer;
+                user-select: none;
+            }
+            .thesis-toggle-area:hover {
+                text-decoration: underline;
+            }
         </style>
     </head>
     <body>

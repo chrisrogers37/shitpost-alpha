@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 import traceback
 
-from dash import Dash, html, dcc, dash_table, Input, Output, State, callback_context
+from dash import Dash, html, dcc, dash_table, Input, Output, State, callback_context, MATCH
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import pandas as pd
@@ -927,7 +927,10 @@ def register_dashboard_callbacks(app: Dash):
                     },
                 )
 
-            post_cards = [create_post_card(row) for _, row in df.iterrows()]
+            post_cards = [
+                create_post_card(row, card_index=idx)
+                for idx, (_, row) in enumerate(df.iterrows())
+            ]
             return post_cards
 
         except Exception as e:
@@ -1438,4 +1441,43 @@ def register_dashboard_callbacks(app: Dash):
             print(f"Performance page errors: {errors}")
 
         return backtest_header, conf_fig, sent_fig, asset_table
+
+    # Post-card thesis expand/collapse — clientside callback
+    app.clientside_callback(
+        """
+        function(n_clicks) {
+            if (!n_clicks || n_clicks === 0) {
+                return [
+                    {"display": "block"},
+                    {"display": "none"},
+                    "Show full thesis",
+                    {"fontSize": "0.65rem", "transition": "transform 0.2s ease", "transform": "rotate(0deg)"}
+                ];
+            }
+            var isExpanded = (n_clicks % 2) === 1;
+            if (isExpanded) {
+                return [
+                    {"display": "none"},
+                    {"display": "block"},
+                    "Hide thesis",
+                    {"fontSize": "0.65rem", "transition": "transform 0.2s ease", "transform": "rotate(180deg)"}
+                ];
+            } else {
+                return [
+                    {"display": "block"},
+                    {"display": "none"},
+                    "Show full thesis",
+                    {"fontSize": "0.65rem", "transition": "transform 0.2s ease", "transform": "rotate(0deg)"}
+                ];
+            }
+        }
+        """,
+        [
+            Output({"type": "post-thesis-preview", "index": MATCH}, "style"),
+            Output({"type": "post-thesis-full", "index": MATCH}, "style"),
+            Output({"type": "post-thesis-toggle-text", "index": MATCH}, "children"),
+            Output({"type": "post-thesis-chevron", "index": MATCH}, "style"),
+        ],
+        [Input({"type": "post-thesis-toggle", "index": MATCH}, "n_clicks")],
+    )
 
