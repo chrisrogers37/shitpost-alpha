@@ -88,6 +88,21 @@ SECTION_ACCENT = {
     "radius": "2px",
 }
 
+# Sparkline configuration for inline price charts on signal cards
+SPARKLINE_CONFIG = {
+    "width": 120,             # px -- chart width
+    "height": 36,             # px -- chart height
+    "line_width": 1.5,        # px -- line stroke width
+    "days_before": 3,         # trading days before prediction to show
+    "days_after": 10,         # trading days after prediction to show
+    "color_up": COLORS["success"],   # Line color when price ended higher
+    "color_down": COLORS["danger"],  # Line color when price ended lower
+    "color_flat": COLORS["text_muted"],  # Line color when negligible change
+    "fill_opacity": 0.08,     # Fill-under-line opacity
+    "marker_color": COLORS["warning"],  # Color of the prediction-date marker
+    "marker_size": 5,         # px -- prediction-date dot size
+}
+
 # ============================================================
 # Chart configuration — shared base for all Plotly figures
 # ============================================================

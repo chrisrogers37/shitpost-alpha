@@ -1177,6 +1177,88 @@ def get_asset_price_history(symbol: str, days: int = 180) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+@ttl_cache(ttl_seconds=300)
+def get_sparkline_prices(
+    symbols: tuple,
+    center_date: str,
+    days_before: int = 3,
+    days_after: int = 10,
+) -> Dict[str, pd.DataFrame]:
+    """Batch-fetch price data for sparkline rendering across multiple symbols.
+
+    Fetches closing prices in a narrow window around the prediction date for
+    each symbol. Returns a dict keyed by symbol, where each value is a small
+    DataFrame of (date, close) rows -- typically 10-15 rows per symbol.
+
+    Uses a single SQL query for ALL symbols to avoid N+1 query patterns.
+
+    Args:
+        symbols: Tuple of ticker symbols (tuple for cache hashability).
+        center_date: ISO date string (YYYY-MM-DD) for the prediction date.
+            The window extends days_before before and days_after after this date.
+        days_before: Trading days before center_date to include.
+        days_after: Trading days after center_date to include.
+
+    Returns:
+        Dict mapping symbol -> DataFrame with columns [date, close].
+        Missing symbols are absent from the dict (not empty DataFrames).
+    """
+    if not symbols:
+        return {}
+
+    # Expand the calendar window to account for weekends/holidays
+    # 3 trading days ~ 6 calendar days; 10 trading days ~ 18 calendar days
+    calendar_before = int(days_before * 2.0)
+    calendar_after = int(days_after * 1.8)
+
+    from datetime import datetime as dt
+
+    center_dt = (
+        dt.strptime(center_date, "%Y-%m-%d").date()
+        if isinstance(center_date, str)
+        else center_date
+    )
+    start = center_dt - timedelta(days=calendar_before)
+    end = center_dt + timedelta(days=calendar_after)
+
+    query = text("""
+        SELECT symbol, date, close
+        FROM market_prices
+        WHERE symbol = ANY(:symbols)
+            AND date >= :start_date
+            AND date <= :end_date
+        ORDER BY symbol, date ASC
+    """)
+
+    params = {
+        "symbols": list(symbols),
+        "start_date": start,
+        "end_date": end,
+    }
+
+    try:
+        rows, columns = execute_query(query, params)
+        if not rows:
+            return {}
+
+        df = pd.DataFrame(rows, columns=columns)
+        df["date"] = pd.to_datetime(df["date"])
+
+        # Split into per-symbol DataFrames
+        result: Dict[str, pd.DataFrame] = {}
+        for symbol in df["symbol"].unique():
+            symbol_df = df[df["symbol"] == symbol][["date", "close"]].reset_index(
+                drop=True
+            )
+            if len(symbol_df) >= 2:  # Need at least 2 points for a line
+                result[symbol] = symbol_df
+
+        return result
+    except Exception as e:
+        logger.error(f"Error loading sparkline prices: {e}")
+        return {}
+
+
 def get_asset_predictions(symbol: str, limit: int = 50) -> pd.DataFrame:
     """
     Get all predictions for a specific asset with their outcomes and tweet text.

@@ -23,6 +23,7 @@ from components.controls import create_filter_controls, get_period_button_styles
 from components.header import create_header, create_footer
 from data import (
     get_unified_feed,
+    get_sparkline_prices,
     get_performance_metrics,
     get_accuracy_by_confidence,
     get_accuracy_by_asset,
@@ -517,8 +518,29 @@ def register_dashboard_callbacks(app: Dash):
         try:
             feed_df = get_unified_feed(limit=15, days=days)
             if not feed_df.empty:
+                # Batch-fetch sparkline prices for unified feed assets
+                sparkline_prices = {}
+                if "assets" in feed_df.columns:
+                    all_assets = set()
+                    for _, r in feed_df.iterrows():
+                        a = r.get("assets", [])
+                        if isinstance(a, list) and a:
+                            all_assets.add(a[0])
+                    if all_assets:
+                        center_ts = pd.to_datetime(feed_df["timestamp"]).median()
+                        center_date = (
+                            center_ts.strftime("%Y-%m-%d")
+                            if pd.notna(center_ts)
+                            else None
+                        )
+                        if center_date:
+                            sparkline_prices = get_sparkline_prices(
+                                symbols=tuple(sorted(all_assets)),
+                                center_date=center_date,
+                            )
+
                 feed_cards = [
-                    create_unified_signal_card(row)
+                    create_unified_signal_card(row, sparkline_prices=sparkline_prices)
                     for _, row in feed_df.iterrows()
                 ]
             else:
