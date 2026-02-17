@@ -662,6 +662,68 @@ class TestEmptyStateChart:
         assert fig.layout.xaxis.showticklabels is False
         assert fig.layout.yaxis.showticklabels is False
 
+    def test_context_line_appears_in_annotation(self):
+        """Test that context_line text appears in the annotation."""
+        from components.cards import create_empty_state_chart
+
+        fig = create_empty_state_chart("Main", context_line="74 evaluated trades all-time")
+        text = fig.layout.annotations[0].text
+        assert "74 evaluated trades all-time" in text
+
+    def test_action_text_appears_in_annotation(self):
+        """Test that action_text appears in the annotation with accent color."""
+        from components.cards import create_empty_state_chart
+        from constants import COLORS
+
+        fig = create_empty_state_chart("Main", action_text="Try expanding to All")
+        text = fig.layout.annotations[0].text
+        assert "Try expanding to All" in text
+        assert COLORS["accent"] in text
+
+    def test_context_and_action_combined(self):
+        """Test that both context_line and action_text appear together."""
+        from components.cards import create_empty_state_chart
+
+        fig = create_empty_state_chart(
+            "Main", context_line="10 trades", action_text="Try All"
+        )
+        text = fig.layout.annotations[0].text
+        assert "10 trades" in text
+        assert "Try All" in text
+
+    def test_empty_context_line_omitted(self):
+        """Test that empty context_line doesn't add extra markup."""
+        from components.cards import create_empty_state_chart
+
+        fig = create_empty_state_chart("Main only")
+        text = fig.layout.annotations[0].text
+        # Only one line — no extra <br> tags beyond message
+        assert text.count("<br>") == 0
+
+    def test_auto_height_adjustment_with_context(self):
+        """Test that height auto-adjusts when context lines are added."""
+        from components.cards import create_empty_state_chart
+
+        fig = create_empty_state_chart("Main", context_line="ctx", action_text="act")
+        assert fig.layout.height == 80 + (2 * 18)  # 116
+
+    def test_explicit_height_no_auto_adjust(self):
+        """Test that explicit height is not auto-adjusted."""
+        from components.cards import create_empty_state_chart
+
+        fig = create_empty_state_chart("Main", context_line="ctx", height=120)
+        assert fig.layout.height == 120
+
+    def test_backward_compatibility_no_new_params(self):
+        """Test that calling without new params works identically to before."""
+        from components.cards import create_empty_state_chart
+
+        fig = create_empty_state_chart("No data", hint="Check back later")
+        assert fig.layout.height == 80
+        text = fig.layout.annotations[0].text
+        assert "No data" in text
+        assert "Check back later" in text
+
     def test_transparent_background(self):
         """Test that the figure has a transparent background."""
         from components.cards import create_empty_state_chart

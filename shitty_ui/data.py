@@ -1126,6 +1126,7 @@ def clear_all_caches() -> None:
     get_backtest_simulation.clear_cache()  # type: ignore
     get_dashboard_kpis.clear_cache()  # type: ignore
     get_top_predicted_asset.clear_cache()  # type: ignore
+    get_empty_state_context.clear_cache()  # type: ignore
 
 
 # =============================================================================
@@ -1581,6 +1582,45 @@ def get_high_confidence_metrics(days: int = None) -> Dict[str, Any]:
         logger.error(f"Error loading high confidence metrics: {e}")
 
     return {"win_rate": 0.0, "total": 0, "correct": 0, "incorrect": 0}
+
+
+@ttl_cache(ttl_seconds=300)
+def get_empty_state_context() -> Dict[str, Any]:
+    """Get contextual counts for smart empty state messages.
+
+    Returns lightweight aggregate counts used by empty-state components
+    to guide users toward timeframes and pages that have data.
+
+    Returns:
+        Dict with keys:
+            total_evaluated: int -- all-time evaluated prediction outcomes
+            total_pending: int -- outcomes awaiting maturation
+            total_high_confidence: int -- all-time high-confidence signals (>=0.75)
+    """
+    query = text("""
+        SELECT
+            COUNT(CASE WHEN correct_t7 IS NOT NULL THEN 1 END) AS total_evaluated,
+            COUNT(CASE WHEN correct_t7 IS NULL THEN 1 END) AS total_pending,
+            COUNT(CASE WHEN prediction_confidence >= 0.75 AND correct_t7 IS NOT NULL THEN 1 END) AS total_high_confidence
+        FROM prediction_outcomes
+    """)
+
+    try:
+        rows, columns = execute_query(query)
+        if rows and rows[0]:
+            return {
+                "total_evaluated": rows[0][0] or 0,
+                "total_pending": rows[0][1] or 0,
+                "total_high_confidence": rows[0][2] or 0,
+            }
+    except Exception as e:
+        logger.error(f"Error loading empty state context: {e}")
+
+    return {
+        "total_evaluated": 0,
+        "total_pending": 0,
+        "total_high_confidence": 0,
+    }
 
 
 @ttl_cache(ttl_seconds=300)

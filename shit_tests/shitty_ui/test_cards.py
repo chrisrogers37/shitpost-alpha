@@ -16,10 +16,11 @@ from components.cards import (
     create_post_card,
     create_prediction_timeline_card,
     create_feed_signal_card,
+    create_empty_state_html,
     get_sentiment_style,
     _build_expandable_thesis,
 )
-from constants import SENTIMENT_COLORS, SENTIMENT_BG_COLORS
+from constants import COLORS, SENTIMENT_COLORS, SENTIMENT_BG_COLORS
 
 
 def _extract_text(component) -> str:
@@ -618,3 +619,84 @@ class TestBuildExpandableThesisHelper:
         )
         toggle = result.children[2]
         assert toggle.id == {"type": "post-thesis-toggle", "index": 3}
+
+
+class TestEmptyStateHtml:
+    """Tests for create_empty_state_html function."""
+
+    def test_returns_html_div(self):
+        """Test that function returns a Dash html.Div."""
+        from dash import html
+
+        result = create_empty_state_html("No data here")
+        assert isinstance(result, html.Div)
+
+    def test_message_appears_in_text(self):
+        """Test that the primary message appears in the output."""
+        result = create_empty_state_html("Nothing to show")
+        # The message is in a Span inside the first child Div
+        inner_div = result.children[0]
+        span = inner_div.children[1]
+        assert "Nothing to show" in span.children
+
+    def test_hint_appears_when_provided(self):
+        """Test that hint text renders when provided."""
+        result = create_empty_state_html("Main", hint="Some hint")
+        # hint is the first sub_child after the main div
+        hint_div = result.children[1]
+        assert "Some hint" in hint_div.children
+
+    def test_context_line_appears_when_provided(self):
+        """Test that context_line renders when provided."""
+        result = create_empty_state_html("Main", context_line="42 trades all-time")
+        # context_line is a sub_child
+        found = False
+        for child in result.children[1:]:
+            if hasattr(child, "children") and "42 trades all-time" in str(child.children):
+                found = True
+                break
+        assert found
+
+    def test_action_text_with_href_creates_link(self):
+        """Test that action_text with action_href creates a dcc.Link."""
+        from dash import dcc
+
+        result = create_empty_state_html(
+            "Main", action_text="Go to performance", action_href="/performance"
+        )
+        # Find the link in sub_children
+        found_link = False
+        for child in result.children[1:]:
+            inner = child.children if hasattr(child, "children") else None
+            if isinstance(inner, dcc.Link):
+                assert inner.href == "/performance"
+                found_link = True
+                break
+        assert found_link
+
+    def test_action_text_without_href_creates_span(self):
+        """Test that action_text without href creates a plain Span."""
+        from dash import html
+
+        result = create_empty_state_html("Main", action_text="Try expanding to All")
+        found_span = False
+        for child in result.children[1:]:
+            inner = child.children if hasattr(child, "children") else None
+            if isinstance(inner, html.Span):
+                assert "Try expanding to All" in inner.children
+                found_span = True
+                break
+        assert found_span
+
+    def test_icon_class_applied(self):
+        """Test that a custom icon class is applied."""
+        result = create_empty_state_html("Main", icon_class="fas fa-rocket")
+        icon = result.children[0].children[0]
+        assert "fas fa-rocket" in icon.className
+
+    def test_minimal_call_only_message(self):
+        """Test that calling with just a message works without extras."""
+        result = create_empty_state_html("Just a message")
+        # Should have 1 child (the main div with icon+span), no sub_children
+        assert len(result.children) == 1
+        assert result.style["textAlign"] == "center"

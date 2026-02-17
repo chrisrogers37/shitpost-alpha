@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Smart empty states** -- Dashboard sections now show contextual guidance when empty, including data counts, why the section is empty, and suggestions to expand the time period or visit other pages
+  - New `create_empty_state_html()` component for HTML-based empty states with navigation links
+  - Enhanced `create_empty_state_chart()` with `context_line` and `action_text` parameters
+  - New `get_empty_state_context()` cached query for aggregate counts
 - **Expandable thesis cards** -- Signal feed and post feed cards now show a "Show full thesis" toggle when the LLM investment reasoning exceeds the preview length, allowing users to read the full analysis without navigating away
   - Feed signal cards expand at 120 characters, post cards at 200 characters
   - Click-to-expand uses clientside callbacks for zero-latency toggling
