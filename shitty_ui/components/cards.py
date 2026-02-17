@@ -9,6 +9,7 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 
 from constants import COLORS, FONT_SIZES, SENTIMENT_COLORS, SENTIMENT_BG_COLORS
+from components.sparkline import create_sparkline_component, create_sparkline_placeholder
 
 
 def strip_urls(text: str) -> str:
@@ -618,7 +619,7 @@ def create_signal_card(row):
     )
 
 
-def create_unified_signal_card(row) -> html.Div:
+def create_unified_signal_card(row, sparkline_prices: dict = None) -> html.Div:
     """Create a card for the unified prediction feed on the dashboard.
 
     Combines the aggregated outcome logic from hero cards with the compact
@@ -786,6 +787,43 @@ def create_unified_signal_card(row) -> html.Div:
             },
         ),
     ]
+
+    # Row 3b: Sparkline for first asset (if available)
+    first_asset = assets[0] if isinstance(assets, list) and assets else None
+    sparkline_element = None
+    if sparkline_prices and first_asset and first_asset in sparkline_prices:
+        price_df = sparkline_prices[first_asset]
+        pred_date = timestamp.date() if isinstance(timestamp, datetime) else None
+        sparkline_element = create_sparkline_component(
+            price_df,
+            prediction_date=pred_date,
+            component_id=f"sparkline-unified-{first_asset}-{id(row)}",
+        )
+    elif sparkline_prices is not None and first_asset:
+        sparkline_element = create_sparkline_placeholder()
+
+    if sparkline_element is not None:
+        children.append(
+            html.Div(
+                [
+                    html.Span(
+                        f"{first_asset} price",
+                        style={
+                            "color": COLORS["text_muted"],
+                            "fontSize": "0.7rem",
+                            "marginRight": "8px",
+                            "verticalAlign": "middle",
+                        },
+                    ),
+                    sparkline_element,
+                ],
+                style={
+                    "marginTop": "8px",
+                    "display": "flex",
+                    "alignItems": "center",
+                },
+            )
+        )
 
     # Row 4: Thesis preview (truncated)
     if thesis:
@@ -1561,7 +1599,7 @@ def _build_expandable_thesis(
     return html.Div([preview_el, full_el, toggle_el])
 
 
-def create_feed_signal_card(row, card_index: int = 0) -> html.Div:
+def create_feed_signal_card(row, card_index: int = 0, sparkline_prices: dict = None) -> html.Div:
     """
     Create a signal card for the /signals feed page.
 
@@ -1836,6 +1874,44 @@ def create_feed_signal_card(row, card_index: int = 0) -> html.Div:
     if metrics_children:
         children.append(
             html.Div(metrics_children, style={"marginTop": "8px"})
+        )
+
+    # Row 4b: Sparkline price chart (between metrics and thesis)
+    sparkline_element = None
+    if sparkline_prices and symbol and symbol in sparkline_prices:
+        price_df = sparkline_prices[symbol]
+        pred_date = None
+        if isinstance(timestamp, datetime):
+            pred_date = timestamp.date()
+        sparkline_element = create_sparkline_component(
+            price_df,
+            prediction_date=pred_date,
+            component_id=f"sparkline-feed-{symbol}-{card_index}",
+        )
+    elif sparkline_prices is not None and symbol:
+        sparkline_element = create_sparkline_placeholder()
+
+    if sparkline_element is not None:
+        children.append(
+            html.Div(
+                [
+                    html.Span(
+                        f"{symbol} price",
+                        style={
+                            "color": COLORS["text_muted"],
+                            "fontSize": "0.7rem",
+                            "marginRight": "8px",
+                            "verticalAlign": "middle",
+                        },
+                    ),
+                    sparkline_element,
+                ],
+                style={
+                    "marginTop": "8px",
+                    "display": "flex",
+                    "alignItems": "center",
+                },
+            )
         )
 
     # Row 5: Thesis — expandable if long, static if short

@@ -65,6 +65,7 @@ def _make_row(**overrides):
         "is_complete": False,
         "shitpost_id": "post123",
         "prediction_id": 1,
+        "symbol": None,
     }
     base.update(overrides)
     return base
@@ -784,3 +785,104 @@ class TestCreateUnifiedSignalCard:
         text = _extract_text(card)
         assert "85%" in text
         assert "Confidence:" not in text
+
+
+# =============================================================================
+# Sparkline Integration Tests
+# =============================================================================
+
+
+def _find_component_type(component, type_name: str) -> bool:
+    """Recursively search a Dash component tree for a component type."""
+    if type(component).__name__ == type_name:
+        return True
+    if hasattr(component, "children"):
+        children = component.children
+        if isinstance(children, list):
+            return any(
+                _find_component_type(c, type_name)
+                for c in children
+                if c is not None and not isinstance(c, str)
+            )
+        elif children is not None and not isinstance(children, str):
+            return _find_component_type(children, type_name)
+    return False
+
+
+class TestFeedSignalCardSparkline:
+    """Tests for sparkline integration in create_feed_signal_card."""
+
+    def test_no_sparkline_when_prices_not_provided(self):
+        """Card should render normally without sparkline when no prices passed."""
+        card = create_feed_signal_card(_make_row())
+        assert card is not None
+        # No Graph component should exist
+        assert not _find_component_type(card, "Graph")
+
+    def test_no_sparkline_when_prices_is_none(self):
+        """Card should not crash when sparkline_prices is None."""
+        card = create_feed_signal_card(_make_row(), sparkline_prices=None)
+        assert card is not None
+
+    def test_placeholder_when_symbol_missing_from_prices(self):
+        """Card should show placeholder when symbol has no price data."""
+        import pandas as pd
+
+        row = _make_row()
+        row["symbol"] = "AAPL"
+        card = create_feed_signal_card(row, sparkline_prices={})
+        text = _extract_text(card)
+        assert "No price data" in text
+
+    def test_sparkline_rendered_when_data_available(self):
+        """Card should contain a dcc.Graph when sparkline data exists."""
+        import pandas as pd
+
+        row = _make_row()
+        row["symbol"] = "AAPL"
+        price_df = pd.DataFrame(
+            {
+                "date": pd.bdate_range("2025-06-10", periods=5),
+                "close": [150, 151, 152, 153, 154],
+            }
+        )
+        card = create_feed_signal_card(row, sparkline_prices={"AAPL": price_df})
+        assert _find_component_type(card, "Graph"), "Expected a dcc.Graph sparkline"
+
+
+class TestUnifiedSignalCardSparkline:
+    """Tests for sparkline integration in create_unified_signal_card."""
+
+    def test_no_sparkline_when_prices_not_provided(self):
+        """Unified card should render normally without sparkline."""
+        card = create_unified_signal_card(_make_row())
+        assert card is not None
+        assert not _find_component_type(card, "Graph")
+
+    def test_no_sparkline_when_prices_is_none(self):
+        """Unified card should not crash when sparkline_prices is None."""
+        card = create_unified_signal_card(_make_row(), sparkline_prices=None)
+        assert card is not None
+
+    def test_sparkline_rendered_for_first_asset(self):
+        """Unified card should show sparkline for the first asset."""
+        import pandas as pd
+
+        row = _make_row(assets=["AAPL", "TSLA"])
+        price_df = pd.DataFrame(
+            {
+                "date": pd.bdate_range("2025-06-10", periods=5),
+                "close": [150, 151, 152, 153, 154],
+            }
+        )
+        card = create_unified_signal_card(
+            row, sparkline_prices={"AAPL": price_df}
+        )
+        assert _find_component_type(card, "Graph"), "Expected a dcc.Graph sparkline"
+
+    def test_placeholder_when_asset_missing_from_prices(self):
+        """Unified card should show placeholder when first asset has no data."""
+        row = _make_row(assets=["MISSING"])
+        card = create_unified_signal_card(row, sparkline_prices={})
+        text = _extract_text(card)
+        assert "No price data" in text

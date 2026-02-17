@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Inline price sparklines on signal cards** -- Mini price charts displayed on signal feed cards and dashboard unified feed cards showing the asset's price movement around the prediction date
+  - Green line when price went up, red when down, yellow dot marks prediction date
+  - Batch price fetching via single SQL query (no N+1) with 5-minute caching
+  - "No price data" placeholder for symbols without market data
+  - New `get_sparkline_prices()` data layer function for efficient multi-symbol batch queries
+  - New `shitty_ui/components/sparkline.py` module with `build_sparkline_figure()`, `create_sparkline_component()`, and `create_sparkline_placeholder()`
 - **Smart empty states** -- Dashboard sections now show contextual guidance when empty, including data counts, why the section is empty, and suggestions to expand the time period or visit other pages
   - New `create_empty_state_html()` component for HTML-based empty states with navigation links
   - Enhanced `create_empty_state_chart()` with `context_line` and `action_text` parameters

@@ -6,8 +6,11 @@ from dash import Dash, html, dcc, Input, Output, State, MATCH
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
+import pandas as pd
+
 from constants import COLORS
 from components.cards import create_feed_signal_card, create_new_signals_banner
+from data import get_sparkline_prices
 
 PAGE_SIZE = 20
 
@@ -373,8 +376,25 @@ def register_signal_callbacks(app: Dash):
                 )
                 return [empty_card], "No signals found", 0, None, {"display": "none"}
 
+            # Batch-fetch sparkline price data for all symbols in this page
+            sparkline_prices = {}
+            if not df.empty and "symbol" in df.columns:
+                unique_symbols = df["symbol"].dropna().unique().tolist()
+                if unique_symbols:
+                    center_ts = pd.to_datetime(df["timestamp"]).median()
+                    center_date = (
+                        center_ts.strftime("%Y-%m-%d") if pd.notna(center_ts) else None
+                    )
+                    if center_date:
+                        sparkline_prices = get_sparkline_prices(
+                            symbols=tuple(sorted(unique_symbols)),
+                            center_date=center_date,
+                        )
+
             cards = [
-                create_feed_signal_card(row, card_index=idx)
+                create_feed_signal_card(
+                    row, card_index=idx, sparkline_prices=sparkline_prices
+                )
                 for idx, (_, row) in enumerate(df.iterrows())
             ]
             count_label = f"Showing {len(df)} of {total_count} signals"
@@ -496,8 +516,25 @@ def register_signal_callbacks(app: Dash):
                     {"display": "none"},
                 )
 
+            # Batch-fetch sparkline price data for new page
+            sparkline_prices = {}
+            if not df.empty and "symbol" in df.columns:
+                unique_symbols = df["symbol"].dropna().unique().tolist()
+                if unique_symbols:
+                    center_ts = pd.to_datetime(df["timestamp"]).median()
+                    center_date = (
+                        center_ts.strftime("%Y-%m-%d") if pd.notna(center_ts) else None
+                    )
+                    if center_date:
+                        sparkline_prices = get_sparkline_prices(
+                            symbols=tuple(sorted(unique_symbols)),
+                            center_date=center_date,
+                        )
+
             new_cards = [
-                create_feed_signal_card(row, card_index=current_offset + idx)
+                create_feed_signal_card(
+                    row, card_index=current_offset + idx, sparkline_prices=sparkline_prices
+                )
                 for idx, (_, row) in enumerate(df.iterrows())
             ]
             updated_cards = (existing_cards or []) + new_cards
