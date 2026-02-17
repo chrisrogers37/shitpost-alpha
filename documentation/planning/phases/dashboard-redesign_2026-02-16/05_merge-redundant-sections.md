@@ -3,6 +3,7 @@
 **Status**: ✅ COMPLETE
 **Started**: 2026-02-17
 **Completed**: 2026-02-17
+**PR**: #77
 
 **PR Title**: refactor: unified prediction feed replacing dual columns
 **Risk Level**: Medium
