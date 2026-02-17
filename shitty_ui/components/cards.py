@@ -8,7 +8,7 @@ from dash import html, dcc
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 
-from constants import COLORS, FONT_SIZES, SENTIMENT_COLORS, SENTIMENT_BG_COLORS
+from constants import COLORS, FONT_SIZES, HIERARCHY, SENTIMENT_COLORS, SENTIMENT_BG_COLORS
 from components.sparkline import create_sparkline_component, create_sparkline_placeholder
 
 
@@ -422,35 +422,75 @@ def create_metric_card(
     color: str = None,
     note: str = "",
 ):
-    """Create a metric card component with responsive styling."""
+    """Create a metric card component with hero-level visual treatment.
+
+    KPI cards are the highest-priority elements on the dashboard. They use
+    elevated styling with accent-colored icon backgrounds, larger value
+    typography, and a subtle glow shadow to draw the eye first.
+    """
     color = color or COLORS["accent"]
     return dbc.Card(
         [
             dbc.CardBody(
                 [
+                    # Icon with circular accent background
                     html.Div(
                         [
                             html.I(
                                 className=f"fas fa-{icon}",
-                                style={"fontSize": "1.5rem", "color": color},
+                                style={
+                                    "fontSize": "1.1rem",
+                                    "color": "#ffffff",
+                                },
                             ),
                         ],
-                        className="mb-2",
+                        style={
+                            "width": "40px",
+                            "height": "40px",
+                            "borderRadius": "50%",
+                            "backgroundColor": color,
+                            "display": "flex",
+                            "alignItems": "center",
+                            "justifyContent": "center",
+                            "marginBottom": "10px",
+                            "opacity": "0.9",
+                        },
                     ),
-                    html.H3(
-                        value, style={"margin": 0, "color": color, "fontWeight": "bold"}
+                    # Value -- hero-sized, extra bold
+                    html.Div(
+                        value,
+                        className="kpi-hero-value",
+                        style={
+                            "fontSize": "2rem",
+                            "fontWeight": "800",
+                            "color": color,
+                            "lineHeight": "1.1",
+                            "margin": "0 0 4px 0",
+                        },
                     ),
+                    # Title label
                     html.P(
                         title,
                         style={
                             "margin": 0,
                             "color": COLORS["text_muted"],
-                            "fontSize": "0.85rem",
+                            "fontSize": "0.82rem",
+                            "fontWeight": "500",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.03em",
                         },
                     ),
-                    html.Small(subtitle, style={"color": COLORS["text_muted"]})
+                    # Subtitle
+                    html.Small(
+                        subtitle,
+                        style={
+                            "color": COLORS["text_muted"],
+                            "fontSize": "0.75rem",
+                        },
+                    )
                     if subtitle
                     else None,
+                    # Optional note (e.g., "All-time" fallback from Phase 01)
                     html.Div(
                         note,
                         style={
@@ -462,13 +502,23 @@ def create_metric_card(
                     if note
                     else None,
                 ],
-                style={"textAlign": "center", "padding": "15px"},
+                style={
+                    "textAlign": "center",
+                    "padding": "18px 15px",
+                    "minHeight": "130px",
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                },
             )
         ],
-        className="metric-card",
+        className="metric-card kpi-hero-card",
         style={
-            "backgroundColor": COLORS["secondary"],
-            "border": f"1px solid {COLORS['border']}",
+            "backgroundColor": HIERARCHY["primary"]["background"],
+            "border": HIERARCHY["primary"]["border"],
+            "borderRadius": HIERARCHY["primary"]["border_radius"],
+            "boxShadow": HIERARCHY["primary"]["shadow"],
         },
     )
 

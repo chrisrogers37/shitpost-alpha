@@ -172,6 +172,9 @@ def create_header():
             "padding": "15px 20px",
             "borderBottom": f"1px solid {COLORS['border']}",
             "backgroundColor": COLORS["secondary"],
+            "boxShadow": "0 2px 8px rgba(0, 0, 0, 0.3)",
+            "position": "relative",
+            "zIndex": 10,
         },
     )
 

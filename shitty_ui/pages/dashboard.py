@@ -8,7 +8,7 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import pandas as pd
 
-from constants import COLORS, CHART_COLORS, CHART_CONFIG
+from constants import COLORS, CHART_COLORS, CHART_CONFIG, HIERARCHY
 from components.cards import (
     create_error_card,
     create_empty_chart,
@@ -102,14 +102,17 @@ def create_dashboard_page() -> html.Div:
                             "justifyContent": "flex-end",
                         },
                     ),
-                    # Key Metrics Row
+                    # Key Metrics Row (Primary tier - hero treatment)
                     dcc.Loading(
                         id="performance-metrics-loading",
                         type="default",
                         color=COLORS["accent"],
-                        children=html.Div(id="performance-metrics", className="mb-4"),
+                        children=html.Div(
+                            id="performance-metrics",
+                            style={"marginBottom": "32px"},
+                        ),
                     ),
-                    # ========== Analytics Section: Tabbed Charts ==========
+                    # ========== Analytics Section: Tabbed Charts (Secondary tier) ==========
                     dbc.Card(
                         [
                             dbc.CardHeader(
@@ -118,7 +121,7 @@ def create_dashboard_page() -> html.Div:
                                     "Analytics",
                                 ],
                                 className="fw-bold",
-                                style={"backgroundColor": COLORS["secondary"]},
+                                style={"backgroundColor": HIERARCHY["secondary"]["background"]},
                             ),
                             dbc.CardBody(
                                 [
@@ -167,13 +170,17 @@ def create_dashboard_page() -> html.Div:
                                         className="analytics-tabs",
                                     ),
                                 ],
-                                style={"backgroundColor": COLORS["secondary"]},
+                                style={"backgroundColor": HIERARCHY["secondary"]["background"]},
                             ),
                         ],
                         className="mb-4",
-                        style={"backgroundColor": COLORS["secondary"]},
+                        style={
+                            "backgroundColor": HIERARCHY["secondary"]["background"],
+                            "borderTop": HIERARCHY["secondary"]["accent_top"],
+                            "boxShadow": HIERARCHY["secondary"]["shadow"],
+                        },
                     ),
-                    # ========== Unified Prediction Feed ==========
+                    # ========== Unified Prediction Feed (Secondary tier) ==========
                     dbc.Card(
                         [
                             dbc.CardHeader(
@@ -189,7 +196,7 @@ def create_dashboard_page() -> html.Div:
                                     ),
                                 ],
                                 className="fw-bold",
-                                style={"backgroundColor": COLORS["secondary"]},
+                                style={"backgroundColor": HIERARCHY["secondary"]["background"]},
                             ),
                             dbc.CardBody(
                                 [
@@ -205,13 +212,17 @@ def create_dashboard_page() -> html.Div:
                                         ),
                                     )
                                 ],
-                                style={"backgroundColor": COLORS["secondary"]},
+                                style={"backgroundColor": HIERARCHY["secondary"]["background"]},
                             ),
                         ],
-                        className="mb-4",
-                        style={"backgroundColor": COLORS["secondary"]},
+                        style={
+                            "backgroundColor": HIERARCHY["secondary"]["background"],
+                            "borderTop": HIERARCHY["secondary"]["accent_top"],
+                            "boxShadow": HIERARCHY["secondary"]["shadow"],
+                            "marginBottom": "32px",
+                        },
                     ),
-                    # ========== Latest Posts (full width) ==========
+                    # ========== Latest Posts (Tertiary tier) ==========
                     dbc.Card(
                         [
                             dbc.CardHeader(
@@ -244,10 +255,14 @@ def create_dashboard_page() -> html.Div:
                                 ]
                             ),
                         ],
-                        className="mb-4",
-                        style={"backgroundColor": COLORS["secondary"]},
+                        className="section-tertiary mb-4",
+                        style={
+                            "backgroundColor": HIERARCHY["tertiary"]["background"],
+                            "border": HIERARCHY["tertiary"]["border"],
+                            "boxShadow": HIERARCHY["tertiary"]["shadow"],
+                        },
                     ),
-                    # ========== Collapsible Full Data Table ==========
+                    # ========== Collapsible Full Data Table (Tertiary tier) ==========
                     dbc.Card(
                         [
                             dbc.CardHeader(
@@ -286,8 +301,12 @@ def create_dashboard_page() -> html.Div:
                                 is_open=False,
                             ),
                         ],
-                        className="mb-4",
-                        style={"backgroundColor": COLORS["secondary"]},
+                        className="section-tertiary mb-4",
+                        style={
+                            "backgroundColor": HIERARCHY["tertiary"]["background"],
+                            "border": HIERARCHY["tertiary"]["border"],
+                            "boxShadow": HIERARCHY["tertiary"]["shadow"],
+                        },
                     ),
                     # Footer
                     create_footer(),
@@ -634,7 +653,7 @@ def register_dashboard_callbacks(app: Dash):
                         md=3,
                     ),
                 ],
-                className="g-2 g-md-3",
+                className="g-2 g-md-2",
             )
         except Exception as e:
             errors.append(f"Performance metrics: {e}")

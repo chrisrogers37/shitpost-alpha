@@ -91,6 +91,7 @@ def create_app() -> Dash:
                 border-radius: 12px !important;
                 border: 1px solid #334155 !important;
                 overflow: hidden;
+                transition: box-shadow 0.15s ease;
             }
             .card-header {
                 border-bottom: 1px solid #334155 !important;
@@ -345,6 +346,42 @@ def create_app() -> Dash:
             }
             .collapse-chevron.rotated {
                 transform: rotate(90deg);
+            }
+
+            /* ======================================
+               Visual hierarchy tiers
+               ====================================== */
+
+            /* Primary tier: KPI metrics (most important) */
+            .kpi-hero-card {
+                border-radius: 16px !important;
+                transition: transform 0.15s ease, box-shadow 0.15s ease;
+            }
+            .kpi-hero-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 32px rgba(59, 130, 246, 0.12), 0 2px 6px rgba(0, 0, 0, 0.25) !important;
+            }
+            .kpi-hero-value {
+                font-variant-numeric: tabular-nums;
+            }
+
+            /* Tertiary tier: posts, data table (receded) */
+            .section-tertiary {
+                border-radius: 10px;
+            }
+            .section-tertiary .card-header {
+                background-color: #172032 !important;
+                border-bottom-color: #2d3a4e !important;
+            }
+            .section-tertiary .card-body {
+                background-color: #172032 !important;
+            }
+
+            /* Header elevation shadow */
+            .header-container {
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+                position: relative;
+                z-index: 10;
             }
 
             /* ======================================
