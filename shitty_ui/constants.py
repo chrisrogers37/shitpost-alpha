@@ -12,6 +12,7 @@ COLORS = {
     "text": "#f1f5f9",  # Slate 100 - primary text
     "text_muted": "#94a3b8",  # Slate 400 - secondary text
     "border": "#334155",  # Slate 700 - borders
+    "surface_sunken": "#172032",  # Slightly darker than secondary, for tertiary sections
 }
 
 # Sentiment-specific color mapping for chart overlays
@@ -86,6 +87,32 @@ SECTION_ACCENT = {
     "width": "3px",
     "color": COLORS["accent"],
     "radius": "2px",
+}
+
+# Visual hierarchy tiers -- backgrounds, shadows, and borders for section differentiation
+# Primary tier = KPI metrics (most important, elevated)
+# Secondary tier = Prediction feed, analytics charts (main content)
+# Tertiary tier = Posts feed, raw data table (supporting content)
+HIERARCHY = {
+    "primary": {
+        "background": COLORS["secondary"],
+        "shadow": "0 4px 24px rgba(59, 130, 246, 0.08), 0 1px 3px rgba(0, 0, 0, 0.2)",
+        "border": f"1px solid {COLORS['accent']}40",
+        "border_radius": "16px",
+    },
+    "secondary": {
+        "background": COLORS["secondary"],
+        "shadow": "0 1px 3px rgba(0, 0, 0, 0.12)",
+        "border": f"1px solid {COLORS['border']}",
+        "border_radius": "12px",
+        "accent_top": f"2px solid {COLORS['accent']}",
+    },
+    "tertiary": {
+        "background": COLORS["surface_sunken"],
+        "shadow": "none",
+        "border": "1px solid #2d3a4e",
+        "border_radius": "10px",
+    },
 }
 
 # Sparkline configuration for inline price charts on signal cards

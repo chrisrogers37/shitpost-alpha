@@ -21,7 +21,7 @@ from components.cards import (
     get_sentiment_style,
     _build_expandable_thesis,
 )
-from constants import COLORS, SENTIMENT_COLORS, SENTIMENT_BG_COLORS
+from constants import COLORS, HIERARCHY, SENTIMENT_COLORS, SENTIMENT_BG_COLORS
 
 
 def _extract_text(component) -> str:
@@ -886,3 +886,103 @@ class TestUnifiedSignalCardSparkline:
         card = create_unified_signal_card(row, sparkline_prices={})
         text = _extract_text(card)
         assert "No price data" in text
+
+
+class TestMetricCardHeroStyle:
+    """Tests for the redesigned metric card with hero KPI treatment."""
+
+    def test_metric_card_has_kpi_hero_class(self):
+        """Test that metric card className includes kpi-hero-card."""
+        from components.cards import create_metric_card
+
+        card = create_metric_card("Total Signals", "74", "evaluated", "signal")
+        assert "kpi-hero-card" in (card.className or "")
+
+    def test_metric_card_has_elevated_shadow(self):
+        """Test that metric card has a box shadow for elevation."""
+        from components.cards import create_metric_card
+
+        card = create_metric_card("Accuracy", "65.0%", "correct at 7d", "bullseye")
+        assert "boxShadow" in card.style
+        assert "rgba" in card.style["boxShadow"]
+
+    def test_metric_card_has_accent_border(self):
+        """Test that metric card border uses accent color at low opacity."""
+        from components.cards import create_metric_card
+
+        card = create_metric_card("P&L", "$500", "simulated", "dollar-sign")
+        assert "border" in card.style
+        assert COLORS["accent"] in card.style["border"]
+
+    def test_metric_card_has_larger_border_radius(self):
+        """Test that metric card borderRadius is 16px (not default 12px)."""
+        from components.cards import create_metric_card
+
+        card = create_metric_card("Test", "100", "", "chart-line")
+        assert card.style.get("borderRadius") == "16px"
+
+    def test_metric_card_value_has_hero_size(self):
+        """Test that value element uses 2rem font size."""
+        from components.cards import create_metric_card
+        from dash import html
+
+        card = create_metric_card("Test", "42", "", "chart-line")
+        card_body = card.children[0]  # dbc.CardBody
+        children = card_body.children
+        value_div = None
+        for child in children:
+            if child is not None and hasattr(child, "className"):
+                if child.className and "kpi-hero-value" in child.className:
+                    value_div = child
+                    break
+        assert value_div is not None, "Could not find kpi-hero-value element"
+        assert value_div.style.get("fontSize") == "2rem"
+        assert value_div.style.get("fontWeight") == "800"
+
+    def test_metric_card_icon_has_circular_background(self):
+        """Test that icon is wrapped in a circular colored background."""
+        from components.cards import create_metric_card
+
+        card = create_metric_card("Test", "100", "", "signal", COLORS["accent"])
+        card_body = card.children[0]  # dbc.CardBody
+        icon_wrapper = card_body.children[0]  # First child is icon wrapper div
+        assert icon_wrapper.style.get("borderRadius") == "50%"
+        assert icon_wrapper.style.get("backgroundColor") == COLORS["accent"]
+
+    def test_metric_card_title_is_uppercase(self):
+        """Test that title label uses uppercase text transform."""
+        from components.cards import create_metric_card
+        from dash import html
+
+        card = create_metric_card("Total Signals", "74", "", "signal")
+        card_body = card.children[0]
+        title_elem = None
+        for child in card_body.children:
+            if child is not None and isinstance(child, html.P):
+                title_elem = child
+                break
+        assert title_elem is not None
+        assert title_elem.style.get("textTransform") == "uppercase"
+
+    def test_metric_card_preserves_note_param(self):
+        """Test backward compatibility: note parameter still works."""
+        from components.cards import create_metric_card
+
+        card = create_metric_card("Test", "0", "", "signal", note="All-time")
+        text = _extract_text(card)
+        assert "All-time" in text
+
+    def test_metric_card_no_note_when_empty(self):
+        """Test that card renders correctly when note is empty string."""
+        from components.cards import create_metric_card
+
+        card = create_metric_card("Test", "100", "sub", "signal", note="")
+        assert card is not None
+
+    def test_metric_card_min_height(self):
+        """Test that card body has minHeight for consistent alignment."""
+        from components.cards import create_metric_card
+
+        card = create_metric_card("Test", "100", "", "signal")
+        card_body = card.children[0]
+        assert card_body.style.get("minHeight") == "130px"
