@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`HIERARCHY` design tokens** -- Centralized primary/secondary/tertiary visual tier definitions (backgrounds, shadows, borders) in `constants.py` for consistent section differentiation
+- **`COLORS["surface_sunken"]`** -- Darker surface color (`#172032`) for tertiary dashboard sections
+- **`.kpi-hero-card` CSS class** -- Hover elevation effect with `translateY(-2px)` and stronger shadow, plus `tabular-nums` for stable KPI number rendering
+- **`.section-tertiary` CSS class** -- Background and border overrides for receded sections (posts feed, data table)
 - **Inline price sparklines on signal cards** -- Mini price charts displayed on signal feed cards and dashboard unified feed cards showing the asset's price movement around the prediction date
   - Green line when price went up, red when down, yellow dot marks prediction date
   - Batch price fetching via single SQL query (no N+1) with 5-minute caching
@@ -25,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Short theses display in full without a toggle
 
 ### Changed
+- **Dashboard: visual hierarchy system** -- Established 3-tier visual differentiation: KPI metrics (primary/elevated), prediction feed and analytics (secondary/standard), posts and raw data (tertiary/receded), guiding the eye through content by importance
+- **Dashboard: KPI card hero redesign** -- Metric cards now use circular accent-colored icon backgrounds, 2rem/800-weight values, uppercase labels, elevated shadows, and 16px border radius for a hero-level visual treatment
+- **Dashboard: section spacing** -- Increased gap between hierarchy tiers to 32px (up from 16px) for clearer visual separation between content zones
+- **Dashboard: header elevation** -- Added subtle bottom shadow to the header bar for visual separation from scrolling content
 - **Dashboard: unified prediction feed** -- Replaced the redundant "Hero Signals" section and "Recent Predictions" sidebar with a single full-width prediction feed showing up to 15 signals with aggregated outcomes, thesis previews, and evaluated-first sort order
 - **Dashboard: full-width Latest Posts** -- Moved "Latest Posts" from a 7-column split layout to full-width, giving post content more room to breathe
 - **Dashboard: callback simplification** -- Reduced main dashboard callback from 7 outputs to 6, removing redundant data fetches

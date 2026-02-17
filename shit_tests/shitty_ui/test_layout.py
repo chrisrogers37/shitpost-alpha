@@ -1919,3 +1919,165 @@ class TestThesisToggleCSS:
         app = create_app()
 
         assert ".thesis-toggle-area" in app.index_string
+
+
+class TestVisualHierarchy:
+    """Tests for visual hierarchy tier differentiation in the dashboard layout."""
+
+    def test_kpi_section_has_larger_margin(self):
+        """Test that KPI section uses 32px margin instead of standard 16px/24px."""
+        from pages.dashboard import create_dashboard_page
+
+        page = create_dashboard_page()
+        perf_metrics = _find_component_by_id(page, "performance-metrics")
+        assert perf_metrics is not None
+        style = perf_metrics.style or {}
+        assert style.get("marginBottom") == "32px"
+
+    def test_latest_posts_has_tertiary_class(self):
+        """Test that Latest Posts card has section-tertiary className."""
+        from pages.dashboard import create_dashboard_page
+        import dash_bootstrap_components as dbc
+
+        page = create_dashboard_page()
+        all_cards = _find_components_by_type(page, dbc.Card)
+        tertiary_cards = [
+            c for c in all_cards
+            if hasattr(c, "className") and c.className and "section-tertiary" in c.className
+        ]
+        assert len(tertiary_cards) >= 1, "At least one card should have section-tertiary class"
+
+    def test_collapsible_table_has_tertiary_class(self):
+        """Test that collapsible data table card has section-tertiary className."""
+        from pages.dashboard import create_dashboard_page
+        import dash_bootstrap_components as dbc
+
+        page = create_dashboard_page()
+        all_cards = _find_components_by_type(page, dbc.Card)
+        tertiary_cards = [
+            c for c in all_cards
+            if hasattr(c, "className") and c.className and "section-tertiary" in c.className
+        ]
+        assert len(tertiary_cards) >= 2, "Both posts and table should be section-tertiary"
+
+    def test_tertiary_cards_have_darker_background(self):
+        """Test that tertiary-tier cards use the sunken background color."""
+        from pages.dashboard import create_dashboard_page
+        from constants import COLORS
+        import dash_bootstrap_components as dbc
+
+        page = create_dashboard_page()
+        all_cards = _find_components_by_type(page, dbc.Card)
+        tertiary_cards = [
+            c for c in all_cards
+            if hasattr(c, "className") and c.className and "section-tertiary" in c.className
+        ]
+        for card in tertiary_cards:
+            bg = card.style.get("backgroundColor", "") if card.style else ""
+            assert bg == COLORS["surface_sunken"], (
+                f"Tertiary card should use COLORS['surface_sunken'], got: {bg}"
+            )
+
+    def test_header_has_shadow(self):
+        """Test that header container has a box shadow for elevation."""
+        from components.header import create_header
+
+        header = create_header()
+        style = header.style or {}
+        assert "boxShadow" in style, "Header should have boxShadow for elevation"
+        assert "rgba" in style["boxShadow"], "Shadow should use rgba for transparency"
+
+
+class TestHierarchyCSS:
+    """Tests for hierarchy CSS classes in the app stylesheet."""
+
+    @patch("data.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_index_string_contains_kpi_hero_card_css(
+        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
+    ):
+        """Test that app index_string contains .kpi-hero-card CSS class."""
+        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
+        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+
+        from layout import create_app
+        app = create_app()
+
+        assert ".kpi-hero-card" in app.index_string
+        assert ".kpi-hero-card:hover" in app.index_string
+
+    @patch("data.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_index_string_contains_section_tertiary_css(
+        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
+    ):
+        """Test that app index_string contains .section-tertiary CSS overrides."""
+        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
+        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+
+        from layout import create_app
+        app = create_app()
+
+        assert ".section-tertiary" in app.index_string
+        assert ".section-tertiary .card-header" in app.index_string
+        assert ".section-tertiary .card-body" in app.index_string
+
+    @patch("data.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_index_string_contains_tabular_nums(
+        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
+    ):
+        """Test that .kpi-hero-value uses tabular-nums for numeric alignment."""
+        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
+        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+
+        from layout import create_app
+        app = create_app()
+
+        assert "tabular-nums" in app.index_string
+
+    @patch("data.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_header_shadow_in_css(
+        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
+    ):
+        """Test that .header-container CSS includes box-shadow."""
+        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
+        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+
+        from layout import create_app
+        app = create_app()
+
+        assert "box-shadow:" in app.index_string or "boxShadow" in app.index_string
