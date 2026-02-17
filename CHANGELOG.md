@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Chevron icon animates on expand/collapse
   - Short theses display in full without a toggle
 
+### Changed
+- **Dashboard: unified prediction feed** -- Replaced the redundant "Hero Signals" section and "Recent Predictions" sidebar with a single full-width prediction feed showing up to 15 signals with aggregated outcomes, thesis previews, and evaluated-first sort order
+- **Dashboard: full-width Latest Posts** -- Moved "Latest Posts" from a 7-column split layout to full-width, giving post content more room to breathe
+- **Dashboard: callback simplification** -- Reduced main dashboard callback from 7 outputs to 6, removing redundant data fetches
+
+### Added
+- **`get_unified_feed()`** -- New data function combining deduplication logic from `get_active_signals()` with time-period filtering from `get_recent_signals()`, with evaluated-first sort order
+- **`create_unified_signal_card()`** -- New card component merging hero card's aggregated outcomes with signal card's compact layout and thesis preview
+
 ### Fixed
 - **Dashboard KPIs show zeros** -- Added smart fallback to all-time data when selected time period has no evaluated predictions, with visual indicator
 - **Signal feed buries evaluated outcomes** -- Changed sort order to show Correct/Incorrect signals before Pending ones; added "Evaluated" filter option

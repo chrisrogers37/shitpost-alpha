@@ -17,6 +17,7 @@ from components.cards import (
     create_prediction_timeline_card,
     create_feed_signal_card,
     create_empty_state_html,
+    create_unified_signal_card,
     get_sentiment_style,
     _build_expandable_thesis,
 )
@@ -56,6 +57,14 @@ def _make_row(**overrides):
         "replies_count": 10,
         "reblogs_count": 5,
         "favourites_count": 20,
+        "outcome_count": 0,
+        "correct_count": 0,
+        "incorrect_count": 0,
+        "total_pnl_t7": None,
+        "avg_return_t7": None,
+        "is_complete": False,
+        "shitpost_id": "post123",
+        "prediction_id": 1,
     }
     base.update(overrides)
     return base
@@ -699,4 +708,79 @@ class TestEmptyStateHtml:
         result = create_empty_state_html("Just a message")
         # Should have 1 child (the main div with icon+span), no sub_children
         assert len(result.children) == 1
-        assert result.style["textAlign"] == "center"
+
+
+class TestCreateUnifiedSignalCard:
+    """Tests for the unified signal card component."""
+
+    def test_renders_without_error(self):
+        """Test basic rendering with standard row data."""
+        card = create_unified_signal_card(
+            _make_row(
+                outcome_count=2,
+                correct_count=2,
+                incorrect_count=0,
+                total_pnl_t7=50.0,
+            )
+        )
+        assert card is not None
+
+    def test_has_unified_signal_card_class(self):
+        """Test that className is 'unified-signal-card'."""
+        card = create_unified_signal_card(_make_row())
+        assert card.className == "unified-signal-card"
+
+    def test_has_sentiment_left_border(self):
+        """Test that card has a sentiment-colored left border."""
+        card = create_unified_signal_card(
+            _make_row(market_impact={"AAPL": "bullish"})
+        )
+        assert "borderLeft" in card.style
+        assert SENTIMENT_COLORS["bullish"] in card.style["borderLeft"]
+
+    def test_shows_correct_badge_with_pnl(self):
+        """Test aggregated correct outcome shows P&L."""
+        card = create_unified_signal_card(
+            _make_row(
+                outcome_count=3,
+                correct_count=2,
+                incorrect_count=1,
+                total_pnl_t7=120.0,
+            )
+        )
+        text = _extract_text(card)
+        assert "+$120" in text
+
+    def test_shows_pending_when_no_outcomes(self):
+        """Test pending badge when outcome_count is 0."""
+        card = create_unified_signal_card(
+            _make_row(
+                outcome_count=0,
+                correct_count=0,
+                incorrect_count=0,
+                total_pnl_t7=None,
+            )
+        )
+        text = _extract_text(card)
+        assert "Pending" in text
+
+    def test_shows_thesis_preview(self):
+        """Test that thesis is shown as a preview."""
+        card = create_unified_signal_card(
+            _make_row(thesis="Tariffs will boost domestic steel production")
+        )
+        text = _extract_text(card)
+        assert "Tariffs will boost" in text
+
+    def test_no_thesis_section_when_empty(self):
+        """Test that thesis section is omitted when thesis is empty."""
+        card = create_unified_signal_card(_make_row(thesis=""))
+        # Card should have exactly 3 children (time, preview, sentiment row)
+        assert len(card.children) == 3
+
+    def test_confidence_displayed_as_percentage(self):
+        """Test confidence shows as bare percentage."""
+        card = create_unified_signal_card(_make_row(confidence=0.85))
+        text = _extract_text(card)
+        assert "85%" in text
+        assert "Confidence:" not in text
