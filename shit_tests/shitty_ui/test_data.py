@@ -1321,6 +1321,127 @@ class TestClearAllCaches:
 # =============================================================================
 
 
+class TestGetSparklinePrices:
+    """Tests for the get_sparkline_prices batch query function."""
+
+    def setup_method(self):
+        """Clear sparkline cache before each test to avoid cross-test pollution."""
+        from data import get_sparkline_prices
+
+        get_sparkline_prices.clear_cache()
+
+    @patch("data.execute_query")
+    def test_returns_dict_of_dataframes(self, mock_execute):
+        """Should return a dict mapping symbol -> DataFrame."""
+        from data import get_sparkline_prices
+
+        mock_execute.return_value = (
+            [
+                ("AAPL", "2025-06-10", 150.0),
+                ("AAPL", "2025-06-11", 151.0),
+                ("AAPL", "2025-06-12", 152.0),
+                ("TSLA", "2025-06-10", 250.0),
+                ("TSLA", "2025-06-11", 248.0),
+            ],
+            ["symbol", "date", "close"],
+        )
+
+        result = get_sparkline_prices(
+            symbols=("AAPL", "TSLA"),
+            center_date="2025-06-12",
+        )
+
+        assert isinstance(result, dict)
+        assert "AAPL" in result
+        assert "TSLA" in result
+        assert len(result["AAPL"]) == 3
+        assert list(result["AAPL"].columns) == ["date", "close"]
+
+    @patch("data.execute_query")
+    def test_returns_empty_dict_for_empty_symbols(self, mock_execute):
+        """Empty symbols tuple should return empty dict without querying."""
+        from data import get_sparkline_prices
+
+        result = get_sparkline_prices(symbols=(), center_date="2025-06-12")
+
+        assert result == {}
+        mock_execute.assert_not_called()
+
+    @patch("data.execute_query")
+    def test_excludes_symbols_with_single_data_point(self, mock_execute):
+        """Symbols with only 1 price point should be excluded (need >= 2)."""
+        from data import get_sparkline_prices
+
+        mock_execute.return_value = (
+            [
+                ("AAPL", "2025-06-10", 150.0),
+                ("AAPL", "2025-06-11", 151.0),
+                ("TSLA", "2025-06-10", 250.0),  # Only 1 row
+            ],
+            ["symbol", "date", "close"],
+        )
+
+        result = get_sparkline_prices(
+            symbols=("AAPL", "TSLA"),
+            center_date="2025-06-12",
+        )
+
+        assert "AAPL" in result
+        assert "TSLA" not in result
+
+    @patch("data.execute_query")
+    def test_returns_empty_dict_on_db_error(self, mock_execute):
+        """Database errors should return empty dict, not raise."""
+        from data import get_sparkline_prices
+
+        mock_execute.side_effect = Exception("Connection failed")
+
+        result = get_sparkline_prices(
+            symbols=("AAPL",),
+            center_date="2025-06-12",
+        )
+
+        assert result == {}
+
+    @patch("data.execute_query")
+    def test_returns_empty_dict_when_no_rows(self, mock_execute):
+        """No matching price data should return empty dict."""
+        from data import get_sparkline_prices
+
+        mock_execute.return_value = ([], ["symbol", "date", "close"])
+
+        result = get_sparkline_prices(
+            symbols=("AAPL",),
+            center_date="2025-06-12",
+        )
+
+        assert result == {}
+
+    @patch("data.execute_query")
+    def test_passes_correct_date_window(self, mock_execute):
+        """Query should use expanded calendar window around center_date."""
+        from data import get_sparkline_prices
+
+        mock_execute.return_value = ([], ["symbol", "date", "close"])
+
+        get_sparkline_prices(
+            symbols=("AAPL",),
+            center_date="2025-06-15",
+            days_before=3,
+            days_after=10,
+        )
+
+        mock_execute.assert_called_once()
+        call_params = mock_execute.call_args[0][1]
+        # Calendar window: 3 * 2.0 = 6 days before, 10 * 1.8 = 18 days after
+        from datetime import date as d, timedelta
+
+        expected_start = d(2025, 6, 15) - timedelta(days=6)
+        expected_end = d(2025, 6, 15) + timedelta(days=18)
+        assert call_params["start_date"] == expected_start
+        assert call_params["end_date"] == expected_end
+
+
 class TestGetAssetPriceHistory:
     """Tests for get_asset_price_history function."""
 
