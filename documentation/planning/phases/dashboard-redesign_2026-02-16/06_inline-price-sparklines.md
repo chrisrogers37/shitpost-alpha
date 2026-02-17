@@ -1,5 +1,8 @@
 # Phase 06: Inline Price Sparklines
 
+**Status**: 🔧 IN PROGRESS
+**Started**: 2026-02-17
+
 **PR Title**: feat: mini price charts on signal cards
 **Risk Level**: Low
 **Estimated Effort**: Medium (3-4 hours)
@@ -12,9 +15,9 @@
 |------|--------|
 | `shitty_ui/data.py` | Add `get_sparkline_prices()` batch query function |
 | `shitty_ui/components/sparkline.py` | **NEW** -- Create `build_sparkline_figure()` and `create_sparkline_placeholder()` |
-| `shitty_ui/components/cards.py` | Add sparkline row to `create_feed_signal_card()` and `create_hero_signal_card()` |
+| `shitty_ui/components/cards.py` | Add sparkline row to `create_feed_signal_card()` and `create_unified_signal_card()` |
 | `shitty_ui/pages/signals.py` | Pass sparkline price data into card rendering loop |
-| `shitty_ui/pages/dashboard.py` | Pass sparkline price data into hero card rendering loop |
+| `shitty_ui/pages/dashboard.py` | Pass sparkline price data into unified feed rendering loop |
 | `shitty_ui/constants.py` | Add `SPARKLINE_CONFIG` dict |
 | `shit_tests/shitty_ui/test_sparkline.py` | **NEW** -- Tests for sparkline builder and placeholder |
 | `shit_tests/shitty_ui/test_data.py` | Add tests for `get_sparkline_prices()` |
@@ -104,25 +107,6 @@ def get_sparkline_prices(
     calendar_before = int(days_before * 2.0)
     calendar_after = int(days_after * 1.8)
 
-    query = text("""
-        SELECT
-            symbol,
-            date,
-            close
-        FROM market_prices
-        WHERE symbol = ANY(:symbols)
-            AND date >= :start_date
-            AND date <= :end_date
-        ORDER BY symbol, date ASC
-    """)
-
-    params = {
-        "symbols": list(symbols),
-        "start_date": center_date + f" -'{calendar_before} days'::interval",
-        "end_date": center_date + f" +'{calendar_after} days'::interval",
-    }
-
-    # Use date arithmetic compatible with PostgreSQL
     from datetime import datetime as dt, timedelta
     center_dt = dt.strptime(center_date, "%Y-%m-%d").date() if isinstance(center_date, str) else center_date
     start = center_dt - timedelta(days=calendar_before)
@@ -441,66 +425,67 @@ After the metrics row append (after line 1481) and before the thesis append (bef
 
 ---
 
-### Change E: Integrate Sparklines into `create_hero_signal_card()`
+### Change E: Integrate Sparklines into `create_unified_signal_card()`
 
 **File**: `shitty_ui/components/cards.py`
-**Location**: Inside `create_hero_signal_card()` function (line 170)
+**Location**: Inside `create_unified_signal_card()` function (line 621)
+
+> **Note (Challenge #1):** Phase 05 (PR #77) replaced `create_hero_signal_card()` with `create_unified_signal_card()` on the dashboard. This change targets the new unified card instead.
 
 #### Step E1: Add `sparkline_prices` parameter
 
 Change:
 ```python
-def create_hero_signal_card(row) -> html.Div:
+def create_unified_signal_card(row) -> html.Div:
 ```
 
 To:
 ```python
-def create_hero_signal_card(row, sparkline_prices: dict = None) -> html.Div:
+def create_unified_signal_card(row, sparkline_prices: dict = None) -> html.Div:
 ```
 
-#### Step E2: Add sparkline after the bottom row (after line 330)
+#### Step E2: Add sparkline after Row 3 (sentiment/assets/confidence), before Row 4 (thesis)
 
-After the bottom row `html.Div` (the one with sentiment badge + assets + confidence), before the closing of the return `html.Div`, add a sparkline section. The hero card shows the **first asset** from the `assets` list:
+After the Row 3 div append (line ~787), before the thesis check (line ~790), add:
 
 ```python
-            # Sparkline for first asset (if available)
-            *(
-                [
-                    html.Div(
-                        [
-                            html.Span(
-                                f"{assets[0]} price" if isinstance(assets, list) and assets else "Price",
-                                style={
-                                    "color": COLORS["text_muted"],
-                                    "fontSize": "0.7rem",
-                                    "marginRight": "8px",
-                                    "verticalAlign": "middle",
-                                },
-                            ),
-                            create_sparkline_component(
-                                sparkline_prices[assets[0]],
-                                prediction_date=timestamp.date() if isinstance(timestamp, datetime) else None,
-                                component_id=f"sparkline-hero-{assets[0]}-{id(row)}",
-                            ),
-                        ],
-                        style={
-                            "marginTop": "10px",
-                            "display": "flex",
-                            "alignItems": "center",
-                        },
-                    )
-                ]
-                if (
-                    sparkline_prices
-                    and isinstance(assets, list)
-                    and assets
-                    and assets[0] in sparkline_prices
-                )
-                else []
-            ),
-```
+    # Row 3b: Sparkline for first asset (if available)
+    first_asset = assets[0] if isinstance(assets, list) and assets else None
+    sparkline_element = None
+    if sparkline_prices and first_asset and first_asset in sparkline_prices:
+        price_df = sparkline_prices[first_asset]
+        pred_date = timestamp.date() if isinstance(timestamp, datetime) else None
+        sparkline_element = create_sparkline_component(
+            price_df,
+            prediction_date=pred_date,
+            component_id=f"sparkline-unified-{first_asset}-{id(row)}",
+        )
+    elif sparkline_prices is not None and first_asset:
+        sparkline_element = create_sparkline_placeholder()
 
-This uses the `*(list)` spread pattern to conditionally add zero or one elements to the children list, which is a pattern already used in the codebase (e.g., `*price_info` in `create_prediction_timeline_card` line 924).
+    if sparkline_element is not None:
+        children.append(
+            html.Div(
+                [
+                    html.Span(
+                        f"{first_asset} price",
+                        style={
+                            "color": COLORS["text_muted"],
+                            "fontSize": "0.7rem",
+                            "marginRight": "8px",
+                            "verticalAlign": "middle",
+                        },
+                    ),
+                    sparkline_element,
+                ],
+                style={
+                    "marginTop": "8px",
+                    "display": "flex",
+                    "alignItems": "center",
+                },
+            )
+        )
+```
 
 ---
 
@@ -508,6 +493,19 @@ This uses the `*(list)` spread pattern to conditionally add zero or one elements
 
 **File**: `shitty_ui/pages/signals.py`
 **Location**: Inside `update_signal_feed()` callback (line 315) and `load_more_signals()` callback (line 441)
+
+#### Step F0: Add top-level imports
+
+> **Note (Challenge #3):** Use top-level imports, not lazy imports inside callbacks.
+
+Add `get_sparkline_prices` to the top-level imports in signals.py. Also add `import pandas as pd` if not already present.
+
+Add to the existing import from data (currently only `get_signal_feed` and `get_signal_feed_count` are imported lazily inside callbacks — add `get_sparkline_prices` at top level):
+
+```python
+from data import get_sparkline_prices
+import pandas as pd
+```
 
 #### Step F1: Add sparkline data fetch in `update_signal_feed()`
 
@@ -523,7 +521,6 @@ After the `get_signal_feed()` call (after line 340), before the card rendering l
                     center_ts = pd.to_datetime(df["timestamp"]).median()
                     center_date = center_ts.strftime("%Y-%m-%d") if pd.notna(center_ts) else None
                     if center_date:
-                        from data import get_sparkline_prices
                         sparkline_prices = get_sparkline_prices(
                             symbols=tuple(sorted(unique_symbols)),
                             center_date=center_date,
@@ -561,51 +558,60 @@ To:
 
 ---
 
-### Change G: Wire Sparkline Data in Dashboard Hero Section
+### Change G: Wire Sparkline Data in Dashboard Unified Feed
 
 **File**: `shitty_ui/pages/dashboard.py`
-**Location**: Inside `update_dashboard()` callback, hero section (line 554)
+**Location**: Inside `update_dashboard()` callback, unified feed section (line 516-522)
 
-After the `get_active_signals()` call (line 556), before card rendering (line 559), add:
+> **Note (Challenge #1):** Phase 05 replaced the hero section with a unified feed using `get_unified_feed()` + `create_unified_signal_card()`. This targets that new code.
+
+> **Note (Challenge #3):** Use top-level import, not lazy import inside callback.
+
+Add `get_sparkline_prices` to the top-level imports:
 
 ```python
-            # Batch-fetch sparkline prices for hero signal assets
+from data import (
+    get_unified_feed,
+    get_sparkline_prices,
+    ...existing imports...
+)
+```
+
+After the `get_unified_feed()` call (line 518), before card rendering (line 520), add:
+
+```python
+            # Batch-fetch sparkline prices for unified feed assets
             sparkline_prices = {}
-            if not active_df.empty and "assets" in active_df.columns:
+            if not feed_df.empty and "assets" in feed_df.columns:
                 all_assets = set()
-                for _, r in active_df.iterrows():
+                for _, r in feed_df.iterrows():
                     a = r.get("assets", [])
                     if isinstance(a, list):
                         all_assets.update(a[:1])  # Only first asset per card
                 if all_assets:
-                    center_ts = pd.to_datetime(active_df["timestamp"]).median()
+                    center_ts = pd.to_datetime(feed_df["timestamp"]).median()
                     center_date = center_ts.strftime("%Y-%m-%d") if pd.notna(center_ts) else None
                     if center_date:
-                        from data import get_sparkline_prices
                         sparkline_prices = get_sparkline_prices(
                             symbols=tuple(sorted(all_assets)),
                             center_date=center_date,
                         )
 ```
 
-Then change the hero card rendering from:
+Then change the unified card rendering from:
 ```python
-                hero_cards = [
-                    create_hero_signal_card(row) for _, row in active_df.iterrows()
+                feed_cards = [
+                    create_unified_signal_card(row)
+                    for _, row in feed_df.iterrows()
                 ]
 ```
 
 To:
 ```python
-                hero_cards = [
-                    create_hero_signal_card(row, sparkline_prices=sparkline_prices)
-                    for _, row in active_df.iterrows()
+                feed_cards = [
+                    create_unified_signal_card(row, sparkline_prices=sparkline_prices)
+                    for _, row in feed_df.iterrows()
                 ]
-```
-
-Add the necessary import at the top of `dashboard.py`:
-```python
-import pandas as pd
 ```
 
 Note: `pd` is already imported on line 9 of `dashboard.py`.
@@ -957,21 +963,21 @@ class TestFeedSignalCardSparkline:
         assert found_graph, "Expected a dcc.Graph sparkline in the card"
 
 
-class TestHeroSignalCardSparkline:
-    """Tests for sparkline integration in create_hero_signal_card."""
+class TestUnifiedSignalCardSparkline:
+    """Tests for sparkline integration in create_unified_signal_card."""
 
     def test_no_sparkline_when_prices_not_provided(self):
-        """Hero card should render normally without sparkline."""
-        card = create_hero_signal_card(_make_row())
+        """Unified card should render normally without sparkline."""
+        card = create_unified_signal_card(_make_row())
         assert card is not None
 
     def test_no_sparkline_when_prices_is_none(self):
-        """Hero card should not crash when sparkline_prices is None."""
-        card = create_hero_signal_card(_make_row(), sparkline_prices=None)
+        """Unified card should not crash when sparkline_prices is None."""
+        card = create_unified_signal_card(_make_row(), sparkline_prices=None)
         assert card is not None
 
     def test_sparkline_rendered_for_first_asset(self):
-        """Hero card should show sparkline for the first asset."""
+        """Unified card should show sparkline for the first asset."""
         import pandas as pd
 
         row = _make_row(assets=["AAPL", "TSLA"])
@@ -979,11 +985,18 @@ class TestHeroSignalCardSparkline:
             "date": pd.bdate_range("2025-06-10", periods=5),
             "close": [150, 151, 152, 153, 154],
         })
-        card = create_hero_signal_card(
+        card = create_unified_signal_card(
             row, sparkline_prices={"AAPL": price_df}
         )
         found_graph = _find_component_type(card, "Graph")
-        assert found_graph, "Expected a dcc.Graph sparkline in the hero card"
+        assert found_graph, "Expected a dcc.Graph sparkline in the unified card"
+
+    def test_placeholder_when_asset_missing_from_prices(self):
+        """Unified card should show placeholder when first asset has no price data."""
+        row = _make_row(assets=["MISSING"])
+        card = create_unified_signal_card(row, sparkline_prices={})
+        text = _extract_text(card)
+        assert "No price data" in text
 
 
 def _find_component_type(component, type_name: str) -> bool:
@@ -1011,7 +1024,7 @@ def _find_component_type(component, type_name: str) -> bool:
 - [ ] Sparkline line is green when price went up, red when price went down, gray when flat
 - [ ] Yellow dot marks the prediction date on the sparkline
 - [ ] Cards without price data show "No price data" placeholder with dashed border
-- [ ] Hero cards on `/` dashboard show sparkline for first asset
+- [ ] Unified feed cards on `/` dashboard show sparkline for first asset
 - [ ] No N+1 queries: one SQL query per page of signals, not one per card
 - [ ] Sparklines are cached (5-minute TTL via `@ttl_cache`)
 - [ ] `/signals` page load time has not visibly degraded (sparkline query < 100ms)
@@ -1033,7 +1046,7 @@ def _find_component_type(component, type_name: str) -> bool:
 
 3. **Do NOT render sparklines as full-size `dcc.Graph` components.** The default Graph size is ~250px tall with modebar, margins, and axes. Sparklines must be 36px tall with zero chrome. Always use `build_sparkline_figure()` which enforces the compact layout.
 
-4. **Do NOT make sparkline_prices a required parameter.** Both `create_feed_signal_card()` and `create_hero_signal_card()` must continue working with zero arguments changed. The `sparkline_prices=None` default ensures backward compatibility with all 20+ existing callers and tests.
+4. **Do NOT make sparkline_prices a required parameter.** Both `create_feed_signal_card()` and `create_unified_signal_card()` must continue working with zero arguments changed. The `sparkline_prices=None` default ensures backward compatibility with all existing callers and tests.
 
 5. **Do NOT add individual symbol queries in a loop.** The entire point of `get_sparkline_prices()` is to batch-fetch data for all visible symbols in one SQL query. Never call it once per card inside an `iterrows()` loop.
 
@@ -1041,7 +1054,7 @@ def _find_component_type(component, type_name: str) -> bool:
 
 7. **Do NOT modify `clear_all_caches()` in data.py.** The `get_sparkline_prices` function uses `@ttl_cache` which is self-clearing. If needed, add it to `clear_all_caches()` for manual cache busting, but do not remove any existing cache-clear calls.
 
-8. **Do NOT add sparklines to `create_signal_card()` (the dashboard sidebar card) or `create_post_card()`.** These are compact cards used in narrow columns. Sparklines are only appropriate on `create_feed_signal_card()` (full-width signal feed) and `create_hero_signal_card()` (hero section). Adding them to sidebar cards would create layout overflow.
+8. **Do NOT add sparklines to `create_signal_card()` (the dashboard sidebar card) or `create_post_card()`.** These are compact cards used in narrow columns. Sparklines are only appropriate on `create_feed_signal_card()` (full-width signal feed) and `create_unified_signal_card()` (dashboard unified feed). Adding them to sidebar cards would create layout overflow.
 
 ---
 
