@@ -1,5 +1,8 @@
 # Phase 08: Visual Hierarchy Redesign
 
+**Status**: ✅ COMPLETE
+**Started**: 2026-02-17
+**Completed**: 2026-02-17
 **PR Title**: style: section differentiation & data density
 **Risk Level**: Medium
 **Estimated Effort**: Medium (3-4 hours)
@@ -10,13 +13,13 @@
 
 | File | Action |
 |------|--------|
-| `shitty_ui/constants.py` | Add `HIERARCHY` dict (background tiers, shadows, border-radius); add `SECTION_SPACING` dict; extend `COLORS` with `surface_elevated` and `surface_sunken` |
-| `shitty_ui/components/cards.py` | Redesign `create_metric_card()` for hero KPI treatment; add `create_section_container()` wrapper; update card `borderRadius` values |
-| `shitty_ui/pages/dashboard.py` | Apply tiered backgrounds per section; tighten KPI row gutter; add section spacing; restructure section wrappers with hierarchy CSS classes |
-| `shitty_ui/layout.py` | Add hierarchy CSS classes (`.section-primary`, `.section-secondary`, `.section-tertiary`, `.kpi-hero-card`, `.kpi-hero-value`); update existing card CSS border-radius |
+| `shitty_ui/constants.py` | Add `HIERARCHY` dict (background tiers, shadows, border-radius); extend `COLORS` with `surface_sunken` |
+| `shitty_ui/components/cards.py` | Redesign `create_metric_card()` for hero KPI treatment |
+| `shitty_ui/pages/dashboard.py` | Apply tiered backgrounds per section via `HIERARCHY` tokens; tighten KPI row gutter; add section spacing; add `section-tertiary` CSS class to tertiary cards |
+| `shitty_ui/layout.py` | Add hierarchy CSS classes (`.section-tertiary`, `.kpi-hero-card`, `.kpi-hero-value`); update existing card CSS border-radius |
 | `shitty_ui/components/header.py` | Add subtle bottom shadow to header for visual separation from page content |
 | `shit_tests/shitty_ui/test_layout.py` | Add `TestVisualHierarchy` class; add `TestHierarchyCSS` class |
-| `shit_tests/shitty_ui/test_cards.py` | Add `TestMetricCardHeroStyle` class; add `TestSectionContainer` class |
+| `shit_tests/shitty_ui/test_cards.py` | Add `TestMetricCardHeroStyle` class |
 | `CHANGELOG.md` | Add entry |
 
 ## Context
@@ -71,52 +74,39 @@ Additionally:
 # Tertiary tier = Posts feed, raw data table (supporting content)
 HIERARCHY = {
     "primary": {
-        "background": "#1e293b",           # Same as COLORS["secondary"] base
+        "background": COLORS["secondary"],
         "shadow": "0 4px 24px rgba(59, 130, 246, 0.08), 0 1px 3px rgba(0, 0, 0, 0.2)",
-        "border": "1px solid #3b82f640",   # Accent border at 25% opacity
+        "border": f"1px solid {COLORS['accent']}40",  # Accent at 25% opacity
         "border_radius": "16px",
     },
     "secondary": {
-        "background": "#1E293B",           # Same as COLORS["secondary"]
+        "background": COLORS["secondary"],
         "shadow": "0 1px 3px rgba(0, 0, 0, 0.12)",
-        "border": f"1px solid #334155",    # Standard border
+        "border": f"1px solid {COLORS['border']}",
         "border_radius": "12px",
-        "accent_top": "2px solid #3b82f6", # Top accent line for visual anchoring
+        "accent_top": f"2px solid {COLORS['accent']}",
     },
     "tertiary": {
-        "background": "#172032",           # Slightly darker than secondary
+        "background": COLORS["surface_sunken"],
         "shadow": "none",
-        "border": "1px solid #2d3a4e",     # Subtler border
+        "border": "1px solid #2d3a4e",
         "border_radius": "10px",
     },
 }
-
-# Section spacing -- vertical gaps between hierarchy tiers
-SECTION_SPACING = {
-    "between_tiers": "32px",       # Gap between primary -> secondary, secondary -> tertiary
-    "within_tier": "16px",         # Gap between items at the same tier
-    "section_padding": "20px",     # Internal padding for section containers
-}
-
-# KPI card hero styling
-KPI_HERO = {
-    "value_size": "2rem",          # Larger than current H3 default
-    "value_weight": "800",         # Extra bold for hero numbers
-    "icon_bg_size": "40px",        # Circular icon background diameter
-    "icon_font_size": "1.1rem",    # Icon size inside the circle
-    "card_min_height": "130px",    # Minimum card height for alignment
-}
 ```
 
-#### Step A2: Add surface color variants to COLORS
+**Dropped from original plan**: `SECTION_SPACING` (too few consumers — values inlined where used), `KPI_HERO` (values local to `create_metric_card()`, not shared), `create_section_container()` (returns `html.Div` but consumers are `dbc.Card` — wrong abstraction for Card styling).
+
+#### Step A2: Add surface color to COLORS
 
 **File**: `shitty_ui/constants.py`
 **Location**: Inside the `COLORS` dict (after line 14, before the closing `}`)
 
 ```python
-    "surface_elevated": "#243049",  # Slightly lighter than secondary, for hover/active states
     "surface_sunken": "#172032",    # Slightly darker than secondary, for tertiary sections
 ```
+
+**Dropped**: `surface_elevated` — no consumers in this phase or downstream phases.
 
 ---
 
@@ -257,69 +247,7 @@ def create_metric_card(
 7. `minHeight: 130px` ensures all 4 cards align vertically
 8. `note` parameter preserved for Phase 01 compatibility (defaults to `""`)
 
-#### Step B2: Add `create_section_container()` helper
-
-**File**: `shitty_ui/components/cards.py`
-**Location**: After `create_metric_card()` (after the new function above, before `create_signal_card()`)
-
-```python
-def create_section_container(
-    children,
-    tier: str = "secondary",
-    class_name: str = "",
-    margin_bottom: str = "24px",
-) -> html.Div:
-    """Wrap section content in a tier-appropriate visual container.
-
-    Applies hierarchy-specific background, shadow, and border styling
-    so that sections have clear visual differentiation.
-
-    Args:
-        children: Dash components to wrap.
-        tier: One of 'primary', 'secondary', 'tertiary'.
-        class_name: Additional CSS class names.
-        margin_bottom: Bottom margin for section spacing.
-
-    Returns:
-        html.Div with tier-appropriate styling.
-    """
-    tier_styles = {
-        "primary": {
-            "backgroundColor": COLORS["secondary"],
-            "boxShadow": "0 4px 24px rgba(59, 130, 246, 0.08), 0 1px 3px rgba(0, 0, 0, 0.2)",
-            "border": "1px solid #3b82f640",
-            "borderRadius": "16px",
-            "padding": "20px",
-        },
-        "secondary": {
-            "backgroundColor": COLORS["secondary"],
-            "boxShadow": "0 1px 3px rgba(0, 0, 0, 0.12)",
-            "border": f"1px solid {COLORS['border']}",
-            "borderRadius": "12px",
-            "padding": "0",
-        },
-        "tertiary": {
-            "backgroundColor": "#172032",
-            "boxShadow": "none",
-            "border": "1px solid #2d3a4e",
-            "borderRadius": "10px",
-            "padding": "0",
-        },
-    }
-
-    style = tier_styles.get(tier, tier_styles["secondary"])
-    style["marginBottom"] = margin_bottom
-
-    css_class = f"section-{tier}"
-    if class_name:
-        css_class += f" {class_name}"
-
-    return html.Div(
-        children,
-        className=css_class,
-        style=style,
-    )
-```
+**Dropped**: `create_section_container()` — returns `html.Div` wrapper but consumers are `dbc.Card` components needing direct styling + CSS class overrides for child CardHeader/CardBody. Wrong abstraction.
 
 ---
 
@@ -393,13 +321,13 @@ Replace with:
 ```python
                         className="mb-4",
                         style={
-                            "backgroundColor": COLORS["secondary"],
-                            "borderTop": f"2px solid {COLORS['accent']}",
-                            "boxShadow": "0 1px 3px rgba(0, 0, 0, 0.12)",
+                            "backgroundColor": HIERARCHY["secondary"]["background"],
+                            "borderTop": HIERARCHY["secondary"]["accent_top"],
+                            "boxShadow": HIERARCHY["secondary"]["shadow"],
                         },
 ```
 
-**Change**: Adds a 2px accent-blue top border to visually anchor the analytics section as secondary-tier content. Also adds a subtle shadow to differentiate from tertiary sections.
+**Change**: Adds a 2px accent-blue top border to visually anchor the analytics section as secondary-tier content. Also adds a subtle shadow to differentiate from tertiary sections. References `HIERARCHY` tokens instead of hardcoding values.
 
 #### Step C4: Add top accent border to Unified Feed section
 
@@ -412,17 +340,17 @@ Find the style dict on the unified feed outer `dbc.Card`:
                         style={"backgroundColor": COLORS["secondary"]},
 ```
 
-Replace with:
+Replace with (note: `marginBottom: "32px"` replaces `className="mb-4"` for the larger tier gap):
 ```python
-                        className="mb-4",
                         style={
-                            "backgroundColor": COLORS["secondary"],
-                            "borderTop": f"2px solid {COLORS['accent']}",
-                            "boxShadow": "0 1px 3px rgba(0, 0, 0, 0.12)",
+                            "backgroundColor": HIERARCHY["secondary"]["background"],
+                            "borderTop": HIERARCHY["secondary"]["accent_top"],
+                            "boxShadow": HIERARCHY["secondary"]["shadow"],
+                            "marginBottom": "32px",
                         },
 ```
 
-**Change**: Same secondary-tier treatment as analytics. The accent top border creates a visual line that guides the eye downward through the secondary-tier content zone.
+**Change**: Same secondary-tier treatment as analytics. The accent top border creates a visual line that guides the eye downward. The `marginBottom: "32px"` creates a larger gap before the tertiary tier (replacing the standard `mb-4` 24px gap). Remove `className="mb-4"` since the inline style handles spacing.
 
 #### Step C5: Style Latest Posts as tertiary tier
 
@@ -437,15 +365,15 @@ Find the style dict on the Latest Posts outer `dbc.Card`:
 
 Replace with:
 ```python
-                        className="mb-4",
+                        className="section-tertiary mb-4",
                         style={
-                            "backgroundColor": "#172032",
-                            "border": "1px solid #2d3a4e",
-                            "boxShadow": "none",
+                            "backgroundColor": HIERARCHY["tertiary"]["background"],
+                            "border": HIERARCHY["tertiary"]["border"],
+                            "boxShadow": HIERARCHY["tertiary"]["shadow"],
                         },
 ```
 
-**Change**: Tertiary tier uses a darker background (`#172032` vs `#1E293B`), a subtler border color (`#2d3a4e` vs `#334155`), and no shadow. This visually recedes the posts section compared to the prediction feed above.
+**Change**: Tertiary tier uses tokens from `HIERARCHY["tertiary"]` — darker background, subtler border, no shadow. The `className="section-tertiary"` triggers CSS overrides for child CardHeader/CardBody backgrounds.
 
 #### Step C6: Style Collapsible Data Table as tertiary tier
 
@@ -459,40 +387,19 @@ Find:
 
 Replace with:
 ```python
+                        className="section-tertiary mb-4",
                         style={
-                            "backgroundColor": "#172032",
-                            "border": "1px solid #2d3a4e",
-                            "boxShadow": "none",
+                            "backgroundColor": HIERARCHY["tertiary"]["background"],
+                            "border": HIERARCHY["tertiary"]["border"],
+                            "boxShadow": HIERARCHY["tertiary"]["shadow"],
                         },
 ```
 
-**Change**: Same tertiary-tier treatment as Latest Posts.
+**Change**: Same tertiary-tier treatment as Latest Posts, using `HIERARCHY` tokens.
 
-#### Step C7: Add section gap between secondary and tertiary tiers
+#### Step C7: REMOVED
 
-**File**: `shitty_ui/pages/dashboard.py`
-**Location**: Between the unified feed and the Latest Posts section (in the `create_dashboard_page()` function)
-
-Insert a spacer div between the unified feed card and the Latest Posts card:
-
-```python
-                    # Tier break: secondary -> tertiary
-                    html.Div(style={"marginBottom": "32px"}),
-```
-
-This creates a 32px gap between the secondary tier (unified feed) and the tertiary tier (posts), which is larger than the 16px `mb-4` gap between same-tier sections. This visual breathing room reinforces the hierarchy.
-
-**Alternative**: Instead of a spacer div, change the unified feed card's `className` from `"mb-4"` to use an explicit style:
-```python
-                        style={
-                            "backgroundColor": COLORS["secondary"],
-                            "borderTop": f"2px solid {COLORS['accent']}",
-                            "boxShadow": "0 1px 3px rgba(0, 0, 0, 0.12)",
-                            "marginBottom": "32px",
-                        },
-```
-
-Use the inline style approach (no spacer div) for cleaner markup. The `className="mb-4"` should be removed since the inline `marginBottom` overrides it.
+Tier gap is now handled by Step C4's inline `marginBottom: "32px"` on the unified feed card. No separate spacer div needed.
 
 ---
 
@@ -624,77 +531,7 @@ Replace with:
 
 The tertiary-tier sections (Latest Posts, Collapsible Data Table) have `dbc.CardHeader` and `dbc.CardBody` children that may explicitly set `backgroundColor: COLORS["secondary"]`. These need to be updated to match the tertiary background.
 
-#### Step F1: Update Latest Posts CardHeader background
-
-**File**: `shitty_ui/pages/dashboard.py`
-**Location**: The Latest Posts `dbc.CardHeader` (inside the full-width card from Phase 05)
-
-If the CardHeader has an explicit `style={"backgroundColor": COLORS["secondary"]}`, change it to:
-```python
-                                style={"backgroundColor": "#172032"},
-```
-
-If the CardHeader has no explicit style (it inherits from the card), no change needed -- the CSS class `.section-tertiary .card-header` from Step D1 handles it. However, since the card uses `dbc.Card` (not a raw div with `className`), we should apply the class name to the wrapping card.
-
-**Approach**: Add `className="section-tertiary mb-4"` to the Latest Posts `dbc.Card`:
-
-Find (the Latest Posts card, after Phase 05):
-```python
-                    dbc.Card(
-                        [
-                            dbc.CardHeader(
-                                [
-                                    html.I(className="fas fa-rss me-2"),
-                                    "Latest Posts",
-```
-
-Add `className` to this card:
-```python
-                    dbc.Card(
-                        [
-                            dbc.CardHeader(
-                                [
-                                    html.I(className="fas fa-rss me-2"),
-                                    "Latest Posts",
-```
-
-Replace the Card's closing parameters:
-```python
-                        className="section-tertiary mb-4",
-                        style={
-                            "backgroundColor": "#172032",
-                            "border": "1px solid #2d3a4e",
-                            "boxShadow": "none",
-                        },
-                    ),
-```
-
-#### Step F2: Update Collapsible Data Table className
-
-**File**: `shitty_ui/pages/dashboard.py`
-**Location**: Lines 282-323 (the collapsible table `dbc.Card`)
-
-Find:
-```python
-                    dbc.Card(
-                        [
-                            dbc.CardHeader(
-                                [
-                                    dbc.Button(
-```
-
-Update the closing parameters of this `dbc.Card`:
-```python
-                        className="section-tertiary mb-4",
-                        style={
-                            "backgroundColor": "#172032",
-                            "border": "1px solid #2d3a4e",
-                            "boxShadow": "none",
-                        },
-                    ),
-```
-
-The `className="section-tertiary"` triggers the CSS rules from Step D1 that set `.section-tertiary .card-header` and `.section-tertiary .card-body` backgrounds.
+**Steps F1/F2 merged into C5/C6**: The `className="section-tertiary"` and `HIERARCHY` token references are now applied directly in Steps C5 and C6. The CSS class `.section-tertiary .card-header` and `.section-tertiary .card-body` rules from Step D1 handle the child background overrides. No separate Change F steps needed.
 
 ---
 
@@ -994,86 +831,7 @@ class TestMetricCardHeroStyle:
         assert card_body.style.get("minHeight") == "130px"
 ```
 
-### New Tests: `TestSectionContainer`
-
-**File**: `shit_tests/shitty_ui/test_cards.py`
-**Location**: After `TestMetricCardHeroStyle` class
-
-```python
-class TestSectionContainer:
-    """Tests for create_section_container helper."""
-
-    def test_primary_tier_has_shadow(self):
-        """Test that primary tier container has elevated box shadow."""
-        from components.cards import create_section_container
-        from dash import html
-
-        container = create_section_container(html.Div("test"), tier="primary")
-        assert "boxShadow" in container.style
-        assert container.style["boxShadow"] != "none"
-
-    def test_secondary_tier_has_standard_border(self):
-        """Test that secondary tier uses standard border color."""
-        from components.cards import create_section_container
-        from dash import html
-
-        container = create_section_container(html.Div("test"), tier="secondary")
-        assert "#334155" in container.style.get("border", "")
-
-    def test_tertiary_tier_has_no_shadow(self):
-        """Test that tertiary tier has no box shadow."""
-        from components.cards import create_section_container
-        from dash import html
-
-        container = create_section_container(html.Div("test"), tier="tertiary")
-        assert container.style.get("boxShadow") == "none"
-
-    def test_tertiary_tier_has_darker_background(self):
-        """Test that tertiary tier uses the sunken background."""
-        from components.cards import create_section_container
-        from dash import html
-
-        container = create_section_container(html.Div("test"), tier="tertiary")
-        assert container.style.get("backgroundColor") == "#172032"
-
-    def test_class_name_includes_tier(self):
-        """Test that className includes section-{tier}."""
-        from components.cards import create_section_container
-        from dash import html
-
-        for tier in ["primary", "secondary", "tertiary"]:
-            container = create_section_container(html.Div("test"), tier=tier)
-            assert f"section-{tier}" in container.className
-
-    def test_custom_class_name_appended(self):
-        """Test that additional class_name is appended."""
-        from components.cards import create_section_container
-        from dash import html
-
-        container = create_section_container(
-            html.Div("test"), tier="secondary", class_name="mb-4"
-        )
-        assert "section-secondary mb-4" == container.className
-
-    def test_custom_margin_bottom(self):
-        """Test that margin_bottom parameter is respected."""
-        from components.cards import create_section_container
-        from dash import html
-
-        container = create_section_container(
-            html.Div("test"), tier="primary", margin_bottom="48px"
-        )
-        assert container.style.get("marginBottom") == "48px"
-
-    def test_invalid_tier_defaults_to_secondary(self):
-        """Test that unknown tier falls back to secondary styling."""
-        from components.cards import create_section_container
-        from dash import html
-
-        container = create_section_container(html.Div("test"), tier="unknown")
-        # Should use secondary defaults, not crash
-        assert "#334155" in container.style.get("border", "")
-```
+**Dropped**: `TestSectionContainer` — `create_section_container()` was removed (wrong abstraction for `dbc.Card` consumers).
 
 ### Existing Test Compatibility
 
@@ -1081,7 +839,7 @@ These existing tests must continue to pass without modification:
 
 - `TestCreateMetricCard` in `test_layout.py` (lines 314-343): Tests `create_metric_card` returns a `dbc.Card`, accepts default color, and accepts custom color. These tests remain valid because the function signature is unchanged (title, value, subtitle, icon, color, note).
 
-- `TestColors.test_colors_are_valid_hex` in `test_layout.py` (lines 115-121): The new `surface_elevated` and `surface_sunken` colors must be valid 7-character hex. Since they are (`#243049` and `#172032`), this test passes.
+- `TestColors.test_colors_are_valid_hex` in `test_layout.py` (lines 115-121): The new `surface_sunken` color must be valid 7-character hex. Since it is (`#172032`), this test passes.
 
 - `TestTypographyConstants` in `test_layout.py` (lines 1368-1456): Constants are only extended, not modified. All existing keys remain.
 
@@ -1112,14 +870,13 @@ These existing tests must continue to pass without modification:
 - [ ] New tests pass: `source venv/bin/activate && pytest shit_tests/shitty_ui/test_layout.py::TestVisualHierarchy -v`
 - [ ] New tests pass: `source venv/bin/activate && pytest shit_tests/shitty_ui/test_layout.py::TestHierarchyCSS -v`
 - [ ] New tests pass: `source venv/bin/activate && pytest shit_tests/shitty_ui/test_cards.py::TestMetricCardHeroStyle -v`
-- [ ] New tests pass: `source venv/bin/activate && pytest shit_tests/shitty_ui/test_cards.py::TestSectionContainer -v`
 - [ ] CHANGELOG.md updated
 
 ---
 
 ## What NOT To Do
 
-1. **Do NOT change the color values in the existing `COLORS` dict.** Only add new keys (`surface_elevated`, `surface_sunken`). Changing existing colors like `primary`, `secondary`, or `border` would break every component in the app. The tertiary background `#172032` is a new distinct value, not a replacement for `COLORS["secondary"]`.
+1. **Do NOT change the color values in the existing `COLORS` dict.** Only add the new key (`surface_sunken`). Changing existing colors like `primary`, `secondary`, or `border` would break every component in the app. The tertiary background `#172032` is a new distinct value, not a replacement for `COLORS["secondary"]`.
 
 2. **Do NOT add shadows to every card.** Only primary-tier (KPI) and secondary-tier (analytics, feed) cards get shadows. Tertiary-tier cards explicitly use `boxShadow: "none"`. Adding shadows everywhere defeats the hierarchy -- the point is that shadows create elevation differences.
 
@@ -1133,7 +890,7 @@ These existing tests must continue to pass without modification:
 
 7. **Do NOT change the mobile responsive breakpoints.** Phase 09 handles mobile. Phase 08 should only add styles that work at all viewport sizes. The KPI card `minHeight: 130px` might need adjustment on mobile, but that is Phase 09's job. Check that `@media (max-width: 768px)` rules in the existing CSS are not broken.
 
-8. **Do NOT hardcode hex colors inline when a `COLORS` key exists.** For example, use `COLORS["accent"]` not `"#3b82f6"` when referencing the accent blue in Python code. The one exception is the translucent accent border `"#3b82f640"` which has alpha and cannot be expressed with the existing COLORS dict (hex doesn't support alpha in CSS shorthand without `rgba()`).
+8. **Do NOT hardcode hex colors inline when a `COLORS` or `HIERARCHY` key exists.** For example, use `COLORS["accent"]` not `"#3b82f6"` when referencing the accent blue in Python code. Use `HIERARCHY["tertiary"]["background"]` not `"#172032"`. The one exception is the translucent accent border in `HIERARCHY` itself (e.g., `{COLORS['accent']}40`) which has alpha and cannot be expressed with the existing COLORS dict.
 
 ---
 
@@ -1162,7 +919,7 @@ Phase 10 changes copy text in section headers. The hierarchy CSS classes (`secti
 
 ### Added
 - **`HIERARCHY` constants** -- Design tokens for primary/secondary/tertiary visual tiers (backgrounds, shadows, borders) in `constants.py`
-- **`create_section_container()`** -- New helper in `cards.py` for wrapping content in tier-appropriate visual containers
+- **`COLORS["surface_sunken"]`** -- Darker surface color for tertiary sections
 - **`.kpi-hero-card` CSS class** -- Hover elevation effect and tabular-nums for KPI metric cards
 - **`.section-tertiary` CSS class** -- Background and border overrides for receded sections (posts, data table)
 ```
