@@ -26,6 +26,7 @@ from components.cards import (
     create_prediction_timeline_card,
     create_related_asset_link,
     create_performance_summary,
+    create_unified_signal_card,
 )
 from components.controls import create_filter_controls, get_period_button_styles
 from components.header import create_header, create_footer
@@ -101,6 +102,16 @@ def create_app() -> Dash:
                 border-radius: 12px;
             }
             .hero-signal-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+            }
+
+            /* Unified signal card hover effect */
+            .unified-signal-card {
+                transition: transform 0.15s ease, box-shadow 0.15s ease;
+                border-radius: 8px;
+            }
+            .unified-signal-card:hover {
                 transform: translateY(-2px);
                 box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
             }

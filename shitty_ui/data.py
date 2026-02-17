@@ -1476,6 +1476,85 @@ def get_active_signals(min_confidence: float = 0.75, hours: int = 48) -> pd.Data
         return pd.DataFrame()
 
 
+def get_unified_feed(
+    limit: int = 15,
+    days: int | None = 90,
+    min_confidence: float = 0.5,
+) -> pd.DataFrame:
+    """Get a unified prediction feed for the dashboard.
+
+    Combines the deduplication logic of get_active_signals() (one row per post,
+    aggregated outcomes) with the time-period filtering of get_recent_signals().
+
+    Sort order: evaluated predictions first (correct/incorrect), then pending,
+    within each group ordered by timestamp descending.
+
+    Args:
+        limit: Maximum number of predictions to return.
+        days: Number of days to look back (None = all time).
+        min_confidence: Minimum confidence threshold.
+
+    Returns:
+        DataFrame with one row per unique post, with aggregated outcome data.
+    """
+    date_filter = ""
+    params: Dict[str, Any] = {
+        "limit": limit,
+        "min_confidence": min_confidence,
+    }
+
+    if days is not None:
+        date_filter = "AND tss.timestamp >= :start_date"
+        params["start_date"] = datetime.now() - timedelta(days=days)
+
+    query = text(f"""
+        SELECT
+            tss.timestamp,
+            tss.text,
+            tss.shitpost_id,
+            p.id as prediction_id,
+            p.assets,
+            p.market_impact,
+            p.confidence,
+            p.thesis,
+            p.analysis_status,
+            COUNT(po.id) AS outcome_count,
+            COUNT(CASE WHEN po.correct_t7 = true THEN 1 END) AS correct_count,
+            COUNT(CASE WHEN po.correct_t7 = false THEN 1 END) AS incorrect_count,
+            AVG(po.return_t7) AS avg_return_t7,
+            SUM(po.pnl_t7) AS total_pnl_t7,
+            BOOL_AND(po.is_complete) AS is_complete
+        FROM truth_social_shitposts tss
+        INNER JOIN predictions p ON tss.shitpost_id = p.shitpost_id
+        LEFT JOIN prediction_outcomes po ON p.id = po.prediction_id
+        WHERE p.analysis_status = 'completed'
+            AND p.confidence IS NOT NULL
+            AND p.confidence >= :min_confidence
+            AND p.assets IS NOT NULL
+            AND p.assets::jsonb <> '[]'::jsonb
+            {date_filter}
+        GROUP BY tss.timestamp, tss.text, tss.shitpost_id,
+                 p.id, p.assets, p.market_impact, p.confidence,
+                 p.thesis, p.analysis_status
+        ORDER BY
+            CASE
+                WHEN COUNT(CASE WHEN po.correct_t7 IS NOT NULL THEN 1 END) > 0
+                THEN 0
+                ELSE 1
+            END,
+            tss.timestamp DESC
+        LIMIT :limit
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        df = pd.DataFrame(rows, columns=columns)
+        return df
+    except Exception as e:
+        logger.error(f"Error loading unified feed: {e}")
+        return pd.DataFrame()
+
+
 def get_active_signals_with_fallback() -> tuple:
     """Get hero signals with progressive fallback for wider time windows.
 

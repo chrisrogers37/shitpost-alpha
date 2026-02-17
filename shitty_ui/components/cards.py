@@ -618,6 +618,204 @@ def create_signal_card(row):
     )
 
 
+def create_unified_signal_card(row) -> html.Div:
+    """Create a card for the unified prediction feed on the dashboard.
+
+    Combines the aggregated outcome logic from hero cards with the compact
+    vertical layout of signal cards. Designed for the unified feed that
+    replaces both the hero section and the recent predictions sidebar.
+
+    Args:
+        row: Dict-like object with columns from get_unified_feed().
+
+    Returns:
+        html.Div containing the rendered card.
+    """
+    timestamp = row.get("timestamp")
+    text_content = row.get("text", "")
+    text_content = strip_urls(text_content)
+    preview = text_content[:200] + "..." if len(text_content) > 200 else text_content
+    confidence = row.get("confidence", 0)
+    assets = row.get("assets", [])
+    market_impact = row.get("market_impact", {})
+    thesis = row.get("thesis", "")
+
+    # Aggregated outcome data (from GROUP BY query)
+    outcome_count = row.get("outcome_count", 0) or 0
+    correct_count = row.get("correct_count", 0) or 0
+    incorrect_count = row.get("incorrect_count", 0) or 0
+    total_pnl_t7 = row.get("total_pnl_t7")
+
+    # Derive overall correctness from aggregated counts
+    if outcome_count > 0 and correct_count + incorrect_count > 0:
+        correct_t7 = correct_count > incorrect_count
+    else:
+        correct_t7 = None  # Pending
+
+    # Determine sentiment
+    sentiment = "neutral"
+    if isinstance(market_impact, dict) and market_impact:
+        first_sentiment = list(market_impact.values())[0]
+        if isinstance(first_sentiment, str):
+            sentiment = first_sentiment.lower()
+
+    # Format time ago (supports weeks for older posts)
+    if isinstance(timestamp, datetime):
+        delta = datetime.now() - timestamp
+        if delta.days > 7:
+            time_ago = f"{delta.days // 7}w ago"
+        elif delta.days > 0:
+            time_ago = f"{delta.days}d ago"
+        elif delta.seconds >= 3600:
+            time_ago = f"{delta.seconds // 3600}h ago"
+        else:
+            time_ago = f"{max(1, delta.seconds // 60)}m ago"
+    else:
+        time_ago = str(timestamp)[:16] if timestamp else ""
+
+    # Asset string
+    asset_str = ", ".join(assets[:4]) if isinstance(assets, list) else str(assets)
+    if isinstance(assets, list) and len(assets) > 4:
+        asset_str += f" +{len(assets) - 4}"
+
+    # Sentiment styling
+    s_style = get_sentiment_style(sentiment)
+    s_color = s_style["color"]
+    s_bg = s_style["bg_color"]
+    s_icon = s_style["icon"]
+
+    # Outcome badge -- uses aggregated P&L
+    pnl_display = total_pnl_t7
+    if correct_t7 is True:
+        outcome_badge = html.Span(
+            [
+                html.I(className="fas fa-check me-1"),
+                f"+${pnl_display:,.0f}" if pnl_display else "Correct",
+            ],
+            style={
+                "color": COLORS["success"],
+                "fontWeight": "600",
+                "fontSize": "0.8rem",
+            },
+        )
+    elif correct_t7 is False:
+        outcome_badge = html.Span(
+            [
+                html.I(className="fas fa-times me-1"),
+                f"${pnl_display:,.0f}" if pnl_display else "Incorrect",
+            ],
+            style={
+                "color": COLORS["danger"],
+                "fontWeight": "600",
+                "fontSize": "0.8rem",
+            },
+        )
+    else:
+        outcome_badge = html.Span(
+            [html.I(className="fas fa-clock me-1"), "Pending"],
+            style={
+                "color": COLORS["warning"],
+                "fontWeight": "600",
+                "fontSize": "0.8rem",
+            },
+        )
+
+    # Build card children
+    children = [
+        # Row 1: time ago + outcome badge
+        html.Div(
+            [
+                html.Span(
+                    time_ago,
+                    style={"color": COLORS["text_muted"], "fontSize": "0.75rem"},
+                ),
+                outcome_badge,
+            ],
+            style={
+                "display": "flex",
+                "justifyContent": "space-between",
+                "alignItems": "center",
+                "marginBottom": "8px",
+            },
+        ),
+        # Row 2: Post preview
+        html.P(
+            preview,
+            style={
+                "fontSize": "0.85rem",
+                "margin": "0 0 10px 0",
+                "lineHeight": "1.5",
+                "color": COLORS["text"],
+            },
+        ),
+        # Row 3: sentiment badge + assets + confidence
+        html.Div(
+            [
+                html.Span(
+                    [
+                        html.I(className=f"fas fa-{s_icon} me-1"),
+                        sentiment.upper(),
+                    ],
+                    className="sentiment-badge",
+                    style={
+                        "backgroundColor": s_bg,
+                        "color": s_color,
+                    },
+                ),
+                html.Span(
+                    asset_str,
+                    style={
+                        "color": COLORS["accent"],
+                        "fontSize": "0.8rem",
+                        "fontWeight": "600",
+                    },
+                ),
+                html.Span(
+                    f"{confidence:.0%}",
+                    style={
+                        "color": COLORS["text_muted"],
+                        "fontSize": "0.8rem",
+                    },
+                ),
+            ],
+            style={
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "12px",
+                "flexWrap": "wrap",
+            },
+        ),
+    ]
+
+    # Row 4: Thesis preview (truncated)
+    if thesis:
+        children.append(
+            html.P(
+                thesis[:150] + "..." if len(thesis) > 150 else thesis,
+                style={
+                    "fontSize": "0.8rem",
+                    "color": COLORS["text_muted"],
+                    "margin": "8px 0 0 0",
+                    "fontStyle": "italic",
+                    "lineHeight": "1.4",
+                },
+            )
+        )
+
+    return html.Div(
+        children,
+        className="unified-signal-card",
+        style={
+            "padding": "16px",
+            "backgroundColor": COLORS["secondary"],
+            "border": f"1px solid {COLORS['border']}",
+            "borderLeft": f"3px solid {s_color}",
+            "borderRadius": "8px",
+            "marginBottom": "12px",
+        },
+    )
+
+
 def create_post_card(row, card_index: int = 0):
     """Create a card for a post in the Latest Posts feed."""
     timestamp = row.get("timestamp")

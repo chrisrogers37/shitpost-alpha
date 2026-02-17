@@ -1695,13 +1695,21 @@ class TestDashboardPageStructure:
         found_ids = _find_component_ids(page)
         assert "post-feed-container" in found_ids
 
-    def test_dashboard_contains_recent_signals(self):
-        """Test that recent-signals-list is present in the dashboard."""
+    def test_dashboard_contains_unified_feed(self):
+        """Test that unified-feed-container is present in the dashboard."""
         from pages.dashboard import create_dashboard_page
 
         page = create_dashboard_page()
         found_ids = _find_component_ids(page)
-        assert "recent-signals-list" in found_ids
+        assert "unified-feed-container" in found_ids
+
+    def test_dashboard_no_longer_has_recent_signals_list(self):
+        """Test that recent-signals-list has been removed."""
+        from pages.dashboard import create_dashboard_page
+
+        page = create_dashboard_page()
+        found_ids = _find_component_ids(page)
+        assert "recent-signals-list" not in found_ids
 
     def test_dashboard_contains_collapse_chevron(self):
         """Test that the collapse section has a chevron icon."""
@@ -1723,13 +1731,13 @@ class TestDashboardPageStructure:
         assert "collapse-chevron" in (chevron.className or "")
         assert "rotated" not in (chevron.className or "")
 
-    def test_dashboard_preserves_hero_signals_section(self):
-        """Test that hero-signals-section is still present."""
+    def test_dashboard_no_longer_has_hero_section(self):
+        """Test that hero-signals-section has been removed."""
         from pages.dashboard import create_dashboard_page
 
         page = create_dashboard_page()
         found_ids = _find_component_ids(page)
-        assert "hero-signals-section" in found_ids
+        assert "hero-signals-section" not in found_ids
 
     def test_dashboard_preserves_performance_metrics(self):
         """Test that performance-metrics is still present."""

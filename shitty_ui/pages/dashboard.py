@@ -14,23 +14,20 @@ from components.cards import (
     create_empty_chart,
     create_empty_state_chart,
     create_empty_state_html,
-    create_hero_signal_card,
     create_metric_card,
-    create_signal_card,
     create_post_card,
+    create_unified_signal_card,
 )
 from components.charts import apply_chart_layout
 from components.controls import create_filter_controls, get_period_button_styles
 from components.header import create_header, create_footer
 from data import (
-    get_recent_signals,
+    get_unified_feed,
     get_performance_metrics,
     get_accuracy_by_confidence,
     get_accuracy_by_asset,
     get_predictions_with_outcomes,
     load_recent_posts,
-    get_active_signals,
-    get_active_signals_with_fallback,
     get_weekly_signal_count,
     get_high_confidence_metrics,
     get_best_performing_asset,
@@ -104,12 +101,6 @@ def create_dashboard_page() -> html.Div:
                             "justifyContent": "flex-end",
                         },
                     ),
-                    # Hero Section: Active High-Confidence Signals
-                    dcc.Loading(
-                        type="default",
-                        color=COLORS["accent"],
-                        children=html.Div(id="hero-signals-section", className="mb-4"),
-                    ),
                     # Key Metrics Row
                     dcc.Loading(
                         id="performance-metrics-loading",
@@ -181,102 +172,79 @@ def create_dashboard_page() -> html.Div:
                         className="mb-4",
                         style={"backgroundColor": COLORS["secondary"]},
                     ),
-                    # ========== Two Column: Latest Posts + Recent Signals ==========
-                    dbc.Row(
+                    # ========== Unified Prediction Feed ==========
+                    dbc.Card(
                         [
-                            # Left column: Latest Posts (wider, primary content)
-                            dbc.Col(
+                            dbc.CardHeader(
                                 [
-                                    dbc.Card(
-                                        [
-                                            dbc.CardHeader(
-                                                [
-                                                    html.I(
-                                                        className="fas fa-rss me-2"
-                                                    ),
-                                                    "Latest Posts",
-                                                    html.Small(
-                                                        " - Trump's posts with LLM analysis",
-                                                        style={
-                                                            "color": COLORS[
-                                                                "text_muted"
-                                                            ],
-                                                            "fontWeight": "normal",
-                                                        },
-                                                    ),
-                                                ],
-                                                className="fw-bold",
-                                            ),
-                                            dbc.CardBody(
-                                                [
-                                                    dcc.Loading(
-                                                        type="circle",
-                                                        color=COLORS["accent"],
-                                                        children=html.Div(
-                                                            id="post-feed-container",
-                                                            style={
-                                                                "maxHeight": "600px",
-                                                                "overflowY": "auto",
-                                                            },
-                                                        ),
-                                                    )
-                                                ]
-                                            ),
-                                        ],
+                                    html.I(className="fas fa-bolt me-2"),
+                                    "Predictions",
+                                    html.Small(
+                                        " - LLM signals with tracked outcomes",
                                         style={
-                                            "backgroundColor": COLORS["secondary"]
+                                            "color": COLORS["text_muted"],
+                                            "fontWeight": "normal",
                                         },
                                     ),
                                 ],
-                                xs=12,
-                                sm=12,
-                                md=7,
-                                lg=7,
-                                xl=7,
+                                className="fw-bold",
+                                style={"backgroundColor": COLORS["secondary"]},
                             ),
-                            # Right column: Recent Predictions
-                            dbc.Col(
+                            dbc.CardBody(
                                 [
-                                    dbc.Card(
-                                        [
-                                            dbc.CardHeader(
-                                                [
-                                                    html.I(
-                                                        className="fas fa-bolt me-2"
-                                                    ),
-                                                    "Recent Predictions",
-                                                ],
-                                                className="fw-bold",
-                                            ),
-                                            dbc.CardBody(
-                                                [
-                                                    dcc.Loading(
-                                                        type="circle",
-                                                        color=COLORS["accent"],
-                                                        children=html.Div(
-                                                            id="recent-signals-list",
-                                                            style={
-                                                                "maxHeight": "600px",
-                                                                "overflowY": "auto",
-                                                            },
-                                                        ),
-                                                    )
-                                                ]
-                                            ),
-                                        ],
-                                        style={
-                                            "backgroundColor": COLORS["secondary"]
-                                        },
-                                    ),
+                                    dcc.Loading(
+                                        type="circle",
+                                        color=COLORS["accent"],
+                                        children=html.Div(
+                                            id="unified-feed-container",
+                                            style={
+                                                "maxHeight": "700px",
+                                                "overflowY": "auto",
+                                            },
+                                        ),
+                                    )
                                 ],
-                                xs=12,
-                                sm=12,
-                                md=5,
-                                lg=5,
-                                xl=5,
+                                style={"backgroundColor": COLORS["secondary"]},
                             ),
                         ],
                         className="mb-4",
+                        style={"backgroundColor": COLORS["secondary"]},
+                    ),
+                    # ========== Latest Posts (full width) ==========
+                    dbc.Card(
+                        [
+                            dbc.CardHeader(
+                                [
+                                    html.I(className="fas fa-rss me-2"),
+                                    "Latest Posts",
+                                    html.Small(
+                                        " - Trump's posts with LLM analysis",
+                                        style={
+                                            "color": COLORS["text_muted"],
+                                            "fontWeight": "normal",
+                                        },
+                                    ),
+                                ],
+                                className="fw-bold",
+                            ),
+                            dbc.CardBody(
+                                [
+                                    dcc.Loading(
+                                        type="circle",
+                                        color=COLORS["accent"],
+                                        children=html.Div(
+                                            id="post-feed-container",
+                                            style={
+                                                "maxHeight": "600px",
+                                                "overflowY": "auto",
+                                            },
+                                        ),
+                                    )
+                                ]
+                            ),
+                        ],
+                        className="mb-4",
+                        style={"backgroundColor": COLORS["secondary"]},
                     ),
                     # ========== Collapsible Full Data Table ==========
                     dbc.Card(
@@ -522,12 +490,11 @@ def register_dashboard_callbacks(app: Dash):
     # ========== Main Dashboard Update Callback ==========
     @app.callback(
         [
-            Output("hero-signals-section", "children"),
+            Output("unified-feed-container", "children"),
             Output("performance-metrics", "children"),
             Output("accuracy-over-time-chart", "figure"),
             Output("confidence-accuracy-chart", "figure"),
             Output("asset-accuracy-chart", "figure"),
-            Output("recent-signals-list", "children"),
             Output("last-update-timestamp", "data"),
         ],
         [
@@ -546,72 +513,37 @@ def register_dashboard_callbacks(app: Dash):
         # Current timestamp for refresh indicator
         current_time = datetime.now().isoformat()
 
-        # ===== Hero Section: Active High-Confidence Signals =====
+        # ===== Unified Prediction Feed =====
         try:
-            active_df, hero_label = get_active_signals_with_fallback()
-            if not active_df.empty:
-                signal_count = len(active_df)
-                hero_cards = [
-                    create_hero_signal_card(row) for _, row in active_df.iterrows()
+            feed_df = get_unified_feed(limit=15, days=days)
+            if not feed_df.empty:
+                feed_cards = [
+                    create_unified_signal_card(row)
+                    for _, row in feed_df.iterrows()
                 ]
-                hero_section = html.Div(
-                    [
-                        html.Div(
-                            [
-                                html.I(
-                                    className="fas fa-bolt me-2",
-                                    style={"color": COLORS["warning"]},
-                                ),
-                                html.Span(
-                                    f"ACTIVE SIGNALS ({signal_count})",
-                                    style={
-                                        "fontWeight": "700",
-                                        "fontSize": "0.9rem",
-                                        "letterSpacing": "0.05em",
-                                    },
-                                ),
-                                html.Span(
-                                    f" - {hero_label}",
-                                    style={
-                                        "color": COLORS["text_muted"],
-                                        "fontSize": "0.8rem",
-                                    },
-                                ),
-                            ],
-                            style={"marginBottom": "12px"},
-                        ),
-                        html.Div(
-                            hero_cards,
-                            className="hero-signals-container",
-                            style={
-                                "display": "flex",
-                                "gap": "12px",
-                                "flexWrap": "wrap",
-                            },
-                        ),
-                    ]
-                )
             else:
                 try:
                     ctx = get_empty_state_context()
-                    hc = ctx["total_high_confidence"]
-                    hc_line = f"{hc} high-confidence signal{'s' if hc != 1 else ''} all-time" if hc > 0 else ""
+                    total_eval = ctx["total_evaluated"]
+                    ctx_line = (
+                        f"{total_eval} evaluated prediction{'s' if total_eval != 1 else ''} all-time"
+                        if total_eval > 0
+                        else ""
+                    )
                 except Exception:
-                    hc_line = ""
-                hero_section = html.Div(
-                    [
-                        create_empty_state_html(
-                            message="No signals with confidence \u2265 60% in the last 30 days",
-                            context_line=hc_line,
-                            action_text="View all on Performance page",
-                            action_href="/performance",
-                        )
-                    ]
-                )
+                    ctx_line = ""
+                feed_cards = [
+                    create_empty_state_html(
+                        message="No predictions for this period",
+                        context_line=ctx_line,
+                        action_text="View all signals",
+                        action_href="/signals",
+                    )
+                ]
         except Exception as e:
-            errors.append(f"Hero signals: {e}")
-            print(f"Error loading hero signals: {traceback.format_exc()}")
-            hero_section = html.Div()
+            errors.append(f"Unified feed: {e}")
+            print(f"Error loading unified feed: {traceback.format_exc()}")
+            feed_cards = [create_error_card("Unable to load predictions", str(e))]
 
         # ===== Performance Metrics with error handling =====
         try:
@@ -897,45 +829,16 @@ def register_dashboard_callbacks(app: Dash):
             print(f"Error loading asset chart: {traceback.format_exc()}")
             asset_fig = create_empty_chart(f"Error: {str(e)[:50]}")
 
-        # ===== Recent Signals with error handling =====
-        try:
-            signals_df = get_recent_signals(limit=10, days=days)
-            if not signals_df.empty:
-                signal_cards = [
-                    create_signal_card(row) for _, row in signals_df.iterrows()
-                ]
-            else:
-                try:
-                    ctx = get_empty_state_context()
-                    total_eval = ctx["total_evaluated"]
-                    ctx_line = f"{total_eval} signal{'s' if total_eval != 1 else ''} all-time" if total_eval > 0 else ""
-                except Exception:
-                    ctx_line = ""
-                signal_cards = [
-                    create_empty_state_html(
-                        message="No recent signals for this period",
-                        context_line=ctx_line,
-                        action_text="View all signals",
-                        action_href="/signals",
-                        icon_class="fas fa-satellite-dish",
-                    )
-                ]
-        except Exception as e:
-            errors.append(f"Recent signals: {e}")
-            print(f"Error loading recent signals: {traceback.format_exc()}")
-            signal_cards = [create_error_card("Unable to load recent signals", str(e))]
-
         # Log any errors that occurred
         if errors:
             print(f"Dashboard update completed with errors: {errors}")
 
         return (
-            hero_section,
+            feed_cards,
             metrics_row,
             acc_fig,
             conf_fig,
             asset_fig,
-            signal_cards,
             current_time,
         )
 

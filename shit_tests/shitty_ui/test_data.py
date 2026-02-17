@@ -1673,6 +1673,144 @@ class TestGetRelatedAssets:
 # =============================================================================
 
 
+class TestGetUnifiedFeed:
+    """Tests for get_unified_feed function."""
+
+    @patch("data.execute_query")
+    def test_returns_dataframe_with_aggregated_columns(self, mock_execute):
+        """Test that unified feed returns DataFrame with expected columns."""
+        from data import get_unified_feed
+
+        mock_execute.return_value = (
+            [
+                (
+                    datetime.now(),
+                    "tariff announcement",
+                    "post123",
+                    1,
+                    ["AAPL", "TSLA"],
+                    {"AAPL": "bullish"},
+                    0.85,
+                    "thesis text",
+                    "completed",
+                    2,       # outcome_count
+                    2,       # correct_count
+                    0,       # incorrect_count
+                    3.5,     # avg_return_t7
+                    70.0,    # total_pnl_t7
+                    True,    # is_complete
+                )
+            ],
+            [
+                "timestamp", "text", "shitpost_id", "prediction_id",
+                "assets", "market_impact", "confidence", "thesis",
+                "analysis_status", "outcome_count", "correct_count",
+                "incorrect_count", "avg_return_t7", "total_pnl_t7",
+                "is_complete",
+            ],
+        )
+
+        result = get_unified_feed(limit=15, days=90)
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 1
+        assert result.iloc[0]["confidence"] == 0.85
+        assert result.iloc[0]["outcome_count"] == 2
+        assert "thesis" in result.columns
+        assert "analysis_status" in result.columns
+
+    @patch("data.execute_query")
+    def test_respects_days_parameter(self, mock_execute):
+        """Test that days parameter adds date filter to query."""
+        from data import get_unified_feed
+
+        mock_execute.return_value = ([], [])
+
+        get_unified_feed(limit=10, days=7)
+
+        call_args = mock_execute.call_args[0]
+        params = call_args[1]
+        assert "start_date" in params
+        assert params["limit"] == 10
+
+    @patch("data.execute_query")
+    def test_no_date_filter_when_days_is_none(self, mock_execute):
+        """Test that days=None omits date filter."""
+        from data import get_unified_feed
+
+        mock_execute.return_value = ([], [])
+
+        get_unified_feed(limit=15, days=None)
+
+        call_args = mock_execute.call_args[0]
+        params = call_args[1]
+        assert "start_date" not in params
+
+    @patch("data.execute_query")
+    def test_respects_min_confidence(self, mock_execute):
+        """Test that min_confidence is passed as query parameter."""
+        from data import get_unified_feed
+
+        mock_execute.return_value = ([], [])
+
+        get_unified_feed(min_confidence=0.7)
+
+        call_args = mock_execute.call_args[0]
+        params = call_args[1]
+        assert params["min_confidence"] == 0.7
+
+    @patch("data.execute_query")
+    def test_returns_empty_dataframe_on_error(self, mock_execute):
+        """Test graceful degradation on database error."""
+        from data import get_unified_feed
+
+        mock_execute.side_effect = Exception("Database error")
+
+        result = get_unified_feed()
+
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+
+    @patch("data.execute_query")
+    def test_returns_empty_dataframe_on_no_results(self, mock_execute):
+        """Test that empty result set returns empty DataFrame, not error."""
+        from data import get_unified_feed
+
+        mock_execute.return_value = ([], [])
+
+        result = get_unified_feed()
+
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+
+    @patch("data.execute_query")
+    def test_query_contains_group_by(self, mock_execute):
+        """Test that query uses GROUP BY for deduplication."""
+        from data import get_unified_feed
+
+        mock_execute.return_value = ([], [])
+
+        get_unified_feed()
+
+        call_args = mock_execute.call_args[0]
+        query_text = str(call_args[0])
+        assert "GROUP BY" in query_text
+
+    @patch("data.execute_query")
+    def test_query_sorts_evaluated_first(self, mock_execute):
+        """Test that query sorts evaluated predictions before pending."""
+        from data import get_unified_feed
+
+        mock_execute.return_value = ([], [])
+
+        get_unified_feed()
+
+        call_args = mock_execute.call_args[0]
+        query_text = str(call_args[0])
+        assert "CASE" in query_text
+        assert "ORDER BY" in query_text
+
+
 class TestGetActiveSignals:
     """Tests for get_active_signals function."""
 
