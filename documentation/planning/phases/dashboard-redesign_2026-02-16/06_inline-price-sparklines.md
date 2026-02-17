@@ -1,7 +1,9 @@
 # Phase 06: Inline Price Sparklines
 
-**Status**: 🔧 IN PROGRESS
+**Status**: ✅ COMPLETE
 **Started**: 2026-02-17
+**Completed**: 2026-02-17
+**PR**: #78
 
 **PR Title**: feat: mini price charts on signal cards
 **Risk Level**: Low
