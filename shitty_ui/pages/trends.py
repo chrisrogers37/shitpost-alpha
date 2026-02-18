@@ -6,6 +6,7 @@ from dash import Dash, html, dcc, Input, Output, callback_context, no_update
 import dash_bootstrap_components as dbc
 
 from constants import COLORS, CHART_CONFIG
+from brand_copy import COPY
 from components.cards import create_error_card
 from components.charts import build_signal_over_trend_chart, build_empty_signal_chart
 from data import get_price_with_signals, get_active_assets_from_db, get_top_predicted_asset
@@ -21,12 +22,12 @@ def create_trends_page() -> html.Div:
                     html.H2(
                         [
                             html.I(className="fas fa-chart-area me-2"),
-                            "Signal Over Trend",
+                            COPY["trends_page_title"],
                         ],
                         style={"margin": 0, "fontWeight": "bold"},
                     ),
                     html.P(
-                        "Prediction signals overlaid on market price charts",
+                        COPY["trends_page_subtitle"],
                         style={
                             "color": COLORS["text_muted"],
                             "margin": 0,
@@ -114,7 +115,7 @@ def create_trends_page() -> html.Div:
                     dbc.CardHeader(
                         [
                             html.I(className="fas fa-chart-area me-2"),
-                            html.Span(id="trends-chart-title", children="Select an asset to view chart"),
+                            html.Span(id="trends-chart-title", children=COPY["trends_chart_default"]),
                         ],
                         className="fw-bold",
                     ),
@@ -184,14 +185,12 @@ def register_trends_callbacks(app: Dash):
         if not symbol:
             return (
                 build_empty_signal_chart(
-                    "No assets with prediction data available yet"
+                    COPY["trends_no_asset_hint"]
                 ),
-                "No Asset Data Available",
+                COPY["trends_no_asset_data"],
                 html.Div(
                     html.P(
-                        "Predictions need to be analyzed and validated before "
-                        "trend charts can be displayed. Check back after the "
-                        "pipeline has processed some posts.",
+                        COPY["trends_no_asset_hint"],
                         style={
                             "color": COLORS["text_muted"],
                             "textAlign": "center",
@@ -293,7 +292,7 @@ def _build_signal_summary(symbol: str, signals_df) -> html.Div:
     if signals_df.empty:
         return html.Div(
             html.P(
-                f"No prediction signals found for {symbol} in this period.",
+                COPY["trends_no_signals_for_asset"].format(symbol=symbol),
                 style={"color": COLORS["text_muted"], "textAlign": "center", "padding": "15px"},
             )
         )
