@@ -21,6 +21,7 @@ from components.cards import (
 from components.charts import apply_chart_layout
 from components.controls import create_filter_controls, get_period_button_styles
 from components.header import create_header, create_footer
+from brand_copy import COPY
 from data import (
     get_unified_feed,
     get_sparkline_prices,
@@ -118,7 +119,7 @@ def create_dashboard_page() -> html.Div:
                             dbc.CardHeader(
                                 [
                                     html.I(className="fas fa-chart-line me-2"),
-                                    "Analytics",
+                                    COPY["analytics_header"],
                                 ],
                                 className="fw-bold",
                                 style={"backgroundColor": HIERARCHY["secondary"]["background"]},
@@ -228,9 +229,9 @@ def create_dashboard_page() -> html.Div:
                             dbc.CardHeader(
                                 [
                                     html.I(className="fas fa-rss me-2"),
-                                    "Latest Posts",
+                                    COPY["latest_posts_header"],
                                     html.Small(
-                                        " - Trump's posts with LLM analysis",
+                                        f" - {COPY['latest_posts_subtitle']}",
                                         style={
                                             "color": COLORS["text_muted"],
                                             "fontWeight": "normal",
@@ -274,7 +275,7 @@ def create_dashboard_page() -> html.Div:
                                                 id="collapse-table-chevron",
                                             ),
                                             html.I(className="fas fa-table me-2"),
-                                            "Full Prediction Data",
+                                            COPY["data_table_header"],
                                         ],
                                         id="collapse-table-button",
                                         color="link",
@@ -345,7 +346,7 @@ def create_performance_page() -> html.Div:
                                                     html.I(
                                                         className="fas fa-chart-bar me-2"
                                                     ),
-                                                    "Accuracy by Confidence Level",
+                                                    COPY["perf_confidence_header"],
                                                 ],
                                                 className="fw-bold",
                                             ),
@@ -373,7 +374,7 @@ def create_performance_page() -> html.Div:
                                                     html.I(
                                                         className="fas fa-chart-pie me-2"
                                                     ),
-                                                    "Sentiment Breakdown",
+                                                    COPY["perf_sentiment_header"],
                                                 ],
                                                 className="fw-bold",
                                             ),
@@ -407,7 +408,7 @@ def create_performance_page() -> html.Div:
                                                     html.I(
                                                         className="fas fa-table me-2"
                                                     ),
-                                                    "Performance by Asset",
+                                                    COPY["perf_asset_header"],
                                                 ],
                                                 className="fw-bold",
                                             ),
@@ -577,7 +578,7 @@ def register_dashboard_callbacks(app: Dash):
                     ctx_line = ""
                 feed_cards = [
                     create_empty_state_html(
-                        message="No predictions for this period",
+                        message=COPY["empty_feed_period"],
                         context_line=ctx_line,
                         action_text="View all signals",
                         action_href="/signals",
@@ -598,9 +599,9 @@ def register_dashboard_callbacks(app: Dash):
                 [
                     dbc.Col(
                         create_metric_card(
-                            "Total Signals",
+                            COPY["kpi_total_signals_title"],
                             f"{kpis['total_signals']}",
-                            "evaluated predictions",
+                            COPY["kpi_total_signals_subtitle"],
                             "signal",
                             COLORS["accent"],
                             note=fallback_note,
@@ -612,9 +613,9 @@ def register_dashboard_callbacks(app: Dash):
                     ),
                     dbc.Col(
                         create_metric_card(
-                            "Accuracy",
+                            COPY["kpi_accuracy_title"],
                             f"{kpis['accuracy_pct']:.1f}%",
-                            "correct at 7 days",
+                            COPY["kpi_accuracy_subtitle"],
                             "bullseye",
                             COLORS["success"]
                             if kpis["accuracy_pct"] > 50
@@ -628,9 +629,9 @@ def register_dashboard_callbacks(app: Dash):
                     ),
                     dbc.Col(
                         create_metric_card(
-                            "Avg 7-Day Return",
+                            COPY["kpi_avg_return_title"],
                             f"{kpis['avg_return_t7']:+.2f}%",
-                            "mean return per signal",
+                            COPY["kpi_avg_return_subtitle"],
                             "chart-line",
                             COLORS["success"]
                             if kpis["avg_return_t7"] > 0
@@ -644,9 +645,9 @@ def register_dashboard_callbacks(app: Dash):
                     ),
                     dbc.Col(
                         create_metric_card(
-                            "Total P&L",
+                            COPY["kpi_pnl_title"],
                             f"${kpis['total_pnl']:+,.0f}",
-                            "simulated $1,000 trades",
+                            COPY["kpi_pnl_subtitle"],
                             "dollar-sign",
                             COLORS["success"]
                             if kpis["total_pnl"] > 0
@@ -743,8 +744,8 @@ def register_dashboard_callbacks(app: Dash):
                     ctx_line = ""
                     act_text = ""
                 acc_fig = create_empty_state_chart(
-                    message="No evaluated predictions yet",
-                    hint="Predictions need 7+ trading days to mature before accuracy is measured",
+                    message=COPY["chart_empty_accuracy"],
+                    hint=COPY["chart_empty_accuracy_hint"],
                     context_line=ctx_line,
                     action_text=act_text,
                 )
@@ -802,8 +803,8 @@ def register_dashboard_callbacks(app: Dash):
                     ctx_line = ""
                     act_text = ""
                 conf_fig = create_empty_state_chart(
-                    message="No accuracy data for this period",
-                    hint="Predictions need 7+ trading days to mature before accuracy is measured",
+                    message=COPY["chart_empty_confidence"],
+                    hint=COPY["chart_empty_confidence_hint"],
                     context_line=ctx_line,
                     action_text=act_text,
                 )
@@ -866,8 +867,8 @@ def register_dashboard_callbacks(app: Dash):
                     ctx_line = ""
                     act_text = ""
                 asset_fig = create_empty_state_chart(
-                    message="No asset performance data for this period",
-                    hint="Asset accuracy appears after prediction outcomes are evaluated",
+                    message=COPY["chart_empty_asset"],
+                    hint=COPY["chart_empty_asset_hint"],
                     context_line=ctx_line,
                     action_text=act_text,
                 )
@@ -904,7 +905,7 @@ def register_dashboard_callbacks(app: Dash):
 
             if df.empty:
                 return html.P(
-                    "No posts available.",
+                    COPY["empty_posts"],
                     style={
                         "color": COLORS["text_muted"],
                         "textAlign": "center",
@@ -1007,7 +1008,7 @@ def register_dashboard_callbacks(app: Dash):
 
             if df.empty:
                 return html.P(
-                    "No prediction data available.",
+                    COPY["empty_predictions_table"],
                     style={
                         "color": COLORS["text_muted"],
                         "textAlign": "center",
@@ -1132,14 +1133,14 @@ def register_dashboard_callbacks(app: Dash):
                                 html.Div(
                                     [
                                         html.H4(
-                                            "Backtest Results",
+                                            COPY["backtest_title"],
                                             style={
                                                 "margin": 0,
                                                 "fontWeight": "700",
                                             },
                                         ),
                                         html.P(
-                                            "Simulated P&L following high-confidence (>75%) signals with $10,000",
+                                            COPY["backtest_subtitle"],
                                             style={
                                                 "color": COLORS["text_muted"],
                                                 "margin": "4px 0 0 0",
@@ -1269,8 +1270,8 @@ def register_dashboard_callbacks(app: Dash):
                 except Exception:
                     ctx_line = ""
                 conf_fig = create_empty_state_chart(
-                    message="No confidence breakdown available yet",
-                    hint="Appears after predictions have evaluated outcomes",
+                    message=COPY["perf_empty_confidence"],
+                    hint=COPY["perf_empty_confidence_hint"],
                     context_line=ctx_line,
                 )
         except Exception as e:
@@ -1340,8 +1341,8 @@ def register_dashboard_callbacks(app: Dash):
                 except Exception:
                     ctx_line = ""
                 sent_fig = create_empty_state_chart(
-                    message="No sentiment breakdown available yet",
-                    hint="Appears after predictions with sentiment labels are evaluated",
+                    message=COPY["perf_empty_sentiment"],
+                    hint=COPY["perf_empty_sentiment_hint"],
                     context_line=ctx_line,
                 )
         except Exception as e:
@@ -1429,7 +1430,7 @@ def register_dashboard_callbacks(app: Dash):
                 )
             else:
                 asset_table = html.P(
-                    "No asset data available.",
+                    COPY["perf_empty_asset_table"],
                     style={"color": COLORS["text_muted"], "textAlign": "center"},
                 )
         except Exception as e:

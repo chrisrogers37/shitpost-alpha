@@ -9,6 +9,7 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 
 from constants import COLORS, FONT_SIZES, HIERARCHY, SENTIMENT_COLORS, SENTIMENT_BG_COLORS
+from brand_copy import COPY
 from components.sparkline import create_sparkline_component, create_sparkline_placeholder
 
 
@@ -72,7 +73,7 @@ def create_error_card(message: str, details: str = None):
                                 style={"color": COLORS["danger"]},
                             ),
                             html.Span(
-                                "Error Loading Data",
+                                COPY["card_error_title"],
                                 style={"color": COLORS["danger"], "fontWeight": "bold"},
                             ),
                         ],
@@ -997,7 +998,7 @@ def create_post_card(row, card_index: int = 0):
                 html.Span(
                     [
                         html.I(className="fas fa-forward me-1"),
-                        "Bypassed",
+                        COPY["card_bypassed"],
                     ],
                     className="badge",
                     style={
@@ -1018,7 +1019,7 @@ def create_post_card(row, card_index: int = 0):
             html.Span(
                 [
                     html.I(className="fas fa-clock me-1"),
-                    "Pending Analysis",
+                    COPY["card_pending_analysis"],
                 ],
                 className="badge",
                 style={

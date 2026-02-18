@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Brand identity system** -- Centralized `COPY` dictionary in `shitty_ui/brand_copy.py` for all user-facing branded text
+- **Self-deprecating copy** -- Replaced generic dashboard text with personality-driven copy that acknowledges the absurdity of the product
+  - Header: "Weaponizing shitposts since 2025"
+  - KPI subtitles: "correct after 7 days (coin flip is 50%)", "simulated $1k trades (monopoly money)"
+  - Signals: "Every prediction, including the embarrassing ones"
+  - Trends: "Pick an asset to see how wrong we are"
+  - Assets: "The Full Damage Report for {SYMBOL}"
+  - Footer: "We are tracking a shitposter's tweets and pretending an AI can predict markets from them"
+- **Tone guard tests** -- Automated tests prevent stale memes, excessive punctuation, and corporate language from entering the copy
 - **`HIERARCHY` design tokens** -- Centralized primary/secondary/tertiary visual tier definitions (backgrounds, shadows, borders) in `constants.py` for consistent section differentiation
 - **`COLORS["surface_sunken"]`** -- Darker surface color (`#172032`) for tertiary dashboard sections
 - **`.kpi-hero-card` CSS class** -- Hover elevation effect with `translateY(-2px)` and stronger shadow, plus `tabular-nums` for stable KPI number rendering

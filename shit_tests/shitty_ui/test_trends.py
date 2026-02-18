@@ -79,7 +79,7 @@ class TestBuildSignalSummary:
         result = _build_signal_summary("TEST", pd.DataFrame())
         assert isinstance(result, html.Div)
         html_str = str(result)
-        assert "No prediction signals found" in html_str
+        assert "No prediction signals for TEST" in html_str
 
     def test_valid_signals_returns_row(self):
         """Test that valid signals produce a summary row."""

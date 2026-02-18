@@ -18,6 +18,7 @@ from components.cards import (
     create_performance_summary,
 )
 from components.header import create_footer
+from brand_copy import COPY
 from data import (
     get_asset_price_history,
     get_asset_predictions,
@@ -139,7 +140,7 @@ def create_asset_page(symbol: str) -> html.Div:
                                                     html.I(
                                                         className="fas fa-chart-pie me-2"
                                                     ),
-                                                    "Performance Summary",
+                                                    COPY["asset_performance_header"],
                                                 ],
                                                 className="fw-bold",
                                             ),
@@ -158,7 +159,7 @@ def create_asset_page(symbol: str) -> html.Div:
                                                     html.I(
                                                         className="fas fa-project-diagram me-2"
                                                     ),
-                                                    "Related Assets",
+                                                    COPY["asset_related_header"],
                                                 ],
                                                 className="fw-bold",
                                             ),
@@ -179,7 +180,7 @@ def create_asset_page(symbol: str) -> html.Div:
                             dbc.CardHeader(
                                 [
                                     html.I(className="fas fa-history me-2"),
-                                    f"Prediction Timeline for {symbol}",
+                                    COPY["asset_timeline_header"].format(symbol=symbol),
                                 ],
                                 className="fw-bold",
                             ),
@@ -272,7 +273,7 @@ def create_asset_header(symbol: str) -> html.Div:
                         style={"display": "flex", "alignItems": "baseline"},
                     ),
                     html.P(
-                        "Prediction Performance Deep Dive",
+                        COPY["asset_page_subtitle"].format(symbol=symbol),
                         style={
                             "color": COLORS["text_muted"],
                             "margin": 0,
@@ -386,7 +387,7 @@ def register_asset_callbacks(app: Dash):
                 latest_close = price_df.iloc[-1]["close"]
                 current_price_text = f"${latest_close:,.2f}"
             else:
-                current_price_text = "Price unavailable"
+                current_price_text = COPY["asset_no_price"]
 
             # --- PERFORMANCE SUMMARY ---
             performance_summary = create_performance_summary(stats)
@@ -401,7 +402,7 @@ def register_asset_callbacks(app: Dash):
             else:
                 timeline_cards = [
                     html.P(
-                        f"No predictions found for {symbol}.",
+                        COPY["asset_no_predictions"].format(symbol=symbol),
                         style={
                             "color": COLORS["text_muted"],
                             "textAlign": "center",
@@ -420,7 +421,7 @@ def register_asset_callbacks(app: Dash):
             else:
                 related_links = [
                     html.P(
-                        "No related assets found.",
+                        COPY["asset_no_related"],
                         style={
                             "color": COLORS["text_muted"],
                             "textAlign": "center",
