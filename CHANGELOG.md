@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Harvester failing on ScrapeCreators API** -- API began returning `content-type: text/plain` instead of `application/json`, causing aiohttp's `response.json()` to reject the valid JSON body. Added `content_type=None` to both `_test_connection()` and `_fetch_batch()` calls to accept any content type.
+
 ## [v1.2.0] - 2026-02-18
 
 ### Added

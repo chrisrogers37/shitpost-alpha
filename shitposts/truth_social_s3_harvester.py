@@ -77,7 +77,7 @@ class TruthSocialS3Harvester(SignalHarvester):
             logger.debug(f"API test response status: {response.status}")
             if response.status != 200:
                 raise Exception(f"API connection test failed: {response.status}")
-            data = await response.json()
+            data = await response.json(content_type=None)
             if not data.get('success'):
                 raise Exception(f"API returned error: {data}")
         logger.debug("ScrapeCreators API connection test successful")
@@ -108,7 +108,7 @@ class TruthSocialS3Harvester(SignalHarvester):
                     logger.error(f"API request failed: {response.status}")
                     return [], None
 
-                data = await response.json()
+                data = await response.json(content_type=None)
                 if not data.get('success'):
                     logger.error(f"API returned error: {data}")
                     return [], None

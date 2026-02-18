@@ -155,7 +155,7 @@ class TestTruthSocialS3Harvester:
         # Mock aiohttp ClientSession
         class MockResponse:
             status = 200
-            async def json(self):
+            async def json(self, **kwargs):
                 return {"success": True, "posts": []}
             async def __aenter__(self):
                 return self
@@ -221,7 +221,7 @@ class TestTruthSocialS3Harvester:
         """Test API connection test."""
         class MockResponse:
             status = 200
-            async def json(self):
+            async def json(self, **kwargs):
                 return {"success": True}
             async def __aenter__(self):
                 return self
@@ -242,7 +242,7 @@ class TestTruthSocialS3Harvester:
         """Test successful fetching via _fetch_batch."""
         class MockResponse:
             status = 200
-            async def json(self):
+            async def json(self, **kwargs):
                 return sample_api_response
             async def __aenter__(self):
                 return self
@@ -267,7 +267,7 @@ class TestTruthSocialS3Harvester:
         """Test fetching with cursor parameter."""
         class MockResponse:
             status = 200
-            async def json(self):
+            async def json(self, **kwargs):
                 return sample_api_response
             async def __aenter__(self):
                 return self
@@ -295,7 +295,7 @@ class TestTruthSocialS3Harvester:
         """Test backward-compatible _fetch_recent_shitposts method."""
         class MockResponse:
             status = 200
-            async def json(self):
+            async def json(self, **kwargs):
                 return sample_api_response
             async def __aenter__(self):
                 return self
@@ -319,7 +319,7 @@ class TestTruthSocialS3Harvester:
         """Test fetching shitposts with max_id parameter."""
         class MockResponse:
             status = 200
-            async def json(self):
+            async def json(self, **kwargs):
                 return sample_api_response
             async def __aenter__(self):
                 return self
@@ -370,7 +370,7 @@ class TestTruthSocialS3Harvester:
         """Test fetching with API error in response."""
         class MockResponse:
             status = 200
-            async def json(self):
+            async def json(self, **kwargs):
                 return {"success": False, "error": "API error"}
             async def __aenter__(self):
                 return self
@@ -432,7 +432,7 @@ class TestTruthSocialS3Harvester:
         class MockResponse:
             status = 200
             call_count = 0
-            async def json(self_resp):
+            async def json(self_resp, **kwargs):
                 self_resp.call_count += 1
                 if self_resp.call_count > 1:
                     return {"success": True, "posts": []}
@@ -472,7 +472,7 @@ class TestTruthSocialS3Harvester:
         class MockResponse:
             status = 200
             call_count = 0
-            async def json(self_resp):
+            async def json(self_resp, **kwargs):
                 self_resp.call_count += 1
                 if self_resp.call_count > 1:
                     return {"success": True, "posts": []}
@@ -509,7 +509,7 @@ class TestTruthSocialS3Harvester:
 
         class MockResponse:
             status = 200
-            async def json(self):
+            async def json(self, **kwargs):
                 return sample_api_response
             async def __aenter__(self):
                 return self
@@ -538,7 +538,7 @@ class TestTruthSocialS3Harvester:
         class MockResponse:
             status = 200
             call_count = 0
-            async def json(self_resp):
+            async def json(self_resp, **kwargs):
                 self_resp.call_count += 1
                 if self_resp.call_count > 1:
                     return {"success": True, "posts": []}
@@ -569,7 +569,7 @@ class TestTruthSocialS3Harvester:
         """Test incremental mode stops when encountering existing posts in S3."""
         class MockResponse:
             status = 200
-            async def json(self):
+            async def json(self, **kwargs):
                 return sample_api_response
             async def __aenter__(self):
                 return self
@@ -625,7 +625,7 @@ class TestTruthSocialS3Harvester:
 
             class MockResponse:
                 status = 200
-                async def json(self):
+                async def json(self, **kwargs):
                     return api_response
                 async def __aenter__(self):
                     return self
@@ -672,7 +672,7 @@ class TestTruthSocialS3Harvester:
 
             class MockResponse:
                 status = 200
-                async def json(self):
+                async def json(self, **kwargs):
                     return old_posts_response
                 async def __aenter__(self):
                     return self
