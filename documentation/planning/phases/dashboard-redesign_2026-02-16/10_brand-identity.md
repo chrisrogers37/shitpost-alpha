@@ -1,10 +1,20 @@
 # Phase 10: Brand Identity Injection
 
+**Status**: ✅ COMPLETE
+**Started**: 2026-02-17
+**Completed**: 2026-02-17
 **PR Title**: style: self-deprecating copy & personality
 **Risk Level**: Low
 **Estimated Effort**: Small (1-2 hours)
 **Dependencies**: Phase 03 (Smart Empty States), Phase 05 (Merge Sections)
 **Unlocks**: None (final phase)
+
+### Challenge Round Decisions (2026-02-17)
+- Removed dead references: `recent_predictions_header`, `hero_label_prefix`, `hero_label_suffix`, `hero_empty` (hero section removed in Phase 05)
+- Added `empty_feed_period` key for actual unified feed empty state at dashboard.py:580
+- Renamed `copy.py` → `brand_copy.py` to avoid shadowing Python's stdlib `copy` module
+- Kept identical-text COPY keys (centralization is the point)
+- Fixed mismatched "before" strings to match actual codebase
 
 ## Files Modified
 
