@@ -41,6 +41,7 @@ def create_header():
                                 },
                             ),
                         ],
+                        className="header-logo",
                         style={"marginRight": "30px"},
                     ),
                     # Navigation links
@@ -80,7 +81,12 @@ def create_header():
                                 id="nav-link-performance",
                             ),
                         ],
-                        style={"display": "flex", "gap": "8px", "alignItems": "center"},
+                        className="nav-links-row",
+                        style={
+                            "display": "flex",
+                            "gap": "8px",
+                            "alignItems": "center",
+                        },
                     ),
                 ],
                 style={"display": "flex", "alignItems": "center", "flex": 1},
@@ -120,6 +126,7 @@ def create_header():
                                     ),
                                     html.Span(
                                         "Last updated ",
+                                        className="refresh-detail",
                                         style={
                                             "color": COLORS["text_muted"],
                                             "fontSize": "0.7rem",
@@ -137,6 +144,7 @@ def create_header():
                                 [
                                     html.Span(
                                         "Next refresh ",
+                                        className="refresh-detail",
                                         style={
                                             "color": COLORS["text_muted"],
                                             "fontSize": "0.7rem",

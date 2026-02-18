@@ -173,6 +173,7 @@ CHART_CONFIG = {
     "displayModeBar": False,
     "displaylogo": False,
     "scrollZoom": False,
+    "responsive": True,
 }
 
 # Extended candlestick-specific colors (override Plotly defaults)

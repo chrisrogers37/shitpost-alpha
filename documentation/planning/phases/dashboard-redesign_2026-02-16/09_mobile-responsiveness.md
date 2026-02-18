@@ -3,6 +3,8 @@
 **PR Title**: fix: mobile layout at 375px viewport
 **Risk Level**: Low
 **Estimated Effort**: Small (1-2 hours)
+**Status**: 🔧 IN PROGRESS
+**Started**: 2026-02-17
 **Dependencies**: Phase 08 (visual hierarchy)
 **Unlocks**: None (leaf node)
 
@@ -13,7 +15,7 @@
 | `shitty_ui/layout.py` | Replace existing `@media (max-width: 768px)` block with comprehensive mobile-first media queries for 375px, 480px, and 768px breakpoints; add viewport meta tag |
 | `shitty_ui/components/header.py` | Restructure `create_header()` to stack logo/nav vertically on mobile; make nav links scrollable-horizontal; increase touch target sizes to 48px; hide refresh indicator text on small screens |
 | `shitty_ui/pages/dashboard.py` | Add `className` props to KPI card columns for CSS-driven stacking; set chart `config.responsive: True`; constrain main content padding on mobile |
-| `shitty_ui/constants.py` | Add `BREAKPOINTS` dict with `xs`, `sm`, `md`, `lg` viewport widths |
+| `shitty_ui/constants.py` | Add `"responsive": True` to `CHART_CONFIG` dict |
 | `shit_tests/shitty_ui/test_layout.py` | Add tests for new CSS classes, breakpoint constants, viewport meta tag, touch target dimensions |
 | `shit_tests/shitty_ui/test_cards.py` | Add tests for `hero-signal-card` minimum width on mobile |
 | `CHANGELOG.md` | Add entry |
@@ -39,23 +41,14 @@ The existing `@media (max-width: 768px)` block in `layout.py` (lines 152-186) ad
 
 ## Detailed Implementation
 
-### Change A: Add Breakpoint Constants
+### Change A: Add `responsive: True` to CHART_CONFIG
 
-#### Step A1: Add `BREAKPOINTS` to constants.py
+#### Step A1: Update `CHART_CONFIG` in constants.py
 
 **File**: `shitty_ui/constants.py`
-**Location**: After the `SECTION_ACCENT` dict (after line 89)
+**Location**: The `CHART_CONFIG` dict
 
-```python
-# Responsive breakpoints (viewport widths in px)
-# Used in CSS media queries in layout.py index_string
-BREAKPOINTS = {
-    "xs": 375,   # iPhone SE, small Android
-    "sm": 480,   # Large phones
-    "md": 768,   # iPad portrait, small tablets
-    "lg": 1024,  # iPad landscape, small laptops
-}
-```
+Add `"responsive": True` to the existing `CHART_CONFIG` dict. This fixes all charts globally with a single change instead of modifying 5 individual `dcc.Graph` calls.
 
 ---
 
@@ -701,36 +694,9 @@ To:
 
 Apply the same `className="kpi-col-mobile"` addition to all 4 `dbc.Col` wrappers: Total Signals, Accuracy, Avg 7-Day Return, and Total P&L.
 
-#### Step D3: Set `config.responsive: True` on all Plotly charts
+#### Step D3: Chart responsiveness
 
-**File**: `shitty_ui/pages/dashboard.py`
-**Location**: Lines 134-137, 149-150, 167 (the `dcc.Graph` components for accuracy, confidence, and asset charts)
-
-For each `dcc.Graph` in the analytics tabs, change the `config` dict to include `responsive: True`:
-
-Change:
-```python
-                                                        config={
-                                                            "displayModeBar": False
-                                                        },
-```
-
-To:
-```python
-                                                        config={
-                                                            "displayModeBar": False,
-                                                            "responsive": True,
-                                                        },
-```
-
-Apply this to all three chart `dcc.Graph` components:
-- `accuracy-over-time-chart` (line ~134)
-- `confidence-accuracy-chart` (line ~149)
-- `asset-accuracy-chart` (line ~167)
-
-Also apply to the performance page charts:
-- `perf-confidence-chart` (line ~370)
-- `perf-sentiment-chart` (line ~400)
+Charts already use `config=CHART_CONFIG` from constants.py. The `"responsive": True` flag was added to `CHART_CONFIG` in Change A. No per-graph changes needed in dashboard.py.
 
 #### Step D4: Apply same main-content-container class to /performance page
 
@@ -762,49 +728,17 @@ The inline style `"minWidth": "280px"` on `create_hero_signal_card()` in `cards.
 
 ### New Tests in `shit_tests/shitty_ui/test_layout.py`
 
-#### Test Class: `TestResponsiveBreakpoints`
+#### Test Class: `TestChartConfigResponsive`
 
 ```python
-class TestResponsiveBreakpoints:
-    """Tests for responsive breakpoint constants."""
+class TestChartConfigResponsive:
+    """Tests for chart config responsive flag."""
 
-    def test_breakpoints_dict_exists(self):
-        """Test that BREAKPOINTS dictionary is defined with required keys."""
-        from constants import BREAKPOINTS
+    def test_chart_config_has_responsive_true(self):
+        """Test that CHART_CONFIG includes responsive: True."""
+        from constants import CHART_CONFIG
 
-        assert isinstance(BREAKPOINTS, dict)
-        required_keys = ["xs", "sm", "md", "lg"]
-        for key in required_keys:
-            assert key in BREAKPOINTS, f"BREAKPOINTS missing key: {key}"
-
-    def test_breakpoints_are_integers(self):
-        """Test that all breakpoint values are integers (pixels)."""
-        from constants import BREAKPOINTS
-
-        for name, value in BREAKPOINTS.items():
-            assert isinstance(value, int), f"BREAKPOINTS['{name}'] should be int, got: {type(value)}"
-
-    def test_breakpoints_increase(self):
-        """Test that breakpoints increase from xs to lg."""
-        from constants import BREAKPOINTS
-
-        order = ["xs", "sm", "md", "lg"]
-        for i in range(len(order) - 1):
-            assert BREAKPOINTS[order[i]] < BREAKPOINTS[order[i + 1]], (
-                f"BREAKPOINTS['{order[i]}'] should be less than BREAKPOINTS['{order[i + 1]}']"
-            )
-
-    def test_xs_is_375(self):
-        """Test that the smallest breakpoint matches iPhone SE width."""
-        from constants import BREAKPOINTS
-
-        assert BREAKPOINTS["xs"] == 375
-
-    def test_md_is_768(self):
-        """Test that the tablet breakpoint matches iPad portrait width."""
-        from constants import BREAKPOINTS
-
-        assert BREAKPOINTS["md"] == 768
+        assert CHART_CONFIG.get("responsive") is True
 ```
 
 #### Test Class: `TestViewportMetaTag`
@@ -978,9 +912,10 @@ class TestDashboardResponsiveProps:
         found = _find_components_with_class(page, "main-content-container")
         assert len(found) > 0, "main-content-container className not found in performance page"
 
-    def test_chart_configs_have_responsive_true(self):
-        """Test that chart dcc.Graph components have responsive: True in config."""
+    def test_charts_use_chart_config(self):
+        """Test that chart dcc.Graph components use the shared CHART_CONFIG."""
         from pages.dashboard import create_dashboard_page
+        from constants import CHART_CONFIG
         from dash import dcc
 
         page = create_dashboard_page()
@@ -989,8 +924,8 @@ class TestDashboardResponsiveProps:
         for graph in graphs:
             if hasattr(graph, "id") and graph.id in chart_ids:
                 config = getattr(graph, "config", {}) or {}
-                assert config.get("responsive") is True, (
-                    f"Graph '{graph.id}' should have config.responsive=True"
+                assert config == CHART_CONFIG, (
+                    f"Graph '{graph.id}' should use CHART_CONFIG"
                 )
 ```
 
@@ -1058,7 +993,7 @@ class TestHeroCardMobileWidth:
 ### Fixed
 - **Mobile layout at 375px viewport** -- Added comprehensive responsive CSS with three breakpoints (375px, 480px, 768px)
   - KPI cards: reduced padding and font sizes to prevent horizontal overflow on small screens
-  - Charts: added `config.responsive: True` to all Plotly graphs; CSS caps chart height per breakpoint
+  - Charts: added `responsive: True` to shared `CHART_CONFIG`; CSS caps chart height per breakpoint
   - Navigation: horizontal-scroll nav links with 48px minimum touch targets (WCAG 2.5.8)
   - Header: stacks vertically on mobile; refresh labels hidden below 480px to save space
   - Hero cards: `min-width` unset on mobile, cards stack vertically at full width

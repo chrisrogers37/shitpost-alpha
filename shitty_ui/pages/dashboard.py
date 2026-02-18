@@ -311,6 +311,7 @@ def create_dashboard_page() -> html.Div:
                     # Footer
                     create_footer(),
                 ],
+                className="main-content-container",
                 style={"padding": "20px", "maxWidth": "1400px", "margin": "0 auto"},
             ),
         ]
@@ -432,6 +433,7 @@ def create_performance_page() -> html.Div:
                     ),
                     create_footer(),
                 ],
+                className="main-content-container",
                 style={"padding": "20px", "maxWidth": "1400px", "margin": "0 auto"},
             ),
         ]
@@ -606,6 +608,7 @@ def register_dashboard_callbacks(app: Dash):
                         xs=6,
                         sm=6,
                         md=3,
+                        className="kpi-col-mobile",
                     ),
                     dbc.Col(
                         create_metric_card(
@@ -621,6 +624,7 @@ def register_dashboard_callbacks(app: Dash):
                         xs=6,
                         sm=6,
                         md=3,
+                        className="kpi-col-mobile",
                     ),
                     dbc.Col(
                         create_metric_card(
@@ -636,6 +640,7 @@ def register_dashboard_callbacks(app: Dash):
                         xs=6,
                         sm=6,
                         md=3,
+                        className="kpi-col-mobile",
                     ),
                     dbc.Col(
                         create_metric_card(
@@ -651,6 +656,7 @@ def register_dashboard_callbacks(app: Dash):
                         xs=6,
                         sm=6,
                         md=3,
+                        className="kpi-col-mobile",
                     ),
                 ],
                 className="g-2 g-md-2",

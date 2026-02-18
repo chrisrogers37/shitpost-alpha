@@ -77,6 +77,25 @@ def _find_component_by_id(component, target_id):
     return None
 
 
+def _find_components_with_class(component, class_name):
+    """Recursively find all components with a given className."""
+    found = []
+    comp_class = getattr(component, "className", None)
+    if comp_class and class_name in str(comp_class):
+        found.append(component)
+
+    children = getattr(component, "children", None)
+    if children is None:
+        return found
+    if isinstance(children, (list, tuple)):
+        for child in children:
+            if hasattr(child, "children") or hasattr(child, "className"):
+                found.extend(_find_components_with_class(child, class_name))
+    elif hasattr(children, "children") or hasattr(children, "className"):
+        found.extend(_find_components_with_class(children, class_name))
+    return found
+
+
 def _find_components_by_type(component, comp_type):
     """Recursively find all components of a given type in a Dash component tree."""
     found = []
@@ -2081,3 +2100,166 @@ class TestHierarchyCSS:
         app = create_app()
 
         assert "box-shadow:" in app.index_string or "boxShadow" in app.index_string
+
+
+class TestChartConfigResponsive:
+    """Tests for chart config responsive flag."""
+
+    def test_chart_config_has_responsive_true(self):
+        """Test that CHART_CONFIG includes responsive: True."""
+        from constants import CHART_CONFIG
+
+        assert CHART_CONFIG.get("responsive") is True
+
+
+class TestViewportMetaTag:
+    """Tests for the viewport meta tag in the app index string."""
+
+    @patch("data.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_index_string_contains_viewport_meta(
+        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
+    ):
+        """Test that app index_string contains viewport meta tag for mobile."""
+        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
+        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+
+        from layout import create_app
+        app = create_app()
+
+        assert 'name="viewport"' in app.index_string
+        assert "width=device-width" in app.index_string
+
+
+class TestMobileCSS:
+    """Tests for mobile-responsive CSS rules in the app index string."""
+
+    @patch("data.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def _get_app(self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats):
+        """Helper to create the app with mocked data functions."""
+        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
+        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+        from layout import create_app
+        return create_app()
+
+    def test_has_375px_breakpoint(self):
+        """Test that CSS includes a 375px media query."""
+        app = self._get_app()
+        assert "@media (max-width: 375px)" in app.index_string
+
+    def test_has_480px_breakpoint(self):
+        """Test that CSS includes a 480px media query."""
+        app = self._get_app()
+        assert "@media (max-width: 480px)" in app.index_string
+
+    def test_has_768px_breakpoint(self):
+        """Test that CSS includes a 768px media query."""
+        app = self._get_app()
+        assert "@media (max-width: 768px)" in app.index_string
+
+    def test_touch_target_min_height(self):
+        """Test that nav links have min-height: 48px for touch targets."""
+        app = self._get_app()
+        assert "min-height: 48px" in app.index_string
+
+    def test_hero_card_unset_min_width_on_mobile(self):
+        """Test that hero cards have min-width: unset on mobile."""
+        app = self._get_app()
+        assert "min-width: unset" in app.index_string
+
+    def test_nav_links_row_horizontal_scroll(self):
+        """Test that nav-links-row gets overflow-x: auto on mobile."""
+        app = self._get_app()
+        assert ".nav-links-row" in app.index_string
+        assert "overflow-x: auto" in app.index_string
+
+    def test_refresh_detail_hidden_on_small_screens(self):
+        """Test that .refresh-detail is hidden below 480px."""
+        app = self._get_app()
+        assert ".refresh-detail" in app.index_string
+
+    def test_main_content_container_padding_mobile(self):
+        """Test that .main-content-container has reduced padding on mobile."""
+        app = self._get_app()
+        assert ".main-content-container" in app.index_string
+
+
+class TestHeaderResponsiveClasses:
+    """Tests for responsive CSS class names on header components."""
+
+    def test_nav_links_have_nav_links_row_class(self):
+        """Test that the nav links wrapper has nav-links-row className."""
+        from components.header import create_header
+
+        header = create_header()
+        found = _find_components_with_class(header, "nav-links-row")
+        assert len(found) > 0, "nav-links-row className not found in header"
+
+    def test_logo_has_header_logo_class(self):
+        """Test that the logo wrapper has header-logo className."""
+        from components.header import create_header
+
+        header = create_header()
+        found = _find_components_with_class(header, "header-logo")
+        assert len(found) > 0, "header-logo className not found in header"
+
+    def test_refresh_labels_have_refresh_detail_class(self):
+        """Test that refresh indicator labels have refresh-detail className."""
+        from components.header import create_header
+
+        header = create_header()
+        found = _find_components_with_class(header, "refresh-detail")
+        assert len(found) >= 2, "Expected at least 2 elements with refresh-detail class"
+
+
+class TestDashboardResponsiveProps:
+    """Tests for responsive properties on dashboard page components."""
+
+    def test_main_content_has_responsive_class(self):
+        """Test that dashboard main content div has main-content-container class."""
+        from pages.dashboard import create_dashboard_page
+
+        page = create_dashboard_page()
+        found = _find_components_with_class(page, "main-content-container")
+        assert len(found) > 0, "main-content-container className not found in dashboard"
+
+    def test_performance_page_has_responsive_class(self):
+        """Test that performance page main content div has main-content-container class."""
+        from pages.dashboard import create_performance_page
+
+        page = create_performance_page()
+        found = _find_components_with_class(page, "main-content-container")
+        assert len(found) > 0, "main-content-container className not found in performance page"
+
+    def test_charts_use_chart_config(self):
+        """Test that chart dcc.Graph components use the shared CHART_CONFIG."""
+        from pages.dashboard import create_dashboard_page
+        from constants import CHART_CONFIG
+        from dash import dcc
+
+        page = create_dashboard_page()
+        graphs = _find_components_by_type(page, dcc.Graph)
+        chart_ids = {"accuracy-over-time-chart", "confidence-accuracy-chart", "asset-accuracy-chart"}
+        for graph in graphs:
+            if hasattr(graph, "id") and graph.id in chart_ids:
+                config = getattr(graph, "config", {}) or {}
+                assert config == CHART_CONFIG, (
+                    f"Graph '{graph.id}' should use CHART_CONFIG"
+                )
