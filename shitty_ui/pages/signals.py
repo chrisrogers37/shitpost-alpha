@@ -9,6 +9,7 @@ import dash_bootstrap_components as dbc
 import pandas as pd
 
 from constants import COLORS
+from brand_copy import COPY
 from components.cards import create_feed_signal_card, create_new_signals_banner
 from data import get_sparkline_prices
 
@@ -34,12 +35,12 @@ def create_signal_feed_page() -> html.Div:
                     html.H2(
                         [
                             html.I(className="fas fa-rss me-2"),
-                            "Signal Feed",
+                            COPY["signals_page_title"],
                         ],
                         style={"margin": 0, "fontWeight": "bold"},
                     ),
                     html.P(
-                        "Live predictions from Trump's Truth Social posts",
+                        COPY["signals_page_subtitle"],
                         style={
                             "color": COLORS["text_muted"],
                             "margin": 0,
@@ -250,7 +251,7 @@ def create_signal_feed_page() -> html.Div:
                     dbc.Button(
                         [
                             html.I(className="fas fa-download me-2"),
-                            "Export CSV",
+                            COPY["signals_export"],
                         ],
                         id="signal-feed-export-btn",
                         color="secondary",
@@ -281,7 +282,7 @@ def create_signal_feed_page() -> html.Div:
                     dbc.Button(
                         [
                             html.I(className="fas fa-chevron-down me-2"),
-                            "Load More Signals",
+                            COPY["signals_load_more"],
                         ],
                         id="signal-feed-load-more-btn",
                         color="secondary",
@@ -365,7 +366,7 @@ def register_signal_callbacks(app: Dash):
                             },
                         ),
                         html.P(
-                            "No signals match your filters.",
+                            COPY["signals_empty_filters"],
                             style={
                                 "color": COLORS["text_muted"],
                                 "marginTop": "10px",
@@ -374,7 +375,7 @@ def register_signal_callbacks(app: Dash):
                     ],
                     style={"textAlign": "center", "padding": "40px"},
                 )
-                return [empty_card], "No signals found", 0, None, {"display": "none"}
+                return [empty_card], COPY["signals_empty_filters"], 0, None, {"display": "none"}
 
             # Batch-fetch sparkline price data for all symbols in this page
             sparkline_prices = {}
@@ -429,7 +430,7 @@ def register_signal_callbacks(app: Dash):
                         },
                     ),
                     html.P(
-                        "Failed to load signals. Please try refreshing the page.",
+                        COPY["signals_error"],
                         style={
                             "color": COLORS["text_muted"],
                             "marginTop": "10px",
