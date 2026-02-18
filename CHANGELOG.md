@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Chevron icon animates on expand/collapse
   - Short theses display in full without a toggle
 
+### Fixed
+- **Mobile layout at 375px viewport** -- Added comprehensive responsive CSS with three breakpoints (375px, 480px, 768px)
+  - KPI cards: reduced padding and font sizes to prevent horizontal overflow on small screens
+  - Charts: added `responsive: True` to shared `CHART_CONFIG`; CSS caps chart height per breakpoint
+  - Navigation: horizontal-scroll nav links with 48px minimum touch targets (WCAG 2.5.8)
+  - Header: stacks vertically on mobile; refresh labels hidden below 480px to save space
+  - Hero cards: `min-width` unset on mobile, cards stack vertically at full width
+  - Viewport meta tag added to prevent mobile browsers from rendering at desktop width
+
 ### Changed
 - **Dashboard: visual hierarchy system** -- Established 3-tier visual differentiation: KPI metrics (primary/elevated), prediction feed and analytics (secondary/standard), posts and raw data (tertiary/receded), guiding the eye through content by importance
 - **Dashboard: KPI card hero redesign** -- Metric cards now use circular accent-colored icon backgrounds, 2rem/800-weight values, uppercase labels, elevated shadows, and 16px border radius for a hero-level visual treatment

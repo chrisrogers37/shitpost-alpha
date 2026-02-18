@@ -986,3 +986,17 @@ class TestMetricCardHeroStyle:
         card = create_metric_card("Test", "100", "", "signal")
         card_body = card.children[0]
         assert card_body.style.get("minHeight") == "130px"
+
+
+class TestHeroCardMobileWidth:
+    """Tests that hero signal cards have correct inline min-width for desktop."""
+
+    def test_hero_card_has_280_min_width(self):
+        """Test that the desktop inline style still sets minWidth to 280px."""
+        card = create_hero_signal_card(_make_row())
+        assert card.style.get("minWidth") == "280px"
+
+    def test_hero_card_flex_allows_shrink(self):
+        """Test that hero card flex property allows shrinking (flex-basis 0)."""
+        card = create_hero_signal_card(_make_row())
+        assert "1 1 0" in card.style.get("flex", "")

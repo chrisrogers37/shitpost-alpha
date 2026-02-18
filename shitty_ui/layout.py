@@ -77,6 +77,7 @@ def create_app() -> Dash:
 <html>
     <head>
         {%metas%}
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
         <title>{%title%}</title>
         {%favicon%}
         {%css%}
@@ -160,10 +161,49 @@ def create_app() -> Dash:
                 border-radius: 1px;
             }
 
-            /* Mobile-specific styles */
+            /* ======================================
+               Responsive: Tablet (max-width: 768px)
+               ====================================== */
             @media (max-width: 768px) {
+                /* Header: stack logo and nav vertically */
+                .header-container {
+                    flex-direction: column !important;
+                    text-align: center !important;
+                    padding: 12px 16px !important;
+                }
+                .header-right {
+                    margin-top: 10px !important;
+                    width: 100% !important;
+                    justify-content: center !important;
+                }
+
+                /* Navigation: horizontal scroll instead of wrapping */
+                .nav-links-row {
+                    overflow-x: auto !important;
+                    -webkit-overflow-scrolling: touch;
+                    scrollbar-width: none;
+                    flex-wrap: nowrap !important;
+                    justify-content: flex-start !important;
+                    width: 100% !important;
+                    padding-bottom: 4px;
+                }
+                .nav-links-row::-webkit-scrollbar {
+                    display: none;
+                }
+
+                /* Touch targets: minimum 48px height for tap */
+                .nav-link-custom {
+                    min-height: 48px !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    padding: 12px 16px !important;
+                    white-space: nowrap !important;
+                    font-size: 0.85rem !important;
+                }
+
+                /* KPI metric cards */
                 .metric-card {
-                    margin-bottom: 10px;
+                    margin-bottom: 8px;
                 }
                 .metric-card .card-body {
                     padding: 10px !important;
@@ -171,29 +211,168 @@ def create_app() -> Dash:
                 .metric-card h3 {
                     font-size: 1.25rem !important;
                 }
+
+                /* Charts: cap height */
                 .chart-container {
-                    height: 200px !important;
+                    height: 220px !important;
                 }
+                .js-plotly-plot .plotly .main-svg {
+                    max-width: 100% !important;
+                }
+
+                /* Signal cards */
                 .signal-card {
-                    padding: 8px !important;
+                    padding: 10px !important;
                 }
-                h1 {
-                    font-size: 1.5rem !important;
+
+                /* Page title */
+                .page-title {
+                    font-size: 1.4rem !important;
                 }
-                .header-container {
-                    flex-direction: column !important;
-                    text-align: center !important;
-                }
-                .header-right {
-                    margin-top: 10px !important;
-                    flex-direction: column !important;
-                    gap: 8px !important;
-                }
+
+                /* Period selector: center */
                 .period-selector {
                     justify-content: center !important;
                 }
+
+                /* Hero signals: stack vertically */
                 .hero-signals-container {
                     flex-direction: column !important;
+                }
+                .hero-signal-card {
+                    min-width: unset !important;
+                    width: 100% !important;
+                }
+
+                /* Content container: reduce side padding */
+                .main-content-container {
+                    padding: 16px 12px !important;
+                }
+
+                /* Analytics tabs: smaller text */
+                .analytics-tabs .nav-link {
+                    padding: 10px 14px !important;
+                    font-size: 0.82rem !important;
+                }
+
+                /* Data table: allow horizontal scroll */
+                .dash-spreadsheet-container {
+                    overflow-x: auto !important;
+                }
+            }
+
+            /* ======================================
+               Responsive: Large phone (max-width: 480px)
+               ====================================== */
+            @media (max-width: 480px) {
+                /* Tighter padding on cards */
+                .metric-card .card-body {
+                    padding: 8px !important;
+                }
+                .metric-card h3 {
+                    font-size: 1.1rem !important;
+                }
+
+                /* Reduce chart height further */
+                .chart-container {
+                    height: 200px !important;
+                }
+
+                /* Section headers */
+                .section-header {
+                    font-size: 1rem !important;
+                }
+
+                /* Card headers */
+                .card-header {
+                    font-size: 0.85rem !important;
+                    padding: 10px 12px !important;
+                }
+
+                /* Hide refresh countdown text to save space */
+                .refresh-detail {
+                    display: none !important;
+                }
+
+                /* Signal feed cards: reduce padding */
+                .feed-signal-card {
+                    padding: 12px !important;
+                }
+            }
+
+            /* ======================================
+               Responsive: Small phone (max-width: 375px)
+               ====================================== */
+            @media (max-width: 375px) {
+                /* Header: minimal padding */
+                .header-container {
+                    padding: 10px 12px !important;
+                }
+
+                /* Logo: smaller */
+                .header-logo h1 {
+                    font-size: 1.3rem !important;
+                }
+                .header-logo p {
+                    font-size: 0.7rem !important;
+                }
+
+                /* KPI cards: full width at 375px */
+                .kpi-col-mobile {
+                    flex: 0 0 50% !important;
+                    max-width: 50% !important;
+                }
+                .metric-card h3 {
+                    font-size: 1rem !important;
+                    word-break: break-all;
+                }
+                .metric-card .card-body {
+                    padding: 6px !important;
+                }
+
+                /* Icon size reduction */
+                .metric-card .fas {
+                    font-size: 1.1rem !important;
+                }
+
+                /* Period selector buttons: smaller */
+                .period-selector .btn {
+                    font-size: 0.75rem !important;
+                    padding: 4px 8px !important;
+                    min-height: 36px;
+                }
+
+                /* Chart height: compact */
+                .chart-container {
+                    height: 180px !important;
+                }
+
+                /* Post/signal text: smaller line height */
+                .signal-card p, .feed-signal-card p {
+                    font-size: 0.82rem !important;
+                    line-height: 1.35 !important;
+                }
+
+                /* Engagement icons row */
+                .engagement-row {
+                    font-size: 0.7rem !important;
+                }
+
+                /* Analytics tabs: compress further */
+                .analytics-tabs .nav-link {
+                    padding: 8px 10px !important;
+                    font-size: 0.78rem !important;
+                }
+
+                /* Sentiment badges: smaller */
+                .sentiment-badge {
+                    font-size: 0.65rem !important;
+                    padding: 2px 6px !important;
+                }
+
+                /* Footer: smaller text */
+                footer p {
+                    font-size: 0.7rem !important;
                 }
             }
 
