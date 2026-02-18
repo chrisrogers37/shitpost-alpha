@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.2.0] - 2026-02-18
+
 ### Added
 - **Brand identity system** -- Centralized `COPY` dictionary in `shitty_ui/brand_copy.py` for all user-facing branded text
 - **Self-deprecating copy** -- Replaced generic dashboard text with personality-driven copy that acknowledges the absurdity of the product
@@ -36,15 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Click-to-expand uses clientside callbacks for zero-latency toggling
   - Chevron icon animates on expand/collapse
   - Short theses display in full without a toggle
-
-### Fixed
-- **Mobile layout at 375px viewport** -- Added comprehensive responsive CSS with three breakpoints (375px, 480px, 768px)
-  - KPI cards: reduced padding and font sizes to prevent horizontal overflow on small screens
-  - Charts: added `responsive: True` to shared `CHART_CONFIG`; CSS caps chart height per breakpoint
-  - Navigation: horizontal-scroll nav links with 48px minimum touch targets (WCAG 2.5.8)
-  - Header: stacks vertically on mobile; refresh labels hidden below 480px to save space
-  - Hero cards: `min-width` unset on mobile, cards stack vertically at full width
-  - Viewport meta tag added to prevent mobile browsers from rendering at desktop width
+- **`get_unified_feed()`** -- New data function combining deduplication logic from `get_active_signals()` with time-period filtering from `get_recent_signals()`, with evaluated-first sort order
+- **`create_unified_signal_card()`** -- New card component merging hero card's aggregated outcomes with signal card's compact layout and thesis preview
 
 ### Changed
 - **Dashboard: visual hierarchy system** -- Established 3-tier visual differentiation: KPI metrics (primary/elevated), prediction feed and analytics (secondary/standard), posts and raw data (tertiary/receded), guiding the eye through content by importance
@@ -54,20 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dashboard: unified prediction feed** -- Replaced the redundant "Hero Signals" section and "Recent Predictions" sidebar with a single full-width prediction feed showing up to 15 signals with aggregated outcomes, thesis previews, and evaluated-first sort order
 - **Dashboard: full-width Latest Posts** -- Moved "Latest Posts" from a 7-column split layout to full-width, giving post content more room to breathe
 - **Dashboard: callback simplification** -- Reduced main dashboard callback from 7 outputs to 6, removing redundant data fetches
-
-### Added
-- **`get_unified_feed()`** -- New data function combining deduplication logic from `get_active_signals()` with time-period filtering from `get_recent_signals()`, with evaluated-first sort order
-- **`create_unified_signal_card()`** -- New card component merging hero card's aggregated outcomes with signal card's compact layout and thesis preview
-
-### Fixed
-- **Dashboard KPIs show zeros** -- Added smart fallback to all-time data when selected time period has no evaluated predictions, with visual indicator
-- **Signal feed buries evaluated outcomes** -- Changed sort order to show Correct/Incorrect signals before Pending ones; added "Evaluated" filter option
-- **Accuracy chart requires 2+ weeks** -- Lowered threshold to 1 week; added all-time fallback when period has no data
-- **Hero signals often empty** -- Added progressive time window fallback (72h -> 7d -> 30d -> lower confidence) with dynamic labels
-- **Direct URL access 404** -- Fixed `/assets/<symbol>`, `/signals`, `/trends`, and `/performance` returning Flask 404 on direct URL access (browser refresh, new tab, shared links)
-  - Added Flask catch-all routes that serve the Dash SPA index for all client-side routes
-
-### Changed
 - **Chart restyling** -- Unified all Plotly chart styling through shared `CHART_LAYOUT` base config and `apply_chart_layout()` helper
   - Consistent dark hoverlabel styling, system font stack, and transparent backgrounds across all charts
   - Candlestick charts use solid fill colors matching the app's emerald/red palette (no more default Plotly half-fills)
@@ -81,6 +62,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Old monolith (`shitpost_alpha.py --mode incremental`) disabled (sleeping, not deleted)
 
 ### Fixed
+- **Mobile layout at 375px viewport** -- Added comprehensive responsive CSS with three breakpoints (375px, 480px, 768px)
+  - KPI cards: reduced padding and font sizes to prevent horizontal overflow on small screens
+  - Charts: added `responsive: True` to shared `CHART_CONFIG`; CSS caps chart height per breakpoint
+  - Navigation: horizontal-scroll nav links with 48px minimum touch targets (WCAG 2.5.8)
+  - Header: stacks vertically on mobile; refresh labels hidden below 480px to save space
+  - Hero cards: `min-width` unset on mobile, cards stack vertically at full width
+  - Viewport meta tag added to prevent mobile browsers from rendering at desktop width
+- **Dashboard KPIs show zeros** -- Added smart fallback to all-time data when selected time period has no evaluated predictions, with visual indicator
+- **Signal feed buries evaluated outcomes** -- Changed sort order to show Correct/Incorrect signals before Pending ones; added "Evaluated" filter option
+- **Accuracy chart requires 2+ weeks** -- Lowered threshold to 1 week; added all-time fallback when period has no data
+- **Hero signals often empty** -- Added progressive time window fallback (72h -> 7d -> 30d -> lower confidence) with dynamic labels
+- **Direct URL access 404** -- Fixed `/assets/<symbol>`, `/signals`, `/trends`, and `/performance` returning Flask 404 on direct URL access (browser refresh, new tab, shared links)
+  - Added Flask catch-all routes that serve the Dash SPA index for all client-side routes
 - **Analyzer session error** - `ShitpostAnalyzer.initialize()` now correctly creates an `AsyncSession` and wraps it in `DatabaseOperations` before passing to `ShitpostOperations`/`PredictionOperations`, fixing `'DatabaseClient' object has no attribute 'session'` in the analyzer event worker
 
 ## [v1.1.0] - 2026-02-15
