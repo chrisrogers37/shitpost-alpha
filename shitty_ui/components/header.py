@@ -4,6 +4,7 @@ from dash import html, dcc
 import dash_bootstrap_components as dbc
 
 from constants import COLORS
+from brand_copy import COPY
 
 
 def create_header():
@@ -33,7 +34,7 @@ def create_header():
                                 style={"textDecoration": "none"},
                             ),
                             html.P(
-                                "Trading Intelligence Dashboard",
+                                COPY["app_subtitle"],
                                 style={
                                     "color": COLORS["text_muted"],
                                     "margin": 0,
@@ -194,7 +195,7 @@ def create_footer():
             html.Hr(style={"borderColor": COLORS["border"], "margin": "40px 0 20px 0"}),
             html.P(
                 [
-                    "Disclaimer: This is NOT financial advice. For entertainment and research purposes only."
+                    COPY["footer_disclaimer"],
                 ],
                 style={
                     "textAlign": "center",
@@ -206,7 +207,7 @@ def create_footer():
             html.P(
                 [
                     html.A(
-                        [html.I(className="fab fa-github me-1"), "View Source"],
+                        [html.I(className="fab fa-github me-1"), COPY["footer_source_link"]],
                         href="https://github.com/chrisrogers37/shitpost-alpha",
                         target="_blank",
                         style={"color": COLORS["accent"], "textDecoration": "none"},
