@@ -86,6 +86,9 @@ def create_app() -> Dash:
         {%favicon%}
         {%css%}
         <style>
+            html, body {
+                overflow-x: hidden;
+            }
             body {
                 background-color: #0F172A !important;
                 font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
@@ -271,12 +274,57 @@ def create_app() -> Dash:
                Responsive: Large phone (max-width: 480px)
                ====================================== */
             @media (max-width: 480px) {
+                /* Content container: tighter padding */
+                .main-content-container {
+                    padding: 12px 8px !important;
+                }
+
+                /* Logo: smaller to prevent clipping */
+                .header-logo {
+                    margin-right: 0 !important;
+                }
+                .header-logo h1 {
+                    font-size: 1.1rem !important;
+                }
+                .header-logo p {
+                    font-size: 0.65rem !important;
+                }
+
+                /* KPI hero values: scale down to fit 50% column */
+                .kpi-hero-value {
+                    font-size: 1.4rem !important;
+                }
+                .kpi-hero-card .card-body {
+                    padding: 6px 4px !important;
+                    min-height: auto !important;
+                }
+
+                /* KPI icon circles: shrink */
+                .kpi-hero-card .card-body > div:first-child {
+                    width: 28px !important;
+                    height: 28px !important;
+                    margin-bottom: 6px !important;
+                }
+                .kpi-hero-card .card-body > div:first-child .fas {
+                    font-size: 0.8rem !important;
+                }
+
                 /* Tighter padding on cards */
                 .metric-card .card-body {
                     padding: 8px !important;
                 }
                 .metric-card h3 {
                     font-size: 1.1rem !important;
+                }
+                .metric-card p {
+                    font-size: 0.7rem !important;
+                }
+
+                /* Period selector: center and wrap */
+                .period-selector {
+                    justify-content: center !important;
+                    flex-wrap: wrap !important;
+                    gap: 6px;
                 }
 
                 /* Reduce chart height further */
