@@ -632,6 +632,137 @@ def get_accuracy_by_asset(limit: int = 15, days: int = None) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+@ttl_cache(ttl_seconds=300)
+def get_asset_screener_data(days: int = None) -> pd.DataFrame:
+    """Get combined asset screener data for the dashboard table.
+
+    Joins per-asset accuracy metrics with the latest prediction sentiment
+    for each asset, plus average confidence. Returns a single DataFrame
+    ready for table rendering.
+
+    Args:
+        days: Number of days to look back (None = all time).
+
+    Returns:
+        DataFrame with columns: symbol, total_predictions, correct,
+        incorrect, avg_return, total_pnl, accuracy, latest_sentiment,
+        avg_confidence. Sorted by total_predictions descending.
+    """
+    date_filter = ""
+    params: Dict[str, Any] = {}
+
+    if days is not None:
+        date_filter = "AND po.prediction_date >= :start_date"
+        params["start_date"] = (datetime.now() - timedelta(days=days)).date()
+
+    query = text(f"""
+        WITH asset_metrics AS (
+            SELECT
+                po.symbol,
+                COUNT(*) as total_predictions,
+                COUNT(CASE WHEN po.correct_t7 = true THEN 1 END) as correct,
+                COUNT(CASE WHEN po.correct_t7 = false THEN 1 END) as incorrect,
+                ROUND(AVG(CASE WHEN po.return_t7 IS NOT NULL
+                    THEN po.return_t7 END)::numeric, 2) as avg_return,
+                ROUND(SUM(CASE WHEN po.pnl_t7 IS NOT NULL
+                    THEN po.pnl_t7 ELSE 0 END)::numeric, 2) as total_pnl,
+                ROUND(AVG(po.prediction_confidence)::numeric, 2) as avg_confidence
+            FROM prediction_outcomes po
+            WHERE po.correct_t7 IS NOT NULL
+            {date_filter}
+            GROUP BY po.symbol
+            HAVING COUNT(*) >= 2
+        ),
+        latest_sentiment AS (
+            SELECT DISTINCT ON (po.symbol)
+                po.symbol,
+                po.prediction_sentiment
+            FROM prediction_outcomes po
+            WHERE po.correct_t7 IS NOT NULL
+            {date_filter}
+            ORDER BY po.symbol, po.prediction_date DESC
+        )
+        SELECT
+            am.symbol,
+            am.total_predictions,
+            am.correct,
+            am.incorrect,
+            am.avg_return,
+            am.total_pnl,
+            am.avg_confidence,
+            ls.prediction_sentiment as latest_sentiment
+        FROM asset_metrics am
+        LEFT JOIN latest_sentiment ls ON am.symbol = ls.symbol
+        ORDER BY am.total_predictions DESC
+    """)
+
+    try:
+        rows, columns = execute_query(query, params)
+        df = pd.DataFrame(rows, columns=columns)
+        if not df.empty:
+            df["accuracy"] = (df["correct"] / df["total_predictions"] * 100).round(1)
+        return df
+    except Exception as e:
+        logger.error(f"Error loading asset screener data: {e}")
+        return pd.DataFrame()
+
+
+@ttl_cache(ttl_seconds=300)
+def get_screener_sparkline_prices(symbols: tuple) -> Dict[str, pd.DataFrame]:
+    """Batch-fetch 30-day trailing price data for screener sparklines.
+
+    Unlike get_sparkline_prices() which centers on a prediction date,
+    this fetches the most recent 30 calendar days of prices for each symbol.
+
+    Args:
+        symbols: Tuple of ticker symbols (tuple for cache hashability).
+
+    Returns:
+        Dict mapping symbol -> DataFrame with columns [date, close].
+    """
+    if not symbols:
+        return {}
+
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=45)
+
+    query = text("""
+        SELECT symbol, date, close
+        FROM market_prices
+        WHERE symbol = ANY(:symbols)
+            AND date >= :start_date
+            AND date <= :end_date
+        ORDER BY symbol, date ASC
+    """)
+
+    params = {
+        "symbols": list(symbols),
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+
+    try:
+        rows, columns = execute_query(query, params)
+        if not rows:
+            return {}
+
+        df = pd.DataFrame(rows, columns=columns)
+        df["date"] = pd.to_datetime(df["date"])
+
+        result: Dict[str, pd.DataFrame] = {}
+        for symbol in df["symbol"].unique():
+            symbol_df = df[df["symbol"] == symbol][["date", "close"]].reset_index(
+                drop=True
+            )
+            if len(symbol_df) >= 2:
+                result[symbol] = symbol_df
+
+        return result
+    except Exception as e:
+        logger.error(f"Error loading screener sparkline prices: {e}")
+        return {}
+
+
 def get_similar_predictions(
     asset: str = None, limit: int = 10, days: int = None
 ) -> pd.DataFrame:
@@ -2214,7 +2345,11 @@ def get_signal_feed_csv(
     export_df["Post Text"] = df["text"].fillna("")
     export_df["Asset"] = df["symbol"].fillna(
         df["assets"].apply(
-            lambda x: ", ".join(x) if isinstance(x, list) else (str(x) if pd.notna(x) else "N/A")
+            lambda x: (
+                ", ".join(x)
+                if isinstance(x, list)
+                else (str(x) if pd.notna(x) else "N/A")
+            )
         )
     )
     export_df["Sentiment"] = df["prediction_sentiment"].fillna("N/A")
@@ -2348,7 +2483,10 @@ def get_price_with_signals(
 
     params = {"symbol": symbol.upper(), "start_date": start_date}
 
-    result: Dict[str, pd.DataFrame] = {"prices": pd.DataFrame(), "signals": pd.DataFrame()}
+    result: Dict[str, pd.DataFrame] = {
+        "prices": pd.DataFrame(),
+        "signals": pd.DataFrame(),
+    }
 
     try:
         rows, columns = execute_query(price_query, params)
@@ -2419,4 +2557,3 @@ def get_multi_asset_signals(
     except Exception as e:
         logger.error(f"Error loading multi-asset signals: {e}")
         return pd.DataFrame()
-

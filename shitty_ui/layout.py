@@ -55,6 +55,8 @@ from data import (  # noqa: F401
     get_performance_metrics,
     get_accuracy_by_confidence,
     get_accuracy_by_asset,
+    get_asset_screener_data,
+    get_screener_sparkline_prices,
     get_active_assets_from_db,
     get_available_assets,
 )
@@ -658,6 +660,42 @@ def create_app() -> Dash:
             }
             .thesis-toggle-area:hover {
                 text-decoration: underline;
+            }
+
+            /* ======================================
+               Asset Screener Table
+               ====================================== */
+            .screener-row:hover {
+                background-color: rgba(133, 187, 101, 0.06) !important;
+            }
+            .screener-row:hover td {
+                background-color: rgba(133, 187, 101, 0.06) !important;
+            }
+
+            /* ======================================
+               Screener: Tablet (max-width: 768px)
+               ====================================== */
+            @media (max-width: 768px) {
+                .screener-table-container {
+                    overflow-x: auto !important;
+                    -webkit-overflow-scrolling: touch;
+                }
+                .screener-hide-tablet {
+                    display: none !important;
+                }
+            }
+
+            /* ======================================
+               Screener: Mobile (max-width: 480px)
+               ====================================== */
+            @media (max-width: 480px) {
+                .screener-row td {
+                    padding: 6px 8px !important;
+                    font-size: 0.8rem !important;
+                }
+                .screener-hide-mobile {
+                    display: none !important;
+                }
             }
         </style>
     </head>

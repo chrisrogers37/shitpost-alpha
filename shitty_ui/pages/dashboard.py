@@ -1,8 +1,9 @@
 """Dashboard page layout and callbacks."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 import traceback
 
+import dash
 from dash import (
     Dash,
     html,
@@ -18,38 +19,31 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import pandas as pd
 
-from constants import COLORS, CHART_COLORS, CHART_CONFIG, HIERARCHY
+from constants import COLORS, CHART_CONFIG, HIERARCHY
 from components.cards import (
     create_error_card,
     create_empty_chart,
     create_empty_state_chart,
-    create_empty_state_html,
     create_metric_card,
     create_post_card,
-    create_unified_signal_card,
 )
 from components.charts import apply_chart_layout
 from components.controls import create_filter_controls, get_period_button_styles
 from components.header import create_header, create_footer
 from brand_copy import COPY
 from data import (
-    get_unified_feed,
-    get_sparkline_prices,
-    get_performance_metrics,
     get_accuracy_by_confidence,
     get_accuracy_by_asset,
+    get_asset_screener_data,
+    get_screener_sparkline_prices,
     get_predictions_with_outcomes,
     load_recent_posts,
-    get_weekly_signal_count,
-    get_high_confidence_metrics,
-    get_best_performing_asset,
-    get_accuracy_over_time,
     get_backtest_simulation,
     get_sentiment_accuracy,
-    get_dashboard_kpis,
     get_dashboard_kpis_with_fallback,
     get_empty_state_context,
 )
+from components.screener import build_screener_table
 
 
 def create_dashboard_page() -> html.Div:
@@ -123,91 +117,16 @@ def create_dashboard_page() -> html.Div:
                             style={"marginBottom": "32px"},
                         ),
                     ),
-                    # ========== Analytics Section: Tabbed Charts (Secondary tier) ==========
+                    # ========== Asset Screener Table (Secondary tier) ==========
                     dbc.Card(
                         [
                             dbc.CardHeader(
                                 [
-                                    html.I(className="fas fa-chart-line me-2"),
-                                    COPY["analytics_header"],
-                                ],
-                                className="fw-bold",
-                                style={
-                                    "backgroundColor": HIERARCHY["secondary"][
-                                        "background"
-                                    ]
-                                },
-                            ),
-                            dbc.CardBody(
-                                [
-                                    dbc.Tabs(
-                                        [
-                                            dbc.Tab(
-                                                dcc.Loading(
-                                                    type="circle",
-                                                    color=COLORS["accent"],
-                                                    children=dcc.Graph(
-                                                        id="accuracy-over-time-chart",
-                                                        config=CHART_CONFIG,
-                                                    ),
-                                                ),
-                                                label="Accuracy Over Time",
-                                                tab_id="tab-accuracy",
-                                            ),
-                                            dbc.Tab(
-                                                dcc.Loading(
-                                                    type="circle",
-                                                    color=COLORS["accent"],
-                                                    children=dcc.Graph(
-                                                        id="confidence-accuracy-chart",
-                                                        config=CHART_CONFIG,
-                                                    ),
-                                                ),
-                                                label="By Confidence",
-                                                tab_id="tab-confidence",
-                                            ),
-                                            dbc.Tab(
-                                                dcc.Loading(
-                                                    type="circle",
-                                                    color=COLORS["accent"],
-                                                    children=dcc.Graph(
-                                                        id="asset-accuracy-chart",
-                                                        config=CHART_CONFIG,
-                                                        style={"cursor": "pointer"},
-                                                    ),
-                                                ),
-                                                label="By Asset",
-                                                tab_id="tab-asset",
-                                            ),
-                                        ],
-                                        id="analytics-tabs",
-                                        active_tab="tab-accuracy",
-                                        className="analytics-tabs",
-                                    ),
-                                ],
-                                style={
-                                    "backgroundColor": HIERARCHY["secondary"][
-                                        "background"
-                                    ]
-                                },
-                            ),
-                        ],
-                        className="mb-4",
-                        style={
-                            "backgroundColor": HIERARCHY["secondary"]["background"],
-                            "borderTop": HIERARCHY["secondary"]["accent_top"],
-                            "boxShadow": HIERARCHY["secondary"]["shadow"],
-                        },
-                    ),
-                    # ========== Unified Prediction Feed (Secondary tier) ==========
-                    dbc.Card(
-                        [
-                            dbc.CardHeader(
-                                [
-                                    html.I(className="fas fa-bolt me-2"),
-                                    "Predictions",
+                                    html.I(className="fas fa-th-list me-2"),
+                                    "Asset Screener",
                                     html.Small(
-                                        " - LLM signals with tracked outcomes",
+                                        " - performance by ticker, sorted"
+                                        " & heat-mapped",
                                         style={
                                             "color": COLORS["text_muted"],
                                             "fontWeight": "normal",
@@ -227,26 +146,23 @@ def create_dashboard_page() -> html.Div:
                                         type="circle",
                                         color=COLORS["accent"],
                                         children=html.Div(
-                                            id="unified-feed-container",
-                                            style={
-                                                "maxHeight": "700px",
-                                                "overflowY": "auto",
-                                            },
+                                            id="screener-table-container",
                                         ),
-                                    )
+                                    ),
                                 ],
                                 style={
                                     "backgroundColor": HIERARCHY["secondary"][
                                         "background"
-                                    ]
+                                    ],
+                                    "padding": "12px",
                                 },
                             ),
                         ],
+                        className="mb-4",
                         style={
                             "backgroundColor": HIERARCHY["secondary"]["background"],
                             "borderTop": HIERARCHY["secondary"]["accent_top"],
                             "boxShadow": HIERARCHY["secondary"]["shadow"],
-                            "marginBottom": "32px",
                         },
                     ),
                     # ========== Latest Posts (Tertiary tier) ==========
@@ -538,11 +454,8 @@ def register_dashboard_callbacks(app: Dash):
     # ========== Main Dashboard Update Callback ==========
     @app.callback(
         [
-            Output("unified-feed-container", "children"),
+            Output("screener-table-container", "children"),
             Output("performance-metrics", "children"),
-            Output("accuracy-over-time-chart", "figure"),
-            Output("confidence-accuracy-chart", "figure"),
-            Output("asset-accuracy-chart", "figure"),
             Output("last-update-timestamp", "data"),
         ],
         [
@@ -561,58 +474,24 @@ def register_dashboard_callbacks(app: Dash):
         # Current timestamp for refresh indicator
         current_time = datetime.now().isoformat()
 
-        # ===== Unified Prediction Feed =====
+        # ===== Asset Screener Table =====
         try:
-            feed_df = get_unified_feed(limit=15, days=days)
-            if not feed_df.empty:
-                # Batch-fetch sparkline prices for unified feed assets
-                sparkline_prices = {}
-                if "assets" in feed_df.columns:
-                    all_assets = set()
-                    for _, r in feed_df.iterrows():
-                        a = r.get("assets", [])
-                        if isinstance(a, list) and a:
-                            all_assets.add(a[0])
-                    if all_assets:
-                        center_ts = pd.to_datetime(feed_df["timestamp"]).median()
-                        center_date = (
-                            center_ts.strftime("%Y-%m-%d")
-                            if pd.notna(center_ts)
-                            else None
-                        )
-                        if center_date:
-                            sparkline_prices = get_sparkline_prices(
-                                symbols=tuple(sorted(all_assets)),
-                                center_date=center_date,
-                            )
+            screener_df = get_asset_screener_data(days=days)
+            sparkline_data = {}
+            if not screener_df.empty:
+                symbols = tuple(screener_df["symbol"].tolist())
+                sparkline_data = get_screener_sparkline_prices(symbols=symbols)
 
-                feed_cards = [
-                    create_unified_signal_card(row, sparkline_prices=sparkline_prices)
-                    for _, row in feed_df.iterrows()
-                ]
-            else:
-                try:
-                    ctx = get_empty_state_context()
-                    total_eval = ctx["total_evaluated"]
-                    ctx_line = (
-                        f"{total_eval} evaluated prediction{'s' if total_eval != 1 else ''} all-time"
-                        if total_eval > 0
-                        else ""
-                    )
-                except Exception:
-                    ctx_line = ""
-                feed_cards = [
-                    create_empty_state_html(
-                        message=COPY["empty_feed_period"],
-                        context_line=ctx_line,
-                        action_text="View all signals",
-                        action_href="/signals",
-                    )
-                ]
+            screener_table = build_screener_table(
+                screener_df=screener_df,
+                sparkline_data=sparkline_data,
+                sort_column="total_predictions",
+                sort_ascending=False,
+            )
         except Exception as e:
-            errors.append(f"Unified feed: {e}")
-            print(f"Error loading unified feed: {traceback.format_exc()}")
-            feed_cards = [create_error_card("Unable to load predictions", str(e))]
+            errors.append(f"Asset screener: {e}")
+            print(f"Error loading asset screener: {traceback.format_exc()}")
+            screener_table = create_error_card("Unable to load asset screener", str(e))
 
         # ===== Performance Metrics with error handling =====
         try:
@@ -694,248 +573,13 @@ def register_dashboard_callbacks(app: Dash):
                 "Unable to load performance metrics", str(e)
             )
 
-        # ===== Accuracy Over Time Chart =====
-        try:
-            acc_df = get_accuracy_over_time(days=days)
-
-            # If period has no data and we're not already showing all-time, fall back
-            if acc_df.empty and days is not None:
-                acc_df = get_accuracy_over_time(days=None)
-                acc_chart_note = "Showing all-time data (no evaluated predictions in selected period)"
-            else:
-                acc_chart_note = ""
-
-            if not acc_df.empty and len(acc_df) >= 1:
-                acc_fig = go.Figure()
-                acc_fig.add_trace(
-                    go.Scatter(
-                        x=acc_df["week"],
-                        y=acc_df["accuracy"],
-                        mode="lines+markers",
-                        name="Weekly Accuracy",
-                        line=dict(
-                            color=CHART_COLORS["line_accent"],
-                            width=2.5,
-                            shape="spline",
-                        ),
-                        marker=dict(
-                            size=7,
-                            color=CHART_COLORS["line_accent"],
-                            line=dict(width=1.5, color=COLORS["bg"]),
-                        ),
-                        fill="tozeroy",
-                        fillcolor=CHART_COLORS["line_accent_fill"],
-                        hovertemplate=(
-                            "<b>Week of %{x|%b %d, %Y}</b><br>"
-                            "Accuracy: <b>%{y:.1f}%</b><br>"
-                            "<extra></extra>"
-                        ),
-                    )
-                )
-                # 50% reference line
-                acc_fig.add_hline(
-                    y=50,
-                    line_dash="dot",
-                    line_color=CHART_COLORS["reference_line"],
-                    line_width=1,
-                    annotation_text="50% baseline",
-                    annotation_position="bottom right",
-                    annotation_font_color=COLORS["text_muted"],
-                    annotation_font_size=10,
-                )
-                # Add fallback note as subtitle annotation if applicable
-                if acc_chart_note:
-                    acc_fig.add_annotation(
-                        text=acc_chart_note,
-                        showarrow=False,
-                        font=dict(color=COLORS["warning"], size=10),
-                        xref="paper",
-                        yref="paper",
-                        x=0.5,
-                        y=1.05,
-                    )
-                apply_chart_layout(
-                    acc_fig,
-                    height=280,
-                    yaxis={"range": [0, 105], "title": "Accuracy %"},
-                )
-            else:
-                try:
-                    ctx = get_empty_state_context()
-                    total_eval = ctx["total_evaluated"]
-                    ctx_line = (
-                        f"{total_eval} evaluated trade{'s' if total_eval != 1 else ''} all-time"
-                        if total_eval > 0
-                        else ""
-                    )
-                    act_text = (
-                        "Try expanding to All"
-                        if total_eval > 0 and days is not None
-                        else ""
-                    )
-                except Exception:
-                    ctx_line = ""
-                    act_text = ""
-                acc_fig = create_empty_state_chart(
-                    message=COPY["chart_empty_accuracy"],
-                    hint=COPY["chart_empty_accuracy_hint"],
-                    context_line=ctx_line,
-                    action_text=act_text,
-                )
-        except Exception as e:
-            errors.append(f"Accuracy over time: {e}")
-            print(f"Error loading accuracy over time: {traceback.format_exc()}")
-            acc_fig = create_empty_chart(f"Error: {str(e)[:50]}")
-
-        # ===== Confidence Chart with error handling =====
-        try:
-            conf_df = get_accuracy_by_confidence(days=days)
-            if not conf_df.empty:
-                conf_fig = go.Figure()
-                conf_fig.add_trace(
-                    go.Bar(
-                        x=conf_df["confidence_level"],
-                        y=conf_df["accuracy"],
-                        text=conf_df["accuracy"].apply(lambda x: f"{x:.1f}%"),
-                        textposition="outside",
-                        textfont=dict(
-                            color=COLORS["text"],
-                            size=12,
-                        ),
-                        marker=dict(
-                            color=[
-                                COLORS["danger"],
-                                COLORS["warning"],
-                                COLORS["success"],
-                            ],
-                            line=dict(width=0),
-                        ),
-                        hovertemplate=(
-                            "<b>%{x}</b><br>"
-                            "Accuracy: <b>%{y:.1f}%</b><br>"
-                            "Predictions: <b>%{customdata}</b>"
-                            "<extra></extra>"
-                        ),
-                        customdata=conf_df["total"],
-                    )
-                )
-                apply_chart_layout(
-                    conf_fig,
-                    height=250,
-                    yaxis={"range": [0, 100], "title": "Accuracy %"},
-                    xaxis={"title": ""},
-                    bargap=0.35,
-                )
-            else:
-                try:
-                    ctx = get_empty_state_context()
-                    total_eval = ctx["total_evaluated"]
-                    ctx_line = (
-                        f"{total_eval} evaluated trade{'s' if total_eval != 1 else ''} all-time"
-                        if total_eval > 0
-                        else ""
-                    )
-                    act_text = (
-                        "Try expanding to All"
-                        if total_eval > 0 and days is not None
-                        else ""
-                    )
-                except Exception:
-                    ctx_line = ""
-                    act_text = ""
-                conf_fig = create_empty_state_chart(
-                    message=COPY["chart_empty_confidence"],
-                    hint=COPY["chart_empty_confidence_hint"],
-                    context_line=ctx_line,
-                    action_text=act_text,
-                )
-        except Exception as e:
-            errors.append(f"Confidence chart: {e}")
-            print(f"Error loading confidence chart: {traceback.format_exc()}")
-            conf_fig = create_empty_chart(f"Error: {str(e)[:50]}")
-
-        # ===== Asset Chart with error handling =====
-        try:
-            asset_df = get_accuracy_by_asset(limit=10, days=days)
-            if not asset_df.empty:
-                asset_fig = go.Figure()
-                colors = [
-                    COLORS["success"] if x >= 60 else COLORS["danger"]
-                    for x in asset_df["accuracy"]
-                ]
-                asset_fig.add_trace(
-                    go.Bar(
-                        x=asset_df["symbol"],
-                        y=asset_df["accuracy"],
-                        text=asset_df["accuracy"].apply(lambda x: f"{x:.0f}%"),
-                        textposition="outside",
-                        textfont=dict(
-                            color=COLORS["text"],
-                            size=12,
-                        ),
-                        marker=dict(
-                            color=colors,
-                            line=dict(width=0),
-                        ),
-                        hovertemplate=(
-                            "<b>%{x}</b><br>"
-                            "Accuracy: <b>%{y:.1f}%</b><br>"
-                            "Predictions: <b>%{customdata[0]}</b><br>"
-                            "Total P&L: <b>$%{customdata[1]:,.0f}</b><br>"
-                            "<i>Click to drill down</i>"
-                            "<extra></extra>"
-                        ),
-                        customdata=list(
-                            zip(asset_df["total_predictions"], asset_df["total_pnl"])
-                        ),
-                    )
-                )
-                apply_chart_layout(
-                    asset_fig,
-                    height=250,
-                    yaxis={"range": [0, 100], "title": "Accuracy %"},
-                    xaxis={"title": ""},
-                    hovermode="closest",
-                    bargap=0.3,
-                )
-            else:
-                try:
-                    ctx = get_empty_state_context()
-                    total_eval = ctx["total_evaluated"]
-                    ctx_line = (
-                        f"{total_eval} evaluated trade{'s' if total_eval != 1 else ''} all-time"
-                        if total_eval > 0
-                        else ""
-                    )
-                    act_text = (
-                        "Try expanding to All"
-                        if total_eval > 0 and days is not None
-                        else ""
-                    )
-                except Exception:
-                    ctx_line = ""
-                    act_text = ""
-                asset_fig = create_empty_state_chart(
-                    message=COPY["chart_empty_asset"],
-                    hint=COPY["chart_empty_asset_hint"],
-                    context_line=ctx_line,
-                    action_text=act_text,
-                )
-        except Exception as e:
-            errors.append(f"Asset chart: {e}")
-            print(f"Error loading asset chart: {traceback.format_exc()}")
-            asset_fig = create_empty_chart(f"Error: {str(e)[:50]}")
-
         # Log any errors that occurred
         if errors:
             print(f"Dashboard update completed with errors: {errors}")
 
         return (
-            feed_cards,
+            screener_table,
             metrics_row,
-            acc_fig,
-            conf_fig,
-            asset_fig,
             current_time,
         )
 
@@ -972,26 +616,31 @@ def register_dashboard_callbacks(app: Dash):
             print(f"Error loading post feed: {traceback.format_exc()}")
             return create_error_card("Unable to load post feed", str(e))
 
-    # ========== Chart Click Handler ==========
+    # ========== Screener Row Click Handler ==========
     @app.callback(
         Output("url", "pathname", allow_duplicate=True),
-        [Input("asset-accuracy-chart", "clickData")],
+        [Input({"type": "screener-row", "index": dash.ALL}, "n_clicks")],
         prevent_initial_call=True,
     )
-    def handle_asset_chart_click(click_data):
-        """When user clicks a bar in asset chart, navigate to asset page."""
-        if not click_data:
-            from dash import no_update
+    def handle_screener_row_click(n_clicks_list):
+        """Navigate to asset page when a screener row is clicked."""
+        import json
+        from dash import no_update
 
+        if not any(n_clicks_list):
             return no_update
 
-        try:
-            point = click_data["points"][0]
-            asset = point["x"]
-            return f"/assets/{asset}"
-        except (KeyError, IndexError):
-            from dash import no_update
+        ctx = callback_context
+        if not ctx.triggered:
+            return no_update
 
+        triggered_id = ctx.triggered[0]["prop_id"]
+        try:
+            id_str = triggered_id.split(".")[0]
+            id_dict = json.loads(id_str)
+            symbol = id_dict["index"]
+            return f"/assets/{symbol}"
+        except (json.JSONDecodeError, KeyError):
             return no_update
 
     @app.callback(
