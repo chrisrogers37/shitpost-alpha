@@ -3,6 +3,7 @@
 **Status:** ✅ COMPLETE
 **Started:** 2026-02-23
 **Completed:** 2026-02-23
+**PR:** #87
 
 **PR Title:** feat(dashboard): dynamic insight cards that answer "so what right now?"
 
