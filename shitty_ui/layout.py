@@ -13,40 +13,33 @@ from dash import Dash, html, dcc, Input, Output
 import dash_bootstrap_components as dbc
 
 from constants import COLORS
-from components.cards import (
-    create_error_card,
-    create_empty_chart,
-    create_empty_state_chart,
-    create_feed_signal_card,
-    create_hero_signal_card,
-    create_metric_card,
-    create_new_signals_banner,
-    create_signal_card,
-    create_post_card,
-    create_prediction_timeline_card,
-    create_related_asset_link,
-    create_performance_summary,
-    create_unified_signal_card,
-)
-from components.controls import create_filter_controls, get_period_button_styles
-from components.header import create_header, create_footer
 from pages.dashboard import (
     create_dashboard_page,
     register_dashboard_callbacks,
 )
 from pages.assets import (
     create_asset_page,
-    create_asset_header,
     register_asset_callbacks,
 )
 from callbacks.alerts import (
     create_alert_config_panel,
-    create_alert_history_panel,
     register_alert_callbacks,
 )
 from alerts import DEFAULT_ALERT_PREFERENCES
 
-# Re-export data functions for backwards compatibility with test patches
+# Re-export component/data functions consumed by tests via `from layout import ...`
+from components.cards import (  # noqa: F401
+    create_error_card,
+    create_empty_chart,
+    create_empty_state_chart,
+    create_feed_signal_card,
+    create_metric_card,
+    create_new_signals_banner,
+    create_signal_card,
+)
+from components.controls import create_filter_controls, get_period_button_styles  # noqa: F401
+from components.header import create_header, create_footer  # noqa: F401
+from callbacks.alerts import create_alert_history_panel  # noqa: F401
 from data import (  # noqa: F401
     get_recent_signals,
     get_performance_metrics,
