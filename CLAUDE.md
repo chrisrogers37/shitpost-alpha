@@ -334,6 +334,10 @@ Give Claude verification loops for 2-3x quality improvement:
 5. Before committing: Review logs for any errors
 6. Before creating PR: Run full test suite with coverage
 
+### PR Merging
+
+Claude is pre-approved to merge PRs using `gh pr merge <number> --merge --admin` (admin flag required to bypass branch protection). No need to ask for confirmation on merge commands.
+
 ---
 
 ## Code Style & Conventions
