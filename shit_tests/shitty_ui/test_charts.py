@@ -260,7 +260,7 @@ class TestApplyChartLayout:
         apply_chart_layout(fig, yaxis={"title": "Accuracy %"})
         assert fig.layout.yaxis.title.text == "Accuracy %"
         assert fig.layout.yaxis.gridcolor is not None
-        assert "51, 65, 85" in fig.layout.yaxis.gridcolor
+        assert "42, 58, 46" in fig.layout.yaxis.gridcolor
 
     def test_xaxis_override_preserves_gridcolor(self):
         """Overriding xaxis should not lose gridcolor from base."""
@@ -272,9 +272,9 @@ class TestApplyChartLayout:
         """Base layout must set dark hoverlabel with matching font."""
         fig = go.Figure()
         apply_chart_layout(fig)
-        assert fig.layout.hoverlabel.bgcolor == "#1e293b"
-        assert fig.layout.hoverlabel.bordercolor == "#334155"
-        assert fig.layout.hoverlabel.font.color == "#f1f5f9"
+        assert fig.layout.hoverlabel.bgcolor == "#141E22"
+        assert fig.layout.hoverlabel.bordercolor == "#2A3A2E"
+        assert fig.layout.hoverlabel.font.color == "#F5F1E8"
 
     def test_font_family_set(self):
         """Base layout must set system font stack."""
@@ -361,7 +361,7 @@ class TestCandlestickChartRestyled:
             signals_df=pd.DataFrame(),
             symbol="TEST",
         )
-        assert fig.layout.hoverlabel.bgcolor == "#1e293b"
+        assert fig.layout.hoverlabel.bgcolor == "#141E22"
 
     def test_rangeslider_hidden(self):
         """Candlestick range slider must be hidden."""
@@ -379,7 +379,7 @@ class TestEmptyChartRestyled:
     def test_empty_chart_has_hoverlabel(self):
         """Empty chart must have hoverlabel styling from shared base."""
         fig = build_empty_signal_chart("test message")
-        assert fig.layout.hoverlabel.bgcolor == "#1e293b"
+        assert fig.layout.hoverlabel.bgcolor == "#141E22"
 
     def test_empty_chart_hides_gridlines(self):
         """Empty chart must hide all gridlines and tick labels."""
