@@ -3,7 +3,17 @@
 from datetime import datetime, timedelta
 import traceback
 
-from dash import Dash, html, dcc, dash_table, Input, Output, State, callback_context, MATCH
+from dash import (
+    Dash,
+    html,
+    dcc,
+    dash_table,
+    Input,
+    Output,
+    State,
+    callback_context,
+    MATCH,
+)
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import pandas as pd
@@ -122,7 +132,11 @@ def create_dashboard_page() -> html.Div:
                                     COPY["analytics_header"],
                                 ],
                                 className="fw-bold",
-                                style={"backgroundColor": HIERARCHY["secondary"]["background"]},
+                                style={
+                                    "backgroundColor": HIERARCHY["secondary"][
+                                        "background"
+                                    ]
+                                },
                             ),
                             dbc.CardBody(
                                 [
@@ -171,7 +185,11 @@ def create_dashboard_page() -> html.Div:
                                         className="analytics-tabs",
                                     ),
                                 ],
-                                style={"backgroundColor": HIERARCHY["secondary"]["background"]},
+                                style={
+                                    "backgroundColor": HIERARCHY["secondary"][
+                                        "background"
+                                    ]
+                                },
                             ),
                         ],
                         className="mb-4",
@@ -197,7 +215,11 @@ def create_dashboard_page() -> html.Div:
                                     ),
                                 ],
                                 className="fw-bold",
-                                style={"backgroundColor": HIERARCHY["secondary"]["background"]},
+                                style={
+                                    "backgroundColor": HIERARCHY["secondary"][
+                                        "background"
+                                    ]
+                                },
                             ),
                             dbc.CardBody(
                                 [
@@ -213,7 +235,11 @@ def create_dashboard_page() -> html.Div:
                                         ),
                                     )
                                 ],
-                                style={"backgroundColor": HIERARCHY["secondary"]["background"]},
+                                style={
+                                    "backgroundColor": HIERARCHY["secondary"][
+                                        "background"
+                                    ]
+                                },
                             ),
                         ],
                         style={
@@ -439,7 +465,6 @@ def create_performance_page() -> html.Div:
             ),
         ]
     )
-
 
 
 def register_dashboard_callbacks(app: Dash):
@@ -738,8 +763,16 @@ def register_dashboard_callbacks(app: Dash):
                 try:
                     ctx = get_empty_state_context()
                     total_eval = ctx["total_evaluated"]
-                    ctx_line = f"{total_eval} evaluated trade{'s' if total_eval != 1 else ''} all-time" if total_eval > 0 else ""
-                    act_text = "Try expanding to All" if total_eval > 0 and days is not None else ""
+                    ctx_line = (
+                        f"{total_eval} evaluated trade{'s' if total_eval != 1 else ''} all-time"
+                        if total_eval > 0
+                        else ""
+                    )
+                    act_text = (
+                        "Try expanding to All"
+                        if total_eval > 0 and days is not None
+                        else ""
+                    )
                 except Exception:
                     ctx_line = ""
                     act_text = ""
@@ -797,8 +830,16 @@ def register_dashboard_callbacks(app: Dash):
                 try:
                     ctx = get_empty_state_context()
                     total_eval = ctx["total_evaluated"]
-                    ctx_line = f"{total_eval} evaluated trade{'s' if total_eval != 1 else ''} all-time" if total_eval > 0 else ""
-                    act_text = "Try expanding to All" if total_eval > 0 and days is not None else ""
+                    ctx_line = (
+                        f"{total_eval} evaluated trade{'s' if total_eval != 1 else ''} all-time"
+                        if total_eval > 0
+                        else ""
+                    )
+                    act_text = (
+                        "Try expanding to All"
+                        if total_eval > 0 and days is not None
+                        else ""
+                    )
                 except Exception:
                     ctx_line = ""
                     act_text = ""
@@ -861,8 +902,16 @@ def register_dashboard_callbacks(app: Dash):
                 try:
                     ctx = get_empty_state_context()
                     total_eval = ctx["total_evaluated"]
-                    ctx_line = f"{total_eval} evaluated trade{'s' if total_eval != 1 else ''} all-time" if total_eval > 0 else ""
-                    act_text = "Try expanding to All" if total_eval > 0 and days is not None else ""
+                    ctx_line = (
+                        f"{total_eval} evaluated trade{'s' if total_eval != 1 else ''} all-time"
+                        if total_eval > 0
+                        else ""
+                    )
+                    act_text = (
+                        "Try expanding to All"
+                        if total_eval > 0 and days is not None
+                        else ""
+                    )
                 except Exception:
                     ctx_line = ""
                     act_text = ""
@@ -1096,7 +1145,6 @@ def register_dashboard_callbacks(app: Dash):
             print(f"Error loading predictions table: {traceback.format_exc()}")
             return create_error_card("Unable to load prediction data", str(e))
 
-
     # ========== Performance Page Callbacks ==========
     @app.callback(
         [
@@ -1162,7 +1210,9 @@ def register_dashboard_callbacks(app: Dash):
                                         "wallet",
                                         COLORS["text_muted"],
                                     ),
-                                    md=2,
+                                    lg=2,
+                                    md=4,
+                                    sm=4,
                                     xs=6,
                                 ),
                                 dbc.Col(
@@ -1173,7 +1223,9 @@ def register_dashboard_callbacks(app: Dash):
                                         "sack-dollar",
                                         pnl_color,
                                     ),
-                                    md=2,
+                                    lg=2,
+                                    md=4,
+                                    sm=4,
                                     xs=6,
                                 ),
                                 dbc.Col(
@@ -1184,7 +1236,9 @@ def register_dashboard_callbacks(app: Dash):
                                         "exchange-alt",
                                         COLORS["accent"],
                                     ),
-                                    md=2,
+                                    lg=2,
+                                    md=4,
+                                    sm=4,
                                     xs=6,
                                 ),
                                 dbc.Col(
@@ -1197,7 +1251,9 @@ def register_dashboard_callbacks(app: Dash):
                                         if bt["win_rate"] > 50
                                         else COLORS["danger"],
                                     ),
-                                    md=2,
+                                    lg=2,
+                                    md=4,
+                                    sm=4,
                                     xs=6,
                                 ),
                                 dbc.Col(
@@ -1208,7 +1264,9 @@ def register_dashboard_callbacks(app: Dash):
                                         "dollar-sign",
                                         pnl_color,
                                     ),
-                                    md=2,
+                                    lg=2,
+                                    md=4,
+                                    sm=4,
                                     xs=6,
                                 ),
                             ],
@@ -1266,7 +1324,11 @@ def register_dashboard_callbacks(app: Dash):
                 try:
                     ctx = get_empty_state_context()
                     pending = ctx["total_pending"]
-                    ctx_line = f"{pending} prediction{'s' if pending != 1 else ''} awaiting evaluation" if pending > 0 else ""
+                    ctx_line = (
+                        f"{pending} prediction{'s' if pending != 1 else ''} awaiting evaluation"
+                        if pending > 0
+                        else ""
+                    )
                 except Exception:
                     ctx_line = ""
                 conf_fig = create_empty_state_chart(
@@ -1316,7 +1378,11 @@ def register_dashboard_callbacks(app: Dash):
                 # Center annotation
                 total_count = sent_df["total"].sum()
                 total_correct = sent_df["correct"].sum()
-                total_acc = round(total_correct / total_count * 100, 1) if total_count > 0 else 0.0
+                total_acc = (
+                    round(total_correct / total_count * 100, 1)
+                    if total_count > 0
+                    else 0.0
+                )
                 sent_fig.add_annotation(
                     text=f"<b>{total_acc:.0f}%</b><br><span style='font-size:11px'>Overall</span>",
                     showarrow=False,
@@ -1337,7 +1403,11 @@ def register_dashboard_callbacks(app: Dash):
                 try:
                     ctx = get_empty_state_context()
                     pending = ctx["total_pending"]
-                    ctx_line = f"{pending} prediction{'s' if pending != 1 else ''} awaiting evaluation" if pending > 0 else ""
+                    ctx_line = (
+                        f"{pending} prediction{'s' if pending != 1 else ''} awaiting evaluation"
+                        if pending > 0
+                        else ""
+                    )
                 except Exception:
                     ctx_line = ""
                 sent_fig = create_empty_state_chart(
@@ -1480,4 +1550,3 @@ def register_dashboard_callbacks(app: Dash):
         ],
         [Input({"type": "post-thesis-toggle", "index": MATCH}, "n_clicks")],
     )
-
