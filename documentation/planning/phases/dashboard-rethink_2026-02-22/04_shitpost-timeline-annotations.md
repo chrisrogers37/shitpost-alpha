@@ -1,5 +1,9 @@
 # Phase 04: Shitpost Timeline Annotations
 
+✅ COMPLETE
+**Started**: 2026-02-22
+**Completed**: 2026-02-22
+
 **PR Title**: feat(charts): replace candlestick with annotated line chart showing shitpost timeline
 **Risk Level**: Medium
 **Estimated Effort**: Medium (3-4 hours)
@@ -166,9 +170,9 @@ y_max = prices_df["close"].max() * 1.07  # Extra headroom for markers
 
 ### Step 1: Add `build_annotated_price_chart()` to `shitty_ui/components/charts.py`
 
-Add a new function after the existing `build_signal_over_trend_chart()` function (after line 194). The existing function is NOT modified or removed -- it is still used by `trends.py` until that page is retired.
+Add a new function at the **end of the file** (after `build_empty_signal_chart`, currently line 255). The existing `build_signal_over_trend_chart` is NOT modified or removed -- it is still used by `trends.py` until that page is retired.
 
-**New function to add at line 195 (after the closing of `build_signal_over_trend_chart`)**:
+**New function to add at the end of `charts.py`**:
 
 ```python
 def build_annotated_price_chart(
@@ -720,7 +724,7 @@ The vertical line approach is inherently responsive -- lines scale with the char
 
 ### New Tests to Write
 
-All new tests go in `shit_tests/shitty_ui/components/test_charts.py` (or create if it does not exist).
+All new tests go in `shit_tests/shitty_ui/test_charts.py` (existing file — append new test classes).
 
 **Test 1: `test_build_annotated_price_chart_basic`**
 - Verifies the function returns a `go.Figure` with at least one trace (the price line)

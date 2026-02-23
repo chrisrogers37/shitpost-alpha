@@ -135,7 +135,9 @@ def build_signal_over_trend_chart(
 
             # Build hover text
             thesis_preview = (thesis[:100] + "...") if len(thesis) > 100 else thesis
-            post_preview = (post_text[:80] + "...") if len(post_text) > 80 else post_text
+            post_preview = (
+                (post_text[:80] + "...") if len(post_text) > 80 else post_text
+            )
 
             hover_parts = [
                 f"<b>{pred_date.strftime('%Y-%m-%d')}</b>",
@@ -252,3 +254,202 @@ def build_empty_signal_chart(message: str = "No data available") -> go.Figure:
         yaxis={"showgrid": False, "showticklabels": False, "zeroline": False},
     )
     return fig
+
+
+def build_annotated_price_chart(
+    prices_df: pd.DataFrame,
+    signals_df: pd.DataFrame,
+    symbol: str = "",
+    chart_height: int = 450,
+) -> go.Figure:
+    """
+    Build a line chart of closing prices with vertical annotation lines
+    marking each shitpost prediction date.
+
+    This replaces the candlestick chart for the asset detail page. The
+    design prioritizes the "Trump posted, then the market moved" correlation
+    by drawing full-height vertical lines at each prediction date, color-coded
+    by predicted sentiment.
+
+    Args:
+        prices_df: DataFrame with columns: date, open, high, low, close, volume.
+            Must be sorted by date ascending.
+        signals_df: DataFrame with columns: prediction_date, prediction_sentiment,
+            prediction_confidence, thesis, correct_t7, return_t7, pnl_t7, post_text,
+            price_at_prediction. Can be empty.
+        symbol: Ticker symbol for axis labeling.
+        chart_height: Height of the chart in pixels.
+
+    Returns:
+        go.Figure ready to be rendered by dcc.Graph.
+    """
+    if prices_df.empty:
+        return build_empty_signal_chart(f"No price data for {symbol}")
+
+    fig = go.Figure()
+
+    # --- Trace 1: Price Line ---
+    fig.add_trace(
+        go.Scatter(
+            x=prices_df["date"],
+            y=prices_df["close"],
+            mode="lines",
+            line=dict(
+                color=CHART_COLORS["line_accent"],
+                width=2,
+            ),
+            fill="tozeroy",
+            fillcolor=CHART_COLORS["line_accent_fill"],
+            name=f"{symbol} Close",
+            showlegend=False,
+            hovertemplate=(
+                "<b>%{x|%b %d, %Y}</b><br>Close: <b>$%{y:,.2f}</b><extra></extra>"
+            ),
+        )
+    )
+
+    # --- Compute y-axis range with headroom for markers ---
+    y_min = float(prices_df["close"].min()) * 0.97
+    y_max = float(prices_df["close"].max()) * 1.07
+    y_marker = float(prices_df["close"].max()) * 1.04
+
+    # --- Vertical lines + marker dots for signals ---
+    if not signals_df.empty:
+        marker_dates = []
+        marker_colors = []
+        customdata_rows = []
+
+        for _, signal in signals_df.iterrows():
+            pred_date = signal["prediction_date"]
+            sentiment = (signal.get("prediction_sentiment") or "neutral").lower()
+            confidence = signal.get("prediction_confidence") or 0.5
+            correct_t7 = signal.get("correct_t7")
+            return_t7 = signal.get("return_t7")
+            pnl_t7 = signal.get("pnl_t7")
+            post_text = signal.get("post_text") or ""
+
+            sentiment_color = SENTIMENT_COLORS.get(
+                sentiment, SENTIMENT_COLORS["neutral"]
+            )
+
+            # --- Vertical annotation line ---
+            fig.add_shape(
+                type="line",
+                x0=pred_date,
+                x1=pred_date,
+                y0=0,
+                y1=1,
+                yref="paper",
+                line=dict(
+                    color=sentiment_color,
+                    width=1.5,
+                    dash="solid",
+                ),
+                opacity=0.4,
+                layer="below",
+            )
+
+            # --- Collect marker data ---
+            marker_dates.append(pred_date)
+            marker_colors.append(sentiment_color)
+
+            post_snippet = (
+                (post_text[:80] + "...") if len(post_text) > 80 else post_text
+            )
+            conf_str = f"{confidence:.0%}"
+
+            if correct_t7 is True:
+                outcome_str = "CORRECT"
+            elif correct_t7 is False:
+                outcome_str = "INCORRECT"
+            else:
+                outcome_str = "PENDING"
+
+            return_str = f"{return_t7:+.2f}%" if pd.notna(return_t7) else "PENDING"
+            pnl_str = f"${pnl_t7:+,.0f}" if pd.notna(pnl_t7) else "N/A"
+
+            customdata_rows.append(
+                [
+                    post_snippet,
+                    sentiment.upper(),
+                    conf_str,
+                    return_str,
+                    outcome_str,
+                    pnl_str,
+                ]
+            )
+
+        # --- Trace 2: Marker dots (single batched trace) ---
+        if marker_dates:
+            fig.add_trace(
+                go.Scatter(
+                    x=marker_dates,
+                    y=[y_marker] * len(marker_dates),
+                    mode="markers",
+                    marker=dict(
+                        size=8,
+                        color=marker_colors,
+                        symbol="circle",
+                        line=dict(
+                            width=1.5,
+                            color=COLORS["text"],
+                        ),
+                    ),
+                    customdata=customdata_rows,
+                    hovertemplate=(
+                        "<b>%{customdata[0]}</b><br>"
+                        "Sentiment: <b>%{customdata[1]}</b><br>"
+                        "Confidence: <b>%{customdata[2]}</b><br>"
+                        "7d Return: <b>%{customdata[3]}</b><br>"
+                        "Outcome: <b>%{customdata[4]}</b><br>"
+                        "P&L: <b>%{customdata[5]}</b>"
+                        "<extra></extra>"
+                    ),
+                    showlegend=False,
+                    name="Shitpost Signals",
+                )
+            )
+
+    # --- Layout ---
+    apply_chart_layout(
+        fig,
+        height=chart_height,
+        show_legend=False,
+        hovermode="closest",
+        margin={"l": 50, "r": 20, "t": 30, "b": 40},
+        yaxis={
+            "title": "Price ($)",
+            "range": [y_min, y_max],
+        },
+    )
+
+    # --- Sentiment legend ---
+    _add_annotation_legend(fig)
+
+    return fig
+
+
+def _add_annotation_legend(fig: go.Figure) -> None:
+    """Add invisible scatter traces as a legend for annotation line colors."""
+    for sentiment, color in SENTIMENT_COLORS.items():
+        fig.add_trace(
+            go.Scatter(
+                x=[None],
+                y=[None],
+                mode="markers",
+                marker=dict(size=8, color=color, symbol="circle"),
+                name=sentiment.capitalize(),
+                showlegend=True,
+            )
+        )
+    fig.update_layout(
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            font=dict(color=COLORS["text_muted"], size=11),
+        ),
+    )

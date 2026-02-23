@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Annotated price chart** -- Replaced confusing candlestick chart on asset detail page with clean line chart + vertical annotation lines at each shitpost date
+  - Full-height vertical lines color-coded by predicted sentiment (bullish/bearish/neutral)
+  - Hoverable marker dots with post snippet, sentiment, confidence, 7-day return, outcome, and P&L
+  - Signal summary panel below chart: post count, bullish %, accuracy, avg confidence, total P&L
+  - Sentiment legend (Bullish/Bearish/Neutral) above chart
+  - NaN-safe formatting for pending prediction outcomes
 - **Asset screener table** -- Replaced analytics chart tabs and prediction feed on dashboard homepage with SaaS Meltdown-style sortable asset screener table
   - Per-asset rows with inline sparklines, sentiment badges (BULL/BEAR/NEUT), and heat-mapped returns/P&L
   - Heat-map colors derived from design tokens via `_hex_to_rgb()` for automatic theme sync
