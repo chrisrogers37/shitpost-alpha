@@ -8,7 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Alerts panel refactor** - Split `create_alert_config_panel()` into 8 sub-component builder functions in new `alert_components.py`
+- **Alerts callbacks refactor** - Extracted `build_preferences_dict()`, `extract_preferences_tuple()`, and `build_alert_history_card()` from nested callbacks into testable module-level functions
 - **UI helpers extracted** - Consolidated 4 duplicated patterns (time-ago, sentiment extraction, outcome badges, asset display) from cards.py into shared `components/helpers.py`
+
+### Added
+- **Alert callback tests** - 60 new tests in `test_alert_callbacks.py` covering panel sub-components, preference serialization, and alert history card rendering
 
 ### Fixed
 - **Hero card weeks display** - Hero signal cards now correctly show "2w ago" for posts older than 7 days (was showing "14d ago")

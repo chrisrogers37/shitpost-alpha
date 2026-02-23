@@ -12,6 +12,16 @@ from alerts import (
     is_in_quiet_hours,
     dispatch_server_notifications,
 )
+from callbacks.alert_components import (
+    build_master_toggle_section,
+    build_status_indicator,
+    build_confidence_threshold_section,
+    build_asset_selection_section,
+    build_sentiment_filter_section,
+    build_notification_channels_section,
+    build_quiet_hours_section,
+    build_action_buttons_section,
+)
 
 
 def create_alert_config_panel():
@@ -19,12 +29,16 @@ def create_alert_config_panel():
     Create the alert configuration slide-out panel.
 
     Returns a dbc.Offcanvas component that slides in from the right
-    when the user clicks the bell icon in the header.
+    when the user clicks the bell icon in the header. Each section
+    is built by a dedicated function in alert_components.py.
     """
+    notification_channels = build_notification_channels_section()
+    action_buttons = build_action_buttons_section()
+
     return dbc.Offcanvas(
         id="alert-config-offcanvas",
         title="Alert Configuration",
-        placement="end",  # Slide in from the right
+        placement="end",
         is_open=False,
         backdrop=True,
         scrollable=True,
@@ -34,54 +48,8 @@ def create_alert_config_panel():
             "width": "400px",
         },
         children=[
-            # Master toggle
-            html.Div(
-                [
-                    html.Div(
-                        [
-                            html.I(
-                                className="fas fa-power-off me-2",
-                                style={"color": COLORS["accent"]},
-                            ),
-                            html.Span(
-                                "Enable Alerts",
-                                style={"fontWeight": "bold", "fontSize": "1rem"},
-                            ),
-                        ],
-                        style={"display": "flex", "alignItems": "center"},
-                    ),
-                    dbc.Switch(
-                        id="alert-master-toggle",
-                        value=False,
-                        className="ms-auto",
-                        style={"transform": "scale(1.3)"},
-                    ),
-                ],
-                style={
-                    "display": "flex",
-                    "justifyContent": "space-between",
-                    "alignItems": "center",
-                    "padding": "15px",
-                    "backgroundColor": COLORS["secondary"],
-                    "borderRadius": "8px",
-                    "marginBottom": "20px",
-                },
-            ),
-            # Alert status indicator
-            html.Div(
-                id="alert-status-indicator",
-                children=[
-                    html.I(
-                        className="fas fa-circle me-2",
-                        style={"color": COLORS["danger"], "fontSize": "0.6rem"},
-                    ),
-                    html.Span(
-                        "Alerts disabled",
-                        style={"color": COLORS["text_muted"], "fontSize": "0.85rem"},
-                    ),
-                ],
-                style={"marginBottom": "20px", "textAlign": "center"},
-            ),
+            build_master_toggle_section(),
+            build_status_indicator(),
             html.Hr(style={"borderColor": COLORS["border"]}),
             # --- Filter Settings ---
             html.H6(
@@ -91,121 +59,9 @@ def create_alert_config_panel():
                 ],
                 style={"color": COLORS["accent"], "marginBottom": "15px"},
             ),
-            # Minimum confidence threshold
-            html.Div(
-                [
-                    html.Label(
-                        "Minimum Confidence",
-                        style={
-                            "color": COLORS["text"],
-                            "fontWeight": "500",
-                            "fontSize": "0.9rem",
-                        },
-                    ),
-                    html.Div(
-                        id="confidence-threshold-display",
-                        children="70%",
-                        style={
-                            "color": COLORS["accent"],
-                            "fontWeight": "bold",
-                            "fontSize": "0.9rem",
-                            "float": "right",
-                        },
-                    ),
-                    dcc.Slider(
-                        id="alert-confidence-slider",
-                        min=0.0,
-                        max=1.0,
-                        step=0.05,
-                        value=0.7,
-                        marks={
-                            0.0: {
-                                "label": "0%",
-                                "style": {"color": COLORS["text_muted"]},
-                            },
-                            0.5: {
-                                "label": "50%",
-                                "style": {"color": COLORS["text_muted"]},
-                            },
-                            0.7: {
-                                "label": "70%",
-                                "style": {"color": COLORS["warning"]},
-                            },
-                            1.0: {
-                                "label": "100%",
-                                "style": {"color": COLORS["text_muted"]},
-                            },
-                        },
-                        tooltip={"placement": "bottom", "always_visible": False},
-                    ),
-                    html.Small(
-                        "Only alert when prediction confidence is at or above this level.",
-                        style={"color": COLORS["text_muted"]},
-                    ),
-                ],
-                style={"marginBottom": "20px"},
-            ),
-            # Assets of interest
-            html.Div(
-                [
-                    html.Label(
-                        "Assets of Interest",
-                        style={
-                            "color": COLORS["text"],
-                            "fontWeight": "500",
-                            "fontSize": "0.9rem",
-                        },
-                    ),
-                    dcc.Dropdown(
-                        id="alert-assets-dropdown",
-                        options=[],  # Populated by callback from DB
-                        value=[],
-                        multi=True,
-                        placeholder="All assets (leave empty for all)",
-                        style={
-                            "backgroundColor": COLORS["primary"],
-                            "color": COLORS["text"],
-                        },
-                        className="mb-1",
-                    ),
-                    html.Small(
-                        "Leave empty to receive alerts for all assets. Select specific tickers to filter.",
-                        style={"color": COLORS["text_muted"]},
-                    ),
-                ],
-                style={"marginBottom": "20px"},
-            ),
-            # Sentiment filter
-            html.Div(
-                [
-                    html.Label(
-                        "Sentiment Filter",
-                        style={
-                            "color": COLORS["text"],
-                            "fontWeight": "500",
-                            "fontSize": "0.9rem",
-                        },
-                    ),
-                    dbc.RadioItems(
-                        id="alert-sentiment-radio",
-                        options=[
-                            {"label": " All Sentiments", "value": "all"},
-                            {"label": " Bullish Only", "value": "bullish"},
-                            {"label": " Bearish Only", "value": "bearish"},
-                            {"label": " Neutral Only", "value": "neutral"},
-                        ],
-                        value="all",
-                        inline=False,
-                        style={"color": COLORS["text"]},
-                        labelStyle={
-                            "display": "block",
-                            "padding": "6px 0",
-                            "fontSize": "0.9rem",
-                        },
-                    ),
-                ],
-                style={"marginBottom": "20px"},
-            ),
+            build_confidence_threshold_section(),
+            build_asset_selection_section(),
+            build_sentiment_filter_section(),
             html.Hr(style={"borderColor": COLORS["border"]}),
             # --- Notification Channels ---
             html.H6(
@@ -215,247 +71,7 @@ def create_alert_config_panel():
                 ],
                 style={"color": COLORS["accent"], "marginBottom": "15px"},
             ),
-            # Browser notifications toggle
-            html.Div(
-                [
-                    html.Div(
-                        [
-                            html.I(
-                                className="fas fa-globe me-2",
-                                style={"color": COLORS["text_muted"]},
-                            ),
-                            html.Span(
-                                "Browser Notifications", style={"fontSize": "0.9rem"}
-                            ),
-                        ],
-                        style={"display": "flex", "alignItems": "center"},
-                    ),
-                    dbc.Switch(
-                        id="alert-browser-toggle",
-                        value=True,
-                        className="ms-auto",
-                    ),
-                ],
-                style={
-                    "display": "flex",
-                    "justifyContent": "space-between",
-                    "alignItems": "center",
-                    "padding": "10px 15px",
-                    "backgroundColor": COLORS["secondary"],
-                    "borderRadius": "8px",
-                    "marginBottom": "10px",
-                },
-            ),
-            # Browser notification permission status
-            html.Div(
-                id="browser-notification-status",
-                style={"marginBottom": "15px", "fontSize": "0.8rem"},
-            ),
-            # Email notifications
-            html.Div(
-                [
-                    html.Div(
-                        [
-                            html.Div(
-                                [
-                                    html.I(
-                                        className="fas fa-envelope me-2",
-                                        style={"color": COLORS["text_muted"]},
-                                    ),
-                                    html.Span(
-                                        "Email Notifications",
-                                        style={"fontSize": "0.9rem"},
-                                    ),
-                                ],
-                                style={"display": "flex", "alignItems": "center"},
-                            ),
-                            dbc.Switch(
-                                id="alert-email-toggle",
-                                value=False,
-                                className="ms-auto",
-                            ),
-                        ],
-                        style={
-                            "display": "flex",
-                            "justifyContent": "space-between",
-                            "alignItems": "center",
-                        },
-                    ),
-                    # Email input (shown only when email is enabled)
-                    dbc.Collapse(
-                        dbc.Input(
-                            id="alert-email-input",
-                            type="email",
-                            placeholder="your@email.com",
-                            className="mt-2",
-                            style={
-                                "backgroundColor": COLORS["primary"],
-                                "color": COLORS["text"],
-                                "border": f"1px solid {COLORS['border']}",
-                            },
-                        ),
-                        id="email-input-collapse",
-                        is_open=False,
-                    ),
-                ],
-                style={
-                    "padding": "10px 15px",
-                    "backgroundColor": COLORS["secondary"],
-                    "borderRadius": "8px",
-                    "marginBottom": "10px",
-                },
-            ),
-            # SMS notifications
-            html.Div(
-                [
-                    html.Div(
-                        [
-                            html.Div(
-                                [
-                                    html.I(
-                                        className="fas fa-sms me-2",
-                                        style={"color": COLORS["text_muted"]},
-                                    ),
-                                    html.Span(
-                                        "SMS Notifications",
-                                        style={"fontSize": "0.9rem"},
-                                    ),
-                                ],
-                                style={"display": "flex", "alignItems": "center"},
-                            ),
-                            dbc.Switch(
-                                id="alert-sms-toggle",
-                                value=False,
-                                className="ms-auto",
-                            ),
-                        ],
-                        style={
-                            "display": "flex",
-                            "justifyContent": "space-between",
-                            "alignItems": "center",
-                        },
-                    ),
-                    # Phone input (shown only when SMS is enabled)
-                    dbc.Collapse(
-                        html.Div(
-                            [
-                                dbc.Input(
-                                    id="alert-sms-input",
-                                    type="tel",
-                                    placeholder="+1 (555) 123-4567",
-                                    className="mt-2",
-                                    style={
-                                        "backgroundColor": COLORS["primary"],
-                                        "color": COLORS["text"],
-                                        "border": f"1px solid {COLORS['border']}",
-                                    },
-                                ),
-                                html.Small(
-                                    "Enter phone number in E.164 format (e.g., +15551234567).",
-                                    className="mt-1",
-                                    style={"color": COLORS["text_muted"]},
-                                ),
-                            ]
-                        ),
-                        id="sms-input-collapse",
-                        is_open=False,
-                    ),
-                ],
-                style={
-                    "padding": "10px 15px",
-                    "backgroundColor": COLORS["secondary"],
-                    "borderRadius": "8px",
-                    "marginBottom": "10px",
-                },
-            ),
-            # Telegram notifications (multi-tenant via bot)
-            html.Div(
-                [
-                    html.Div(
-                        [
-                            html.Div(
-                                [
-                                    html.I(
-                                        className="fab fa-telegram me-2",
-                                        style={"color": "#0088cc"},
-                                    ),
-                                    html.Span(
-                                        "Telegram Notifications",
-                                        style={
-                                            "fontSize": "0.9rem",
-                                            "fontWeight": "bold",
-                                        },
-                                    ),
-                                    html.Span(
-                                        " (Free!)",
-                                        style={
-                                            "fontSize": "0.75rem",
-                                            "color": COLORS["success"],
-                                            "marginLeft": "5px",
-                                        },
-                                    ),
-                                ],
-                                style={"display": "flex", "alignItems": "center"},
-                            ),
-                        ]
-                    ),
-                    html.Div(
-                        [
-                            html.P(
-                                [
-                                    "Get unlimited free alerts via Telegram! ",
-                                    "Add our bot to receive predictions directly in your chat.",
-                                ],
-                                style={
-                                    "fontSize": "0.85rem",
-                                    "color": COLORS["text_muted"],
-                                    "margin": "10px 0",
-                                },
-                            ),
-                            html.Div(
-                                [
-                                    html.A(
-                                        [
-                                            html.I(className="fab fa-telegram me-2"),
-                                            "Open @ShitpostAlphaBot",
-                                        ],
-                                        href="https://t.me/ShitpostAlphaBot",
-                                        target="_blank",
-                                        className="btn btn-info btn-sm",
-                                        style={
-                                            "backgroundColor": "#0088cc",
-                                            "border": "none",
-                                            "color": "white",
-                                        },
-                                    ),
-                                ],
-                                className="mb-2",
-                            ),
-                            html.Small(
-                                [
-                                    "1. Click the link above to open the bot",
-                                    html.Br(),
-                                    "2. Send /start to subscribe",
-                                    html.Br(),
-                                    "3. Use /settings to customize your alerts",
-                                ],
-                                style={
-                                    "color": COLORS["text_muted"],
-                                    "fontSize": "0.75rem",
-                                    "lineHeight": "1.5",
-                                },
-                            ),
-                        ]
-                    ),
-                ],
-                style={
-                    "padding": "10px 15px",
-                    "backgroundColor": COLORS["secondary"],
-                    "borderRadius": "8px",
-                    "marginBottom": "10px",
-                    "border": "1px solid #0088cc33",
-                },
-            ),
+            *notification_channels,
             html.Hr(style={"borderColor": COLORS["border"]}),
             # --- Quiet Hours ---
             html.H6(
@@ -465,141 +81,10 @@ def create_alert_config_panel():
                 ],
                 style={"color": COLORS["accent"], "marginBottom": "15px"},
             ),
-            html.Div(
-                [
-                    html.Div(
-                        [
-                            html.Span(
-                                "Enable Quiet Hours", style={"fontSize": "0.9rem"}
-                            ),
-                            dbc.Switch(
-                                id="alert-quiet-hours-toggle",
-                                value=False,
-                                className="ms-auto",
-                            ),
-                        ],
-                        style={
-                            "display": "flex",
-                            "justifyContent": "space-between",
-                            "alignItems": "center",
-                            "marginBottom": "10px",
-                        },
-                    ),
-                    dbc.Collapse(
-                        dbc.Row(
-                            [
-                                dbc.Col(
-                                    [
-                                        html.Label(
-                                            "Start",
-                                            style={
-                                                "fontSize": "0.85rem",
-                                                "color": COLORS["text_muted"],
-                                            },
-                                        ),
-                                        dbc.Input(
-                                            id="quiet-hours-start",
-                                            type="time",
-                                            value="22:00",
-                                            style={
-                                                "backgroundColor": COLORS["primary"],
-                                                "color": COLORS["text"],
-                                                "border": f"1px solid {COLORS['border']}",
-                                            },
-                                        ),
-                                    ],
-                                    width=6,
-                                ),
-                                dbc.Col(
-                                    [
-                                        html.Label(
-                                            "End",
-                                            style={
-                                                "fontSize": "0.85rem",
-                                                "color": COLORS["text_muted"],
-                                            },
-                                        ),
-                                        dbc.Input(
-                                            id="quiet-hours-end",
-                                            type="time",
-                                            value="08:00",
-                                            style={
-                                                "backgroundColor": COLORS["primary"],
-                                                "color": COLORS["text"],
-                                                "border": f"1px solid {COLORS['border']}",
-                                            },
-                                        ),
-                                    ],
-                                    width=6,
-                                ),
-                            ]
-                        ),
-                        id="quiet-hours-collapse",
-                        is_open=False,
-                    ),
-                ],
-                style={
-                    "padding": "10px 15px",
-                    "backgroundColor": COLORS["secondary"],
-                    "borderRadius": "8px",
-                    "marginBottom": "20px",
-                },
-            ),
+            build_quiet_hours_section(),
             html.Hr(style={"borderColor": COLORS["border"]}),
             # --- Save / Test Buttons ---
-            html.Div(
-                [
-                    dbc.Button(
-                        [html.I(className="fas fa-save me-2"), "Save Preferences"],
-                        id="save-alert-prefs-button",
-                        color="primary",
-                        className="w-100 mb-2",
-                    ),
-                    dbc.Button(
-                        [html.I(className="fas fa-bell me-2"), "Send Test Alert"],
-                        id="test-alert-button",
-                        color="secondary",
-                        outline=True,
-                        className="w-100 mb-2",
-                    ),
-                    dbc.Button(
-                        [html.I(className="fas fa-trash me-2"), "Clear Alert History"],
-                        id="clear-alert-history-button",
-                        color="danger",
-                        outline=True,
-                        size="sm",
-                        className="w-100",
-                    ),
-                ]
-            ),
-            # Save confirmation toast
-            dbc.Toast(
-                id="alert-save-toast",
-                header="Preferences Saved",
-                is_open=False,
-                dismissable=True,
-                duration=3000,
-                icon="success",
-                style={
-                    "position": "fixed",
-                    "bottom": 20,
-                    "right": 20,
-                    "width": 280,
-                    "zIndex": 9999,
-                },
-                children="Your alert preferences have been saved.",
-            ),
-            # localStorage note
-            html.Small(
-                "Preferences are stored in your browser. They are not synced across devices.",
-                style={
-                    "color": COLORS["text_muted"],
-                    "fontSize": "0.75rem",
-                    "display": "block",
-                    "marginTop": "15px",
-                    "textAlign": "center",
-                },
-            ),
+            *action_buttons,
         ],
     )
 
@@ -643,6 +128,194 @@ def create_alert_history_panel():
         ],
         className="mt-4",
         style={"backgroundColor": COLORS["secondary"]},
+    )
+
+
+def build_preferences_dict(
+    enabled: bool,
+    min_confidence: float,
+    assets: list,
+    sentiment: str,
+    browser_on: bool,
+    email_on: bool,
+    email_addr: str,
+    sms_on: bool,
+    sms_phone: str,
+    quiet_on: bool,
+    quiet_start: str,
+    quiet_end: str,
+) -> dict:
+    """
+    Assemble a preferences dict from individual form field values.
+
+    This is the canonical shape of the preferences object stored
+    in localStorage via alert-preferences-store.
+
+    Args:
+        enabled: Master toggle state.
+        min_confidence: Minimum confidence threshold (0.0-1.0).
+        assets: List of ticker symbols to filter on.
+        sentiment: Sentiment filter ("all", "bullish", "bearish", "neutral").
+        browser_on: Whether browser notifications are enabled.
+        email_on: Whether email notifications are enabled.
+        email_addr: Email address for notifications.
+        sms_on: Whether SMS notifications are enabled.
+        sms_phone: Phone number for SMS notifications.
+        quiet_on: Whether quiet hours are enabled.
+        quiet_start: Quiet hours start time (HH:MM).
+        quiet_end: Quiet hours end time (HH:MM).
+
+    Returns:
+        dict with all preference keys populated with safe defaults for None values.
+    """
+    return {
+        "enabled": bool(enabled),
+        "min_confidence": float(min_confidence or 0.7),
+        "assets_of_interest": assets or [],
+        "sentiment_filter": sentiment or "all",
+        "browser_notifications": bool(browser_on),
+        "email_enabled": bool(email_on),
+        "email_address": email_addr or "",
+        "sms_enabled": bool(sms_on),
+        "sms_phone_number": sms_phone or "",
+        "quiet_hours_enabled": bool(quiet_on),
+        "quiet_hours_start": quiet_start or "22:00",
+        "quiet_hours_end": quiet_end or "08:00",
+        "max_alerts_per_hour": 10,
+    }
+
+
+def extract_preferences_tuple(prefs: dict) -> tuple:
+    """
+    Extract form field values from a preferences dict.
+
+    Returns a 12-element tuple matching the Output order of
+    load_preferences_into_form().
+
+    Args:
+        prefs: Preferences dict from localStorage.
+
+    Returns:
+        Tuple of (enabled, min_confidence, assets, sentiment,
+        browser_on, email_on, email_addr, sms_on, sms_phone,
+        quiet_on, quiet_start, quiet_end).
+    """
+    return (
+        prefs.get("enabled", False),
+        prefs.get("min_confidence", 0.7),
+        prefs.get("assets_of_interest", []),
+        prefs.get("sentiment_filter", "all"),
+        prefs.get("browser_notifications", True),
+        prefs.get("email_enabled", False),
+        prefs.get("email_address", ""),
+        prefs.get("sms_enabled", False),
+        prefs.get("sms_phone_number", ""),
+        prefs.get("quiet_hours_enabled", False),
+        prefs.get("quiet_hours_start", "22:00"),
+        prefs.get("quiet_hours_end", "08:00"),
+    )
+
+
+def build_alert_history_card(alert: dict) -> html.Div:
+    """
+    Build a single alert history card from an alert dict.
+
+    Handles sentiment coloring, timestamp formatting, text truncation,
+    and asset display.
+
+    Args:
+        alert: Dict with keys: sentiment, confidence, assets, text,
+               alert_triggered_at.
+
+    Returns:
+        html.Div component for one alert history entry.
+    """
+    sentiment = alert.get("sentiment", "neutral")
+    confidence = alert.get("confidence", 0)
+    assets = alert.get("assets", [])
+    text = alert.get("text", "")[:120]
+    triggered_at = alert.get("alert_triggered_at", "")
+
+    # Sentiment styling
+    if sentiment == "bullish":
+        sentiment_color = COLORS["success"]
+        sentiment_icon = "arrow-up"
+    elif sentiment == "bearish":
+        sentiment_color = COLORS["danger"]
+        sentiment_icon = "arrow-down"
+    else:
+        sentiment_color = COLORS["text_muted"]
+        sentiment_icon = "minus"
+
+    # Format timestamp
+    try:
+        ts = datetime.fromisoformat(triggered_at.replace("Z", "+00:00"))
+        time_str = ts.strftime("%b %d, %H:%M")
+    except (ValueError, TypeError, AttributeError):
+        time_str = str(triggered_at)[:16]
+
+    asset_str = (
+        ", ".join(assets[:3]) if isinstance(assets, list) else str(assets)
+    )
+
+    return html.Div(
+        [
+            html.Div(
+                [
+                    html.Span(
+                        time_str,
+                        style={
+                            "color": COLORS["text_muted"],
+                            "fontSize": "0.75rem",
+                        },
+                    ),
+                    html.Span(
+                        [
+                            html.I(className=f"fas fa-{sentiment_icon} me-1"),
+                            sentiment.upper(),
+                        ],
+                        style={
+                            "color": sentiment_color,
+                            "fontSize": "0.75rem",
+                            "fontWeight": "bold",
+                        },
+                        className="ms-2",
+                    ),
+                    html.Span(
+                        f" | {confidence:.0%}" if confidence else "",
+                        style={
+                            "color": COLORS["text_muted"],
+                            "fontSize": "0.75rem",
+                        },
+                    ),
+                ],
+                className="d-flex align-items-center mb-1",
+            ),
+            html.P(
+                text + "..." if len(text) >= 120 else text,
+                style={
+                    "fontSize": "0.8rem",
+                    "margin": "3px 0",
+                    "lineHeight": "1.3",
+                    "color": COLORS["text"],
+                },
+            ),
+            html.Div(
+                [
+                    html.Span(
+                        f"Assets: {asset_str}",
+                        style={
+                            "color": COLORS["text_muted"],
+                            "fontSize": "0.75rem",
+                        },
+                    ),
+                ]
+            ),
+        ],
+        style={
+            "padding": "10px",
+            "borderBottom": f"1px solid {COLORS['border']}",
+        },
     )
 
 
@@ -782,21 +455,12 @@ def register_alert_callbacks(app: Dash):
         Gather all form values and write them to the localStorage-backed store.
         Also show a confirmation toast.
         """
-        preferences = {
-            "enabled": bool(enabled),
-            "min_confidence": float(min_confidence or 0.7),
-            "assets_of_interest": assets or [],
-            "sentiment_filter": sentiment or "all",
-            "browser_notifications": bool(browser_on),
-            "email_enabled": bool(email_on),
-            "email_address": email_addr or "",
-            "sms_enabled": bool(sms_on),
-            "sms_phone_number": sms_phone or "",
-            "quiet_hours_enabled": bool(quiet_on),
-            "quiet_hours_start": quiet_start or "22:00",
-            "quiet_hours_end": quiet_end or "08:00",
-            "max_alerts_per_hour": 10,
-        }
+        preferences = build_preferences_dict(
+            enabled, min_confidence, assets, sentiment,
+            browser_on, email_on, email_addr,
+            sms_on, sms_phone,
+            quiet_on, quiet_start, quiet_end,
+        )
         return preferences, True  # True opens the toast
 
     # --- Load preferences into form when panel opens ---
@@ -823,20 +487,7 @@ def register_alert_callbacks(app: Dash):
         if not is_open or not prefs:
             return (no_update,) * 12
 
-        return (
-            prefs.get("enabled", False),
-            prefs.get("min_confidence", 0.7),
-            prefs.get("assets_of_interest", []),
-            prefs.get("sentiment_filter", "all"),
-            prefs.get("browser_notifications", True),
-            prefs.get("email_enabled", False),
-            prefs.get("email_address", ""),
-            prefs.get("sms_enabled", False),
-            prefs.get("sms_phone_number", ""),
-            prefs.get("quiet_hours_enabled", False),
-            prefs.get("quiet_hours_start", "22:00"),
-            prefs.get("quiet_hours_end", "08:00"),
-        )
+        return extract_preferences_tuple(prefs)
 
     # --- Enable/disable alert check interval based on master toggle ---
     app.clientside_callback(
@@ -1081,99 +732,9 @@ def register_alert_callbacks(app: Dash):
             )
 
         count = len(history)
-        alert_cards = []
-
-        # Show most recent first
-        for alert in reversed(history[-50:]):
-            sentiment = alert.get("sentiment", "neutral")
-            confidence = alert.get("confidence", 0)
-            assets = alert.get("assets", [])
-            text = alert.get("text", "")[:120]
-            triggered_at = alert.get("alert_triggered_at", "")
-
-            # Sentiment styling
-            if sentiment == "bullish":
-                sentiment_color = COLORS["success"]
-                sentiment_icon = "arrow-up"
-            elif sentiment == "bearish":
-                sentiment_color = COLORS["danger"]
-                sentiment_icon = "arrow-down"
-            else:
-                sentiment_color = COLORS["text_muted"]
-                sentiment_icon = "minus"
-
-            # Format timestamp
-            try:
-                ts = datetime.fromisoformat(triggered_at.replace("Z", "+00:00"))
-                time_str = ts.strftime("%b %d, %H:%M")
-            except (ValueError, TypeError):
-                time_str = str(triggered_at)[:16]
-
-            asset_str = (
-                ", ".join(assets[:3]) if isinstance(assets, list) else str(assets)
-            )
-
-            card = html.Div(
-                [
-                    html.Div(
-                        [
-                            html.Span(
-                                time_str,
-                                style={
-                                    "color": COLORS["text_muted"],
-                                    "fontSize": "0.75rem",
-                                },
-                            ),
-                            html.Span(
-                                [
-                                    html.I(className=f"fas fa-{sentiment_icon} me-1"),
-                                    sentiment.upper(),
-                                ],
-                                style={
-                                    "color": sentiment_color,
-                                    "fontSize": "0.75rem",
-                                    "fontWeight": "bold",
-                                },
-                                className="ms-2",
-                            ),
-                            html.Span(
-                                f" | {confidence:.0%}" if confidence else "",
-                                style={
-                                    "color": COLORS["text_muted"],
-                                    "fontSize": "0.75rem",
-                                },
-                            ),
-                        ],
-                        className="d-flex align-items-center mb-1",
-                    ),
-                    html.P(
-                        text + "..." if len(text) >= 120 else text,
-                        style={
-                            "fontSize": "0.8rem",
-                            "margin": "3px 0",
-                            "lineHeight": "1.3",
-                            "color": COLORS["text"],
-                        },
-                    ),
-                    html.Div(
-                        [
-                            html.Span(
-                                f"Assets: {asset_str}",
-                                style={
-                                    "color": COLORS["text_muted"],
-                                    "fontSize": "0.75rem",
-                                },
-                            ),
-                        ]
-                    ),
-                ],
-                style={
-                    "padding": "10px",
-                    "borderBottom": f"1px solid {COLORS['border']}",
-                },
-            )
-
-            alert_cards.append(card)
+        alert_cards = [
+            build_alert_history_card(alert) for alert in reversed(history[-50:])
+        ]
 
         return alert_cards, str(count)
 
