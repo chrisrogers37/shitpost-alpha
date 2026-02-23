@@ -68,7 +68,7 @@ def create_app() -> Dash:
         external_stylesheets=[
             dbc.themes.DARKLY,
             "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css",
-            "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+            "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
         ],
         suppress_callback_exceptions=True,
     )
@@ -90,19 +90,19 @@ def create_app() -> Dash:
                 overflow-x: hidden;
             }
             body {
-                background-color: #0F172A !important;
+                background-color: #0B1215 !important;
                 font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
             }
 
             /* Card styling */
             .card {
                 border-radius: 12px !important;
-                border: 1px solid #334155 !important;
+                border: 1px solid #2A3A2E !important;
                 overflow: hidden;
                 transition: box-shadow 0.15s ease;
             }
             .card-header {
-                border-bottom: 1px solid #334155 !important;
+                border-bottom: 1px solid #2A3A2E !important;
             }
 
             /* Hero signal card hover effect */
@@ -112,7 +112,7 @@ def create_app() -> Dash:
             }
             .hero-signal-card:hover {
                 transform: translateY(-2px);
-                box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+                box-shadow: 0 4px 20px rgba(133, 187, 101, 0.15);
             }
 
             /* Unified signal card hover effect */
@@ -122,7 +122,7 @@ def create_app() -> Dash:
             }
             .unified-signal-card:hover {
                 transform: translateY(-2px);
-                box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+                box-shadow: 0 4px 20px rgba(133, 187, 101, 0.15);
             }
 
             /* Sentiment badges */
@@ -140,7 +140,7 @@ def create_app() -> Dash:
 
             /* Nav links with active state accent */
             .nav-link-custom {
-                color: #94a3b8 !important;
+                color: #8B9A7E !important;
                 text-decoration: none !important;
                 padding: 8px 16px;
                 border-radius: 8px;
@@ -150,11 +150,11 @@ def create_app() -> Dash:
                 position: relative;
             }
             .nav-link-custom:hover {
-                color: #f1f5f9 !important;
-                background-color: #334155;
+                color: #F5F1E8 !important;
+                background-color: #2A3A2E;
             }
             .nav-link-custom.active {
-                color: #f1f5f9 !important;
+                color: #F5F1E8 !important;
                 background-color: transparent;
             }
             .nav-link-custom.active::after {
@@ -164,7 +164,7 @@ def create_app() -> Dash:
                 left: 16px;
                 right: 16px;
                 height: 2px;
-                background-color: #3b82f6;
+                background-color: #FFD700;
                 border-radius: 1px;
             }
 
@@ -474,9 +474,9 @@ def create_app() -> Dash:
 
             /* Scrollbar styling for dark theme */
             ::-webkit-scrollbar { width: 8px; }
-            ::-webkit-scrollbar-track { background: #0F172A; }
-            ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-            ::-webkit-scrollbar-thumb:hover { background: #475569; }
+            ::-webkit-scrollbar-track { background: #0B1215; }
+            ::-webkit-scrollbar-thumb { background: #2A3A2E; border-radius: 4px; }
+            ::-webkit-scrollbar-thumb:hover { background: #3D5440; }
 
             /* ======================================
                Typography hierarchy classes
@@ -486,7 +486,7 @@ def create_app() -> Dash:
             .page-title {
                 font-size: 1.75rem;
                 font-weight: 700;
-                color: #f1f5f9;
+                color: #F5F1E8;
                 margin: 0 0 4px 0;
                 line-height: 1.2;
             }
@@ -494,7 +494,7 @@ def create_app() -> Dash:
                 display: block;
                 font-size: 0.8rem;
                 font-weight: 400;
-                color: #94a3b8;
+                color: #8B9A7E;
                 margin-top: 4px;
             }
 
@@ -502,10 +502,10 @@ def create_app() -> Dash:
             .section-header {
                 font-size: 1.15rem;
                 font-weight: 600;
-                color: #f1f5f9;
+                color: #F5F1E8;
                 margin: 0;
                 padding-bottom: 8px;
-                border-bottom: 2px solid #3b82f6;
+                border-bottom: 2px solid #85BB65;
                 margin-bottom: 16px;
                 display: inline-block;
             }
@@ -514,13 +514,13 @@ def create_app() -> Dash:
             .card-header {
                 font-size: 0.95rem !important;
                 font-weight: 600 !important;
-                color: #f1f5f9 !important;
+                color: #F5F1E8 !important;
                 letter-spacing: 0.01em;
             }
             .card-header .card-header-subtitle {
                 font-size: 0.8rem;
                 font-weight: 400;
-                color: #94a3b8;
+                color: #8B9A7E;
                 margin-left: 8px;
             }
 
@@ -528,7 +528,7 @@ def create_app() -> Dash:
             .text-body-default {
                 font-size: 0.9rem;
                 font-weight: 400;
-                color: #f1f5f9;
+                color: #F5F1E8;
                 line-height: 1.5;
             }
 
@@ -536,7 +536,7 @@ def create_app() -> Dash:
             .text-label {
                 font-size: 0.8rem;
                 font-weight: 500;
-                color: #94a3b8;
+                color: #8B9A7E;
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
             }
@@ -545,7 +545,7 @@ def create_app() -> Dash:
             .text-meta {
                 font-size: 0.75rem;
                 font-weight: 400;
-                color: #94a3b8;
+                color: #8B9A7E;
                 line-height: 1.4;
             }
 
@@ -555,13 +555,13 @@ def create_app() -> Dash:
                 font-weight: 700;
                 letter-spacing: 0.05em;
                 text-transform: uppercase;
-                color: #f1f5f9;
+                color: #F5F1E8;
             }
             .section-label .section-label-muted {
                 font-weight: 400;
                 text-transform: none;
                 letter-spacing: normal;
-                color: #94a3b8;
+                color: #8B9A7E;
                 font-size: 0.8rem;
             }
 
@@ -569,11 +569,11 @@ def create_app() -> Dash:
                Analytics tab interface
                ====================================== */
             .analytics-tabs .nav-tabs {
-                border-bottom: 1px solid #334155;
+                border-bottom: 1px solid #2A3A2E;
                 background-color: transparent;
             }
             .analytics-tabs .nav-link {
-                color: #94a3b8 !important;
+                color: #8B9A7E !important;
                 border: none !important;
                 border-bottom: 2px solid transparent !important;
                 background-color: transparent !important;
@@ -583,12 +583,12 @@ def create_app() -> Dash:
                 transition: all 0.15s ease;
             }
             .analytics-tabs .nav-link:hover {
-                color: #f1f5f9 !important;
-                border-bottom-color: #475569 !important;
+                color: #F5F1E8 !important;
+                border-bottom-color: #3D5440 !important;
             }
             .analytics-tabs .nav-link.active {
-                color: #3b82f6 !important;
-                border-bottom-color: #3b82f6 !important;
+                color: #85BB65 !important;
+                border-bottom-color: #85BB65 !important;
                 background-color: transparent !important;
             }
             .analytics-tabs .tab-content {
@@ -624,7 +624,7 @@ def create_app() -> Dash:
             }
             .kpi-hero-card:hover {
                 transform: translateY(-2px);
-                box-shadow: 0 8px 32px rgba(59, 130, 246, 0.12), 0 2px 6px rgba(0, 0, 0, 0.25) !important;
+                box-shadow: 0 8px 32px rgba(133, 187, 101, 0.12), 0 2px 6px rgba(0, 0, 0, 0.25) !important;
             }
             .kpi-hero-value {
                 font-variant-numeric: tabular-nums;
@@ -635,11 +635,11 @@ def create_app() -> Dash:
                 border-radius: 10px;
             }
             .section-tertiary .card-header {
-                background-color: #172032 !important;
-                border-bottom-color: #2d3a4e !important;
+                background-color: #0E1719 !important;
+                border-bottom-color: #2A3A2E !important;
             }
             .section-tertiary .card-body {
-                background-color: #172032 !important;
+                background-color: #0E1719 !important;
             }
 
             /* Header elevation shadow */

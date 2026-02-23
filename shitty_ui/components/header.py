@@ -19,10 +19,8 @@ def create_header():
                             dcc.Link(
                                 html.H1(
                                     [
-                                        html.Span(
-                                            "Shitpost Alpha",
-                                            style={"color": COLORS["accent"]},
-                                        ),
+                                        html.Span("$hitpost ", style={"color": COLORS["accent"]}),
+                                        html.Span("Alpha", style={"color": COLORS["accent_gold"]}),
                                     ],
                                     style={
                                         "fontSize": "1.75rem",
@@ -155,7 +153,7 @@ def create_header():
                                         id="next-update-countdown",
                                         children="5:00",
                                         style={
-                                            "color": COLORS["accent"],
+                                            "color": COLORS["accent_gold"],
                                             "fontWeight": "bold",
                                             "fontSize": "0.75rem",
                                         },

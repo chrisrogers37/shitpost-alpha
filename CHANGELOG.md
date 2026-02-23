@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Hyper-American money theme overhaul** -- Transformed the entire dashboard palette from generic dark finance (blue/slate) to obnoxious American money energy
+  - Dollar bill green (`#85BB65`) replaces blue as primary accent
+  - Gold (`#FFD700`) for active nav states, countdown timer, secondary emphasis
+  - Old Glory red (`#B22234`) and navy (`#002868`) for patriotic chart palette
+  - Warm parchment white (`#F5F1E8`) text on warm dark charcoal (`#0B1215`) background
+  - "$hitpost Alpha" logo — green + gold two-tone branding
+  - "Show Me The Money" analytics header, money-themed copy throughout
+  - New `COLORS["accent_gold"]` and `COLORS["navy"]` design tokens
+
 ### Fixed
 - **Harvester failing on ScrapeCreators API** -- API began returning `content-type: text/plain` instead of `application/json`, causing aiohttp's `response.json()` to reject the valid JSON body. Added `content_type=None` to both `_test_connection()` and `_fetch_batch()` calls to accept any content type.
 

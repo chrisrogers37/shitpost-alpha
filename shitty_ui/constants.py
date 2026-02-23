@@ -1,33 +1,35 @@
 """Shared constants for the Shitty UI dashboard."""
 
-# Color palette - dark theme professional design
+# Color palette - hyper-American money theme
 COLORS = {
-    "bg": "#0F172A",  # Slate 900 - page background
-    "primary": "#1e293b",  # Slate 800 - card headers
-    "secondary": "#1E293B",  # Slate 800 - cards
-    "accent": "#3b82f6",  # Blue 500 - highlights
-    "success": "#10b981",  # Emerald 500 - bullish/correct
-    "danger": "#ef4444",  # Red 500 - bearish/incorrect
-    "warning": "#f59e0b",  # Amber 500 - pending
-    "text": "#f1f5f9",  # Slate 100 - primary text
-    "text_muted": "#94a3b8",  # Slate 400 - secondary text
-    "border": "#334155",  # Slate 700 - borders
-    "surface_sunken": "#172032",  # Slightly darker than secondary, for tertiary sections
+    "bg": "#0B1215",  # Warm dark charcoal - page background
+    "primary": "#141E22",  # Warm dark surface - card headers
+    "secondary": "#141E22",  # Warm dark surface - cards
+    "accent": "#85BB65",  # Dollar bill green - primary highlight
+    "accent_gold": "#FFD700",  # Gold - secondary highlight, active states
+    "navy": "#002868",  # Old Glory blue - tertiary accent
+    "success": "#85BB65",  # Dollar bill green - bullish/correct (cash money)
+    "danger": "#B22234",  # Old Glory red - bearish/incorrect (patriotic red)
+    "warning": "#FFD700",  # Gold - pending states
+    "text": "#F5F1E8",  # Parchment white - primary text
+    "text_muted": "#8B9A7E",  # Sage muted green - secondary text
+    "border": "#2A3A2E",  # Dark olive - borders
+    "surface_sunken": "#0E1719",  # Deeper warm dark - tertiary sections
 }
 
 # Sentiment-specific color mapping for chart overlays
 SENTIMENT_COLORS = {
-    "bullish": "#10b981",   # Emerald 500 (same as COLORS["success"])
-    "bearish": "#ef4444",   # Red 500 (same as COLORS["danger"])
-    "neutral": "#94a3b8",   # Slate 400 (same as COLORS["text_muted"])
+    "bullish": "#85BB65",   # Dollar bill green (same as COLORS["success"])
+    "bearish": "#B22234",   # Old Glory red (same as COLORS["danger"])
+    "neutral": "#8B9A7E",   # Sage muted green (same as COLORS["text_muted"])
 }
 
 # Pre-computed sentiment badge background colors (hex + alpha suffix)
 # Used by card components for consistent badge and border styling
 SENTIMENT_BG_COLORS = {
-    "bullish": "#10b98126",   # Emerald 500 at ~15% opacity
-    "bearish": "#ef444426",   # Red 500 at ~15% opacity
-    "neutral": "#94a3b826",   # Slate 400 at ~15% opacity
+    "bullish": "#85BB6526",   # Dollar bill green at ~15% opacity
+    "bearish": "#B2223426",   # Old Glory red at ~15% opacity
+    "neutral": "#8B9A7E26",   # Sage muted green at ~15% opacity
 }
 
 # Marker configuration for signal overlays
@@ -45,10 +47,10 @@ MARKER_CONFIG = {
 
 # Timeframe window colors (for shaded regions)
 TIMEFRAME_COLORS = {
-    "t1": "rgba(59, 130, 246, 0.06)",   # Blue, very light
-    "t3": "rgba(59, 130, 246, 0.04)",
-    "t7": "rgba(245, 158, 11, 0.04)",   # Amber, very light
-    "t30": "rgba(245, 158, 11, 0.02)",
+    "t1": "rgba(133, 187, 101, 0.06)",  # Dollar bill green, very light
+    "t3": "rgba(133, 187, 101, 0.04)",
+    "t7": "rgba(255, 215, 0, 0.04)",    # Gold, very light
+    "t30": "rgba(255, 215, 0, 0.02)",
 }
 
 # Typography scale - consistent font sizes across all UI components
@@ -96,13 +98,13 @@ SECTION_ACCENT = {
 HIERARCHY = {
     "primary": {
         "background": COLORS["secondary"],
-        "shadow": "0 4px 24px rgba(59, 130, 246, 0.08), 0 1px 3px rgba(0, 0, 0, 0.2)",
+        "shadow": "0 4px 24px rgba(133, 187, 101, 0.10), 0 1px 3px rgba(0, 0, 0, 0.25)",
         "border": f"1px solid {COLORS['accent']}40",
         "border_radius": "16px",
     },
     "secondary": {
         "background": COLORS["secondary"],
-        "shadow": "0 1px 3px rgba(0, 0, 0, 0.12)",
+        "shadow": "0 1px 3px rgba(0, 0, 0, 0.15)",
         "border": f"1px solid {COLORS['border']}",
         "border_radius": "12px",
         "accent_top": f"2px solid {COLORS['accent']}",
@@ -110,7 +112,7 @@ HIERARCHY = {
     "tertiary": {
         "background": COLORS["surface_sunken"],
         "shadow": "none",
-        "border": "1px solid #2d3a4e",
+        "border": f"1px solid {COLORS['border']}",
         "border_radius": "10px",
     },
 }
@@ -139,29 +141,29 @@ CHART_LAYOUT = {
     "plot_bgcolor": "rgba(0,0,0,0)",
     "paper_bgcolor": "rgba(0,0,0,0)",
     "font": {
-        "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-        "color": "#f1f5f9",  # COLORS["text"]
+        "family": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        "color": "#F5F1E8",  # COLORS["text"] — parchment white
         "size": 12,
     },
     "margin": {"l": 48, "r": 16, "t": 24, "b": 40},
     "xaxis": {
-        "gridcolor": "rgba(51, 65, 85, 0.5)",  # COLORS["border"] at 50%
+        "gridcolor": "rgba(42, 58, 46, 0.5)",  # COLORS["border"] (#2A3A2E) at 50%
         "gridwidth": 1,
         "zeroline": False,
         "showline": False,
     },
     "yaxis": {
-        "gridcolor": "rgba(51, 65, 85, 0.5)",
+        "gridcolor": "rgba(42, 58, 46, 0.5)",  # COLORS["border"] (#2A3A2E) at 50%
         "gridwidth": 1,
         "zeroline": False,
         "showline": False,
     },
     "hoverlabel": {
-        "bgcolor": "#1e293b",  # COLORS["secondary"]
-        "bordercolor": "#334155",  # COLORS["border"]
+        "bgcolor": "#141E22",  # COLORS["secondary"] — warm dark surface
+        "bordercolor": "#2A3A2E",  # COLORS["border"] — dark olive
         "font": {
-            "family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-            "color": "#f1f5f9",
+            "family": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+            "color": "#F5F1E8",
             "size": 13,
         },
     },
@@ -178,21 +180,21 @@ CHART_CONFIG = {
 
 # Extended candlestick-specific colors (override Plotly defaults)
 CHART_COLORS = {
-    "candle_up": "#10b981",       # Emerald 500 — matches COLORS["success"]
-    "candle_down": "#ef4444",     # Red 500 — matches COLORS["danger"]
-    "candle_up_fill": "#10b981",  # Solid fill for up candles
-    "candle_down_fill": "#ef4444",
-    "volume_up": "rgba(16, 185, 129, 0.3)",   # Emerald at 30%
-    "volume_down": "rgba(239, 68, 68, 0.3)",  # Red at 30%
-    "line_accent": "#3b82f6",     # Blue 500 — COLORS["accent"]
-    "line_accent_fill": "rgba(59, 130, 246, 0.08)",  # Subtler area fill
-    "bar_palette": [              # Ordered palette for multi-bar charts
-        "#3b82f6",  # Blue 500
-        "#10b981",  # Emerald 500
-        "#f59e0b",  # Amber 500
-        "#ef4444",  # Red 500
-        "#8b5cf6",  # Violet 500
-        "#ec4899",  # Pink 500
+    "candle_up": "#85BB65",       # Dollar bill green — matches COLORS["success"]
+    "candle_down": "#B22234",     # Old Glory red — matches COLORS["danger"]
+    "candle_up_fill": "#85BB65",  # Solid fill for up candles
+    "candle_down_fill": "#B22234",
+    "volume_up": "rgba(133, 187, 101, 0.3)",   # Dollar bill green at 30%
+    "volume_down": "rgba(178, 34, 52, 0.3)",   # Old Glory red at 30%
+    "line_accent": "#85BB65",     # Dollar bill green — COLORS["accent"]
+    "line_accent_fill": "rgba(133, 187, 101, 0.08)",  # Subtler area fill
+    "bar_palette": [              # Money-themed palette for multi-bar charts
+        "#85BB65",  # Dollar bill green
+        "#FFD700",  # Gold
+        "#B22234",  # Old Glory red
+        "#002868",  # Old Glory navy
+        "#F5F1E8",  # Parchment white
+        "#5C8A4D",  # Darker money green
     ],
-    "reference_line": "rgba(148, 163, 184, 0.3)",  # Slate 400 at 30%
+    "reference_line": "rgba(139, 154, 126, 0.3)",  # Sage muted green at 30%
 }
