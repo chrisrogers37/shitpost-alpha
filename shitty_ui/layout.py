@@ -32,7 +32,6 @@ from components.controls import create_filter_controls, get_period_button_styles
 from components.header import create_header, create_footer
 from pages.dashboard import (
     create_dashboard_page,
-    create_performance_page,
     register_dashboard_callbacks,
 )
 from pages.assets import (
@@ -40,8 +39,6 @@ from pages.assets import (
     create_asset_header,
     register_asset_callbacks,
 )
-from pages.signals import create_signal_feed_page, register_signal_callbacks
-from pages.trends import create_trends_page, register_trends_callbacks
 from callbacks.alerts import (
     create_alert_config_panel,
     create_alert_history_panel,
@@ -786,54 +783,22 @@ def register_callbacks(app: Dash):
         [Input("url", "pathname")],
     )
     def route_page(pathname: str):
-        """Route to the correct page based on URL pathname."""
+        """Route to the correct page based on URL pathname.
+
+        Only 2 views exist:
+        - / (Home = Screener)
+        - /assets/<symbol> (Asset Detail)
+
+        Old routes (/signals, /trends, /performance) fall through to home.
+        """
         if pathname and pathname.startswith("/assets/"):
             symbol = pathname.split("/assets/")[-1].strip("/").upper()
             if symbol:
                 return create_asset_page(symbol)
 
-        if pathname == "/performance":
-            return create_performance_page()
-
-        if pathname == "/signals":
-            return create_signal_feed_page()
-
-        if pathname == "/trends":
-            return create_trends_page()
-
         return create_dashboard_page()
-
-    # Active nav link highlighting
-    app.clientside_callback(
-        """
-        function(pathname) {
-            var links = {
-                '/': 'nav-link-dashboard',
-                '/signals': 'nav-link-signals',
-                '/trends': 'nav-link-trends',
-                '/performance': 'nav-link-performance'
-            };
-            var classes = [];
-            for (var path in links) {
-                var isActive = (pathname === path) ||
-                    (path === '/' && (pathname === '' || pathname === null));
-                classes.push(isActive ? 'nav-link-custom active' : 'nav-link-custom');
-            }
-            return classes;
-        }
-        """,
-        [
-            Output("nav-link-dashboard", "className"),
-            Output("nav-link-signals", "className"),
-            Output("nav-link-trends", "className"),
-            Output("nav-link-performance", "className"),
-        ],
-        [Input("url", "pathname")],
-    )
 
     # Delegate to page/callback modules
     register_dashboard_callbacks(app)
     register_asset_callbacks(app)
-    register_signal_callbacks(app)
-    register_trends_callbacks(app)
     register_alert_callbacks(app)
