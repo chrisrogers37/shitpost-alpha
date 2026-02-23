@@ -1655,23 +1655,15 @@ class TestDashboardPageStructure:
         page = create_dashboard_page()
         assert isinstance(page, html.Div)
 
-    def test_dashboard_contains_analytics_tabs(self):
-        """Test that dashboard contains dbc.Tabs with id 'analytics-tabs'."""
+    def test_dashboard_contains_screener_table(self):
+        """Test that dashboard contains the asset screener table container."""
         from pages.dashboard import create_dashboard_page
 
         page = create_dashboard_page()
         found_ids = _find_component_ids(page)
-        assert "analytics-tabs" in found_ids, "analytics-tabs not found in dashboard page"
-
-    def test_dashboard_contains_three_chart_ids(self):
-        """Test that all three chart graph IDs are present in the tabbed layout."""
-        from pages.dashboard import create_dashboard_page
-
-        page = create_dashboard_page()
-        found_ids = _find_component_ids(page)
-        assert "accuracy-over-time-chart" in found_ids
-        assert "confidence-accuracy-chart" in found_ids
-        assert "asset-accuracy-chart" in found_ids
+        assert "screener-table-container" in found_ids, (
+            "screener-table-container not found in dashboard page"
+        )
 
     def test_dashboard_does_not_contain_asset_selector(self):
         """Test that the Asset Deep Dive dropdown has been removed."""
@@ -1714,13 +1706,15 @@ class TestDashboardPageStructure:
         found_ids = _find_component_ids(page)
         assert "post-feed-container" in found_ids
 
-    def test_dashboard_contains_unified_feed(self):
-        """Test that unified-feed-container is present in the dashboard."""
+    def test_dashboard_no_longer_has_unified_feed(self):
+        """Test that unified-feed-container is removed (replaced by screener)."""
         from pages.dashboard import create_dashboard_page
 
         page = create_dashboard_page()
         found_ids = _find_component_ids(page)
-        assert "unified-feed-container" in found_ids
+        assert "unified-feed-container" not in found_ids, (
+            "unified-feed-container should be removed from dashboard"
+        )
 
     def test_dashboard_no_longer_has_recent_signals_list(self):
         """Test that recent-signals-list has been removed."""
@@ -2248,18 +2242,14 @@ class TestDashboardResponsiveProps:
         found = _find_components_with_class(page, "main-content-container")
         assert len(found) > 0, "main-content-container className not found in performance page"
 
-    def test_charts_use_chart_config(self):
-        """Test that chart dcc.Graph components use the shared CHART_CONFIG."""
+    def test_old_chart_ids_removed_from_dashboard(self):
+        """Test that old analytics chart IDs are no longer in the dashboard."""
         from pages.dashboard import create_dashboard_page
-        from constants import CHART_CONFIG
-        from dash import dcc
 
         page = create_dashboard_page()
-        graphs = _find_components_by_type(page, dcc.Graph)
-        chart_ids = {"accuracy-over-time-chart", "confidence-accuracy-chart", "asset-accuracy-chart"}
-        for graph in graphs:
-            if hasattr(graph, "id") and graph.id in chart_ids:
-                config = getattr(graph, "config", {}) or {}
-                assert config == CHART_CONFIG, (
-                    f"Graph '{graph.id}' should use CHART_CONFIG"
-                )
+        found_ids = _find_component_ids(page)
+        removed_ids = {"accuracy-over-time-chart", "confidence-accuracy-chart", "asset-accuracy-chart"}
+        for chart_id in removed_ids:
+            assert chart_id not in found_ids, (
+                f"'{chart_id}' should be removed from dashboard (replaced by screener)"
+            )

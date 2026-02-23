@@ -72,20 +72,13 @@ class TestDashboardBranding:
         text = _extract_all_text(page)
         assert COPY["latest_posts_header"] in text
 
-    def test_dashboard_layout_contains_analytics_header(self):
+    def test_dashboard_layout_contains_screener_header(self):
+        """Dashboard should contain the Asset Screener header."""
         from pages.dashboard import create_dashboard_page
 
         page = create_dashboard_page()
         text = _extract_all_text(page)
-        assert COPY["analytics_header"] in text
-
-    def test_dashboard_layout_does_not_contain_old_analytics(self):
-        """The old generic 'Analytics' header is replaced with 'The Numbers'."""
-        from pages.dashboard import create_dashboard_page
-
-        page = create_dashboard_page()
-        text = _extract_all_text(page)
-        assert COPY["analytics_header"] in text
+        assert "Asset Screener" in text
 
 
 class TestSignalsPageBranding:
