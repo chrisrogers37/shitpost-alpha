@@ -1,6 +1,6 @@
 """Dashboard page layout and callbacks."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 import traceback
 
 import dash
@@ -14,43 +14,32 @@ from dash import (
     State,
     callback_context,
     MATCH,
-    ALL,
 )
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import pandas as pd
 
-from constants import COLORS, CHART_COLORS, CHART_CONFIG, HIERARCHY
+from constants import COLORS, CHART_CONFIG, HIERARCHY
 from components.cards import (
     create_error_card,
     create_empty_chart,
     create_empty_state_chart,
-    create_empty_state_html,
     create_metric_card,
     create_post_card,
-    create_unified_signal_card,
 )
 from components.charts import apply_chart_layout
 from components.controls import create_filter_controls, get_period_button_styles
 from components.header import create_header, create_footer
 from brand_copy import COPY
 from data import (
-    get_unified_feed,
-    get_sparkline_prices,
-    get_performance_metrics,
     get_accuracy_by_confidence,
     get_accuracy_by_asset,
     get_asset_screener_data,
     get_screener_sparkline_prices,
     get_predictions_with_outcomes,
     load_recent_posts,
-    get_weekly_signal_count,
-    get_high_confidence_metrics,
-    get_best_performing_asset,
-    get_accuracy_over_time,
     get_backtest_simulation,
     get_sentiment_accuracy,
-    get_dashboard_kpis,
     get_dashboard_kpis_with_fallback,
     get_empty_state_context,
 )

@@ -12,7 +12,6 @@ from dash import html, dcc
 
 from constants import (
     COLORS,
-    HIERARCHY,
     SENTIMENT_COLORS,
     SENTIMENT_BG_COLORS,
     SPARKLINE_CONFIG,
