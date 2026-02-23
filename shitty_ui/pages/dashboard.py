@@ -33,8 +33,10 @@ from data import (
     get_predictions_with_outcomes,
     load_recent_posts,
     get_dashboard_kpis_with_fallback,
+    get_dynamic_insights,
 )
 from components.screener import build_screener_table
+from components.insights import create_insight_cards
 
 
 def create_dashboard_page() -> html.Div:
@@ -97,6 +99,16 @@ def create_dashboard_page() -> html.Div:
                             "alignItems": "center",
                             "justifyContent": "flex-end",
                         },
+                    ),
+                    # Dynamic Insight Cards (above KPIs, answer "so what right now?")
+                    dcc.Loading(
+                        id="insight-cards-loading",
+                        type="default",
+                        color=COLORS["accent"],
+                        children=html.Div(
+                            id="insight-cards-container",
+                            style={"marginBottom": "16px"},
+                        ),
                     ),
                     # Key Metrics Row (Primary tier - hero treatment)
                     dcc.Loading(
@@ -252,7 +264,6 @@ def create_dashboard_page() -> html.Div:
     )
 
 
-
 def register_dashboard_callbacks(app: Dash):
     """Register all dashboard-specific callbacks."""
 
@@ -324,6 +335,7 @@ def register_dashboard_callbacks(app: Dash):
     # ========== Main Dashboard Update Callback ==========
     @app.callback(
         [
+            Output("insight-cards-container", "children"),
             Output("screener-table-container", "children"),
             Output("performance-metrics", "children"),
             Output("last-update-timestamp", "data"),
@@ -343,6 +355,15 @@ def register_dashboard_callbacks(app: Dash):
 
         # Current timestamp for refresh indicator
         current_time = datetime.now().isoformat()
+
+        # ===== Dynamic Insight Cards =====
+        try:
+            insight_pool = get_dynamic_insights(days=days)
+            insight_cards = create_insight_cards(insight_pool, max_cards=3)
+        except Exception as e:
+            errors.append(f"Insight cards: {e}")
+            print(f"Error loading insight cards: {traceback.format_exc()}")
+            insight_cards = html.Div()  # Silent failure -- insights are not critical
 
         # ===== Asset Screener Table =====
         try:
@@ -448,6 +469,7 @@ def register_dashboard_callbacks(app: Dash):
             print(f"Dashboard update completed with errors: {errors}")
 
         return (
+            insight_cards,
             screener_table,
             metrics_row,
             current_time,

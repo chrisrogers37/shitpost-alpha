@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Dynamic insight cards** -- 2-3 personality-driven callout cards above the screener table answering "so what right now?"
+  - Latest call: most recent evaluated prediction with 7-day return and outcome
+  - Best & worst: top and bottom performing predictions in the selected period
+  - System pulse: accuracy percentage vs coin flip baseline with self-deprecating commentary
+  - Hot asset: most-predicted ticker with average return
+  - High-confidence signal: recent high-confidence call with outcome status
+  - Each card links to the relevant asset detail page
+  - Cards update with time period filter (7D/30D/90D/All)
+  - Graceful degradation: each insight query has independent error handling
+  - Cleaned up dead Signals/Trends/Performance brand copy from Phase 05
+
 ### Changed
 - **2-view information architecture** -- Consolidated 4 pages (Dashboard, Signals, Trends, Performance) into 2 views: Home (Screener) and Asset Detail
   - Removed nav links from header — logo-only navigation
