@@ -225,20 +225,10 @@ def create_asset_header(symbol: str) -> html.Div:
             html.Div(
                 [
                     dcc.Link(
-                        [html.I(className="fas fa-arrow-left me-2"), "Dashboard"],
+                        [html.I(className="fas fa-arrow-left me-2"), "Screener"],
                         href="/",
                         style={
                             "color": COLORS["accent"],
-                            "textDecoration": "none",
-                            "fontSize": "0.85rem",
-                            "marginRight": "16px",
-                        },
-                    ),
-                    dcc.Link(
-                        [html.I(className="fas fa-chart-pie me-2"), "Performance"],
-                        href="/performance",
-                        style={
-                            "color": COLORS["text_muted"],
                             "textDecoration": "none",
                             "fontSize": "0.85rem",
                         },
