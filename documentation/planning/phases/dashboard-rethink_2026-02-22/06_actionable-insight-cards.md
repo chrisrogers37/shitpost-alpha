@@ -1,5 +1,9 @@
 # Phase 06: Actionable Insight Cards
 
+**Status:** ✅ COMPLETE
+**Started:** 2026-02-23
+**Completed:** 2026-02-23
+
 **PR Title:** feat(dashboard): dynamic insight cards that answer "so what right now?"
 
 **Risk Level:** Medium
@@ -440,6 +444,12 @@ Also add `get_dynamic_insights` to the `clear_all_caches()` function:
     "chart_empty_accuracy": "Not enough data to chart accuracy yet",
 ```
 
+### Step 2b: Clean up dead brand copy from Phase 05
+
+**File:** `shitty_ui/brand_copy.py`
+
+Remove copy keys for Signals Page (lines 59-65), Trends Page (lines 67-76), and Performance Page (lines 87-100) — all pages were deleted in Phase 05. Keep only active copy.
+
 ### Step 3: Create the insight cards component
 
 **File:** `shitty_ui/components/insights.py` (NEW FILE)
@@ -694,67 +704,14 @@ def create_insight_cards(insights: List[Dict[str, Any]], max_cards: int = 3) -> 
 
 #### 4a. Add imports
 
-**Existing imports (lines 12-20):**
-```python
-from components.cards import (
-    create_error_card,
-    create_empty_chart,
-    create_empty_state_chart,
-    create_empty_state_html,
-    create_metric_card,
-    create_post_card,
-    create_unified_signal_card,
-)
-```
-
-**Add after this import block:**
+**Add to existing imports:**
 ```python
 from components.insights import create_insight_cards
 ```
 
-**Existing data imports (lines 25-42):**
+**Add `get_dynamic_insights` to the existing `from data import (...)` block:**
 ```python
-from data import (
-    get_unified_feed,
-    get_sparkline_prices,
-    get_performance_metrics,
-    get_accuracy_by_confidence,
-    get_accuracy_by_asset,
-    get_predictions_with_outcomes,
-    load_recent_posts,
-    get_weekly_signal_count,
-    get_high_confidence_metrics,
-    get_best_performing_asset,
-    get_accuracy_over_time,
-    get_backtest_simulation,
-    get_sentiment_accuracy,
-    get_dashboard_kpis,
-    get_dashboard_kpis_with_fallback,
-    get_empty_state_context,
-)
-```
-
-**Replace with (add `get_dynamic_insights`):**
-```python
-from data import (
-    get_unified_feed,
-    get_sparkline_prices,
-    get_performance_metrics,
-    get_accuracy_by_confidence,
-    get_accuracy_by_asset,
-    get_predictions_with_outcomes,
-    load_recent_posts,
-    get_weekly_signal_count,
-    get_high_confidence_metrics,
-    get_best_performing_asset,
-    get_accuracy_over_time,
-    get_backtest_simulation,
-    get_sentiment_accuracy,
-    get_dashboard_kpis,
-    get_dashboard_kpis_with_fallback,
-    get_empty_state_context,
     get_dynamic_insights,
-)
 ```
 
 #### 4b. Add insight cards container to the layout
@@ -803,34 +760,28 @@ In the `create_dashboard_page()` function, add a loading container for insight c
 
 #### 4c. Update the main dashboard callback to include insight cards
 
-**Existing callback outputs (lines 514-523):**
+**Existing callback outputs (3 outputs, post-Phase 05):**
 ```python
     @app.callback(
         [
-            Output("unified-feed-container", "children"),
+            Output("screener-table-container", "children"),
             Output("performance-metrics", "children"),
-            Output("accuracy-over-time-chart", "figure"),
-            Output("confidence-accuracy-chart", "figure"),
-            Output("asset-accuracy-chart", "figure"),
             Output("last-update-timestamp", "data"),
         ],
 ```
 
-**Replace with (add insight-cards-container output):**
+**Replace with (add insight-cards-container as first output, 3→4):**
 ```python
     @app.callback(
         [
             Output("insight-cards-container", "children"),
-            Output("unified-feed-container", "children"),
+            Output("screener-table-container", "children"),
             Output("performance-metrics", "children"),
-            Output("accuracy-over-time-chart", "figure"),
-            Output("confidence-accuracy-chart", "figure"),
-            Output("asset-accuracy-chart", "figure"),
             Output("last-update-timestamp", "data"),
         ],
 ```
 
-**In the `update_dashboard` function body, add insight card generation at the TOP of the function, right after the `days` and `current_time` setup (after line 538):**
+**In the `update_dashboard` function body, add insight card generation after `current_time`:**
 
 After:
 ```python
@@ -850,16 +801,13 @@ Add:
             insight_cards = html.Div()  # Silent failure -- insights are not critical
 ```
 
-**Update the return statement (existing line ~884):**
+**Update the return statement (3→4 values):**
 
 **Existing:**
 ```python
         return (
-            feed_cards,
+            screener_table,
             metrics_row,
-            acc_fig,
-            conf_fig,
-            asset_fig,
             current_time,
         )
 ```
@@ -868,11 +816,8 @@ Add:
 ```python
         return (
             insight_cards,
-            feed_cards,
+            screener_table,
             metrics_row,
-            acc_fig,
-            conf_fig,
-            asset_fig,
             current_time,
         )
 ```
@@ -1079,7 +1024,7 @@ Run the full dashboard test suite to ensure no regressions:
 source venv/bin/activate && pytest shit_tests/shitty_ui/ -v
 ```
 
-The callback output count change (6 -> 7 outputs) will break existing callback tests that mock the `update_dashboard` return value. These tests need the return tuple updated to include the `insight_cards` element as the first item.
+The callback output count change (3 -> 4 outputs) may affect existing callback tests that mock the `update_dashboard` return value. These tests need the return tuple updated to include the `insight_cards` element as the first item.
 
 ### Manual Verification Steps
 
@@ -1129,7 +1074,7 @@ The callback output count change (6 -> 7 outputs) will break existing callback t
 - [ ] `shitty_ui/components/insights.py` exists with `create_insight_cards()` and `_create_single_insight_card()`
 - [ ] `shitty_ui/pages/dashboard.py` imports `create_insight_cards` and `get_dynamic_insights`
 - [ ] `create_dashboard_page()` includes `insight-cards-container` div above `performance-metrics`
-- [ ] `update_dashboard` callback has 7 outputs (insight cards + original 6)
+- [ ] `update_dashboard` callback has 4 outputs (insight cards + original 3)
 - [ ] `update_dashboard` return tuple starts with `insight_cards`
 - [ ] `pytest shit_tests/shitty_ui/ -v` passes (including new insight tests)
 - [ ] `ruff check shitty_ui/components/insights.py` passes
