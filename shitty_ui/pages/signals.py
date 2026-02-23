@@ -80,9 +80,7 @@ def create_signal_feed_page() -> html.Div:
                                             html.Label(
                                                 "Sentiment",
                                                 className="small",
-                                                style={
-                                                    "color": COLORS["text_muted"]
-                                                },
+                                                style={"color": COLORS["text_muted"]},
                                             ),
                                             dcc.Dropdown(
                                                 id="signal-feed-sentiment-filter",
@@ -115,45 +113,49 @@ def create_signal_feed_page() -> html.Div:
                                             html.Label(
                                                 "Confidence Range",
                                                 className="small",
-                                                style={
-                                                    "color": COLORS["text_muted"]
-                                                },
+                                                style={"color": COLORS["text_muted"]},
                                             ),
-                                            dcc.RangeSlider(
-                                                id="signal-feed-confidence-slider",
-                                                min=0,
-                                                max=1,
-                                                step=0.05,
-                                                value=[0, 1],
-                                                marks={
-                                                    0: {
-                                                        "label": "0%",
-                                                        "style": {
-                                                            "color": COLORS[
-                                                                "text_muted"
-                                                            ]
+                                            html.Div(
+                                                dcc.RangeSlider(
+                                                    id="signal-feed-confidence-slider",
+                                                    min=0,
+                                                    max=1,
+                                                    step=0.05,
+                                                    value=[0, 1],
+                                                    marks={
+                                                        0: {
+                                                            "label": "0%",
+                                                            "style": {
+                                                                "color": COLORS[
+                                                                    "text_muted"
+                                                                ]
+                                                            },
+                                                        },
+                                                        0.5: {
+                                                            "label": "50%",
+                                                            "style": {
+                                                                "color": COLORS[
+                                                                    "text_muted"
+                                                                ]
+                                                            },
+                                                        },
+                                                        1: {
+                                                            "label": "100%",
+                                                            "style": {
+                                                                "color": COLORS[
+                                                                    "text_muted"
+                                                                ]
+                                                            },
                                                         },
                                                     },
-                                                    0.5: {
-                                                        "label": "50%",
-                                                        "style": {
-                                                            "color": COLORS[
-                                                                "text_muted"
-                                                            ]
-                                                        },
+                                                    tooltip={
+                                                        "placement": "bottom",
+                                                        "always_visible": False,
                                                     },
-                                                    1: {
-                                                        "label": "100%",
-                                                        "style": {
-                                                            "color": COLORS[
-                                                                "text_muted"
-                                                            ]
-                                                        },
-                                                    },
-                                                },
-                                                tooltip={
-                                                    "placement": "bottom",
-                                                    "always_visible": False,
+                                                ),
+                                                style={
+                                                    "paddingRight": "12px",
+                                                    "paddingLeft": "4px",
                                                 },
                                             ),
                                         ],
@@ -167,9 +169,7 @@ def create_signal_feed_page() -> html.Div:
                                             html.Label(
                                                 "Asset",
                                                 className="small",
-                                                style={
-                                                    "color": COLORS["text_muted"]
-                                                },
+                                                style={"color": COLORS["text_muted"]},
                                             ),
                                             dcc.Dropdown(
                                                 id="signal-feed-asset-filter",
@@ -188,9 +188,7 @@ def create_signal_feed_page() -> html.Div:
                                             html.Label(
                                                 "Outcome",
                                                 className="small",
-                                                style={
-                                                    "color": COLORS["text_muted"]
-                                                },
+                                                style={"color": COLORS["text_muted"]},
                                             ),
                                             dcc.Dropdown(
                                                 id="signal-feed-outcome-filter",
@@ -375,7 +373,13 @@ def register_signal_callbacks(app: Dash):
                     ],
                     style={"textAlign": "center", "padding": "40px"},
                 )
-                return [empty_card], COPY["signals_empty_filters"], 0, None, {"display": "none"}
+                return (
+                    [empty_card],
+                    COPY["signals_empty_filters"],
+                    0,
+                    None,
+                    {"display": "none"},
+                )
 
             # Batch-fetch sparkline price data for all symbols in this page
             sparkline_prices = {}
@@ -407,9 +411,7 @@ def register_signal_callbacks(app: Dash):
                 last_seen_ts = str(newest_ts)
 
             load_more_style = (
-                {"display": "block"}
-                if total_count > PAGE_SIZE
-                else {"display": "none"}
+                {"display": "block"} if total_count > PAGE_SIZE else {"display": "none"}
             )
 
             return cards, count_label, PAGE_SIZE, last_seen_ts, load_more_style
@@ -444,16 +446,10 @@ def register_signal_callbacks(app: Dash):
     # 3.2 Load More Button
     @app.callback(
         [
-            Output(
-                "signal-feed-cards-container", "children", allow_duplicate=True
-            ),
+            Output("signal-feed-cards-container", "children", allow_duplicate=True),
             Output("signal-feed-offset", "data", allow_duplicate=True),
-            Output(
-                "signal-feed-count-label", "children", allow_duplicate=True
-            ),
-            Output(
-                "signal-feed-load-more-container", "style", allow_duplicate=True
-            ),
+            Output("signal-feed-count-label", "children", allow_duplicate=True),
+            Output("signal-feed-load-more-container", "style", allow_duplicate=True),
         ],
         [Input("signal-feed-load-more-btn", "n_clicks")],
         [
@@ -534,7 +530,9 @@ def register_signal_callbacks(app: Dash):
 
             new_cards = [
                 create_feed_signal_card(
-                    row, card_index=current_offset + idx, sparkline_prices=sparkline_prices
+                    row,
+                    card_index=current_offset + idx,
+                    sparkline_prices=sparkline_prices,
                 )
                 for idx, (_, row) in enumerate(df.iterrows())
             ]
@@ -616,9 +614,7 @@ def register_signal_callbacks(app: Dash):
         ],
         prevent_initial_call=True,
     )
-    def export_signal_feed_csv(
-        n_clicks, sentiment, confidence_range, asset, outcome
-    ):
+    def export_signal_feed_csv(n_clicks, sentiment, confidence_range, asset, outcome):
         """Export the current filtered signal feed to a CSV file."""
         from data import get_signal_feed_csv
 
@@ -646,7 +642,9 @@ def register_signal_callbacks(app: Dash):
             if export_df.empty:
                 return None
 
-            filename = f"shitpost_alpha_signals_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            filename = (
+                f"shitpost_alpha_signals_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            )
             return dcc.send_data_frame(export_df.to_csv, filename, index=False)
 
         except Exception as e:

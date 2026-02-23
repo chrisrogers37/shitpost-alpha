@@ -35,7 +35,11 @@ from pages.dashboard import (
     create_performance_page,
     register_dashboard_callbacks,
 )
-from pages.assets import create_asset_page, create_asset_header, register_asset_callbacks
+from pages.assets import (
+    create_asset_page,
+    create_asset_header,
+    register_asset_callbacks,
+)
 from pages.signals import create_signal_feed_page, register_signal_callbacks
 from pages.trends import create_trends_page, register_trends_callbacks
 from callbacks.alerts import (
@@ -82,6 +86,9 @@ def create_app() -> Dash:
         {%favicon%}
         {%css%}
         <style>
+            html, body {
+                overflow-x: hidden;
+            }
             body {
                 background-color: #0F172A !important;
                 font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
@@ -230,9 +237,11 @@ def create_app() -> Dash:
                     font-size: 1.4rem !important;
                 }
 
-                /* Period selector: center */
+                /* Period selector: center and allow wrapping */
                 .period-selector {
                     justify-content: center !important;
+                    flex-wrap: wrap !important;
+                    gap: 6px;
                 }
 
                 /* Hero signals: stack vertically */
@@ -265,12 +274,57 @@ def create_app() -> Dash:
                Responsive: Large phone (max-width: 480px)
                ====================================== */
             @media (max-width: 480px) {
+                /* Content container: tighter padding */
+                .main-content-container {
+                    padding: 12px 8px !important;
+                }
+
+                /* Logo: smaller to prevent clipping */
+                .header-logo {
+                    margin-right: 0 !important;
+                }
+                .header-logo h1 {
+                    font-size: 1.1rem !important;
+                }
+                .header-logo p {
+                    font-size: 0.65rem !important;
+                }
+
+                /* KPI hero values: scale down to fit 50% column */
+                .kpi-hero-value {
+                    font-size: 1.4rem !important;
+                }
+                .kpi-hero-card .card-body {
+                    padding: 6px 4px !important;
+                    min-height: auto !important;
+                }
+
+                /* KPI icon circles: shrink */
+                .kpi-hero-card .card-body > div:first-child {
+                    width: 28px !important;
+                    height: 28px !important;
+                    margin-bottom: 6px !important;
+                }
+                .kpi-hero-card .card-body > div:first-child .fas {
+                    font-size: 0.8rem !important;
+                }
+
                 /* Tighter padding on cards */
                 .metric-card .card-body {
                     padding: 8px !important;
                 }
                 .metric-card h3 {
                     font-size: 1.1rem !important;
+                }
+                .metric-card p {
+                    font-size: 0.7rem !important;
+                }
+
+                /* Period selector: center and wrap */
+                .period-selector {
+                    justify-content: center !important;
+                    flex-wrap: wrap !important;
+                    gap: 6px;
                 }
 
                 /* Reduce chart height further */
@@ -306,15 +360,18 @@ def create_app() -> Dash:
             @media (max-width: 375px) {
                 /* Header: minimal padding */
                 .header-container {
-                    padding: 10px 12px !important;
+                    padding: 10px 8px !important;
                 }
 
-                /* Logo: smaller */
+                /* Logo: smaller to prevent clipping */
+                .header-logo {
+                    margin-right: 0 !important;
+                }
                 .header-logo h1 {
-                    font-size: 1.3rem !important;
+                    font-size: 1.1rem !important;
                 }
                 .header-logo p {
-                    font-size: 0.7rem !important;
+                    font-size: 0.65rem !important;
                 }
 
                 /* KPI cards: full width at 375px */
@@ -322,6 +379,27 @@ def create_app() -> Dash:
                     flex: 0 0 50% !important;
                     max-width: 50% !important;
                 }
+
+                /* KPI hero values: scale down to fit 50% column */
+                .kpi-hero-value {
+                    font-size: 1.4rem !important;
+                }
+                .kpi-hero-card .card-body {
+                    padding: 6px 4px !important;
+                    min-height: auto !important;
+                }
+
+                /* KPI icon circles: shrink */
+                .kpi-hero-card .card-body > div:first-child {
+                    width: 28px !important;
+                    height: 28px !important;
+                    margin-bottom: 6px !important;
+                }
+                .kpi-hero-card .card-body > div:first-child .fas {
+                    font-size: 0.8rem !important;
+                }
+
+                /* KPI title labels: tighter */
                 .metric-card h3 {
                     font-size: 1rem !important;
                     word-break: break-all;
@@ -329,13 +407,21 @@ def create_app() -> Dash:
                 .metric-card .card-body {
                     padding: 6px !important;
                 }
+                .metric-card p {
+                    font-size: 0.7rem !important;
+                }
 
-                /* Icon size reduction */
+                /* Icon size reduction (legacy metric-card) */
                 .metric-card .fas {
                     font-size: 1.1rem !important;
                 }
 
-                /* Period selector buttons: smaller */
+                /* Period selector: center and wrap to prevent "All" clipping */
+                .period-selector {
+                    justify-content: center !important;
+                    flex-wrap: wrap !important;
+                    gap: 6px;
+                }
                 .period-selector .btn {
                     font-size: 0.75rem !important;
                     padding: 4px 8px !important;
