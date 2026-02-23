@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **UI helpers extracted** - Consolidated 4 duplicated patterns (time-ago, sentiment extraction, outcome badges, asset display) from cards.py into shared `components/helpers.py`
+
 ### Fixed
+- **Hero card weeks display** - Hero signal cards now correctly show "2w ago" for posts older than 7 days (was showing "14d ago")
 - **pytest collection blocker** -- Moved `pytest_plugins` declaration from `shit_tests/conftest.py` to root-level `conftest.py` (required by pytest 8.x)
 - **5 stale bypass tests** -- Deleted `test_get_bypass_reason_*` tests that called removed `_get_bypass_reason()` method (coverage exists in `test_bypass_service.py`)
 - **Pydantic V2 deprecation warnings** -- Migrated Settings from legacy `class Config` to `SettingsConfigDict`, removed all deprecated `env=` parameters from Field() calls
