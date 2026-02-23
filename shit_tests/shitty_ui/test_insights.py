@@ -396,43 +396,43 @@ class TestCreateInsightCards:
 
 
 class TestFormatInsightTimestamp:
-    """Tests for _format_insight_timestamp()."""
+    """Tests for format_time_ago (moved from insights to components.helpers)."""
 
     def test_none_returns_empty_string(self):
-        from components.insights import _format_insight_timestamp
+        from components.helpers import format_time_ago
 
-        assert _format_insight_timestamp(None) == ""
+        assert format_time_ago(None) == ""
 
     def test_recent_datetime_returns_relative(self):
-        from components.insights import _format_insight_timestamp
+        from components.helpers import format_time_ago
 
         ts = datetime.now() - timedelta(hours=3)
-        result = _format_insight_timestamp(ts)
+        result = format_time_ago(ts)
         assert "3h ago" == result
 
     def test_days_ago(self):
-        from components.insights import _format_insight_timestamp
+        from components.helpers import format_time_ago
 
         ts = datetime.now() - timedelta(days=2)
-        result = _format_insight_timestamp(ts)
+        result = format_time_ago(ts)
         assert "2d ago" == result
 
     def test_weeks_ago(self):
-        from components.insights import _format_insight_timestamp
+        from components.helpers import format_time_ago
 
         ts = datetime.now() - timedelta(days=15)
-        result = _format_insight_timestamp(ts)
+        result = format_time_ago(ts)
         assert "2w ago" == result
 
     def test_just_now(self):
-        from components.insights import _format_insight_timestamp
+        from components.helpers import format_time_ago
 
         ts = datetime.now() - timedelta(seconds=10)
-        result = _format_insight_timestamp(ts)
+        result = format_time_ago(ts)
         assert result == "just now"
 
     def test_non_datetime_returns_truncated_string(self):
-        from components.insights import _format_insight_timestamp
+        from components.helpers import format_time_ago
 
-        result = _format_insight_timestamp("2026-02-23 12:00:00")
+        result = format_time_ago("2026-02-23 12:00:00")
         assert result == "2026-02-23"

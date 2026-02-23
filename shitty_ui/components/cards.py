@@ -8,9 +8,24 @@ from dash import html, dcc
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 
-from constants import COLORS, FONT_SIZES, HIERARCHY, SENTIMENT_COLORS, SENTIMENT_BG_COLORS
+from constants import (
+    COLORS,
+    FONT_SIZES,
+    HIERARCHY,
+    SENTIMENT_COLORS,
+    SENTIMENT_BG_COLORS,
+)
 from brand_copy import COPY
-from components.sparkline import create_sparkline_component, create_sparkline_placeholder
+from components.helpers import (
+    format_time_ago,
+    extract_sentiment,
+    create_outcome_badge,
+    format_asset_display,
+)
+from components.sparkline import (
+    create_sparkline_component,
+    create_sparkline_placeholder,
+)
 
 
 def strip_urls(text: str) -> str:
@@ -149,7 +164,9 @@ def create_empty_state_chart(
     """
     display_text = f"{icon}  {message}"
     if hint:
-        display_text += f"<br><span style='font-size:11px; color:{COLORS['border']}'>{hint}</span>"
+        display_text += (
+            f"<br><span style='font-size:11px; color:{COLORS['border']}'>{hint}</span>"
+        )
     if context_line:
         display_text += f"<br><span style='font-size:11px; color:{COLORS['text_muted']}'>{context_line}</span>"
     if action_text:
@@ -212,30 +229,56 @@ def create_empty_state_html(
 
     sub_children = []
     if hint:
-        sub_children.append(html.Div(hint, style={
-            "color": COLORS["border"], "fontSize": "0.8rem", "marginTop": "6px",
-        }))
+        sub_children.append(
+            html.Div(
+                hint,
+                style={
+                    "color": COLORS["border"],
+                    "fontSize": "0.8rem",
+                    "marginTop": "6px",
+                },
+            )
+        )
     if context_line:
-        sub_children.append(html.Div(context_line, style={
-            "color": COLORS["text_muted"], "fontSize": "0.8rem", "marginTop": "4px",
-        }))
+        sub_children.append(
+            html.Div(
+                context_line,
+                style={
+                    "color": COLORS["text_muted"],
+                    "fontSize": "0.8rem",
+                    "marginTop": "4px",
+                },
+            )
+        )
     if action_text:
         action_content = (
-            dcc.Link(action_text, href=action_href, style={
-                "color": COLORS["accent"], "fontSize": "0.8rem", "textDecoration": "none",
-            })
+            dcc.Link(
+                action_text,
+                href=action_href,
+                style={
+                    "color": COLORS["accent"],
+                    "fontSize": "0.8rem",
+                    "textDecoration": "none",
+                },
+            )
             if action_href
-            else html.Span(action_text, style={
-                "color": COLORS["accent"], "fontSize": "0.8rem",
-            })
+            else html.Span(
+                action_text,
+                style={
+                    "color": COLORS["accent"],
+                    "fontSize": "0.8rem",
+                },
+            )
         )
         sub_children.append(html.Div(action_content, style={"marginTop": "4px"}))
 
     return html.Div(
         [html.Div(children), *sub_children],
         style={
-            "padding": "24px", "textAlign": "center",
-            "backgroundColor": COLORS["secondary"], "borderRadius": "12px",
+            "padding": "24px",
+            "textAlign": "center",
+            "backgroundColor": COLORS["secondary"],
+            "borderRadius": "12px",
             "border": f"1px solid {COLORS['border']}",
         },
     )
@@ -267,26 +310,13 @@ def create_hero_signal_card(row) -> html.Div:
         correct_t7 = None  # Pending
 
     # Determine sentiment
-    sentiment = "neutral"
-    if isinstance(market_impact, dict) and market_impact:
-        first_sentiment = list(market_impact.values())[0]
-        if isinstance(first_sentiment, str):
-            sentiment = first_sentiment.lower()
+    sentiment = extract_sentiment(market_impact)
 
     # Format time ago
-    if isinstance(timestamp, datetime):
-        delta = datetime.now() - timestamp
-        if delta.days > 0:
-            time_ago = f"{delta.days}d ago"
-        elif delta.seconds >= 3600:
-            time_ago = f"{delta.seconds // 3600}h ago"
-        else:
-            time_ago = f"{delta.seconds // 60}m ago"
-    else:
-        time_ago = str(timestamp)[:16] if timestamp else ""
+    time_ago = format_time_ago(timestamp)
 
     # Asset string
-    asset_str = ", ".join(assets[:4]) if isinstance(assets, list) else str(assets)
+    asset_str = format_asset_display(assets, max_count=4, show_overflow=False)
 
     # Sentiment styling
     s_style = get_sentiment_style(sentiment)
@@ -301,39 +331,7 @@ def create_hero_signal_card(row) -> html.Div:
 
     # Outcome badge -- uses aggregated P&L when available
     pnl_display = total_pnl_t7 if total_pnl_t7 is not None else row.get("pnl_t7")
-    if correct_t7 is True:
-        outcome = html.Span(
-            [
-                html.I(className="fas fa-check me-1"),
-                f"+${pnl_display:,.0f}" if pnl_display else "Correct",
-            ],
-            style={
-                "color": COLORS["success"],
-                "fontWeight": "600",
-                "fontSize": "0.8rem",
-            },
-        )
-    elif correct_t7 is False:
-        outcome = html.Span(
-            [
-                html.I(className="fas fa-times me-1"),
-                f"${pnl_display:,.0f}" if pnl_display else "Incorrect",
-            ],
-            style={
-                "color": COLORS["danger"],
-                "fontWeight": "600",
-                "fontSize": "0.8rem",
-            },
-        )
-    else:
-        outcome = html.Span(
-            [html.I(className="fas fa-clock me-1"), "Pending"],
-            style={
-                "color": COLORS["warning"],
-                "fontWeight": "600",
-                "fontSize": "0.8rem",
-            },
-        )
+    outcome = create_outcome_badge(correct_t7, pnl_display, font_size="0.8rem")
 
     return html.Div(
         [
@@ -537,61 +535,16 @@ def create_signal_card(row):
     pnl_t7 = row.get("pnl_t7")
 
     # Determine sentiment from market_impact
-    sentiment = "neutral"
-    if isinstance(market_impact, dict) and market_impact:
-        first_sentiment = list(market_impact.values())[0]
-        if isinstance(first_sentiment, str):
-            sentiment = first_sentiment.lower()
+    sentiment = extract_sentiment(market_impact)
 
     # Format time ago
-    if isinstance(timestamp, datetime):
-        delta = datetime.now() - timestamp
-        if delta.days > 7:
-            time_ago = f"{delta.days // 7}w ago"
-        elif delta.days > 0:
-            time_ago = f"{delta.days}d ago"
-        elif delta.seconds >= 3600:
-            time_ago = f"{delta.seconds // 3600}h ago"
-        else:
-            time_ago = f"{max(1, delta.seconds // 60)}m ago"
-    else:
-        time_ago = str(timestamp)[:16] if timestamp else ""
+    time_ago = format_time_ago(timestamp)
 
     # Format assets
-    asset_str = ", ".join(assets[:3]) if isinstance(assets, list) else str(assets)
-    if isinstance(assets, list) and len(assets) > 3:
-        asset_str += f" +{len(assets) - 3}"
+    asset_str = format_asset_display(assets, max_count=3)
 
     # Outcome badge with P&L
-    if correct_t7 is True:
-        pnl_text = f"+${pnl_t7:,.0f}" if pnl_t7 else "Correct"
-        outcome_badge = html.Span(
-            [html.I(className="fas fa-check me-1"), pnl_text],
-            style={
-                "color": COLORS["success"],
-                "fontSize": "0.75rem",
-                "fontWeight": "600",
-            },
-        )
-    elif correct_t7 is False:
-        pnl_text = f"${pnl_t7:,.0f}" if pnl_t7 else "Incorrect"
-        outcome_badge = html.Span(
-            [html.I(className="fas fa-times me-1"), pnl_text],
-            style={
-                "color": COLORS["danger"],
-                "fontSize": "0.75rem",
-                "fontWeight": "600",
-            },
-        )
-    else:
-        outcome_badge = html.Span(
-            [html.I(className="fas fa-clock me-1"), "Pending"],
-            style={
-                "color": COLORS["warning"],
-                "fontSize": "0.75rem",
-                "fontWeight": "600",
-            },
-        )
+    outcome_badge = create_outcome_badge(correct_t7, pnl_t7)
 
     # Sentiment styling
     s_style = get_sentiment_style(sentiment)
@@ -705,30 +658,13 @@ def create_unified_signal_card(row, sparkline_prices: dict = None) -> html.Div:
         correct_t7 = None  # Pending
 
     # Determine sentiment
-    sentiment = "neutral"
-    if isinstance(market_impact, dict) and market_impact:
-        first_sentiment = list(market_impact.values())[0]
-        if isinstance(first_sentiment, str):
-            sentiment = first_sentiment.lower()
+    sentiment = extract_sentiment(market_impact)
 
-    # Format time ago (supports weeks for older posts)
-    if isinstance(timestamp, datetime):
-        delta = datetime.now() - timestamp
-        if delta.days > 7:
-            time_ago = f"{delta.days // 7}w ago"
-        elif delta.days > 0:
-            time_ago = f"{delta.days}d ago"
-        elif delta.seconds >= 3600:
-            time_ago = f"{delta.seconds // 3600}h ago"
-        else:
-            time_ago = f"{max(1, delta.seconds // 60)}m ago"
-    else:
-        time_ago = str(timestamp)[:16] if timestamp else ""
+    # Format time ago
+    time_ago = format_time_ago(timestamp)
 
     # Asset string
-    asset_str = ", ".join(assets[:4]) if isinstance(assets, list) else str(assets)
-    if isinstance(assets, list) and len(assets) > 4:
-        asset_str += f" +{len(assets) - 4}"
+    asset_str = format_asset_display(assets, max_count=4)
 
     # Sentiment styling
     s_style = get_sentiment_style(sentiment)
@@ -738,39 +674,7 @@ def create_unified_signal_card(row, sparkline_prices: dict = None) -> html.Div:
 
     # Outcome badge -- uses aggregated P&L
     pnl_display = total_pnl_t7
-    if correct_t7 is True:
-        outcome_badge = html.Span(
-            [
-                html.I(className="fas fa-check me-1"),
-                f"+${pnl_display:,.0f}" if pnl_display else "Correct",
-            ],
-            style={
-                "color": COLORS["success"],
-                "fontWeight": "600",
-                "fontSize": "0.8rem",
-            },
-        )
-    elif correct_t7 is False:
-        outcome_badge = html.Span(
-            [
-                html.I(className="fas fa-times me-1"),
-                f"${pnl_display:,.0f}" if pnl_display else "Incorrect",
-            ],
-            style={
-                "color": COLORS["danger"],
-                "fontWeight": "600",
-                "fontSize": "0.8rem",
-            },
-        )
-    else:
-        outcome_badge = html.Span(
-            [html.I(className="fas fa-clock me-1"), "Pending"],
-            style={
-                "color": COLORS["warning"],
-                "fontWeight": "600",
-                "fontSize": "0.8rem",
-            },
-        )
+    outcome_badge = create_outcome_badge(correct_t7, pnl_display, font_size="0.8rem")
 
     # Build card children
     children = [
@@ -923,21 +827,18 @@ def create_post_card(row, card_index: int = 0):
     display_text = post_text[:300] + "..." if len(post_text) > 300 else post_text
 
     # Determine sentiment from market_impact
-    sentiment = None
-    if isinstance(market_impact, dict) and market_impact:
-        first_sentiment = list(market_impact.values())[0]
-        if isinstance(first_sentiment, str):
-            sentiment = first_sentiment.lower()
+    raw_sentiment = extract_sentiment(market_impact)
+    sentiment = raw_sentiment if raw_sentiment != "neutral" else None
 
     # Card border color based on sentiment (defaults to neutral for bypassed/pending)
-    card_border_color = SENTIMENT_COLORS.get(sentiment or "neutral", SENTIMENT_COLORS["neutral"])
+    card_border_color = SENTIMENT_COLORS.get(
+        sentiment or "neutral", SENTIMENT_COLORS["neutral"]
+    )
 
     # Build analysis section based on status
     if analysis_status == "completed" and assets:
         # Format assets
-        asset_str = ", ".join(assets[:5]) if isinstance(assets, list) else str(assets)
-        if isinstance(assets, list) and len(assets) > 5:
-            asset_str += f" +{len(assets) - 5}"
+        asset_str = format_asset_display(assets, max_count=5)
 
         s_style = get_sentiment_style(sentiment or "neutral")
         sentiment_color = s_style["color"]
@@ -1224,9 +1125,7 @@ def create_prediction_timeline_card(row: dict) -> html.Div:
                                 },
                             ),
                             html.Span(
-                                f" | {confidence:.0%}"
-                                if confidence
-                                else "",
+                                f" | {confidence:.0%}" if confidence else "",
                                 style={
                                     "color": COLORS["text_muted"],
                                     "fontSize": "0.85rem",
@@ -1650,7 +1549,9 @@ def _build_expandable_thesis(
     return html.Div([preview_el, full_el, toggle_el])
 
 
-def create_feed_signal_card(row, card_index: int = 0, sparkline_prices: dict = None) -> html.Div:
+def create_feed_signal_card(
+    row, card_index: int = 0, sparkline_prices: dict = None
+) -> html.Div:
     """
     Create a signal card for the /signals feed page.
 
@@ -1683,13 +1584,10 @@ def create_feed_signal_card(row, card_index: int = 0, sparkline_prices: dict = N
         is_new = ts > cutoff
 
     # Determine sentiment direction
-    sentiment = "neutral"
     if prediction_sentiment:
         sentiment = prediction_sentiment.lower()
-    elif isinstance(market_impact, dict) and market_impact:
-        first_val = list(market_impact.values())[0]
-        if isinstance(first_val, str):
-            sentiment = first_val.lower()
+    else:
+        sentiment = extract_sentiment(market_impact)
 
     s_style = get_sentiment_style(sentiment)
     sentiment_color = s_style["color"]
@@ -1699,12 +1597,8 @@ def create_feed_signal_card(row, card_index: int = 0, sparkline_prices: dict = N
     # Format asset display
     if symbol:
         asset_display = symbol
-    elif isinstance(assets, list):
-        asset_display = ", ".join(assets[:3])
-        if len(assets) > 3:
-            asset_display += f" +{len(assets) - 3}"
     else:
-        asset_display = str(assets) if assets else "N/A"
+        asset_display = format_asset_display(assets, max_count=3) or "N/A"
 
     # Truncate text
     post_text = strip_urls(post_text)
@@ -1828,9 +1722,7 @@ def create_feed_signal_card(row, card_index: int = 0, sparkline_prices: dict = N
         pnl_color = COLORS["success"] if pnl_t7 > 0 else COLORS["danger"]
         if metrics_children:
             metrics_children.append(
-                html.Span(
-                    " | ", style={"color": COLORS["border"], "margin": "0 6px"}
-                )
+                html.Span(" | ", style={"color": COLORS["border"], "margin": "0 6px"})
             )
         metrics_children.append(
             html.Span(
@@ -1923,9 +1815,7 @@ def create_feed_signal_card(row, card_index: int = 0, sparkline_prices: dict = N
 
     # Row 4: Return / P&L metrics (only if we have data)
     if metrics_children:
-        children.append(
-            html.Div(metrics_children, style={"marginTop": "8px"})
-        )
+        children.append(html.Div(metrics_children, style={"marginTop": "8px"}))
 
     # Row 4b: Sparkline price chart (between metrics and thesis)
     sparkline_element = None
@@ -2038,4 +1928,3 @@ def create_new_signals_banner(count: int) -> html.Div:
             "color": COLORS["accent"],
         },
     )
-

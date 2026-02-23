@@ -15,6 +15,7 @@ from dash import html, dcc
 
 from constants import COLORS
 from brand_copy import COPY
+from components.helpers import format_time_ago
 
 
 # Map insight type -> COPY key for the category label
@@ -34,31 +35,7 @@ _BORDER_COLOR_MAP = {
 }
 
 
-def _format_insight_timestamp(ts) -> str:
-    """Format a timestamp into a human-readable relative string.
-
-    Args:
-        ts: datetime object or None.
-
-    Returns:
-        String like "2d ago", "5h ago", or "" if None.
-    """
-    if ts is None:
-        return ""
-    if not isinstance(ts, datetime):
-        return str(ts)[:10]
-
-    delta = datetime.now() - ts
-    if delta.days > 7:
-        return f"{delta.days // 7}w ago"
-    elif delta.days > 0:
-        return f"{delta.days}d ago"
-    elif delta.seconds >= 3600:
-        return f"{delta.seconds // 3600}h ago"
-    elif delta.seconds >= 60:
-        return f"{delta.seconds // 60}m ago"
-    else:
-        return "just now"
+# Time formatting moved to components.helpers.format_time_ago
 
 
 def _create_single_insight_card(insight: Dict[str, Any]) -> html.Div:
@@ -86,7 +63,7 @@ def _create_single_insight_card(insight: Dict[str, Any]) -> html.Div:
     border_color = _BORDER_COLOR_MAP.get(sentiment, COLORS["text_muted"])
 
     # Timestamp display
-    time_str = _format_insight_timestamp(timestamp)
+    time_str = format_time_ago(timestamp)
 
     # Build asset links
     asset_links = []
