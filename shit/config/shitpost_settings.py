@@ -5,7 +5,7 @@ Uses Pydantic for environment variable validation and management.
 
 import os
 from typing import Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
 # Load .env file from project root
@@ -24,123 +24,95 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Environment
-    ENVIRONMENT: str = Field(default="development", env="ENVIRONMENT")
-    DEBUG: bool = Field(default=True, env="DEBUG")
+    ENVIRONMENT: str = Field(default="development")
+    DEBUG: bool = Field(default=True)
 
     # Database
-    DATABASE_URL: str = Field(
-        default="sqlite:///./shitpost_alpha.db", env="DATABASE_URL"
-    )
+    DATABASE_URL: str = Field(default="sqlite:///./shitpost_alpha.db")
 
     # LLM Configuration
-    OPENAI_API_KEY: Optional[str] = Field(default=None, env="OPENAI_API_KEY")
-    ANTHROPIC_API_KEY: Optional[str] = Field(default=None, env="ANTHROPIC_API_KEY")
-    XAI_API_KEY: Optional[str] = Field(default=None, env="XAI_API_KEY")
-    LLM_PROVIDER: str = Field(default="openai", env="LLM_PROVIDER")  # openai, anthropic, grok
-    LLM_MODEL: str = Field(default="gpt-4", env="LLM_MODEL")
-    LLM_BASE_URL: Optional[str] = Field(default=None, env="LLM_BASE_URL")  # Custom base URL for OpenAI-compatible APIs
+    OPENAI_API_KEY: Optional[str] = Field(default=None)
+    ANTHROPIC_API_KEY: Optional[str] = Field(default=None)
+    XAI_API_KEY: Optional[str] = Field(default=None)
+    LLM_PROVIDER: str = Field(default="openai")  # openai, anthropic, grok
+    LLM_MODEL: str = Field(default="gpt-4")
+    LLM_BASE_URL: Optional[str] = Field(default=None)  # Custom base URL for OpenAI-compatible APIs
 
     # Truth Social Shitpost Configuration
-    TRUTH_SOCIAL_USERNAME: str = Field(
-        default="realDonaldTrump", env="TRUTH_SOCIAL_USERNAME"
-    )
-    TRUTH_SOCIAL_SHITPOST_INTERVAL: int = Field(
-        default=30, env="TRUTH_SOCIAL_SHITPOST_INTERVAL"
-    )  # seconds between shitpost harvests
+    TRUTH_SOCIAL_USERNAME: str = Field(default="realDonaldTrump")
+    TRUTH_SOCIAL_SHITPOST_INTERVAL: int = Field(default=30)  # seconds between shitpost harvests
 
     # Analysis Configuration
-    CONFIDENCE_THRESHOLD: float = Field(default=0.7, env="CONFIDENCE_THRESHOLD")
-    MAX_SHITPOST_LENGTH: int = Field(default=4000, env="MAX_SHITPOST_LENGTH")
+    CONFIDENCE_THRESHOLD: float = Field(default=0.7)
+    MAX_SHITPOST_LENGTH: int = Field(default=4000)
 
     # System Launch Configuration
-    SYSTEM_LAUNCH_DATE: str = Field(
-        default="2025-01-01T00:00:00Z", env="SYSTEM_LAUNCH_DATE"
-    )
+    SYSTEM_LAUNCH_DATE: str = Field(default="2025-01-01T00:00:00Z")
 
     # SMS/Alerting Configuration (Phase 2)
-    TWILIO_ACCOUNT_SID: Optional[str] = Field(default=None, env="TWILIO_ACCOUNT_SID")
-    TWILIO_AUTH_TOKEN: Optional[str] = Field(default=None, env="TWILIO_AUTH_TOKEN")
-    TWILIO_PHONE_NUMBER: Optional[str] = Field(default=None, env="TWILIO_PHONE_NUMBER")
+    TWILIO_ACCOUNT_SID: Optional[str] = Field(default=None)
+    TWILIO_AUTH_TOKEN: Optional[str] = Field(default=None)
+    TWILIO_PHONE_NUMBER: Optional[str] = Field(default=None)
 
     # Email Configuration (Phase 2 - Alerting)
-    EMAIL_PROVIDER: str = Field(
-        default="smtp", env="EMAIL_PROVIDER"
-    )  # "smtp" or "sendgrid"
-    SMTP_HOST: Optional[str] = Field(default=None, env="SMTP_HOST")
-    SMTP_PORT: int = Field(default=587, env="SMTP_PORT")
-    SMTP_USERNAME: Optional[str] = Field(default=None, env="SMTP_USERNAME")
-    SMTP_PASSWORD: Optional[str] = Field(default=None, env="SMTP_PASSWORD")
-    SMTP_USE_TLS: bool = Field(default=True, env="SMTP_USE_TLS")
-    EMAIL_FROM_ADDRESS: str = Field(
-        default="alerts@shitpostalpha.com",
-        env="EMAIL_FROM_ADDRESS",
-    )
-    EMAIL_FROM_NAME: str = Field(
-        default="Shitpost Alpha",
-        env="EMAIL_FROM_NAME",
-    )
-    SENDGRID_API_KEY: Optional[str] = Field(default=None, env="SENDGRID_API_KEY")
+    EMAIL_PROVIDER: str = Field(default="smtp")  # "smtp" or "sendgrid"
+    SMTP_HOST: Optional[str] = Field(default=None)
+    SMTP_PORT: int = Field(default=587)
+    SMTP_USERNAME: Optional[str] = Field(default=None)
+    SMTP_PASSWORD: Optional[str] = Field(default=None)
+    SMTP_USE_TLS: bool = Field(default=True)
+    EMAIL_FROM_ADDRESS: str = Field(default="alerts@shitpostalpha.com")
+    EMAIL_FROM_NAME: str = Field(default="Shitpost Alpha")
+    SENDGRID_API_KEY: Optional[str] = Field(default=None)
 
     # Telegram Bot Configuration (Phase 2 - Alerting)
-    TELEGRAM_BOT_TOKEN: Optional[str] = Field(default=None, env="TELEGRAM_BOT_TOKEN")
-    TELEGRAM_BOT_USERNAME: Optional[str] = Field(
-        default=None, env="TELEGRAM_BOT_USERNAME"
-    )  # Without @ prefix
-    TELEGRAM_WEBHOOK_URL: Optional[str] = Field(
-        default=None, env="TELEGRAM_WEBHOOK_URL"
-    )  # For webhook mode (optional)
+    TELEGRAM_BOT_TOKEN: Optional[str] = Field(default=None)
+    TELEGRAM_BOT_USERNAME: Optional[str] = Field(default=None)  # Without @ prefix
+    TELEGRAM_WEBHOOK_URL: Optional[str] = Field(default=None)  # For webhook mode (optional)
 
     # Market Data Resilience Configuration
-    ALPHA_VANTAGE_API_KEY: Optional[str] = Field(default=None, env="ALPHA_VANTAGE_API_KEY")
-    MARKET_DATA_PRIMARY_PROVIDER: str = Field(default="yfinance", env="MARKET_DATA_PRIMARY_PROVIDER")
-    MARKET_DATA_FALLBACK_PROVIDER: str = Field(default="alphavantage", env="MARKET_DATA_FALLBACK_PROVIDER")
-    MARKET_DATA_MAX_RETRIES: int = Field(default=3, env="MARKET_DATA_MAX_RETRIES")
-    MARKET_DATA_RETRY_DELAY: float = Field(default=1.0, env="MARKET_DATA_RETRY_DELAY")  # seconds
-    MARKET_DATA_RETRY_BACKOFF: float = Field(default=2.0, env="MARKET_DATA_RETRY_BACKOFF")  # multiplier
-    MARKET_DATA_STALENESS_THRESHOLD_HOURS: int = Field(default=48, env="MARKET_DATA_STALENESS_THRESHOLD_HOURS")
-    MARKET_DATA_HEALTH_CHECK_SYMBOLS: str = Field(default="SPY,AAPL", env="MARKET_DATA_HEALTH_CHECK_SYMBOLS")
-    MARKET_DATA_FAILURE_ALERT_CHAT_ID: Optional[str] = Field(default=None, env="MARKET_DATA_FAILURE_ALERT_CHAT_ID")
+    ALPHA_VANTAGE_API_KEY: Optional[str] = Field(default=None)
+    MARKET_DATA_PRIMARY_PROVIDER: str = Field(default="yfinance")
+    MARKET_DATA_FALLBACK_PROVIDER: str = Field(default="alphavantage")
+    MARKET_DATA_MAX_RETRIES: int = Field(default=3)
+    MARKET_DATA_RETRY_DELAY: float = Field(default=1.0)  # seconds
+    MARKET_DATA_RETRY_BACKOFF: float = Field(default=2.0)  # multiplier
+    MARKET_DATA_STALENESS_THRESHOLD_HOURS: int = Field(default=48)
+    MARKET_DATA_HEALTH_CHECK_SYMBOLS: str = Field(default="SPY,AAPL")
+    MARKET_DATA_FAILURE_ALERT_CHAT_ID: Optional[str] = Field(default=None)
 
     # ScrapeCreators API Configuration
-    SCRAPECREATORS_API_KEY: Optional[str] = Field(
-        default=None, env="SCRAPECREATORS_API_KEY"
-    )
+    SCRAPECREATORS_API_KEY: Optional[str] = Field(default=None)
 
     # S3 Data Lake Configuration
-    S3_BUCKET_NAME: str = Field(default="shitpost-alpha-raw-data", env="S3_BUCKET_NAME")
-    S3_PREFIX: str = Field(default="truth-social", env="S3_PREFIX")
-    AWS_ACCESS_KEY_ID: Optional[str] = Field(default=None, env="AWS_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY: Optional[str] = Field(
-        default=None, env="AWS_SECRET_ACCESS_KEY"
-    )
-    AWS_REGION: str = Field(default="us-east-1", env="AWS_REGION")
+    S3_BUCKET_NAME: str = Field(default="shitpost-alpha-raw-data")
+    S3_PREFIX: str = Field(default="truth-social")
+    AWS_ACCESS_KEY_ID: Optional[str] = Field(default=None)
+    AWS_SECRET_ACCESS_KEY: Optional[str] = Field(default=None)
+    AWS_REGION: str = Field(default="us-east-1")
 
     # Multi-Source Harvester Configuration
-    ENABLED_HARVESTERS: str = Field(
-        default="truth_social",
-        env="ENABLED_HARVESTERS",
-    )  # Comma-separated list of enabled harvester source names
+    ENABLED_HARVESTERS: str = Field(default="truth_social")  # Comma-separated list of enabled harvester source names
 
     # Twitter/X Configuration (Future)
-    TWITTER_API_KEY: Optional[str] = Field(default=None, env="TWITTER_API_KEY")
-    TWITTER_API_SECRET: Optional[str] = Field(default=None, env="TWITTER_API_SECRET")
-    TWITTER_BEARER_TOKEN: Optional[str] = Field(default=None, env="TWITTER_BEARER_TOKEN")
-    TWITTER_TARGET_USERS: str = Field(
-        default="", env="TWITTER_TARGET_USERS"
-    )  # Comma-separated Twitter usernames to monitor
+    TWITTER_API_KEY: Optional[str] = Field(default=None)
+    TWITTER_API_SECRET: Optional[str] = Field(default=None)
+    TWITTER_BEARER_TOKEN: Optional[str] = Field(default=None)
+    TWITTER_TARGET_USERS: str = Field(default="")  # Comma-separated Twitter usernames to monitor
 
     # Logging
-    LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
-    FILE_LOGGING: bool = Field(default=False, env="FILE_LOGGING")
-    LOG_FILE_PATH: Optional[str] = Field(default=None, env="LOG_FILE_PATH")
+    LOG_LEVEL: str = Field(default="INFO")
+    FILE_LOGGING: bool = Field(default=False)
+    LOG_FILE_PATH: Optional[str] = Field(default=None)
 
     # Neon CLI (used by db-admin tooling, not by application code)
-    NEON_PROJECT_ID: Optional[str] = Field(default=None, env="NEON_PROJECT_ID")
-    NEON_ORG_ID: Optional[str] = Field(default=None, env="NEON_ORG_ID")
+    NEON_PROJECT_ID: Optional[str] = Field(default=None)
+    NEON_ORG_ID: Optional[str] = Field(default=None)
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+    )
 
     def get_llm_api_key(self) -> str:
         """Get the appropriate LLM API key based on provider."""

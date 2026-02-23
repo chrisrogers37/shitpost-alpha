@@ -32,8 +32,8 @@ from shit.llm.llm_client import LLMClient
 from shit.config.shitpost_settings import Settings
 
 
-# Configure pytest for async tests
-pytest_plugins = ['pytest_asyncio']
+# NOTE: pytest_plugins declaration moved to root-level conftest.py
+# (pytest 8.x requires pytest_plugins in root conftest only)
 
 
 @pytest.fixture(scope="session")

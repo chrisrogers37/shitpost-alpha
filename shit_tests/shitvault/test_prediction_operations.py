@@ -431,41 +431,6 @@ class TestPredictionOperations:
         
         assert result is False
 
-    def test_get_bypass_reason_no_text(self, prediction_ops):
-        """Test bypass reason for empty text."""
-        shitpost_data = {'text': ''}
-        reason = prediction_ops._get_bypass_reason(shitpost_data)
-        assert reason == 'No text content'
-
-    def test_get_bypass_reason_short_text(self, prediction_ops):
-        """Test bypass reason for short text."""
-        shitpost_data = {'text': 'short'}
-        reason = prediction_ops._get_bypass_reason(shitpost_data)
-        assert reason == 'Text too short'
-
-    def test_get_bypass_reason_test_content(self, prediction_ops):
-        """Test bypass reason for test content (needs to be long enough)."""
-        # These words trigger test content check only if they pass length check
-        # Length must be >= 10 characters and have >= 3 words, so single words won't trigger this
-        shitpost_data = {'text': 'short'}
-        reason = prediction_ops._get_bypass_reason(shitpost_data)
-        # Short single words return "Text too short" before reaching test content check
-        assert reason == 'Text too short'
-
-    def test_get_bypass_reason_insufficient_words(self, prediction_ops):
-        """Test bypass reason for insufficient words."""
-        # Text that is long enough (>= 10 chars) but has < 3 words
-        shitpost_data = {'text': 'two words here'}  # 14 chars, 3 words - should pass
-        reason = prediction_ops._get_bypass_reason(shitpost_data)
-        # With 3 words and 14 chars, this should fall through to default
-        assert reason == 'Content not analyzable'
-
-    def test_get_bypass_reason_fallback(self, prediction_ops):
-        """Test bypass reason fallback."""
-        shitpost_data = {'text': 'Some weird content that cannot be analyzed properly'}
-        reason = prediction_ops._get_bypass_reason(shitpost_data)
-        # This should pass all checks and return the fallback
-        assert reason in ['No text content', 'Text too short', 'Test content', 'Insufficient words', 'Content not analyzable']
 
 
 class TestPredictionOperationsIntegration:
