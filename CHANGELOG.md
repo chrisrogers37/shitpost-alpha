@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Asset screener table** -- Replaced analytics chart tabs and prediction feed on dashboard homepage with SaaS Meltdown-style sortable asset screener table
+  - Per-asset rows with inline sparklines, sentiment badges (BULL/BEAR/NEUT), and heat-mapped returns/P&L
+  - Heat-map colors derived from design tokens via `_hex_to_rgb()` for automatic theme sync
+  - Click any row to drill into asset detail page
+  - Table respects time period filter (7D/30D/90D/All)
+  - Responsive: hides sparkline + confidence columns on mobile (<480px)
+  - KPI hero cards remain above the screener unchanged
 - **Hyper-American money theme overhaul** -- Transformed the entire dashboard palette from generic dark finance (blue/slate) to obnoxious American money energy
   - Dollar bill green (`#85BB65`) replaces blue as primary accent
   - Gold (`#FFD700`) for active nav states, countdown timer, secondary emphasis
