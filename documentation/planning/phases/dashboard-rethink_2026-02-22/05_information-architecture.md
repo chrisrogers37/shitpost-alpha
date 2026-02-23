@@ -3,6 +3,7 @@
 **Status:** ✅ COMPLETE
 **Started:** 2026-02-23
 **Completed:** 2026-02-23
+**PR:** #86
 
 **PR Title:** refactor: consolidate 4-page IA into 2-view architecture (Screener + Asset Detail)
 **Risk Level:** High
