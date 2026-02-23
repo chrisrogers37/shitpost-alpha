@@ -1,17 +1,14 @@
 """Asset deep dive page layout and callbacks."""
 
-from datetime import datetime
 import traceback
 
-from dash import Dash, html, dcc, Input, Output, State, callback_context
+from dash import Dash, html, dcc, Input, Output, callback_context
 import dash_bootstrap_components as dbc
-import plotly.graph_objects as go
 
 from constants import COLORS, CHART_CONFIG
-from components.charts import build_signal_over_trend_chart, build_empty_signal_chart
+from components.charts import build_annotated_price_chart, build_empty_signal_chart
 from components.cards import (
     create_error_card,
-    create_empty_chart,
     create_metric_card,
     create_prediction_timeline_card,
     create_related_asset_link,
@@ -174,6 +171,12 @@ def create_asset_page(symbol: str) -> html.Div:
                         ],
                         className="mb-4",
                     ),
+                    # Signal summary stats for this asset
+                    dcc.Loading(
+                        type="default",
+                        color=COLORS["accent"],
+                        children=html.Div(id="asset-signal-summary", className="mb-4"),
+                    ),
                     # Prediction timeline
                     dbc.Card(
                         [
@@ -291,7 +294,6 @@ def create_asset_header(symbol: str) -> html.Div:
     )
 
 
-
 def register_asset_callbacks(app: Dash):
     """Register all asset page callbacks."""
 
@@ -302,6 +304,7 @@ def register_asset_callbacks(app: Dash):
             Output("asset-stat-cards", "children"),
             Output("asset-current-price", "children"),
             Output("asset-performance-summary", "children"),
+            Output("asset-signal-summary", "children"),
             Output("asset-prediction-timeline", "children"),
             Output("asset-related-assets", "children"),
         ],
@@ -314,7 +317,7 @@ def register_asset_callbacks(app: Dash):
         """
         if not symbol:
             empty = html.P("No asset selected.", style={"color": COLORS["text_muted"]})
-            return empty, "", empty, empty, empty
+            return empty, "", empty, empty, empty, empty
 
         try:
             # --- STAT CARDS ---
@@ -411,6 +414,9 @@ def register_asset_callbacks(app: Dash):
                     )
                 ]
 
+            # --- SIGNAL SUMMARY ---
+            signal_summary = _build_asset_signal_summary(symbol, predictions_df)
+
             # --- RELATED ASSETS ---
             related_df = get_related_assets(symbol, limit=8)
             if not related_df.empty:
@@ -434,6 +440,7 @@ def register_asset_callbacks(app: Dash):
                 stat_cards,
                 current_price_text,
                 performance_summary,
+                signal_summary,
                 timeline_cards,
                 related_links,
             )
@@ -441,7 +448,7 @@ def register_asset_callbacks(app: Dash):
         except Exception as e:
             print(f"Error loading asset page for {symbol}: {traceback.format_exc()}")
             error_card = create_error_card(f"Unable to load data for {symbol}", str(e))
-            return error_card, "", error_card, error_card, error_card
+            return error_card, "", error_card, error_card, error_card, error_card
 
     @app.callback(
         Output("asset-price-chart", "figure"),
@@ -477,11 +484,10 @@ def register_asset_callbacks(app: Dash):
             if data["prices"].empty:
                 return build_empty_signal_chart(f"No price data available for {symbol}")
 
-            return build_signal_over_trend_chart(
+            return build_annotated_price_chart(
                 prices_df=data["prices"],
                 signals_df=data["signals"],
                 symbol=symbol,
-                show_timeframe_windows=False,
                 chart_height=400,
             )
 
@@ -552,3 +558,150 @@ def register_asset_callbacks(app: Dash):
 
         return tuple(styles)
 
+
+def _build_asset_signal_summary(symbol: str, predictions_df) -> html.Div:
+    """Build a summary stats row for shitpost signals on this asset.
+
+    Shows total post count, bullish %, accuracy, avg confidence, and total P&L
+    as a compact stat row below the price chart.
+
+    Args:
+        symbol: Ticker symbol.
+        predictions_df: DataFrame from get_asset_predictions() with columns
+            prediction_sentiment, prediction_confidence, correct_t7, pnl_t7.
+
+    Returns:
+        html.Div containing a dbc.Row of mini stat cards, or an empty Div.
+    """
+    if predictions_df.empty:
+        return html.Div(
+            html.P(
+                f"No predictions found for {symbol}.",
+                style={
+                    "color": COLORS["text_muted"],
+                    "textAlign": "center",
+                    "padding": "15px",
+                },
+            )
+        )
+
+    total = len(predictions_df)
+
+    bullish = 0
+    if "prediction_sentiment" in predictions_df.columns:
+        bullish = (
+            predictions_df["prediction_sentiment"].str.lower() == "bullish"
+        ).sum()
+    bullish_pct = (bullish / total * 100) if total > 0 else 0
+
+    avg_conf = 0.0
+    if "prediction_confidence" in predictions_df.columns:
+        avg_conf = predictions_df["prediction_confidence"].mean() or 0.0
+
+    evaluated = 0
+    correct = 0
+    accuracy = 0.0
+    if "correct_t7" in predictions_df.columns:
+        correct_col = predictions_df["correct_t7"]
+        evaluated = correct_col.notna().sum()
+        correct = (correct_col == True).sum()  # noqa: E712
+        accuracy = (correct / evaluated * 100) if evaluated > 0 else 0.0
+
+    total_pnl = 0.0
+    if "pnl_t7" in predictions_df.columns:
+        total_pnl = predictions_df["pnl_t7"].sum() or 0.0
+
+    return dbc.Row(
+        [
+            dbc.Col(
+                _mini_stat_card(
+                    f"{total} posts",
+                    f"mentioning {symbol}",
+                    COLORS["accent"],
+                ),
+                md=2,
+                sm=4,
+                xs=6,
+            ),
+            dbc.Col(
+                _mini_stat_card(
+                    f"{bullish_pct:.0f}%",
+                    "predicted bullish",
+                    COLORS["success"],
+                ),
+                md=2,
+                sm=4,
+                xs=6,
+            ),
+            dbc.Col(
+                _mini_stat_card(
+                    f"{accuracy:.0f}%",
+                    f"accuracy ({correct}/{evaluated})",
+                    COLORS["success"] if accuracy > 50 else COLORS["danger"],
+                ),
+                md=2,
+                sm=4,
+                xs=6,
+            ),
+            dbc.Col(
+                _mini_stat_card(
+                    f"{avg_conf:.0%}",
+                    "avg confidence",
+                    COLORS["warning"],
+                ),
+                md=2,
+                sm=4,
+                xs=6,
+            ),
+            dbc.Col(
+                _mini_stat_card(
+                    f"${total_pnl:+,.0f}",
+                    "total P&L (7d)",
+                    COLORS["success"] if total_pnl > 0 else COLORS["danger"],
+                ),
+                md=2,
+                sm=4,
+                xs=6,
+            ),
+        ],
+        className="g-2",
+    )
+
+
+def _mini_stat_card(value: str, label: str, color: str) -> html.Div:
+    """Compact stat display for the signal summary row.
+
+    Args:
+        value: The prominent value text (e.g., "12 posts", "67%").
+        label: Descriptive label below the value.
+        color: CSS color for the value text.
+
+    Returns:
+        html.Div styled as a small stat card.
+    """
+    return html.Div(
+        [
+            html.Div(
+                value,
+                style={
+                    "fontSize": "1.1rem",
+                    "fontWeight": "bold",
+                    "color": color,
+                },
+            ),
+            html.Div(
+                label,
+                style={
+                    "fontSize": "0.75rem",
+                    "color": COLORS["text_muted"],
+                },
+            ),
+        ],
+        style={
+            "textAlign": "center",
+            "padding": "10px",
+            "backgroundColor": COLORS["secondary"],
+            "borderRadius": "8px",
+            "border": f"1px solid {COLORS['border']}",
+        },
+    )
