@@ -50,20 +50,14 @@ class TestCopyDictStructure:
             "chart_empty_confidence_hint",
             "chart_empty_asset",
             "chart_empty_asset_hint",
-            # Signals page
-            "signals_page_title",
-            "signals_page_subtitle",
-            "signals_empty_filters",
-            "signals_error",
-            "signals_load_more",
-            "signals_export",
-            # Trends page
-            "trends_page_title",
-            "trends_page_subtitle",
-            "trends_chart_default",
-            "trends_no_asset_data",
-            "trends_no_asset_hint",
-            "trends_no_signals_for_asset",
+            # Insight cards
+            "insight_latest_call_label",
+            "insight_best_worst_label",
+            "insight_system_pulse_label",
+            "insight_hot_asset_label",
+            "insight_hot_signal_label",
+            "insight_empty",
+            "insight_section_aria",
             # Assets page
             "asset_page_subtitle",
             "asset_no_predictions",
@@ -72,17 +66,6 @@ class TestCopyDictStructure:
             "asset_performance_header",
             "asset_related_header",
             "asset_timeline_header",
-            # Performance page
-            "backtest_title",
-            "backtest_subtitle",
-            "perf_confidence_header",
-            "perf_sentiment_header",
-            "perf_asset_header",
-            "perf_empty_confidence",
-            "perf_empty_confidence_hint",
-            "perf_empty_sentiment",
-            "perf_empty_sentiment_hint",
-            "perf_empty_asset_table",
             # Cards
             "card_pending_analysis",
             "card_bypassed",
@@ -105,7 +88,6 @@ class TestCopyDictStructure:
 
     def test_format_placeholders_are_valid(self):
         format_keys = [
-            "trends_no_signals_for_asset",
             "asset_page_subtitle",
             "asset_no_predictions",
             "asset_timeline_header",
@@ -141,7 +123,11 @@ class TestCopyToneGuard:
             assert "???" not in value, f"COPY['{key}'] contains '???' -- too try-hard"
 
     def test_no_all_caps_words(self):
-        allowed_caps = {"AI", "LLM", "P&L", "CSV", "ACTIVE", "SIGNALS", "NOT", "THAT"}
+        allowed_caps = {
+            "AI", "LLM", "P&L", "CSV", "ACTIVE", "SIGNALS", "NOT", "THAT",
+            "LATEST", "CALL", "BEST", "WORST", "SYSTEM", "PULSE",
+            "ASSET", "HIGH-CONFIDENCE", "SIGNAL",
+        }
         for key, value in COPY.items():
             words = value.split()
             for word in words:

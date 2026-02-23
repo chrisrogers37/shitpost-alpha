@@ -48,6 +48,15 @@ COPY = {
     "empty_posts": "No posts to show. Even shitposters sleep sometimes.",
     "empty_predictions_table": "No predictions match these filters. We're not THAT prolific.",
 
+    # ===== Dashboard: Insight Cards =====
+    "insight_latest_call_label": "LATEST CALL",
+    "insight_best_worst_label": "BEST & WORST",
+    "insight_system_pulse_label": "SYSTEM PULSE",
+    "insight_hot_asset_label": "HOT ASSET",
+    "insight_hot_signal_label": "HIGH-CONFIDENCE SIGNAL",
+    "insight_empty": "Nothing interesting to report. Check back in 5 minutes.",
+    "insight_section_aria": "Dynamic insight cards summarizing recent prediction performance",
+
     # ===== Dashboard: Chart Empty States =====
     "chart_empty_accuracy": "Not enough data to chart accuracy yet",
     "chart_empty_accuracy_hint": "Predictions need 7+ trading days to mature. Patience, money isn't made overnight.",
@@ -55,25 +64,6 @@ COPY = {
     "chart_empty_confidence_hint": "Takes 7+ days per prediction. We'll get there.",
     "chart_empty_asset": "No asset performance data yet",
     "chart_empty_asset_hint": "Asset accuracy appears after the market proves us wrong (or makes us rich)",
-
-    # ===== Signals Page =====
-    "signals_page_title": "Signal Feed",
-    "signals_page_subtitle": "Every prediction, including the ones we wish we could delete",
-    "signals_empty_filters": "No signals match your filters. Maybe lower your standards?",
-    "signals_error": "Failed to load signals. The irony of our own system failing is not lost on us.",
-    "signals_load_more": "Load More Signals",
-    "signals_export": "Export CSV",
-
-    # ===== Trends Page =====
-    "trends_page_title": "Signal Over Trend",
-    "trends_page_subtitle": "Our predictions vs. what the market actually did (spoiler: the market usually wins)",
-    "trends_chart_default": "Pick an asset to see how wrong we are",
-    "trends_no_asset_data": "No Asset Data Available",
-    "trends_no_asset_hint": (
-        "Predictions need to be analyzed and validated before "
-        "we can show you how wrong we were. Check back later."
-    ),
-    "trends_no_signals_for_asset": "No prediction signals for {symbol} in this period. We had nothing to say.",
 
     # ===== Assets Page =====
     "asset_page_subtitle": "The Full Damage Report for {symbol}",
@@ -83,21 +73,6 @@ COPY = {
     "asset_performance_header": "Performance Summary",
     "asset_related_header": "Related Assets",
     "asset_timeline_header": "Prediction Timeline for {symbol}",
-
-    # ===== Performance Page =====
-    "backtest_title": "Backtest Results",
-    "backtest_subtitle": (
-        "Simulated P&L following high-confidence signals with $10,000 of American dream money. "
-        "In hindsight, everything is obvious."
-    ),
-    "perf_confidence_header": "Accuracy by Confidence Level",
-    "perf_sentiment_header": "Sentiment Breakdown",
-    "perf_asset_header": "Performance by Asset",
-    "perf_empty_confidence": "No confidence breakdown yet",
-    "perf_empty_confidence_hint": "We need more predictions to evaluate. Patience is a virtue we can't afford.",
-    "perf_empty_sentiment": "No sentiment breakdown yet",
-    "perf_empty_sentiment_hint": "We need evaluated predictions to know if our vibes were right.",
-    "perf_empty_asset_table": "No asset data yet. The market hasn't had time to take our money.",
 
     # ===== Cards: Analysis Status Labels =====
     "card_pending_analysis": "Pending Analysis",
