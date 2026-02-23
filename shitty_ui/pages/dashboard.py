@@ -491,9 +491,7 @@ def register_dashboard_callbacks(app: Dash):
         except Exception as e:
             errors.append(f"Asset screener: {e}")
             print(f"Error loading asset screener: {traceback.format_exc()}")
-            screener_table = create_error_card(
-                "Unable to load asset screener", str(e)
-            )
+            screener_table = create_error_card("Unable to load asset screener", str(e))
 
         # ===== Performance Metrics with error handling =====
         try:

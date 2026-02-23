@@ -92,9 +92,7 @@ def _sentiment_badge(sentiment: Optional[str]) -> html.Span:
             "backgroundColor": SENTIMENT_BG_COLORS.get(
                 sentiment_lower, SENTIMENT_BG_COLORS["neutral"]
             ),
-            "color": SENTIMENT_COLORS.get(
-                sentiment_lower, SENTIMENT_COLORS["neutral"]
-            ),
+            "color": SENTIMENT_COLORS.get(sentiment_lower, SENTIMENT_COLORS["neutral"]),
             "fontSize": "0.7rem",
             "padding": "2px 8px",
             "borderRadius": "9999px",
@@ -354,9 +352,7 @@ def build_screener_table(
                             **num_style,
                             "textAlign": "right",
                             "color": _text_color(avg_return),
-                            "backgroundColor": _heat_bg(
-                                avg_return, threshold=5.0
-                            ),
+                            "backgroundColor": _heat_bg(avg_return, threshold=5.0),
                             "fontWeight": "600",
                         },
                     ),
@@ -367,9 +363,7 @@ def build_screener_table(
                             **num_style,
                             "textAlign": "right",
                             "color": _text_color(total_pnl),
-                            "backgroundColor": _heat_bg(
-                                total_pnl, threshold=500.0
-                            ),
+                            "backgroundColor": _heat_bg(total_pnl, threshold=500.0),
                             "fontWeight": "700",
                         },
                     ),

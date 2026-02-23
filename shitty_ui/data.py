@@ -2345,7 +2345,11 @@ def get_signal_feed_csv(
     export_df["Post Text"] = df["text"].fillna("")
     export_df["Asset"] = df["symbol"].fillna(
         df["assets"].apply(
-            lambda x: ", ".join(x) if isinstance(x, list) else (str(x) if pd.notna(x) else "N/A")
+            lambda x: (
+                ", ".join(x)
+                if isinstance(x, list)
+                else (str(x) if pd.notna(x) else "N/A")
+            )
         )
     )
     export_df["Sentiment"] = df["prediction_sentiment"].fillna("N/A")
@@ -2479,7 +2483,10 @@ def get_price_with_signals(
 
     params = {"symbol": symbol.upper(), "start_date": start_date}
 
-    result: Dict[str, pd.DataFrame] = {"prices": pd.DataFrame(), "signals": pd.DataFrame()}
+    result: Dict[str, pd.DataFrame] = {
+        "prices": pd.DataFrame(),
+        "signals": pd.DataFrame(),
+    }
 
     try:
         rows, columns = execute_query(price_query, params)
@@ -2550,4 +2557,3 @@ def get_multi_asset_signals(
     except Exception as e:
         logger.error(f"Error loading multi-asset signals: {e}")
         return pd.DataFrame()
-
