@@ -90,7 +90,13 @@ shitpost_alpha/
 ├── shitty_ui/              # Prediction performance dashboard
 │   ├── app.py              # Dash application entry point
 │   ├── layout.py           # App factory, router & callback registration
-│   ├── data.py             # Database query functions
+│   ├── data/               # Database query layer (split by domain)
+│   │   ├── __init__.py     # Re-exports all functions (backward compat)
+│   │   ├── base.py         # execute_query, ttl_cache, logger
+│   │   ├── signal_queries.py    # Signal loading, feed, filtering
+│   │   ├── performance_queries.py  # KPIs, accuracy, P&L, streaks
+│   │   ├── asset_queries.py     # Screener, sparklines, asset stats
+│   │   └── insight_queries.py   # Dynamic insight cards
 │   ├── pages/              # Page modules (dashboard, assets)
 │   ├── components/         # Reusable UI components
 │   └── callbacks/          # Callback groups (alerts, navigation, clientside)

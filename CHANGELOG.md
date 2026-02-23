@@ -10,16 +10,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Alerts panel refactor** - Split `create_alert_config_panel()` into 8 sub-component builder functions in new `alert_components.py`
 - **Alerts callbacks refactor** - Extracted `build_preferences_dict()`, `extract_preferences_tuple()`, and `build_alert_history_card()` from nested callbacks into testable module-level functions
+- **UI helpers extracted** - Consolidated 4 duplicated patterns (time-ago, sentiment extraction, outcome badges, asset display) from cards.py into shared `components/helpers.py`
 
 ### Added
 - **Alert callback tests** - 60 new tests in `test_alert_callbacks.py` covering panel sub-components, preference serialization, and alert history card rendering
 
 ### Fixed
+- **Hero card weeks display** - Hero signal cards now correctly show "2w ago" for posts older than 7 days (was showing "14d ago")
 - **pytest collection blocker** -- Moved `pytest_plugins` declaration from `shit_tests/conftest.py` to root-level `conftest.py` (required by pytest 8.x)
 - **5 stale bypass tests** -- Deleted `test_get_bypass_reason_*` tests that called removed `_get_bypass_reason()` method (coverage exists in `test_bypass_service.py`)
 - **Pydantic V2 deprecation warnings** -- Migrated Settings from legacy `class Config` to `SettingsConfigDict`, removed all deprecated `env=` parameters from Field() calls
 
 ### Added
+- **Event System Tests** -- 52 new tests covering all 4 event consumers, CLI commands, and worker signal handling
+  - S3ProcessorWorker: empty keys, S3 iteration, downstream event emission, cleanup
+  - AnalyzerWorker: batch size calculation, cleanup guarantees
+  - MarketDataWorker: skip logic for incomplete/missing data, successful backfill
+  - NotificationsWorker: subscriber dispatch, preference filtering, JSON parsing
+  - CLI: queue-stats, retry-dead-letter, cleanup, list with all filter combinations
+  - EventWorker: SIGTERM/SIGINT signal handlers, persistent run() loop behavior
 - **Dynamic insight cards** -- 2-3 personality-driven callout cards above the screener table answering "so what right now?"
   - Latest call: most recent evaluated prediction with 7-day return and outcome
   - Best & worst: top and bottom performing predictions in the selected period
@@ -32,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Cleaned up dead Signals/Trends/Performance brand copy from Phase 05
 
 ### Changed
+- **Dashboard CSS extraction** - Moved 611 lines of inline CSS from `layout.py` to `shitty_ui/assets/custom.css`
+  - `layout.py` reduced from ~800 lines to ~190 lines of pure Python
+  - CSS now gets proper syntax highlighting and linting in editors
+  - Dash auto-loads CSS from the `assets/` directory (no config needed)
 - **2-view information architecture** -- Consolidated 4 pages (Dashboard, Signals, Trends, Performance) into 2 views: Home (Screener) and Asset Detail
   - Removed nav links from header — logo-only navigation
   - Old routes (`/signals`, `/trends`, `/performance`) fall through to home
@@ -60,6 +73,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - "$hitpost Alpha" logo — green + gold two-tone branding
   - "Show Me The Money" analytics header, money-themed copy throughout
   - New `COLORS["accent_gold"]` and `COLORS["navy"]` design tokens
+
+- **Data Layer Architecture** -- Split monolithic `shitty_ui/data.py` (2,865 lines) into 5 focused modules under `shitty_ui/data/` package
+  - `data/base.py` -- shared infrastructure (execute_query, ttl_cache, logger)
+  - `data/signal_queries.py` -- signal loading, feed, filtering, CSV export
+  - `data/performance_queries.py` -- KPIs, accuracy, P&L, streaks, backtesting
+  - `data/asset_queries.py` -- screener, sparklines, asset stats, price history
+  - `data/insight_queries.py` -- dynamic insight card generation
+  - `data/__init__.py` re-exports all public functions for zero breaking changes
 
 ### Fixed
 - **Harvester failing on ScrapeCreators API** -- API began returning `content-type: text/plain` instead of `application/json`, causing aiohttp's `response.json()` to reject the valid JSON body. Added `content_type=None` to both `_test_connection()` and `_fetch_batch()` calls to accept any content type.
