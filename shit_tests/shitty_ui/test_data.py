@@ -27,7 +27,7 @@ def clear_data_caches():
 class TestGetPredictionStats:
     """Tests for get_prediction_stats function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_stats_dict(self, mock_execute):
         """Test that function returns a dictionary with expected keys."""
         from data import get_prediction_stats
@@ -54,7 +54,7 @@ class TestGetPredictionStats:
         assert "avg_confidence" in result
         assert "high_confidence_predictions" in result
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_handles_null_values(self, mock_execute):
         """Test that function handles NULL values from database."""
         from data import get_prediction_stats
@@ -77,7 +77,7 @@ class TestGetPredictionStats:
         assert result["analyzed_posts"] == 0
         assert result["avg_confidence"] == 0.0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_defaults_on_empty_result(self, mock_execute):
         """Test that function returns defaults when no rows returned."""
         from data import get_prediction_stats
@@ -93,7 +93,7 @@ class TestGetPredictionStats:
 class TestGetRecentSignals:
     """Tests for get_recent_signals function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dataframe(self, mock_execute):
         """Test that function returns a pandas DataFrame."""
         from data import get_recent_signals
@@ -150,7 +150,7 @@ class TestGetRecentSignals:
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 1
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_respects_limit_parameter(self, mock_execute):
         """Test that limit parameter is passed to query."""
         from data import get_recent_signals
@@ -164,7 +164,7 @@ class TestGetRecentSignals:
         assert call_args[1]["limit"] == 25
         assert call_args[1]["min_confidence"] == 0.7
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dataframe_on_error(self, mock_execute):
         """Test that function returns empty DataFrame on error."""
         from data import get_recent_signals
@@ -180,7 +180,7 @@ class TestGetRecentSignals:
 class TestGetPerformanceMetrics:
     """Tests for get_performance_metrics function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_metrics_dict(self, mock_execute):
         """Test that function returns a dictionary with performance metrics."""
         from data import get_performance_metrics
@@ -207,7 +207,7 @@ class TestGetPerformanceMetrics:
         assert result["avg_return_t7"] == 2.5
         assert result["total_pnl_t7"] == 2500.0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_calculates_accuracy_correctly(self, mock_execute):
         """Test that accuracy is calculated correctly."""
         from data import get_performance_metrics
@@ -229,7 +229,7 @@ class TestGetPerformanceMetrics:
 
         assert result["accuracy_t7"] == 70.0  # 35/50 = 70%
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_handles_zero_evaluated(self, mock_execute):
         """Test that function handles zero evaluated predictions."""
         from data import get_performance_metrics
@@ -251,7 +251,7 @@ class TestGetPerformanceMetrics:
 
         assert result["accuracy_t7"] == 0.0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_defaults_on_error(self, mock_execute):
         """Test that function returns defaults on error."""
         from data import get_performance_metrics
@@ -267,7 +267,7 @@ class TestGetPerformanceMetrics:
 class TestGetDashboardKpis:
     """Tests for get_dashboard_kpis function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_kpis_dict(self, mock_execute):
         """Test that function returns a dict with all four KPI values."""
         from data import get_dashboard_kpis
@@ -286,7 +286,7 @@ class TestGetDashboardKpis:
         assert result["avg_return_t7"] == 2.15
         assert result["total_pnl"] == 1720.0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_accuracy_calculated_correctly(self, mock_execute):
         """Test that accuracy percentage is correct."""
         from data import get_dashboard_kpis
@@ -301,7 +301,7 @@ class TestGetDashboardKpis:
 
         assert result["accuracy_pct"] == 65.0  # 130/200 = 65%
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_handles_zero_signals(self, mock_execute):
         """Test that function handles zero evaluated predictions gracefully."""
         from data import get_dashboard_kpis
@@ -319,7 +319,7 @@ class TestGetDashboardKpis:
         assert result["avg_return_t7"] == 0.0
         assert result["total_pnl"] == 0.0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_defaults_on_error(self, mock_execute):
         """Test that function returns default zeros on database error."""
         from data import get_dashboard_kpis
@@ -334,7 +334,7 @@ class TestGetDashboardKpis:
         assert result["avg_return_t7"] == 0.0
         assert result["total_pnl"] == 0.0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_passes_date_filter_when_days_specified(self, mock_execute):
         """Test that the days parameter creates a date filter in the query."""
         from data import get_dashboard_kpis
@@ -352,7 +352,7 @@ class TestGetDashboardKpis:
         params = call_args[1]
         assert "start_date" in params
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_no_date_filter_when_days_is_none(self, mock_execute):
         """Test that no date filter is applied when days is None (all time)."""
         from data import get_dashboard_kpis
@@ -370,7 +370,7 @@ class TestGetDashboardKpis:
         params = call_args[1]
         assert "start_date" not in params
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_negative_pnl_returned_correctly(self, mock_execute):
         """Test that negative P&L values are returned without modification."""
         from data import get_dashboard_kpis
@@ -387,7 +387,7 @@ class TestGetDashboardKpis:
         assert result["avg_return_t7"] == -1.5
         assert result["accuracy_pct"] == 40.0  # 20/50 = 40%
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_handles_null_avg_return(self, mock_execute):
         """Test that NULL avg_return from database is returned as 0.0."""
         from data import get_dashboard_kpis
@@ -407,7 +407,7 @@ class TestGetDashboardKpis:
 class TestGetAccuracyByConfidence:
     """Tests for get_accuracy_by_confidence function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dataframe(self, mock_execute):
         """Test that function returns a pandas DataFrame."""
         from data import get_accuracy_by_confidence
@@ -434,7 +434,7 @@ class TestGetAccuracyByConfidence:
         assert len(result) == 3
         assert "accuracy" in result.columns
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_calculates_accuracy_column(self, mock_execute):
         """Test that accuracy column is calculated correctly."""
         from data import get_accuracy_by_confidence
@@ -455,7 +455,7 @@ class TestGetAccuracyByConfidence:
 
         assert result["accuracy"].iloc[0] == 80.0  # 16/20 = 80%
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dataframe_on_error(self, mock_execute):
         """Test that function returns empty DataFrame on error."""
         from data import get_accuracy_by_confidence
@@ -471,7 +471,7 @@ class TestGetAccuracyByConfidence:
 class TestGetAccuracyByAsset:
     """Tests for get_accuracy_by_asset function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dataframe(self, mock_execute):
         """Test that function returns a pandas DataFrame."""
         from data import get_accuracy_by_asset
@@ -497,7 +497,7 @@ class TestGetAccuracyByAsset:
         assert len(result) == 2
         assert "accuracy" in result.columns
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_respects_limit_parameter(self, mock_execute):
         """Test that limit parameter is passed to query."""
         from data import get_accuracy_by_asset
@@ -514,7 +514,7 @@ class TestGetAccuracyByAsset:
 class TestGetSimilarPredictions:
     """Tests for get_similar_predictions function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dataframe_for_asset(self, mock_execute):
         """Test that function returns a DataFrame for a specific asset."""
         from data import get_similar_predictions
@@ -570,7 +570,7 @@ class TestGetSimilarPredictions:
         assert isinstance(result, pd.DataFrame)
         assert result.empty
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dataframe_on_error(self, mock_execute):
         """Test that function returns empty DataFrame on error."""
         from data import get_similar_predictions
@@ -586,7 +586,7 @@ class TestGetSimilarPredictions:
 class TestGetPredictionsWithOutcomes:
     """Tests for get_predictions_with_outcomes function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dataframe(self, mock_execute):
         """Test that function returns a pandas DataFrame."""
         from data import get_predictions_with_outcomes
@@ -645,7 +645,7 @@ class TestGetPredictionsWithOutcomes:
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 1
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_respects_limit_parameter(self, mock_execute):
         """Test that limit parameter is passed to query."""
         from data import get_predictions_with_outcomes
@@ -662,7 +662,7 @@ class TestGetPredictionsWithOutcomes:
 class TestGetSentimentDistribution:
     """Tests for get_sentiment_distribution function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_distribution_dict(self, mock_execute):
         """Test that function returns a dictionary with sentiment counts."""
         from data import get_sentiment_distribution
@@ -679,7 +679,7 @@ class TestGetSentimentDistribution:
         assert result["bearish"] == 30
         assert result["neutral"] == 20
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_defaults_on_error(self, mock_execute):
         """Test that function returns defaults on error."""
         from data import get_sentiment_distribution
@@ -694,7 +694,7 @@ class TestGetSentimentDistribution:
 class TestGetActiveAssetsFromDb:
     """Tests for get_active_assets_from_db function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_list_of_assets(self, mock_execute):
         """Test that function returns a list of asset symbols."""
         from data import get_active_assets_from_db
@@ -711,7 +711,7 @@ class TestGetActiveAssetsFromDb:
         assert "AAPL" in result
         assert "TSLA" in result
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_filters_out_none_values(self, mock_execute):
         """Test that function filters out None values."""
         from data import get_active_assets_from_db
@@ -723,7 +723,7 @@ class TestGetActiveAssetsFromDb:
         assert len(result) == 2
         assert None not in result
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_list_on_error(self, mock_execute):
         """Test that function returns empty list on error."""
         from data import get_active_assets_from_db
@@ -738,7 +738,7 @@ class TestGetActiveAssetsFromDb:
 class TestLoadFilteredPosts:
     """Tests for load_filtered_posts function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dataframe(self, mock_execute):
         """Test that function returns a pandas DataFrame."""
         from data import load_filtered_posts
@@ -780,7 +780,7 @@ class TestLoadFilteredPosts:
 
         assert isinstance(result, pd.DataFrame)
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_on_no_results(self, mock_execute):
         """Test that function returns empty DataFrame when no results."""
         from data import load_filtered_posts
@@ -792,7 +792,7 @@ class TestLoadFilteredPosts:
         assert isinstance(result, pd.DataFrame)
         assert result.empty
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_passes_limit_to_query(self, mock_execute):
         """Test that limit parameter is passed to query."""
         from data import load_filtered_posts
@@ -809,7 +809,7 @@ class TestLoadFilteredPosts:
 class TestTimePeriodFiltering:
     """Tests for time period filtering (days parameter) in data functions."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_performance_metrics_with_days(self, mock_execute):
         """Test that days parameter adds date filter to query."""
         from data import get_performance_metrics
@@ -833,7 +833,7 @@ class TestTimePeriodFiltering:
         call_args = mock_execute.call_args[0]
         assert "start_date" in call_args[1]
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_performance_metrics_without_days(self, mock_execute):
         """Test that without days parameter, no date filter is added."""
         from data import get_performance_metrics
@@ -857,7 +857,7 @@ class TestTimePeriodFiltering:
         call_args = mock_execute.call_args[0]
         assert "start_date" not in call_args[1]
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_accuracy_by_confidence_with_days(self, mock_execute):
         """Test that days parameter adds date filter to confidence query."""
         from data import get_accuracy_by_confidence
@@ -880,7 +880,7 @@ class TestTimePeriodFiltering:
         call_args = mock_execute.call_args[0]
         assert "start_date" in call_args[1]
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_accuracy_by_asset_with_days(self, mock_execute):
         """Test that days parameter adds date filter to asset query."""
         from data import get_accuracy_by_asset
@@ -904,7 +904,7 @@ class TestTimePeriodFiltering:
         assert "start_date" in call_args[1]
         assert call_args[1]["limit"] == 10
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_recent_signals_with_days(self, mock_execute):
         """Test that days parameter adds date filter to signals query."""
         from data import get_recent_signals
@@ -918,7 +918,7 @@ class TestTimePeriodFiltering:
         assert "start_date" in call_args[1]
         assert call_args[1]["limit"] == 10
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_recent_signals_without_days(self, mock_execute):
         """Test that without days parameter, no date filter is added to signals."""
         from data import get_recent_signals
@@ -931,7 +931,7 @@ class TestTimePeriodFiltering:
         call_args = mock_execute.call_args[0]
         assert "start_date" not in call_args[1]
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_sentiment_distribution_with_days(self, mock_execute):
         """Test that days parameter adds date filter to sentiment query."""
         from data import get_sentiment_distribution
@@ -949,7 +949,7 @@ class TestTimePeriodFiltering:
         call_args = mock_execute.call_args[0]
         assert "start_date" in call_args[1]
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_similar_predictions_with_days(self, mock_execute):
         """Test that days parameter adds date filter to similar predictions query."""
         from data import get_similar_predictions
@@ -962,7 +962,7 @@ class TestTimePeriodFiltering:
         call_args = mock_execute.call_args[0]
         assert "start_date" in call_args[1]
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_predictions_with_outcomes_with_days(self, mock_execute):
         """Test that days parameter adds date filter to predictions with outcomes."""
         from data import get_predictions_with_outcomes
@@ -1049,7 +1049,7 @@ class TestTTLCache:
 class TestCumulativePnl:
     """Tests for get_cumulative_pnl function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dataframe_with_cumulative(self, mock_execute):
         """Test that function returns DataFrame with cumulative P&L."""
         from data import get_cumulative_pnl
@@ -1070,7 +1070,7 @@ class TestCumulativePnl:
         assert "cumulative_pnl" in result.columns
         assert result["cumulative_pnl"].iloc[-1] == 250.0  # 100 - 50 + 200
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_with_days_parameter(self, mock_execute):
         """Test that days parameter adds date filter."""
         from data import get_cumulative_pnl
@@ -1083,7 +1083,7 @@ class TestCumulativePnl:
         call_args = mock_execute.call_args[0]
         assert "start_date" in call_args[1]
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dataframe_on_error(self, mock_execute):
         """Test that function returns empty DataFrame on error."""
         from data import get_cumulative_pnl
@@ -1099,7 +1099,7 @@ class TestCumulativePnl:
 class TestRollingAccuracy:
     """Tests for get_rolling_accuracy function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_rolling_accuracy(self, mock_execute):
         """Test that function returns DataFrame with rolling accuracy."""
         from data import get_rolling_accuracy
@@ -1118,7 +1118,7 @@ class TestRollingAccuracy:
         assert isinstance(result, pd.DataFrame)
         assert "rolling_accuracy" in result.columns
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_with_days_parameter(self, mock_execute):
         """Test that days parameter adds date filter."""
         from data import get_rolling_accuracy
@@ -1131,7 +1131,7 @@ class TestRollingAccuracy:
         call_args = mock_execute.call_args[0]
         assert "start_date" in call_args[1]
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dataframe_on_error(self, mock_execute):
         """Test that function returns empty DataFrame on error."""
         from data import get_rolling_accuracy
@@ -1147,7 +1147,7 @@ class TestRollingAccuracy:
 class TestWinLossStreaks:
     """Tests for get_win_loss_streaks function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_calculates_streaks(self, mock_execute):
         """Test that function calculates streaks correctly."""
         from data import get_win_loss_streaks
@@ -1170,7 +1170,7 @@ class TestWinLossStreaks:
         assert result["max_loss_streak"] == 2
         assert result["current_streak"] == -2
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_zeros_on_empty_data(self, mock_execute):
         """Test that function returns zeros when no data."""
         from data import get_win_loss_streaks
@@ -1185,7 +1185,7 @@ class TestWinLossStreaks:
             "max_loss_streak": 0,
         }
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_defaults_on_error(self, mock_execute):
         """Test that function returns defaults on error."""
         from data import get_win_loss_streaks
@@ -1204,7 +1204,7 @@ class TestWinLossStreaks:
 class TestConfidenceCalibration:
     """Tests for get_confidence_calibration function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_calibration_data(self, mock_execute):
         """Test that function returns calibration DataFrame."""
         from data import get_confidence_calibration
@@ -1224,7 +1224,7 @@ class TestConfidenceCalibration:
         assert "predicted_confidence" in result.columns
         assert "bucket_label" in result.columns
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_with_custom_buckets(self, mock_execute):
         """Test that custom bucket count is used."""
         from data import get_confidence_calibration
@@ -1237,7 +1237,7 @@ class TestConfidenceCalibration:
         call_args = mock_execute.call_args[0]
         assert call_args[1]["bucket_size"] == 0.2  # 1.0 / 5
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dataframe_on_error(self, mock_execute):
         """Test that function returns empty DataFrame on error."""
         from data import get_confidence_calibration
@@ -1253,7 +1253,7 @@ class TestConfidenceCalibration:
 class TestMonthlyPerformance:
     """Tests for get_monthly_performance function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_monthly_data(self, mock_execute):
         """Test that function returns monthly performance DataFrame."""
         from data import get_monthly_performance
@@ -1279,7 +1279,7 @@ class TestMonthlyPerformance:
         assert "accuracy" in result.columns
         assert result["accuracy"].iloc[0] == 60.0  # 30/50 = 60%
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_with_custom_months(self, mock_execute):
         """Test that months parameter is passed to query."""
         from data import get_monthly_performance
@@ -1292,7 +1292,7 @@ class TestMonthlyPerformance:
         call_args = mock_execute.call_args[0]
         assert call_args[1]["months"] == 6
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dataframe_on_error(self, mock_execute):
         """Test that function returns empty DataFrame on error."""
         from data import get_monthly_performance
@@ -1330,7 +1330,7 @@ class TestGetSparklinePrices:
 
         get_sparkline_prices.clear_cache()
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dict_of_dataframes(self, mock_execute):
         """Should return a dict mapping symbol -> DataFrame."""
         from data import get_sparkline_prices
@@ -1357,7 +1357,7 @@ class TestGetSparklinePrices:
         assert len(result["AAPL"]) == 3
         assert list(result["AAPL"].columns) == ["date", "close"]
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dict_for_empty_symbols(self, mock_execute):
         """Empty symbols tuple should return empty dict without querying."""
         from data import get_sparkline_prices
@@ -1367,7 +1367,7 @@ class TestGetSparklinePrices:
         assert result == {}
         mock_execute.assert_not_called()
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_excludes_symbols_with_single_data_point(self, mock_execute):
         """Symbols with only 1 price point should be excluded (need >= 2)."""
         from data import get_sparkline_prices
@@ -1389,7 +1389,7 @@ class TestGetSparklinePrices:
         assert "AAPL" in result
         assert "TSLA" not in result
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dict_on_db_error(self, mock_execute):
         """Database errors should return empty dict, not raise."""
         from data import get_sparkline_prices
@@ -1403,7 +1403,7 @@ class TestGetSparklinePrices:
 
         assert result == {}
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dict_when_no_rows(self, mock_execute):
         """No matching price data should return empty dict."""
         from data import get_sparkline_prices
@@ -1417,7 +1417,7 @@ class TestGetSparklinePrices:
 
         assert result == {}
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_passes_correct_date_window(self, mock_execute):
         """Query should use expanded calendar window around center_date."""
         from data import get_sparkline_prices
@@ -1445,7 +1445,7 @@ class TestGetSparklinePrices:
 class TestGetAssetPriceHistory:
     """Tests for get_asset_price_history function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dataframe_with_price_data(self, mock_execute):
         """Test that function returns a DataFrame with price columns."""
         from data import get_asset_price_history
@@ -1469,7 +1469,7 @@ class TestGetAssetPriceHistory:
         assert "high" in result.columns
         assert "low" in result.columns
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_passes_symbol_and_date_to_query(self, mock_execute):
         """Test that symbol and start_date are passed to the query."""
         from data import get_asset_price_history
@@ -1483,7 +1483,7 @@ class TestGetAssetPriceHistory:
         assert call_args[1]["symbol"] == "TSLA"
         assert "start_date" in call_args[1]
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_uppercases_symbol(self, mock_execute):
         """Test that symbol is uppercased."""
         from data import get_asset_price_history
@@ -1495,7 +1495,7 @@ class TestGetAssetPriceHistory:
         call_args = mock_execute.call_args[0]
         assert call_args[1]["symbol"] == "AAPL"
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dataframe_on_error(self, mock_execute):
         """Test that function returns empty DataFrame on error."""
         from data import get_asset_price_history
@@ -1511,7 +1511,7 @@ class TestGetAssetPriceHistory:
 class TestGetAssetPredictions:
     """Tests for get_asset_predictions function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dataframe_with_predictions(self, mock_execute):
         """Test that function returns a DataFrame with prediction data."""
         from data import get_asset_predictions
@@ -1576,7 +1576,7 @@ class TestGetAssetPredictions:
         assert "text" in result.columns
         assert "prediction_sentiment" in result.columns
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_respects_limit_parameter(self, mock_execute):
         """Test that limit parameter is passed to query."""
         from data import get_asset_predictions
@@ -1588,7 +1588,7 @@ class TestGetAssetPredictions:
         call_args = mock_execute.call_args[0]
         assert call_args[1]["limit"] == 25
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dataframe_on_error(self, mock_execute):
         """Test that function returns empty DataFrame on error."""
         from data import get_asset_predictions
@@ -1604,7 +1604,7 @@ class TestGetAssetPredictions:
 class TestGetAssetStats:
     """Tests for get_asset_stats function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_stats_dict(self, mock_execute):
         """Test that function returns a dictionary with expected keys."""
         from data import get_asset_stats
@@ -1662,7 +1662,7 @@ class TestGetAssetStats:
         assert result["worst_return_t7"] == -3.2
         assert result["overall_accuracy_t7"] == 60.0  # 600/1000 = 60%
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_handles_zero_evaluated(self, mock_execute):
         """Test that function handles zero evaluated predictions."""
         from data import get_asset_stats
@@ -1712,7 +1712,7 @@ class TestGetAssetStats:
         assert result["accuracy_t7"] == 0.0
         assert result["best_return_t7"] is None
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_defaults_on_error(self, mock_execute):
         """Test that function returns defaults on error."""
         from data import get_asset_stats
@@ -1730,7 +1730,7 @@ class TestGetAssetStats:
 class TestGetRelatedAssets:
     """Tests for get_related_assets function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dataframe_with_related_assets(self, mock_execute):
         """Test that function returns DataFrame with related assets."""
         from data import get_related_assets
@@ -1752,7 +1752,7 @@ class TestGetRelatedAssets:
         assert "co_occurrence_count" in result.columns
         assert result.iloc[0]["related_symbol"] == "GOOGL"
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_respects_limit_parameter(self, mock_execute):
         """Test that limit parameter is passed to query."""
         from data import get_related_assets
@@ -1764,7 +1764,7 @@ class TestGetRelatedAssets:
         call_args = mock_execute.call_args[0]
         assert call_args[1]["limit"] == 5
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_uppercases_symbol(self, mock_execute):
         """Test that symbol is uppercased."""
         from data import get_related_assets
@@ -1776,7 +1776,7 @@ class TestGetRelatedAssets:
         call_args = mock_execute.call_args[0]
         assert call_args[1]["symbol"] == "AAPL"
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dataframe_on_error(self, mock_execute):
         """Test that function returns empty DataFrame on error."""
         from data import get_related_assets
@@ -1797,7 +1797,7 @@ class TestGetRelatedAssets:
 class TestGetUnifiedFeed:
     """Tests for get_unified_feed function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dataframe_with_aggregated_columns(self, mock_execute):
         """Test that unified feed returns DataFrame with expected columns."""
         from data import get_unified_feed
@@ -1840,7 +1840,7 @@ class TestGetUnifiedFeed:
         assert "thesis" in result.columns
         assert "analysis_status" in result.columns
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_respects_days_parameter(self, mock_execute):
         """Test that days parameter adds date filter to query."""
         from data import get_unified_feed
@@ -1854,7 +1854,7 @@ class TestGetUnifiedFeed:
         assert "start_date" in params
         assert params["limit"] == 10
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_no_date_filter_when_days_is_none(self, mock_execute):
         """Test that days=None omits date filter."""
         from data import get_unified_feed
@@ -1867,7 +1867,7 @@ class TestGetUnifiedFeed:
         params = call_args[1]
         assert "start_date" not in params
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_respects_min_confidence(self, mock_execute):
         """Test that min_confidence is passed as query parameter."""
         from data import get_unified_feed
@@ -1880,7 +1880,7 @@ class TestGetUnifiedFeed:
         params = call_args[1]
         assert params["min_confidence"] == 0.7
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dataframe_on_error(self, mock_execute):
         """Test graceful degradation on database error."""
         from data import get_unified_feed
@@ -1892,7 +1892,7 @@ class TestGetUnifiedFeed:
         assert isinstance(result, pd.DataFrame)
         assert result.empty
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dataframe_on_no_results(self, mock_execute):
         """Test that empty result set returns empty DataFrame, not error."""
         from data import get_unified_feed
@@ -1904,7 +1904,7 @@ class TestGetUnifiedFeed:
         assert isinstance(result, pd.DataFrame)
         assert result.empty
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_query_contains_group_by(self, mock_execute):
         """Test that query uses GROUP BY for deduplication."""
         from data import get_unified_feed
@@ -1917,7 +1917,7 @@ class TestGetUnifiedFeed:
         query_text = str(call_args[0])
         assert "GROUP BY" in query_text
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_query_sorts_evaluated_first(self, mock_execute):
         """Test that query sorts evaluated predictions before pending."""
         from data import get_unified_feed
@@ -1935,7 +1935,7 @@ class TestGetUnifiedFeed:
 class TestGetActiveSignals:
     """Tests for get_active_signals function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dataframe(self, mock_execute):
         """Test that function returns a pandas DataFrame with aggregated columns."""
         from data import get_active_signals
@@ -1985,7 +1985,7 @@ class TestGetActiveSignals:
         assert result.iloc[0]["outcome_count"] == 2
         assert result.iloc[0]["correct_count"] == 2
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_one_row_per_post_not_per_ticker(self, mock_execute):
         """Test that multi-ticker posts produce one row, not one per ticker."""
         from data import get_active_signals
@@ -2034,7 +2034,7 @@ class TestGetActiveSignals:
         assert result.iloc[0]["outcome_count"] == 4
         assert result.iloc[0]["total_pnl_t7"] == 84.0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_on_error(self, mock_execute):
         """Test that function returns empty DataFrame on error."""
         from data import get_active_signals
@@ -2046,7 +2046,7 @@ class TestGetActiveSignals:
         assert isinstance(result, pd.DataFrame)
         assert result.empty
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_passes_params_to_query(self, mock_execute):
         """Test that min_confidence and hours are used in query params."""
         from data import get_active_signals
@@ -2059,7 +2059,7 @@ class TestGetActiveSignals:
         call_args = mock_execute.call_args[0]
         assert call_args[1]["min_confidence"] == 0.8
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_no_outcomes_shows_pending(self, mock_execute):
         """Test that a post with zero outcomes shows zero counts."""
         from data import get_active_signals
@@ -2107,7 +2107,7 @@ class TestGetActiveSignals:
         assert result.iloc[0]["outcome_count"] == 0
         assert result.iloc[0]["total_pnl_t7"] is None
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_single_ticker_post(self, mock_execute):
         """Test that a single-ticker post works correctly."""
         from data import get_active_signals
@@ -2159,7 +2159,7 @@ class TestGetActiveSignals:
 class TestGetWeeklySignalCount:
     """Tests for get_weekly_signal_count function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_integer_count(self, mock_execute):
         """Test that function returns an integer count."""
         from data import get_weekly_signal_count
@@ -2171,7 +2171,7 @@ class TestGetWeeklySignalCount:
         assert isinstance(result, int)
         assert result == 15
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_zero_on_empty(self, mock_execute):
         """Test that function returns 0 when no results."""
         from data import get_weekly_signal_count
@@ -2182,7 +2182,7 @@ class TestGetWeeklySignalCount:
 
         assert result == 0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_zero_on_error(self, mock_execute):
         """Test that function returns 0 on error."""
         from data import get_weekly_signal_count
@@ -2197,7 +2197,7 @@ class TestGetWeeklySignalCount:
 class TestGetHighConfidenceMetrics:
     """Tests for get_high_confidence_metrics function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_metrics_dict(self, mock_execute):
         """Test that function returns a dict with expected keys."""
         from data import get_high_confidence_metrics
@@ -2213,7 +2213,7 @@ class TestGetHighConfidenceMetrics:
         assert result["incorrect"] == 6
         assert result["win_rate"] == 70.0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_handles_zero_total(self, mock_execute):
         """Test that function handles zero total predictions."""
         from data import get_high_confidence_metrics
@@ -2226,7 +2226,7 @@ class TestGetHighConfidenceMetrics:
         assert result["win_rate"] == 0.0
         assert result["total"] == 0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_with_days_parameter(self, mock_execute):
         """Test that days parameter adds date filter."""
         from data import get_high_confidence_metrics
@@ -2240,7 +2240,7 @@ class TestGetHighConfidenceMetrics:
         call_args = mock_execute.call_args[0]
         assert "start_date" in call_args[1]
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_defaults_on_error(self, mock_execute):
         """Test that function returns defaults on error."""
         from data import get_high_confidence_metrics
@@ -2256,7 +2256,7 @@ class TestGetHighConfidenceMetrics:
 class TestGetBestPerformingAsset:
     """Tests for get_best_performing_asset function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_asset_dict(self, mock_execute):
         """Test that function returns a dict with asset info."""
         from data import get_best_performing_asset
@@ -2274,7 +2274,7 @@ class TestGetBestPerformingAsset:
         assert result["prediction_count"] == 10
         assert result["accuracy"] == 70.0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_defaults_on_empty(self, mock_execute):
         """Test that function returns defaults when no data."""
         from data import get_best_performing_asset
@@ -2287,7 +2287,7 @@ class TestGetBestPerformingAsset:
         assert result["symbol"] == "N/A"
         assert result["total_pnl"] == 0.0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_defaults_on_error(self, mock_execute):
         """Test that function returns defaults on error."""
         from data import get_best_performing_asset
@@ -2303,7 +2303,7 @@ class TestGetBestPerformingAsset:
 class TestGetAccuracyOverTime:
     """Tests for get_accuracy_over_time function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dataframe_with_accuracy(self, mock_execute):
         """Test that function returns DataFrame with accuracy column."""
         from data import get_accuracy_over_time
@@ -2322,7 +2322,7 @@ class TestGetAccuracyOverTime:
         assert "accuracy" in result.columns
         assert result["accuracy"].iloc[0] == 70.0  # 7/10
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_with_days_parameter(self, mock_execute):
         """Test that days parameter adds date filter."""
         from data import get_accuracy_over_time
@@ -2335,7 +2335,7 @@ class TestGetAccuracyOverTime:
         call_args = mock_execute.call_args[0]
         assert "start_date" in call_args[1]
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_on_error(self, mock_execute):
         """Test that function returns empty DataFrame on error."""
         from data import get_accuracy_over_time
@@ -2351,7 +2351,7 @@ class TestGetAccuracyOverTime:
 class TestGetBacktestSimulation:
     """Tests for get_backtest_simulation function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_simulation_dict(self, mock_execute):
         """Test that function returns a dict with simulation results."""
         from data import get_backtest_simulation
@@ -2374,7 +2374,7 @@ class TestGetBacktestSimulation:
         assert result["losses"] == 1
         assert result["final_value"] == 10040.0  # 10000 + 25 - 15 + 30
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_defaults_on_no_data(self, mock_execute):
         """Test that function returns defaults when no data."""
         from data import get_backtest_simulation
@@ -2388,7 +2388,7 @@ class TestGetBacktestSimulation:
         assert result["trade_count"] == 0
         assert result["win_rate"] == 0.0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_defaults_on_error(self, mock_execute):
         """Test that function returns defaults on error."""
         from data import get_backtest_simulation
@@ -2401,7 +2401,7 @@ class TestGetBacktestSimulation:
         assert result["trade_count"] == 0
         assert result["win_rate"] == 0.0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_win_rate_calculation(self, mock_execute):
         """Test that win rate is calculated correctly."""
         from data import get_backtest_simulation
@@ -2427,7 +2427,7 @@ class TestGetBacktestSimulation:
 class TestGetSentimentAccuracy:
     """Tests for get_sentiment_accuracy function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dataframe(self, mock_execute):
         """Test that function returns a pandas DataFrame."""
         from data import get_sentiment_accuracy
@@ -2448,7 +2448,7 @@ class TestGetSentimentAccuracy:
         assert "accuracy" in result.columns
         assert result.iloc[0]["accuracy"] == 70.0  # 35/50
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_with_days_parameter(self, mock_execute):
         """Test that days parameter adds date filter."""
         from data import get_sentiment_accuracy
@@ -2461,7 +2461,7 @@ class TestGetSentimentAccuracy:
         call_args = mock_execute.call_args[0]
         assert "start_date" in call_args[1]
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_on_error(self, mock_execute):
         """Test that function returns empty DataFrame on error."""
         from data import get_sentiment_accuracy
@@ -2482,7 +2482,7 @@ class TestGetSentimentAccuracy:
 class TestGetSignalFeed:
     """Tests for get_signal_feed function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dataframe(self, mock_execute):
         """Test that function returns a pandas DataFrame."""
         from data import get_signal_feed
@@ -2542,7 +2542,7 @@ class TestGetSignalFeed:
         assert len(result) == 1
         assert result["confidence"].iloc[0] == 0.85
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_passes_pagination_params(self, mock_execute):
         """Test that limit and offset are passed to the query."""
         from data import get_signal_feed
@@ -2557,7 +2557,7 @@ class TestGetSignalFeed:
         assert params["limit"] == 10
         assert params["offset"] == 30
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_applies_sentiment_filter(self, mock_execute):
         """Test that sentiment filter is included in query params."""
         from data import get_signal_feed
@@ -2570,7 +2570,7 @@ class TestGetSignalFeed:
         params = call_args[1]
         assert params["sentiment_filter"] == "bullish"
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_applies_confidence_range(self, mock_execute):
         """Test that confidence min and max are included in query params."""
         from data import get_signal_feed
@@ -2584,7 +2584,7 @@ class TestGetSignalFeed:
         assert params["confidence_min"] == 0.6
         assert params["confidence_max"] == 0.9
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_applies_asset_filter(self, mock_execute):
         """Test that asset filter is uppercased and included in query params."""
         from data import get_signal_feed
@@ -2597,7 +2597,7 @@ class TestGetSignalFeed:
         params = call_args[1]
         assert params["asset_filter"] == "AAPL"
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_applies_outcome_filter_correct(self, mock_execute):
         """Test that outcome filter for 'correct' adds the right WHERE clause."""
         from data import get_signal_feed
@@ -2610,7 +2610,7 @@ class TestGetSignalFeed:
         query_str = str(call_args[0])
         assert "correct_t7 = true" in query_str
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_applies_outcome_filter_incorrect(self, mock_execute):
         """Test that outcome filter for 'incorrect' adds the right WHERE clause."""
         from data import get_signal_feed
@@ -2623,7 +2623,7 @@ class TestGetSignalFeed:
         query_str = str(call_args[0])
         assert "correct_t7 = false" in query_str
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_applies_outcome_filter_pending(self, mock_execute):
         """Test that outcome filter for 'pending' adds IS NULL clause."""
         from data import get_signal_feed
@@ -2636,7 +2636,7 @@ class TestGetSignalFeed:
         query_str = str(call_args[0])
         assert "correct_t7 IS NULL" in query_str
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_no_filter_when_none(self, mock_execute):
         """Test that no extra filters are added when all params are None."""
         from data import get_signal_feed
@@ -2652,7 +2652,7 @@ class TestGetSignalFeed:
         assert "confidence_min" not in params
         assert "confidence_max" not in params
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_dataframe_on_error(self, mock_execute):
         """Test that function returns empty DataFrame on database error."""
         from data import get_signal_feed
@@ -2668,7 +2668,7 @@ class TestGetSignalFeed:
 class TestGetSignalFeedCount:
     """Tests for get_signal_feed_count function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_integer_count(self, mock_execute):
         """Test that function returns an integer."""
         from data import get_signal_feed_count
@@ -2680,7 +2680,7 @@ class TestGetSignalFeedCount:
         assert isinstance(result, int)
         assert result == 142
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_zero_on_no_results(self, mock_execute):
         """Test that function returns 0 when query returns no rows."""
         from data import get_signal_feed_count
@@ -2691,7 +2691,7 @@ class TestGetSignalFeedCount:
 
         assert result == 0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_zero_on_error(self, mock_execute):
         """Test that function returns 0 on database error."""
         from data import get_signal_feed_count
@@ -2702,7 +2702,7 @@ class TestGetSignalFeedCount:
 
         assert result == 0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_applies_sentiment_filter(self, mock_execute):
         """Test that sentiment filter is passed to query."""
         from data import get_signal_feed_count
@@ -2715,7 +2715,7 @@ class TestGetSignalFeedCount:
         params = call_args[1]
         assert params["sentiment_filter"] == "bearish"
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_zero_on_null_count(self, mock_execute):
         """Test that function returns 0 when database returns NULL count."""
         from data import get_signal_feed_count
@@ -2730,7 +2730,7 @@ class TestGetSignalFeedCount:
 class TestGetNewSignalsSince:
     """Tests for get_new_signals_since function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_count_of_new_signals(self, mock_execute):
         """Test that function returns the count of new signals."""
         from data import get_new_signals_since
@@ -2757,7 +2757,7 @@ class TestGetNewSignalsSince:
 
         assert result == 0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_passes_timestamp_to_query(self, mock_execute):
         """Test that timestamp is passed as query parameter."""
         from data import get_new_signals_since
@@ -2770,7 +2770,7 @@ class TestGetNewSignalsSince:
         params = call_args[1]
         assert params["since_timestamp"] == "2025-01-15T10:00:00"
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_zero_on_error(self, mock_execute):
         """Test that function returns 0 on database error."""
         from data import get_new_signals_since
@@ -2785,7 +2785,7 @@ class TestGetNewSignalsSince:
 class TestGetSignalFeedCsv:
     """Tests for get_signal_feed_csv function."""
 
-    @patch("data.get_signal_feed")
+    @patch("data.signal_queries.get_signal_feed")
     def test_returns_dataframe_with_export_columns(self, mock_feed):
         """Test that function returns a DataFrame with human-readable columns."""
         from data import get_signal_feed_csv
@@ -2827,7 +2827,7 @@ class TestGetSignalFeedCsv:
         assert "Confidence" in result.columns
         assert "Outcome" in result.columns
 
-    @patch("data.get_signal_feed")
+    @patch("data.signal_queries.get_signal_feed")
     def test_returns_empty_dataframe_when_no_data(self, mock_feed):
         """Test that function returns empty DataFrame when feed is empty."""
         from data import get_signal_feed_csv
@@ -2839,7 +2839,7 @@ class TestGetSignalFeedCsv:
         assert isinstance(result, pd.DataFrame)
         assert result.empty
 
-    @patch("data.get_signal_feed")
+    @patch("data.signal_queries.get_signal_feed")
     def test_formats_confidence_as_percentage(self, mock_feed):
         """Test that confidence is formatted as a percentage string."""
         from data import get_signal_feed_csv
@@ -2875,7 +2875,7 @@ class TestGetSignalFeedCsv:
 
         assert result["Confidence"].iloc[0] == "85%"
 
-    @patch("data.get_signal_feed")
+    @patch("data.signal_queries.get_signal_feed")
     def test_formats_outcome_labels(self, mock_feed):
         """Test that outcome column uses Correct/Incorrect/Pending labels."""
         from data import get_signal_feed_csv
@@ -2957,7 +2957,7 @@ class TestGetSignalFeedCsv:
         assert result["Outcome"].iloc[1] == "Incorrect"
         assert result["Outcome"].iloc[2] == "Pending"
 
-    @patch("data.get_signal_feed")
+    @patch("data.signal_queries.get_signal_feed")
     def test_passes_filters_to_feed(self, mock_feed):
         """Test that filter params are forwarded to get_signal_feed."""
         from data import get_signal_feed_csv
@@ -2986,7 +2986,7 @@ class TestGetSignalFeedCsv:
 class TestGetTopPredictedAsset:
     """Tests for get_top_predicted_asset function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_top_asset(self, mock_execute):
         """Test that function returns the symbol with most predictions."""
         from data import get_top_predicted_asset
@@ -3000,7 +3000,7 @@ class TestGetTopPredictedAsset:
         result = get_top_predicted_asset()
         assert result == "TSLA"
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_none_when_empty(self, mock_execute):
         """Test that function returns None when no assets exist."""
         from data import get_top_predicted_asset
@@ -3011,7 +3011,7 @@ class TestGetTopPredictedAsset:
         result = get_top_predicted_asset()
         assert result is None
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_none_on_error(self, mock_execute):
         """Test that function returns None on database error."""
         from data import get_top_predicted_asset
@@ -3026,7 +3026,7 @@ class TestGetTopPredictedAsset:
 class TestGetDashboardKpisWithFallback:
     """Tests for get_dashboard_kpis_with_fallback function."""
 
-    @patch("data.get_dashboard_kpis")
+    @patch("data.performance_queries.get_dashboard_kpis")
     def test_returns_period_data_when_available(self, mock_kpis):
         """When period has evaluated signals, return without fallback."""
         from data import get_dashboard_kpis_with_fallback
@@ -3043,7 +3043,7 @@ class TestGetDashboardKpisWithFallback:
         assert result["fallback_label"] == ""
         mock_kpis.assert_called_once_with(days=7)
 
-    @patch("data.get_dashboard_kpis")
+    @patch("data.performance_queries.get_dashboard_kpis")
     def test_falls_back_to_alltime_when_period_empty(self, mock_kpis):
         """When period returns zero signals, fall back to all-time."""
         from data import get_dashboard_kpis_with_fallback
@@ -3060,7 +3060,7 @@ class TestGetDashboardKpisWithFallback:
         mock_kpis.assert_any_call(days=7)
         mock_kpis.assert_any_call(days=None)
 
-    @patch("data.get_dashboard_kpis")
+    @patch("data.performance_queries.get_dashboard_kpis")
     def test_no_fallback_when_days_is_none(self, mock_kpis):
         """When days=None (already all-time), never fall back."""
         from data import get_dashboard_kpis_with_fallback
@@ -3075,7 +3075,7 @@ class TestGetDashboardKpisWithFallback:
         assert result["is_fallback"] is False
         mock_kpis.assert_called_once_with(days=None)
 
-    @patch("data.get_dashboard_kpis")
+    @patch("data.performance_queries.get_dashboard_kpis")
     def test_preserves_all_original_keys(self, mock_kpis):
         """Fallback result contains all original keys plus is_fallback and fallback_label."""
         from data import get_dashboard_kpis_with_fallback
@@ -3098,7 +3098,7 @@ class TestGetDashboardKpisWithFallback:
 class TestGetActiveSignalsWithFallback:
     """Tests for get_active_signals_with_fallback progressive fallback."""
 
-    @patch("data.get_active_signals")
+    @patch("data.signal_queries.get_active_signals")
     def test_returns_72h_when_available(self, mock_signals):
         """Strategy 1: returns 72h high confidence signals when available."""
         from data import get_active_signals_with_fallback
@@ -3109,7 +3109,7 @@ class TestGetActiveSignalsWithFallback:
         assert "72h" in label
         mock_signals.assert_called_once_with(min_confidence=0.75, hours=72)
 
-    @patch("data.get_active_signals")
+    @patch("data.signal_queries.get_active_signals")
     def test_falls_back_to_7d(self, mock_signals):
         """Strategy 2: falls back to 7 days when 72h is empty."""
         from data import get_active_signals_with_fallback
@@ -3123,7 +3123,7 @@ class TestGetActiveSignalsWithFallback:
         assert "week" in label
         assert mock_signals.call_count == 2
 
-    @patch("data.get_active_signals")
+    @patch("data.signal_queries.get_active_signals")
     def test_falls_back_to_30d(self, mock_signals):
         """Strategy 3: falls back to 30 days when 7d is empty."""
         from data import get_active_signals_with_fallback
@@ -3138,7 +3138,7 @@ class TestGetActiveSignalsWithFallback:
         assert "month" in label
         assert mock_signals.call_count == 3
 
-    @patch("data.get_active_signals")
+    @patch("data.signal_queries.get_active_signals")
     def test_falls_back_to_lower_confidence(self, mock_signals):
         """Strategy 4: falls back to medium confidence when high confidence is empty."""
         from data import get_active_signals_with_fallback
@@ -3154,7 +3154,7 @@ class TestGetActiveSignalsWithFallback:
         assert "60%" in label
         assert mock_signals.call_count == 4
 
-    @patch("data.get_active_signals")
+    @patch("data.signal_queries.get_active_signals")
     def test_returns_empty_when_all_strategies_fail(self, mock_signals):
         """Returns empty DataFrame when all 4 strategies find nothing."""
         from data import get_active_signals_with_fallback
@@ -3169,7 +3169,7 @@ class TestGetActiveSignalsWithFallback:
 class TestSignalFeedEvaluatedSort:
     """Tests for evaluated-first sort order and evaluated filter in signal feed."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_sort_order_has_evaluated_first(self, mock_execute):
         """Signal feed sorts evaluated outcomes before pending ones."""
         from data import get_signal_feed
@@ -3181,7 +3181,7 @@ class TestSignalFeedEvaluatedSort:
         query_str = str(call_args[0])
         assert "CASE WHEN po.correct_t7 IS NOT NULL THEN 0 ELSE 1 END" in query_str
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_evaluated_filter_in_signal_feed(self, mock_execute):
         """Outcome filter 'evaluated' adds IS NOT NULL clause."""
         from data import get_signal_feed
@@ -3193,7 +3193,7 @@ class TestSignalFeedEvaluatedSort:
         query_str = str(call_args[0])
         assert "correct_t7 IS NOT NULL" in query_str
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_evaluated_filter_in_signal_feed_count(self, mock_execute):
         """Outcome filter 'evaluated' adds IS NOT NULL clause in count function."""
         from data import get_signal_feed_count
@@ -3210,7 +3210,7 @@ class TestSignalFeedEvaluatedSort:
 class TestGetEmptyStateContext:
     """Tests for get_empty_state_context function."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_expected_keys(self, mock_execute):
         """Test that the return dict has all expected keys."""
         from data import get_empty_state_context
@@ -3223,7 +3223,7 @@ class TestGetEmptyStateContext:
         assert result["total_pending"] == 5
         assert result["total_high_confidence"] == 3
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_handles_all_zeros(self, mock_execute):
         """Test that zero values are returned correctly."""
         from data import get_empty_state_context
@@ -3235,7 +3235,7 @@ class TestGetEmptyStateContext:
         assert result["total_pending"] == 0
         assert result["total_high_confidence"] == 0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_handles_null_values(self, mock_execute):
         """Test that NULL values from the DB are treated as 0."""
         from data import get_empty_state_context
@@ -3247,7 +3247,7 @@ class TestGetEmptyStateContext:
         assert result["total_pending"] == 0
         assert result["total_high_confidence"] == 0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_handles_query_error(self, mock_execute):
         """Test that query errors return safe fallback dict."""
         from data import get_empty_state_context
