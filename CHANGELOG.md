@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pydantic V2 deprecation warnings** -- Migrated Settings from legacy `class Config` to `SettingsConfigDict`, removed all deprecated `env=` parameters from Field() calls
 
 ### Added
+- **Event System Tests** -- 52 new tests covering all 4 event consumers, CLI commands, and worker signal handling
+  - S3ProcessorWorker: empty keys, S3 iteration, downstream event emission, cleanup
+  - AnalyzerWorker: batch size calculation, cleanup guarantees
+  - MarketDataWorker: skip logic for incomplete/missing data, successful backfill
+  - NotificationsWorker: subscriber dispatch, preference filtering, JSON parsing
+  - CLI: queue-stats, retry-dead-letter, cleanup, list with all filter combinations
+  - EventWorker: SIGTERM/SIGINT signal handlers, persistent run() loop behavior
 - **Dynamic insight cards** -- 2-3 personality-driven callout cards above the screener table answering "so what right now?"
   - Latest call: most recent evaluated prediction with 7-day return and outcome
   - Best & worst: top and bottom performing predictions in the selected period
@@ -25,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Cleaned up dead Signals/Trends/Performance brand copy from Phase 05
 
 ### Changed
+- **Dashboard CSS extraction** - Moved 611 lines of inline CSS from `layout.py` to `shitty_ui/assets/custom.css`
+  - `layout.py` reduced from ~800 lines to ~190 lines of pure Python
+  - CSS now gets proper syntax highlighting and linting in editors
+  - Dash auto-loads CSS from the `assets/` directory (no config needed)
 - **2-view information architecture** -- Consolidated 4 pages (Dashboard, Signals, Trends, Performance) into 2 views: Home (Screener) and Asset Detail
   - Removed nav links from header — logo-only navigation
   - Old routes (`/signals`, `/trends`, `/performance`) fall through to home
