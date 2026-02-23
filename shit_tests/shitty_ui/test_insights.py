@@ -12,7 +12,7 @@ from unittest.mock import patch
 class TestGetDynamicInsights:
     """Tests for data.get_dynamic_insights()."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_empty_list_when_no_data(self, mock_query):
         """Should return [] when all queries return empty results."""
         mock_query.return_value = ([], [])
@@ -23,7 +23,7 @@ class TestGetDynamicInsights:
         assert isinstance(result, list)
         assert len(result) == 0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_latest_call_insight(self, mock_query):
         """Should include a latest_call insight when recent outcomes exist."""
         mock_query.side_effect = [
@@ -70,7 +70,7 @@ class TestGetDynamicInsights:
         assert "AAPL" in latest[0]["assets"]
         assert latest[0]["sentiment"] == "positive"
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_latest_call_negative_sentiment(self, mock_query):
         """Should mark incorrect prediction as negative sentiment."""
         mock_query.side_effect = [
@@ -112,7 +112,7 @@ class TestGetDynamicInsights:
         assert latest[0]["sentiment"] == "negative"
         assert "Ouch" in latest[0]["body"]
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_system_pulse_requires_minimum_predictions(self, mock_query):
         """System pulse insight should not appear with fewer than 5 predictions."""
         mock_query.side_effect = [
@@ -129,7 +129,7 @@ class TestGetDynamicInsights:
         pulse = [i for i in result if i["type"] == "system_pulse"]
         assert len(pulse) == 0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_system_pulse_appears_with_enough_predictions(self, mock_query):
         """System pulse should appear when at least 5 predictions exist."""
         mock_query.side_effect = [
@@ -147,7 +147,7 @@ class TestGetDynamicInsights:
         assert len(pulse) == 1
         assert "60%" in pulse[0]["headline"]
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_each_insight_has_required_keys(self, mock_query):
         """Every insight dict must have type, headline, body, assets, sentiment, priority."""
         mock_query.side_effect = [
@@ -198,7 +198,7 @@ class TestGetDynamicInsights:
             result = get_dynamic_insights(days=7)
             assert isinstance(result, list)
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_best_worst_insight(self, mock_query):
         """Should generate best/worst insight when both rows exist."""
         mock_query.side_effect = [
@@ -396,43 +396,43 @@ class TestCreateInsightCards:
 
 
 class TestFormatInsightTimestamp:
-    """Tests for _format_insight_timestamp()."""
+    """Tests for format_time_ago (moved from insights to components.helpers)."""
 
     def test_none_returns_empty_string(self):
-        from components.insights import _format_insight_timestamp
+        from components.helpers import format_time_ago
 
-        assert _format_insight_timestamp(None) == ""
+        assert format_time_ago(None) == ""
 
     def test_recent_datetime_returns_relative(self):
-        from components.insights import _format_insight_timestamp
+        from components.helpers import format_time_ago
 
         ts = datetime.now() - timedelta(hours=3)
-        result = _format_insight_timestamp(ts)
+        result = format_time_ago(ts)
         assert "3h ago" == result
 
     def test_days_ago(self):
-        from components.insights import _format_insight_timestamp
+        from components.helpers import format_time_ago
 
         ts = datetime.now() - timedelta(days=2)
-        result = _format_insight_timestamp(ts)
+        result = format_time_ago(ts)
         assert "2d ago" == result
 
     def test_weeks_ago(self):
-        from components.insights import _format_insight_timestamp
+        from components.helpers import format_time_ago
 
         ts = datetime.now() - timedelta(days=15)
-        result = _format_insight_timestamp(ts)
+        result = format_time_ago(ts)
         assert "2w ago" == result
 
     def test_just_now(self):
-        from components.insights import _format_insight_timestamp
+        from components.helpers import format_time_ago
 
         ts = datetime.now() - timedelta(seconds=10)
-        result = _format_insight_timestamp(ts)
+        result = format_time_ago(ts)
         assert result == "just now"
 
     def test_non_datetime_returns_truncated_string(self):
-        from components.insights import _format_insight_timestamp
+        from components.helpers import format_time_ago
 
-        result = _format_insight_timestamp("2026-02-23 12:00:00")
+        result = format_time_ago("2026-02-23 12:00:00")
         assert result == "2026-02-23"

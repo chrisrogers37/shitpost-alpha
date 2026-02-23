@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **UI helpers extracted** - Consolidated 4 duplicated patterns (time-ago, sentiment extraction, outcome badges, asset display) from cards.py into shared `components/helpers.py`
+
 ### Fixed
+- **Hero card weeks display** - Hero signal cards now correctly show "2w ago" for posts older than 7 days (was showing "14d ago")
 - **pytest collection blocker** -- Moved `pytest_plugins` declaration from `shit_tests/conftest.py` to root-level `conftest.py` (required by pytest 8.x)
 - **5 stale bypass tests** -- Deleted `test_get_bypass_reason_*` tests that called removed `_get_bypass_reason()` method (coverage exists in `test_bypass_service.py`)
 - **Pydantic V2 deprecation warnings** -- Migrated Settings from legacy `class Config` to `SettingsConfigDict`, removed all deprecated `env=` parameters from Field() calls
@@ -64,6 +68,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - "$hitpost Alpha" logo — green + gold two-tone branding
   - "Show Me The Money" analytics header, money-themed copy throughout
   - New `COLORS["accent_gold"]` and `COLORS["navy"]` design tokens
+
+- **Data Layer Architecture** -- Split monolithic `shitty_ui/data.py` (2,865 lines) into 5 focused modules under `shitty_ui/data/` package
+  - `data/base.py` -- shared infrastructure (execute_query, ttl_cache, logger)
+  - `data/signal_queries.py` -- signal loading, feed, filtering, CSV export
+  - `data/performance_queries.py` -- KPIs, accuracy, P&L, streaks, backtesting
+  - `data/asset_queries.py` -- screener, sparklines, asset stats, price history
+  - `data/insight_queries.py` -- dynamic insight card generation
+  - `data/__init__.py` re-exports all public functions for zero breaking changes
 
 ### Fixed
 - **Harvester failing on ScrapeCreators API** -- API began returning `content-type: text/plain` instead of `application/json`, causing aiohttp's `response.json()` to reject the valid JSON body. Added `content_type=None` to both `_test_connection()` and `_fetch_batch()` calls to accept any content type.

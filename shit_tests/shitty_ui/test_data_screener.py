@@ -26,7 +26,7 @@ def clear_caches():
 class TestGetAssetScreenerData:
     """Tests for get_asset_screener_data."""
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_expected_columns(self, mock_query):
         mock_query.return_value = (
             [("XLE", 29, 14, 15, 2.48, 719.0, 0.72, "bullish")],
@@ -55,7 +55,7 @@ class TestGetAssetScreenerData:
         }
         assert set(df.columns) == expected_cols
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_calculates_accuracy(self, mock_query):
         mock_query.return_value = (
             [("XLE", 10, 6, 4, 1.5, 300.0, 0.70, "bullish")],
@@ -73,7 +73,7 @@ class TestGetAssetScreenerData:
         df = get_asset_screener_data()
         assert df.iloc[0]["accuracy"] == 60.0
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_with_days_filter(self, mock_query):
         mock_query.return_value = ([], [])
         get_asset_screener_data(days=30)
@@ -83,19 +83,19 @@ class TestGetAssetScreenerData:
             call_args[1].get("params", call_args[0][1] if len(call_args[0]) > 1 else {})
         )
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_empty_result(self, mock_query):
         mock_query.return_value = ([], [])
         df = get_asset_screener_data()
         assert df.empty
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_error_returns_empty(self, mock_query):
         mock_query.side_effect = Exception("DB error")
         df = get_asset_screener_data()
         assert df.empty
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_multiple_assets(self, mock_query):
         mock_query.return_value = (
             [
@@ -126,7 +126,7 @@ class TestGetScreenerSparklinePrices:
         result = get_screener_sparkline_prices(symbols=())
         assert result == {}
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_returns_dict_keyed_by_symbol(self, mock_query):
         mock_query.return_value = (
             [
@@ -142,7 +142,7 @@ class TestGetScreenerSparklinePrices:
         assert "DIS" in result
         assert isinstance(result["XLE"], pd.DataFrame)
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_filters_symbols_with_less_than_2_points(self, mock_query):
         mock_query.return_value = (
             [
@@ -156,19 +156,19 @@ class TestGetScreenerSparklinePrices:
         assert "XLE" in result
         assert "DIS" not in result
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_no_rows_returns_empty(self, mock_query):
         mock_query.return_value = ([], [])
         result = get_screener_sparkline_prices(symbols=("XLE",))
         assert result == {}
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_error_returns_empty(self, mock_query):
         mock_query.side_effect = Exception("DB error")
         result = get_screener_sparkline_prices(symbols=("XLE",))
         assert result == {}
 
-    @patch("data.execute_query")
+    @patch("data.base.execute_query")
     def test_dataframe_has_date_and_close_columns(self, mock_query):
         mock_query.return_value = (
             [
