@@ -113,6 +113,16 @@ def _find_components_by_type(component, comp_type):
     return found
 
 
+def _read_custom_css() -> str:
+    """Read the custom CSS file from the assets directory."""
+    css_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "..", "shitty_ui", "assets", "custom.css",
+    )
+    with open(css_path) as f:
+        return f.read()
+
+
 class TestColors:
     """Tests for color palette configuration."""
 
@@ -1481,78 +1491,29 @@ class TestTypographyConstants:
 
 
 class TestCSSClasses:
-    """Tests for CSS classes in the app index string."""
+    """Tests for CSS classes in the custom stylesheet."""
 
-    @patch("data.get_prediction_stats")
-    @patch("layout.get_performance_metrics")
-    @patch("layout.get_accuracy_by_confidence")
-    @patch("layout.get_accuracy_by_asset")
-    @patch("layout.get_recent_signals")
-    @patch("layout.get_active_assets_from_db")
-    def test_index_string_contains_section_header_class(
-        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
-    ):
-        """Test that app index_string contains .section-header CSS class."""
-        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
-        mock_conf_acc.return_value = pd.DataFrame()
-        mock_asset_acc.return_value = pd.DataFrame()
-        mock_signals.return_value = pd.DataFrame()
-        mock_assets.return_value = []
+    def test_custom_css_contains_section_header_class(self):
+        """Test that custom.css contains .section-header CSS class."""
+        css = _read_custom_css()
 
-        from layout import create_app
-        app = create_app()
+        assert ".section-header" in css
+        assert ".page-title" in css
+        assert ".text-label" in css
+        assert ".text-meta" in css
+        assert ".section-label" in css
 
-        assert ".section-header" in app.index_string
-        assert ".page-title" in app.index_string
-        assert ".text-label" in app.index_string
-        assert ".text-meta" in app.index_string
-        assert ".section-label" in app.index_string
+    def test_custom_css_contains_active_nav_pseudo_element(self):
+        """Test that custom.css contains nav-link active ::after pseudo-element."""
+        css = _read_custom_css()
 
-    @patch("data.get_prediction_stats")
-    @patch("layout.get_performance_metrics")
-    @patch("layout.get_accuracy_by_confidence")
-    @patch("layout.get_accuracy_by_asset")
-    @patch("layout.get_recent_signals")
-    @patch("layout.get_active_assets_from_db")
-    def test_index_string_contains_active_nav_pseudo_element(
-        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
-    ):
-        """Test that app index_string contains nav-link active ::after pseudo-element."""
-        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
-        mock_conf_acc.return_value = pd.DataFrame()
-        mock_asset_acc.return_value = pd.DataFrame()
-        mock_signals.return_value = pd.DataFrame()
-        mock_assets.return_value = []
+        assert ".nav-link-custom.active::after" in css
 
-        from layout import create_app
-        app = create_app()
-
-        assert ".nav-link-custom.active::after" in app.index_string
-
-    @patch("data.get_prediction_stats")
-    @patch("layout.get_performance_metrics")
-    @patch("layout.get_accuracy_by_confidence")
-    @patch("layout.get_accuracy_by_asset")
-    @patch("layout.get_recent_signals")
-    @patch("layout.get_active_assets_from_db")
-    def test_card_header_has_font_size_override(
-        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
-    ):
+    def test_custom_css_contains_card_header_font_size(self):
         """Test that .card-header CSS includes font-size override."""
-        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
-        mock_conf_acc.return_value = pd.DataFrame()
-        mock_asset_acc.return_value = pd.DataFrame()
-        mock_signals.return_value = pd.DataFrame()
-        mock_assets.return_value = []
+        css = _read_custom_css()
 
-        from layout import create_app
-        app = create_app()
-
-        # Verify the card-header override includes font-size
-        assert "0.95rem" in app.index_string
+        assert "0.95rem" in css
 
 
 class TestDashboardPageStructure:
@@ -1683,53 +1644,21 @@ class TestDashboardPageStructure:
 
 
 class TestAnalyticsTabsCSS:
-    """Tests for analytics tab CSS in the app stylesheet."""
+    """Tests for analytics tab CSS in the custom stylesheet."""
 
-    @patch("data.get_prediction_stats")
-    @patch("layout.get_performance_metrics")
-    @patch("layout.get_accuracy_by_confidence")
-    @patch("layout.get_accuracy_by_asset")
-    @patch("layout.get_recent_signals")
-    @patch("layout.get_active_assets_from_db")
-    def test_index_string_contains_analytics_tabs_css(
-        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
-    ):
-        """Test that app index_string contains .analytics-tabs CSS."""
-        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
-        mock_conf_acc.return_value = pd.DataFrame()
-        mock_asset_acc.return_value = pd.DataFrame()
-        mock_signals.return_value = pd.DataFrame()
-        mock_assets.return_value = []
+    def test_custom_css_contains_analytics_tabs_css(self):
+        """Test that custom.css contains .analytics-tabs CSS."""
+        css = _read_custom_css()
 
-        from layout import create_app
-        app = create_app()
+        assert ".analytics-tabs" in css
+        assert ".collapse-chevron" in css
+        assert ".collapse-chevron.rotated" in css
 
-        assert ".analytics-tabs" in app.index_string
-        assert ".collapse-chevron" in app.index_string
-        assert ".collapse-chevron.rotated" in app.index_string
+    def test_custom_css_contains_collapse_toggle_css(self):
+        """Test that custom.css contains .collapse-toggle-btn CSS."""
+        css = _read_custom_css()
 
-    @patch("data.get_prediction_stats")
-    @patch("layout.get_performance_metrics")
-    @patch("layout.get_accuracy_by_confidence")
-    @patch("layout.get_accuracy_by_asset")
-    @patch("layout.get_recent_signals")
-    @patch("layout.get_active_assets_from_db")
-    def test_index_string_contains_collapse_toggle_css(
-        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
-    ):
-        """Test that app index_string contains .collapse-toggle-btn CSS."""
-        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
-        mock_conf_acc.return_value = pd.DataFrame()
-        mock_asset_acc.return_value = pd.DataFrame()
-        mock_signals.return_value = pd.DataFrame()
-        mock_assets.return_value = []
-
-        from layout import create_app
-        app = create_app()
-
-        assert ".collapse-toggle-btn" in app.index_string
+        assert ".collapse-toggle-btn" in css
 
 
 class TestClientSideRoutes:
@@ -1820,29 +1749,13 @@ class TestClientSideRoutes:
 
 
 class TestThesisToggleCSS:
-    """Tests for thesis expand/collapse CSS classes in the app stylesheet."""
+    """Tests for thesis expand/collapse CSS classes in the custom stylesheet."""
 
-    @patch("data.get_prediction_stats")
-    @patch("layout.get_performance_metrics")
-    @patch("layout.get_accuracy_by_confidence")
-    @patch("layout.get_accuracy_by_asset")
-    @patch("layout.get_recent_signals")
-    @patch("layout.get_active_assets_from_db")
-    def test_index_string_contains_thesis_toggle_css(
-        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
-    ):
-        """Test that app index_string contains .thesis-toggle-area CSS class."""
-        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
-        mock_conf_acc.return_value = pd.DataFrame()
-        mock_asset_acc.return_value = pd.DataFrame()
-        mock_signals.return_value = pd.DataFrame()
-        mock_assets.return_value = []
+    def test_custom_css_contains_thesis_toggle_css(self):
+        """Test that custom.css contains .thesis-toggle-area CSS class."""
+        css = _read_custom_css()
 
-        from layout import create_app
-        app = create_app()
-
-        assert ".thesis-toggle-area" in app.index_string
+        assert ".thesis-toggle-area" in css
 
 
 class TestVisualHierarchy:
@@ -1913,98 +1826,34 @@ class TestVisualHierarchy:
 
 
 class TestHierarchyCSS:
-    """Tests for hierarchy CSS classes in the app stylesheet."""
+    """Tests for hierarchy CSS classes in the custom stylesheet."""
 
-    @patch("data.get_prediction_stats")
-    @patch("layout.get_performance_metrics")
-    @patch("layout.get_accuracy_by_confidence")
-    @patch("layout.get_accuracy_by_asset")
-    @patch("layout.get_recent_signals")
-    @patch("layout.get_active_assets_from_db")
-    def test_index_string_contains_kpi_hero_card_css(
-        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
-    ):
-        """Test that app index_string contains .kpi-hero-card CSS class."""
-        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
-        mock_conf_acc.return_value = pd.DataFrame()
-        mock_asset_acc.return_value = pd.DataFrame()
-        mock_signals.return_value = pd.DataFrame()
-        mock_assets.return_value = []
+    def test_custom_css_contains_kpi_hero_card_css(self):
+        """Test that custom.css contains .kpi-hero-card CSS class."""
+        css = _read_custom_css()
 
-        from layout import create_app
-        app = create_app()
+        assert ".kpi-hero-card" in css
+        assert ".kpi-hero-card:hover" in css
 
-        assert ".kpi-hero-card" in app.index_string
-        assert ".kpi-hero-card:hover" in app.index_string
+    def test_custom_css_contains_section_tertiary_css(self):
+        """Test that custom.css contains .section-tertiary CSS overrides."""
+        css = _read_custom_css()
 
-    @patch("data.get_prediction_stats")
-    @patch("layout.get_performance_metrics")
-    @patch("layout.get_accuracy_by_confidence")
-    @patch("layout.get_accuracy_by_asset")
-    @patch("layout.get_recent_signals")
-    @patch("layout.get_active_assets_from_db")
-    def test_index_string_contains_section_tertiary_css(
-        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
-    ):
-        """Test that app index_string contains .section-tertiary CSS overrides."""
-        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
-        mock_conf_acc.return_value = pd.DataFrame()
-        mock_asset_acc.return_value = pd.DataFrame()
-        mock_signals.return_value = pd.DataFrame()
-        mock_assets.return_value = []
+        assert ".section-tertiary" in css
+        assert ".section-tertiary .card-header" in css
+        assert ".section-tertiary .card-body" in css
 
-        from layout import create_app
-        app = create_app()
+    def test_custom_css_contains_tabular_nums(self):
+        """Test that custom.css uses tabular-nums for KPI values."""
+        css = _read_custom_css()
 
-        assert ".section-tertiary" in app.index_string
-        assert ".section-tertiary .card-header" in app.index_string
-        assert ".section-tertiary .card-body" in app.index_string
+        assert "tabular-nums" in css
 
-    @patch("data.get_prediction_stats")
-    @patch("layout.get_performance_metrics")
-    @patch("layout.get_accuracy_by_confidence")
-    @patch("layout.get_accuracy_by_asset")
-    @patch("layout.get_recent_signals")
-    @patch("layout.get_active_assets_from_db")
-    def test_index_string_contains_tabular_nums(
-        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
-    ):
-        """Test that .kpi-hero-value uses tabular-nums for numeric alignment."""
-        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
-        mock_conf_acc.return_value = pd.DataFrame()
-        mock_asset_acc.return_value = pd.DataFrame()
-        mock_signals.return_value = pd.DataFrame()
-        mock_assets.return_value = []
+    def test_custom_css_contains_header_elevation_shadow(self):
+        """Test that custom.css contains header elevation box-shadow."""
+        css = _read_custom_css()
 
-        from layout import create_app
-        app = create_app()
-
-        assert "tabular-nums" in app.index_string
-
-    @patch("data.get_prediction_stats")
-    @patch("layout.get_performance_metrics")
-    @patch("layout.get_accuracy_by_confidence")
-    @patch("layout.get_accuracy_by_asset")
-    @patch("layout.get_recent_signals")
-    @patch("layout.get_active_assets_from_db")
-    def test_header_shadow_in_css(
-        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
-    ):
-        """Test that .header-container CSS includes box-shadow."""
-        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
-        mock_conf_acc.return_value = pd.DataFrame()
-        mock_asset_acc.return_value = pd.DataFrame()
-        mock_signals.return_value = pd.DataFrame()
-        mock_assets.return_value = []
-
-        from layout import create_app
-        app = create_app()
-
-        assert "box-shadow:" in app.index_string or "boxShadow" in app.index_string
+        assert "box-shadow:" in css
 
 
 class TestChartConfigResponsive:
@@ -2015,6 +1864,45 @@ class TestChartConfigResponsive:
         from constants import CHART_CONFIG
 
         assert CHART_CONFIG.get("responsive") is True
+
+
+class TestCSSExternalFile:
+    """Tests verifying CSS is served from assets/custom.css."""
+
+    def test_custom_css_file_exists(self):
+        """Test that shitty_ui/assets/custom.css exists on disk."""
+        css_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "..", "shitty_ui", "assets", "custom.css",
+        )
+        assert os.path.isfile(css_path), f"Expected CSS file at {css_path}"
+
+    def test_custom_css_is_not_empty(self):
+        """Test that custom.css has substantial content (>500 lines)."""
+        css = _read_custom_css()
+        line_count = len(css.strip().splitlines())
+        assert line_count > 500, f"Expected 500+ lines, got {line_count}"
+
+    @patch("data.get_prediction_stats")
+    @patch("layout.get_performance_metrics")
+    @patch("layout.get_accuracy_by_confidence")
+    @patch("layout.get_accuracy_by_asset")
+    @patch("layout.get_recent_signals")
+    @patch("layout.get_active_assets_from_db")
+    def test_index_string_does_not_contain_style_tag(
+        self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats,
+    ):
+        """Test that index_string no longer has an embedded <style> block."""
+        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
+        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_conf_acc.return_value = pd.DataFrame()
+        mock_asset_acc.return_value = pd.DataFrame()
+        mock_signals.return_value = pd.DataFrame()
+        mock_assets.return_value = []
+
+        from layout import create_app
+        app = create_app()
+        assert "<style>" not in app.index_string
 
 
 class TestViewportMetaTag:
@@ -2045,65 +1933,52 @@ class TestViewportMetaTag:
 
 
 class TestMobileCSS:
-    """Tests for mobile-responsive CSS rules in the app index string."""
+    """Tests for mobile-responsive CSS rules in the custom stylesheet."""
 
-    @patch("data.get_prediction_stats")
-    @patch("layout.get_performance_metrics")
-    @patch("layout.get_accuracy_by_confidence")
-    @patch("layout.get_accuracy_by_asset")
-    @patch("layout.get_recent_signals")
-    @patch("layout.get_active_assets_from_db")
-    def _get_app(self, mock_assets, mock_signals, mock_asset_acc, mock_conf_acc, mock_perf, mock_stats):
-        """Helper to create the app with mocked data functions."""
-        mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
-        mock_conf_acc.return_value = pd.DataFrame()
-        mock_asset_acc.return_value = pd.DataFrame()
-        mock_signals.return_value = pd.DataFrame()
-        mock_assets.return_value = []
-        from layout import create_app
-        return create_app()
+    def _get_css(self):
+        """Read the custom CSS file."""
+        return _read_custom_css()
 
     def test_has_375px_breakpoint(self):
         """Test that CSS includes a 375px media query."""
-        app = self._get_app()
-        assert "@media (max-width: 375px)" in app.index_string
+        css = self._get_css()
+        assert "@media (max-width: 375px)" in css
 
     def test_has_480px_breakpoint(self):
         """Test that CSS includes a 480px media query."""
-        app = self._get_app()
-        assert "@media (max-width: 480px)" in app.index_string
+        css = self._get_css()
+        assert "@media (max-width: 480px)" in css
 
     def test_has_768px_breakpoint(self):
         """Test that CSS includes a 768px media query."""
-        app = self._get_app()
-        assert "@media (max-width: 768px)" in app.index_string
+        css = self._get_css()
+        assert "@media (max-width: 768px)" in css
 
     def test_touch_target_min_height(self):
         """Test that nav links have min-height: 48px for touch targets."""
-        app = self._get_app()
-        assert "min-height: 48px" in app.index_string
+        css = self._get_css()
+        assert "min-height: 48px" in css
 
     def test_hero_card_unset_min_width_on_mobile(self):
         """Test that hero cards have min-width: unset on mobile."""
-        app = self._get_app()
-        assert "min-width: unset" in app.index_string
+        css = self._get_css()
+        assert "min-width: unset" in css
 
     def test_nav_links_row_horizontal_scroll(self):
         """Test that nav-links-row gets overflow-x: auto on mobile."""
-        app = self._get_app()
-        assert ".nav-links-row" in app.index_string
-        assert "overflow-x: auto" in app.index_string
+        css = self._get_css()
+        assert ".nav-links-row" in css
+        assert "overflow-x: auto" in css
 
     def test_refresh_detail_hidden_on_small_screens(self):
         """Test that .refresh-detail is hidden below 480px."""
-        app = self._get_app()
-        assert ".refresh-detail" in app.index_string
+        css = self._get_css()
+        assert ".refresh-detail" in css
 
     def test_main_content_container_padding_mobile(self):
         """Test that .main-content-container has reduced padding on mobile."""
-        app = self._get_app()
-        assert ".main-content-container" in app.index_string
+        css = self._get_css()
+        assert ".main-content-container" in css
 
 
 class TestHeaderResponsiveClasses:
