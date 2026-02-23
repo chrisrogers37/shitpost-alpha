@@ -48,11 +48,15 @@ class TestEventWorker:
             finally:
                 session.close()
 
-        with patch("shit.events.worker.SessionLocal", TestSession), \
-             patch("shit.events.worker.get_session", mock_get_session):
+        with (
+            patch("shit.events.worker.SessionLocal", TestSession),
+            patch("shit.events.worker.get_session", mock_get_session),
+        ):
             yield
 
-    def _seed_events(self, count: int = 3, consumer_group: str = "test_consumer") -> list[int]:
+    def _seed_events(
+        self, count: int = 3, consumer_group: str = "test_consumer"
+    ) -> list[int]:
         """Seed pending events into the test database."""
         session = self._TestSession()
         ids = []
@@ -72,8 +76,10 @@ class TestEventWorker:
 
     def test_consumer_group_required(self):
         """Test that consumer_group must be set."""
+
         class BadWorker(EventWorker):
             consumer_group = ""
+
             def process_event(self, event_type, payload):
                 pass
 
@@ -208,3 +214,128 @@ class TestEventWorker:
         total = worker.run_once()
 
         assert total == 0  # Not yet ready for retry
+
+    # --- New tests for signal handlers and run() ---
+
+    def test_signal_handler_sets_shutdown_flag(self):
+        """Test that receiving SIGTERM sets the _shutdown flag."""
+        import os
+        import signal as sig_mod
+
+        worker = DummyWorker()
+        assert worker._shutdown is False
+
+        orig_term = sig_mod.getsignal(sig_mod.SIGTERM)
+        orig_int = sig_mod.getsignal(sig_mod.SIGINT)
+
+        try:
+            worker._setup_signal_handlers()
+            os.kill(os.getpid(), sig_mod.SIGTERM)
+            assert worker._shutdown is True
+        finally:
+            sig_mod.signal(sig_mod.SIGTERM, orig_term)
+            sig_mod.signal(sig_mod.SIGINT, orig_int)
+
+    def test_signal_handler_sigint_sets_shutdown_flag(self):
+        """Test that SIGINT also sets the _shutdown flag."""
+        import os
+        import signal as sig_mod
+
+        worker = DummyWorker()
+
+        orig_term = sig_mod.getsignal(sig_mod.SIGTERM)
+        orig_int = sig_mod.getsignal(sig_mod.SIGINT)
+
+        try:
+            worker._setup_signal_handlers()
+            os.kill(os.getpid(), sig_mod.SIGINT)
+            assert worker._shutdown is True
+        finally:
+            sig_mod.signal(sig_mod.SIGTERM, orig_term)
+            sig_mod.signal(sig_mod.SIGINT, orig_int)
+
+    def test_run_exits_on_shutdown_flag(self):
+        """Test that run() exits its loop when _shutdown becomes True."""
+        worker = DummyWorker(poll_interval=0.1)
+
+        call_count = 0
+
+        def fake_sleep(seconds):
+            nonlocal call_count
+            call_count += 1
+            worker._shutdown = True
+
+        with (
+            patch("shit.events.worker.time.sleep", side_effect=fake_sleep),
+            patch("shit.events.worker.signal.signal"),
+        ):
+            worker.run()
+
+        assert call_count >= 1
+
+    def test_run_processes_events_before_shutdown(self):
+        """Test that run() processes events before checking shutdown."""
+        self._seed_events(2)
+        worker = DummyWorker(poll_interval=0.01)
+
+        def shutdown_on_sleep(seconds):
+            worker._shutdown = True
+
+        with (
+            patch("shit.events.worker.time.sleep", side_effect=shutdown_on_sleep),
+            patch("shit.events.worker.signal.signal"),
+        ):
+            worker.run()
+
+        assert len(worker.processed_events) == 2
+
+        session = self._TestSession()
+        events = session.query(Event).all()
+        for e in events:
+            assert e.status == "completed"
+        session.close()
+
+    def test_run_handles_poll_exception_gracefully(self):
+        """Test that run() catches exceptions in _poll_and_process and continues."""
+        worker = DummyWorker(poll_interval=0.01)
+        poll_count = 0
+
+        def failing_poll():
+            nonlocal poll_count
+            poll_count += 1
+            if poll_count == 1:
+                raise RuntimeError("Unexpected DB error")
+            return 0
+
+        worker._poll_and_process = failing_poll
+
+        def shutdown_on_sleep(seconds):
+            worker._shutdown = True
+
+        with (
+            patch("shit.events.worker.time.sleep", side_effect=shutdown_on_sleep),
+            patch("shit.events.worker.signal.signal"),
+        ):
+            worker.run()
+
+        assert poll_count >= 1
+
+    def test_run_skips_sleep_when_events_processed(self):
+        """Test that run() does NOT sleep when events were just processed."""
+        self._seed_events(1)
+        worker = DummyWorker(poll_interval=0.1)
+
+        sleep_calls = []
+
+        def tracking_sleep(seconds):
+            sleep_calls.append(seconds)
+            worker._shutdown = True
+
+        with (
+            patch("shit.events.worker.time.sleep", side_effect=tracking_sleep),
+            patch("shit.events.worker.signal.signal"),
+        ):
+            worker.run()
+
+        assert len(sleep_calls) == 1
+        assert len(worker.processed_events) == 1
