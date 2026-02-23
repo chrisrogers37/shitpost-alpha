@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Alerts panel refactor** - Split `create_alert_config_panel()` into 8 sub-component builder functions in new `alert_components.py`
+- **Alerts callbacks refactor** - Extracted `build_preferences_dict()`, `extract_preferences_tuple()`, and `build_alert_history_card()` from nested callbacks into testable module-level functions
+
+### Added
+- **Alert callback tests** - 60 new tests in `test_alert_callbacks.py` covering panel sub-components, preference serialization, and alert history card rendering
+
 ### Fixed
 - **pytest collection blocker** -- Moved `pytest_plugins` declaration from `shit_tests/conftest.py` to root-level `conftest.py` (required by pytest 8.x)
 - **5 stale bypass tests** -- Deleted `test_get_bypass_reason_*` tests that called removed `_get_bypass_reason()` method (coverage exists in `test_bypass_service.py`)
