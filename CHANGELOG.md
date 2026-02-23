@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **pytest collection blocker** -- Moved `pytest_plugins` declaration from `shit_tests/conftest.py` to root-level `conftest.py` (required by pytest 8.x)
+- **5 stale bypass tests** -- Deleted `test_get_bypass_reason_*` tests that called removed `_get_bypass_reason()` method (coverage exists in `test_bypass_service.py`)
+- **Pydantic V2 deprecation warnings** -- Migrated Settings from legacy `class Config` to `SettingsConfigDict`, removed all deprecated `env=` parameters from Field() calls
+
 ### Added
 - **Dynamic insight cards** -- 2-3 personality-driven callout cards above the screener table answering "so what right now?"
   - Latest call: most recent evaluated prediction with 7-day return and outcome
