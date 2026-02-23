@@ -1290,63 +1290,6 @@ class TestCreateNewSignalsBanner:
         assert banner.children[1].id == "signal-feed-show-new-btn"
 
 
-class TestCreateSignalFeedPage:
-    """Tests for create_signal_feed_page function."""
-
-    def test_returns_html_div(self):
-        """Test that function returns an HTML Div."""
-        from pages.signals import create_signal_feed_page
-        from dash import html
-
-        page = create_signal_feed_page()
-        assert isinstance(page, html.Div)
-
-    def test_has_filter_controls(self):
-        """Test that page contains filter controls."""
-        from pages.signals import create_signal_feed_page
-
-        page = create_signal_feed_page()
-        # Page should have multiple children (header, banner, interval, stores, filters, etc.)
-        assert len(page.children) > 5
-
-    def test_has_load_more_button(self):
-        """Test that page contains the load-more container."""
-        from pages.signals import create_signal_feed_page
-
-        page = create_signal_feed_page()
-        # Find the load-more container by its id
-        found = False
-        for child in page.children:
-            if hasattr(child, "id") and child.id == "signal-feed-load-more-container":
-                found = True
-                break
-        assert found, "Load More container not found in page"
-
-    def test_has_poll_interval(self):
-        """Test that page contains the signal-feed-poll-interval."""
-        from pages.signals import create_signal_feed_page
-        from dash import dcc
-
-        page = create_signal_feed_page()
-        found = False
-        for child in page.children:
-            if isinstance(child, dcc.Interval) and getattr(child, "id", None) == "signal-feed-poll-interval":
-                found = True
-                break
-        assert found, "Poll interval not found in page"
-
-    def test_has_csv_download(self):
-        """Test that page contains the CSV download component."""
-        from pages.signals import create_signal_feed_page
-        from dash import dcc
-
-        page = create_signal_feed_page()
-        found = False
-        for child in page.children:
-            if isinstance(child, dcc.Download) and getattr(child, "id", None) == "signal-feed-csv-download":
-                found = True
-                break
-        assert found, "CSV download component not found in page"
 
 
 class TestHeroSignalCardDedup:
@@ -1535,38 +1478,6 @@ class TestTypographyConstants:
         assert "color" in SECTION_ACCENT
         assert "radius" in SECTION_ACCENT
 
-
-class TestNavLinkIds:
-    """Tests for nav link IDs in the header component."""
-
-    def test_nav_links_have_ids(self):
-        """Test that all four navigation links have unique IDs."""
-        from components.header import create_header
-
-        header = create_header()
-
-        expected_ids = [
-            "nav-link-dashboard",
-            "nav-link-signals",
-            "nav-link-trends",
-            "nav-link-performance",
-        ]
-        found_ids = _find_component_ids(header)
-        for nav_id in expected_ids:
-            assert nav_id in found_ids, f"Nav link ID '{nav_id}' not found in header"
-
-    def test_nav_links_have_nav_link_custom_class(self):
-        """Test that all nav links use the nav-link-custom class."""
-        from components.header import create_header
-        from dash import dcc
-
-        header = create_header()
-        nav_links = _find_components_by_type(header, dcc.Link)
-        for link in nav_links:
-            if hasattr(link, "id") and link.id and str(link.id).startswith("nav-link-"):
-                assert "nav-link-custom" in (link.className or ""), (
-                    f"Nav link {link.id} should have nav-link-custom class"
-                )
 
 
 class TestCSSClasses:
@@ -2198,14 +2109,6 @@ class TestMobileCSS:
 class TestHeaderResponsiveClasses:
     """Tests for responsive CSS class names on header components."""
 
-    def test_nav_links_have_nav_links_row_class(self):
-        """Test that the nav links wrapper has nav-links-row className."""
-        from components.header import create_header
-
-        header = create_header()
-        found = _find_components_with_class(header, "nav-links-row")
-        assert len(found) > 0, "nav-links-row className not found in header"
-
     def test_logo_has_header_logo_class(self):
         """Test that the logo wrapper has header-logo className."""
         from components.header import create_header
@@ -2233,14 +2136,6 @@ class TestDashboardResponsiveProps:
         page = create_dashboard_page()
         found = _find_components_with_class(page, "main-content-container")
         assert len(found) > 0, "main-content-container className not found in dashboard"
-
-    def test_performance_page_has_responsive_class(self):
-        """Test that performance page main content div has main-content-container class."""
-        from pages.dashboard import create_performance_page
-
-        page = create_performance_page()
-        found = _find_components_with_class(page, "main-content-container")
-        assert len(found) > 0, "main-content-container className not found in performance page"
 
     def test_old_chart_ids_removed_from_dashboard(self):
         """Test that old analytics chart IDs are no longer in the dashboard."""

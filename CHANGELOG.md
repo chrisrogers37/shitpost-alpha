@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **2-view information architecture** -- Consolidated 4 pages (Dashboard, Signals, Trends, Performance) into 2 views: Home (Screener) and Asset Detail
+  - Removed nav links from header — logo-only navigation
+  - Old routes (`/signals`, `/trends`, `/performance`) fall through to home
+  - Deleted `pages/signals.py` (712 lines) and `pages/trends.py` (350 lines)
+  - Removed `create_performance_page()` and its callback (~485 lines) from dashboard
+  - Asset detail back link renamed "Dashboard" → "Screener"
+  - 16 new architecture tests verify route behavior, header simplification, and import hygiene
 - **Annotated price chart** -- Replaced confusing candlestick chart on asset detail page with clean line chart + vertical annotation lines at each shitpost date
   - Full-height vertical lines color-coded by predicted sentiment (bullish/bearish/neutral)
   - Hoverable marker dots with post snippet, sentiment, confidence, 7-day return, outcome, and P&L

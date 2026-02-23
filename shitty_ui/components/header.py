@@ -43,50 +43,6 @@ def create_header():
                         className="header-logo",
                         style={"marginRight": "30px"},
                     ),
-                    # Navigation links
-                    html.Div(
-                        [
-                            dcc.Link(
-                                [html.I(className="fas fa-home me-1"), "Dashboard"],
-                                href="/",
-                                className="nav-link-custom",
-                                id="nav-link-dashboard",
-                            ),
-                            dcc.Link(
-                                [
-                                    html.I(className="fas fa-rss me-1"),
-                                    "Signals",
-                                ],
-                                href="/signals",
-                                className="nav-link-custom",
-                                id="nav-link-signals",
-                            ),
-                            dcc.Link(
-                                [
-                                    html.I(className="fas fa-chart-area me-1"),
-                                    "Trends",
-                                ],
-                                href="/trends",
-                                className="nav-link-custom",
-                                id="nav-link-trends",
-                            ),
-                            dcc.Link(
-                                [
-                                    html.I(className="fas fa-chart-pie me-1"),
-                                    "Performance",
-                                ],
-                                href="/performance",
-                                className="nav-link-custom",
-                                id="nav-link-performance",
-                            ),
-                        ],
-                        className="nav-links-row",
-                        style={
-                            "display": "flex",
-                            "gap": "8px",
-                            "alignItems": "center",
-                        },
-                    ),
                 ],
                 style={"display": "flex", "alignItems": "center", "flex": 1},
             ),

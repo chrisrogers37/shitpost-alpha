@@ -81,41 +81,6 @@ class TestDashboardBranding:
         assert "Asset Screener" in text
 
 
-class TestSignalsPageBranding:
-    """Test that signals page uses branded copy."""
-
-    def test_signals_page_contains_branded_subtitle(self):
-        from pages.signals import create_signal_feed_page
-
-        page = create_signal_feed_page()
-        text = _extract_all_text(page)
-        assert COPY["signals_page_subtitle"] in text
-
-    def test_signals_page_does_not_contain_old_subtitle(self):
-        from pages.signals import create_signal_feed_page
-
-        page = create_signal_feed_page()
-        text = _extract_all_text(page)
-        assert "Live predictions from Trump" not in text
-
-
-class TestTrendsPageBranding:
-    """Test that trends page uses branded copy."""
-
-    def test_trends_page_contains_branded_subtitle(self):
-        from pages.trends import create_trends_page
-
-        page = create_trends_page()
-        text = _extract_all_text(page)
-        assert COPY["trends_page_subtitle"] in text
-
-    def test_trends_page_contains_branded_chart_default(self):
-        from pages.trends import create_trends_page
-
-        page = create_trends_page()
-        text = _extract_all_text(page)
-        assert COPY["trends_chart_default"] in text
-
 
 class TestAssetPageBranding:
     """Test that asset page uses branded copy."""
