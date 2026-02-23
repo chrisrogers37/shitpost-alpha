@@ -54,6 +54,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - "Show Me The Money" analytics header, money-themed copy throughout
   - New `COLORS["accent_gold"]` and `COLORS["navy"]` design tokens
 
+- **Data Layer Architecture** -- Split monolithic `shitty_ui/data.py` (2,865 lines) into 5 focused modules under `shitty_ui/data/` package
+  - `data/base.py` -- shared infrastructure (execute_query, ttl_cache, logger)
+  - `data/signal_queries.py` -- signal loading, feed, filtering, CSV export
+  - `data/performance_queries.py` -- KPIs, accuracy, P&L, streaks, backtesting
+  - `data/asset_queries.py` -- screener, sparklines, asset stats, price history
+  - `data/insight_queries.py` -- dynamic insight card generation
+  - `data/__init__.py` re-exports all public functions for zero breaking changes
+
 ### Fixed
 - **Harvester failing on ScrapeCreators API** -- API began returning `content-type: text/plain` instead of `application/json`, causing aiohttp's `response.json()` to reject the valid JSON body. Added `content_type=None` to both `_test_connection()` and `_fetch_batch()` calls to accept any content type.
 
