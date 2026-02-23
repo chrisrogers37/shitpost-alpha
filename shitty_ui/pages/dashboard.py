@@ -264,7 +264,6 @@ def create_dashboard_page() -> html.Div:
     )
 
 
-
 def register_dashboard_callbacks(app: Dash):
     """Register all dashboard-specific callbacks."""
 

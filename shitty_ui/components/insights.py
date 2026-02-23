@@ -126,7 +126,9 @@ def _create_single_insight_card(insight: Dict[str, Any]) -> html.Div:
                         "fontSize": "0.75rem",
                         "color": COLORS["text_muted"],
                     },
-                ) if time_str else None,
+                )
+                if time_str
+                else None,
             ],
             style={
                 "display": "flex",
@@ -155,7 +157,9 @@ def _create_single_insight_card(insight: Dict[str, Any]) -> html.Div:
                 "lineHeight": "1.4",
                 "marginBottom": "8px",
             },
-        ) if body else None,
+        )
+        if body
+        else None,
         # Asset links row
         html.Div(
             asset_links,
@@ -165,7 +169,9 @@ def _create_single_insight_card(insight: Dict[str, Any]) -> html.Div:
                 "flexWrap": "wrap",
                 "gap": "4px",
             },
-        ) if asset_links else None,
+        )
+        if asset_links
+        else None,
     ]
 
     # Filter out None children
@@ -186,7 +192,9 @@ def _create_single_insight_card(insight: Dict[str, Any]) -> html.Div:
     )
 
 
-def create_insight_cards(insights: List[Dict[str, Any]], max_cards: int = 3) -> html.Div:
+def create_insight_cards(
+    insights: List[Dict[str, Any]], max_cards: int = 3
+) -> html.Div:
     """Create the insight cards container from a pool of insight dicts.
 
     Sorts insights by priority (lower = more important), then picks

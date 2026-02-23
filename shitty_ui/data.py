@@ -2631,19 +2631,23 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
                     body = "Cha-ching." if return_t7 > 2 else "Not bad."
                     ins_sentiment = "positive"
                 else:
-                    headline = f"Trump mentioned {symbol} -- it went {ret_str} in 7 days."
+                    headline = (
+                        f"Trump mentioned {symbol} -- it went {ret_str} in 7 days."
+                    )
                     body = "Ouch." if return_t7 < -2 else "Close, but no cigar."
                     ins_sentiment = "negative"
 
-                insights.append({
-                    "type": "latest_call",
-                    "headline": headline,
-                    "body": body,
-                    "assets": [symbol],
-                    "sentiment": ins_sentiment,
-                    "timestamp": post_ts,
-                    "priority": 1,
-                })
+                insights.append(
+                    {
+                        "type": "latest_call",
+                        "headline": headline,
+                        "body": body,
+                        "assets": [symbol],
+                        "sentiment": ins_sentiment,
+                        "timestamp": post_ts,
+                        "priority": 1,
+                    }
+                )
     except Exception as e:
         logger.error(f"Error generating latest_call insight: {e}")
 
@@ -2684,15 +2688,17 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
             headline = f"Best: {best_sym} {best_ret:+.2f}%. Worst: {worst_sym} {worst_ret:+.2f}%."
             body = "Can't win 'em all."
 
-            insights.append({
-                "type": "best_worst",
-                "headline": headline,
-                "body": body,
-                "assets": [best_sym, worst_sym],
-                "sentiment": "neutral",
-                "timestamp": None,
-                "priority": 2,
-            })
+            insights.append(
+                {
+                    "type": "best_worst",
+                    "headline": headline,
+                    "body": body,
+                    "assets": [best_sym, worst_sym],
+                    "sentiment": "neutral",
+                    "timestamp": None,
+                    "priority": 2,
+                }
+            )
     except Exception as e:
         logger.error(f"Error generating best_worst insight: {e}")
 
@@ -2727,17 +2733,21 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
                 ins_sentiment = "negative"
 
             period_label = f"last {days} days" if days else "all time"
-            headline = f"{accuracy:.0f}% accuracy ({total} predictions, {period_label})."
+            headline = (
+                f"{accuracy:.0f}% accuracy ({total} predictions, {period_label})."
+            )
 
-            insights.append({
-                "type": "system_pulse",
-                "headline": headline,
-                "body": body,
-                "assets": [],
-                "sentiment": ins_sentiment,
-                "timestamp": None,
-                "priority": 3,
-            })
+            insights.append(
+                {
+                    "type": "system_pulse",
+                    "headline": headline,
+                    "body": body,
+                    "assets": [],
+                    "sentiment": ins_sentiment,
+                    "timestamp": None,
+                    "priority": 3,
+                }
+            )
     except Exception as e:
         logger.error(f"Error generating system_pulse insight: {e}")
 
@@ -2766,19 +2776,33 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
             count = rows[0][1]
             avg_ret = float(rows[0][2]) if rows[0][2] is not None else 0.0
 
-            ret_comment = f"averaging {avg_ret:+.2f}% per call" if avg_ret != 0 else "averaging flat returns"
+            ret_comment = (
+                f"averaging {avg_ret:+.2f}% per call"
+                if avg_ret != 0
+                else "averaging flat returns"
+            )
             headline = f"{symbol} is our most-called asset ({count} predictions), {ret_comment}."
-            body = "Trump can't stop talking about it." if count > 10 else "Keeps showing up."
+            body = (
+                "Trump can't stop talking about it."
+                if count > 10
+                else "Keeps showing up."
+            )
 
-            insights.append({
-                "type": "hot_asset",
-                "headline": headline,
-                "body": body,
-                "assets": [symbol],
-                "sentiment": "positive" if avg_ret > 0 else "negative" if avg_ret < 0 else "neutral",
-                "timestamp": None,
-                "priority": 4,
-            })
+            insights.append(
+                {
+                    "type": "hot_asset",
+                    "headline": headline,
+                    "body": body,
+                    "assets": [symbol],
+                    "sentiment": "positive"
+                    if avg_ret > 0
+                    else "negative"
+                    if avg_ret < 0
+                    else "neutral",
+                    "timestamp": None,
+                    "priority": 4,
+                }
+            )
     except Exception as e:
         logger.error(f"Error generating hot_asset insight: {e}")
 
@@ -2824,15 +2848,17 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
                 body = "Confidence != competence."
                 ins_sentiment = "negative"
 
-            insights.append({
-                "type": "hot_signal",
-                "headline": headline,
-                "body": body,
-                "assets": [symbol],
-                "sentiment": ins_sentiment,
-                "timestamp": post_ts,
-                "priority": 5,
-            })
+            insights.append(
+                {
+                    "type": "hot_signal",
+                    "headline": headline,
+                    "body": body,
+                    "assets": [symbol],
+                    "sentiment": ins_sentiment,
+                    "timestamp": post_ts,
+                    "priority": 5,
+                }
+            )
     except Exception as e:
         logger.error(f"Error generating hot_signal insight: {e}")
 

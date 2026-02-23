@@ -79,7 +79,9 @@ class TestCopyDictStructure:
 
     def test_all_values_are_strings(self):
         for key, value in COPY.items():
-            assert isinstance(value, str), f"COPY['{key}'] should be str, got {type(value)}"
+            assert isinstance(value, str), (
+                f"COPY['{key}'] should be str, got {type(value)}"
+            )
             assert len(value) > 0, f"COPY['{key}'] should not be empty"
 
     def test_no_double_spaces(self):
@@ -94,7 +96,9 @@ class TestCopyDictStructure:
         ]
         for key in format_keys:
             result = COPY[key].format(symbol="AAPL")
-            assert "AAPL" in result, f"COPY['{key}'].format(symbol='AAPL') should contain 'AAPL'"
+            assert "AAPL" in result, (
+                f"COPY['{key}'].format(symbol='AAPL') should contain 'AAPL'"
+            )
 
 
 class TestCopyToneGuard:
@@ -124,9 +128,23 @@ class TestCopyToneGuard:
 
     def test_no_all_caps_words(self):
         allowed_caps = {
-            "AI", "LLM", "P&L", "CSV", "ACTIVE", "SIGNALS", "NOT", "THAT",
-            "LATEST", "CALL", "BEST", "WORST", "SYSTEM", "PULSE",
-            "ASSET", "HIGH-CONFIDENCE", "SIGNAL",
+            "AI",
+            "LLM",
+            "P&L",
+            "CSV",
+            "ACTIVE",
+            "SIGNALS",
+            "NOT",
+            "THAT",
+            "LATEST",
+            "CALL",
+            "BEST",
+            "WORST",
+            "SYSTEM",
+            "PULSE",
+            "ASSET",
+            "HIGH-CONFIDENCE",
+            "SIGNAL",
         }
         for key, value in COPY.items():
             words = value.split()

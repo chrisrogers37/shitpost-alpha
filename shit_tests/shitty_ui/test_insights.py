@@ -186,9 +186,7 @@ class TestGetDynamicInsights:
         result = get_dynamic_insights(days=30)
         required_keys = {"type", "headline", "body", "assets", "sentiment", "priority"}
         for insight in result:
-            assert required_keys.issubset(
-                insight.keys()
-            ), f"Missing keys in {insight}"
+            assert required_keys.issubset(insight.keys()), f"Missing keys in {insight}"
 
     def test_insight_survives_db_error_gracefully(self):
         """If all queries fail, should return empty list without raising."""
