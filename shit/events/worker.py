@@ -10,6 +10,7 @@ Supports two modes:
 """
 
 import abc
+import argparse
 import signal
 import time
 import uuid
@@ -18,7 +19,7 @@ from typing import Optional
 
 from sqlalchemy import and_, or_
 
-from shit.db.sync_session import get_session, SessionLocal
+from shit.db.sync_session import get_session, SessionLocal  # noqa: F401 (get_session patched in tests)
 from shit.events.models import Event
 from shit.logging import get_service_logger
 
@@ -112,8 +113,7 @@ class EventWorker(abc.ABC):
             Total number of events processed.
         """
         self.logger.info(
-            f"Worker {self.worker_id} draining queue "
-            f"(group={self.consumer_group})"
+            f"Worker {self.worker_id} draining queue (group={self.consumer_group})"
         )
 
         total = 0
@@ -219,17 +219,69 @@ class EventWorker(abc.ABC):
 
         except Exception:
             session.rollback()
-            self.logger.error(
-                f"Transaction failed for event {event.id}", exc_info=True
-            )
+            self.logger.error(f"Transaction failed for event {event.id}", exc_info=True)
         finally:
             session.close()
 
     def _setup_signal_handlers(self) -> None:
         """Register SIGTERM/SIGINT handlers for graceful shutdown."""
+
         def _handle_signal(signum, frame):
             self.logger.info(f"Received signal {signum}, shutting down...")
             self._shutdown = True
 
         signal.signal(signal.SIGTERM, _handle_signal)
         signal.signal(signal.SIGINT, _handle_signal)
+
+
+def run_worker_main(
+    worker_class: type[EventWorker],
+    service_name: str,
+    prog: str | None = None,
+    description: str | None = None,
+) -> int:
+    """Shared CLI entry point for event consumer workers.
+
+    Provides the standard --once and --poll-interval arguments, instantiates
+    the worker, and dispatches to run_once() or run().
+
+    Args:
+        worker_class: The EventWorker subclass to instantiate.
+        service_name: Passed to setup_cli_logging(service_name=...).
+        prog: argparse prog string. Defaults to None (argparse auto-detects).
+        description: argparse description. Defaults to
+            "{service_name} event consumer worker".
+
+    Returns:
+        Exit code (always 0 on success).
+    """
+    from shit.logging import setup_cli_logging
+
+    setup_cli_logging(service_name=service_name)
+
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        description=description or f"{service_name} event consumer worker",
+    )
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Drain queue and exit (for cron deployment)",
+    )
+    parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=2.0,
+        help="Seconds between polls in persistent mode (default: 2.0)",
+    )
+    args = parser.parse_args()
+
+    worker = worker_class(poll_interval=args.poll_interval)
+
+    if args.once:
+        total = worker.run_once()
+        print(f"Processed {total} events")
+    else:
+        worker.run()
+
+    return 0

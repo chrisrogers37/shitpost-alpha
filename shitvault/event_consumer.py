@@ -5,13 +5,12 @@ Consumes ``posts_harvested`` events and processes S3 data to database.
 Runs as a standalone worker via ``python -m shitvault.event_consumer --once``.
 """
 
-import argparse
 import sys
 
 from shit.config.shitpost_settings import settings
 from shit.events.event_types import EventType, ConsumerGroup
-from shit.events.worker import EventWorker
-from shit.logging import setup_cli_logging, get_service_logger
+from shit.events.worker import EventWorker, run_worker_main
+from shit.logging import get_service_logger
 
 logger = get_service_logger("s3_processor_worker")
 
@@ -77,7 +76,9 @@ class S3ProcessorWorker(EventWorker):
                         stats["total_processed"] += 1
                         s3_data = await s3_data_lake.get_raw_data(s3_key)
                         if s3_data:
-                            await processor._process_single_s3_data(s3_data, stats, dry_run=False)
+                            await processor._process_single_s3_data(
+                                s3_data, stats, dry_run=False
+                            )
 
                     # Emit downstream event
                     signal_ids = stats.pop("signal_ids", [])
@@ -103,31 +104,12 @@ class S3ProcessorWorker(EventWorker):
 
 def main() -> int:
     """CLI entry point for the S3 processor event consumer."""
-    setup_cli_logging(service_name="s3_processor_worker")
-
-    parser = argparse.ArgumentParser(
+    return run_worker_main(
+        S3ProcessorWorker,
+        service_name="s3_processor_worker",
         prog="python -m shitvault.event_consumer",
         description="S3 Processor event consumer worker",
     )
-    parser.add_argument(
-        "--once", action="store_true",
-        help="Drain queue and exit (for cron deployment)",
-    )
-    parser.add_argument(
-        "--poll-interval", type=float, default=2.0,
-        help="Seconds between polls in persistent mode (default: 2.0)",
-    )
-    args = parser.parse_args()
-
-    worker = S3ProcessorWorker(poll_interval=args.poll_interval)
-
-    if args.once:
-        total = worker.run_once()
-        print(f"Processed {total} events")
-    else:
-        worker.run()
-
-    return 0
 
 
 if __name__ == "__main__":

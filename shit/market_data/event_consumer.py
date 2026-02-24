@@ -6,12 +6,11 @@ and outcome calculation for new predictions.
 Runs as a standalone worker via ``python -m shit.market_data.event_consumer --once``.
 """
 
-import argparse
 import sys
 
-from shit.events.event_types import EventType, ConsumerGroup
-from shit.events.worker import EventWorker
-from shit.logging import setup_cli_logging, get_service_logger
+from shit.events.event_types import ConsumerGroup
+from shit.events.worker import EventWorker, run_worker_main
+from shit.logging import get_service_logger
 
 logger = get_service_logger("market_data_worker")
 
@@ -67,31 +66,12 @@ class MarketDataWorker(EventWorker):
 
 def main() -> int:
     """CLI entry point for the market data event consumer."""
-    setup_cli_logging(service_name="market_data_worker")
-
-    parser = argparse.ArgumentParser(
+    return run_worker_main(
+        MarketDataWorker,
+        service_name="market_data_worker",
         prog="python -m shit.market_data.event_consumer",
         description="Market Data event consumer worker",
     )
-    parser.add_argument(
-        "--once", action="store_true",
-        help="Drain queue and exit (for cron deployment)",
-    )
-    parser.add_argument(
-        "--poll-interval", type=float, default=2.0,
-        help="Seconds between polls in persistent mode (default: 2.0)",
-    )
-    args = parser.parse_args()
-
-    worker = MarketDataWorker(poll_interval=args.poll_interval)
-
-    if args.once:
-        total = worker.run_once()
-        print(f"Processed {total} events")
-    else:
-        worker.run()
-
-    return 0
 
 
 if __name__ == "__main__":
