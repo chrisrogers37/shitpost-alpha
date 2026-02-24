@@ -27,12 +27,12 @@
 |-------|------|----------|------|--------|------------|---------|
 | 01 | fix-conftest-and-failing-tests | fix: resolve conftest pytest_plugins blocker, delete stale bypass tests, modernize settings config | Low | Low (~1-2h) | None | 02-08 | ✅ PR #88 |
 | 02 | extract-shared-ui-helpers | refactor: extract shared UI helpers from cards.py | Low | Low (~1-2h) | 01 | 03 | ✅ PR #89 |
-| 03 | split-cards-modules | refactor: split 2041-line cards.py into card module package | Low | Medium (~2-3h) | 02 | — | 📋 PENDING |
+| 03 | split-cards-modules | refactor: split 2041-line cards.py into card module package | Low | Medium (~2-3h) | 02 | — | ✅ PR #94 |
 | 04 | split-data-modules | refactor: split 2865-line data.py into domain query modules | Medium | High (~4-6h) | 01 | — | ✅ PR #90 |
 | 05 | event-system-tests | test: add 52 tests for event consumers, worker gaps, and CLI | Low | High (~4-6h) | 01 | 08 | ✅ PR #93 |
 | 06 | alerts-refactor-and-tests | refactor: extract alert components and add 60 callback tests | Medium | High (~4-6h) | 01 | — | ✅ PR #92 |
 | 07 | extract-css-to-stylesheet | refactor: extract 611 lines of inline CSS to external stylesheet | Low | Low (~1h) | 01 | — | ✅ PR #91 |
-| 08 | dedup-event-worker-cli | refactor: extract run_worker_main() helper, deduplicate 4 event consumers | Low | Low (~1-2h) | 01, 05 | — | 📋 PENDING |
+| 08 | dedup-event-worker-cli | refactor: extract run_worker_main() helper, deduplicate 4 event consumers | Low | Low (~1-2h) | 01, 05 | — | ✅ PR #95 |
 
 **Total estimated effort**: ~18-27 hours across 8 PRs
 
