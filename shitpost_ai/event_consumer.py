@@ -5,12 +5,11 @@ Consumes ``signals_stored`` events and runs LLM analysis on new signals.
 Runs as a standalone worker via ``python -m shitpost_ai.event_consumer --once``.
 """
 
-import argparse
 import sys
 
-from shit.events.event_types import EventType, ConsumerGroup
-from shit.events.worker import EventWorker
-from shit.logging import setup_cli_logging, get_service_logger
+from shit.events.event_types import ConsumerGroup
+from shit.events.worker import EventWorker, run_worker_main
+from shit.logging import get_service_logger
 
 logger = get_service_logger("analyzer_worker")
 
@@ -57,31 +56,12 @@ class AnalyzerWorker(EventWorker):
 
 def main() -> int:
     """CLI entry point for the analyzer event consumer."""
-    setup_cli_logging(service_name="analyzer_worker")
-
-    parser = argparse.ArgumentParser(
+    return run_worker_main(
+        AnalyzerWorker,
+        service_name="analyzer_worker",
         prog="python -m shitpost_ai.event_consumer",
         description="Analyzer event consumer worker",
     )
-    parser.add_argument(
-        "--once", action="store_true",
-        help="Drain queue and exit (for cron deployment)",
-    )
-    parser.add_argument(
-        "--poll-interval", type=float, default=2.0,
-        help="Seconds between polls in persistent mode (default: 2.0)",
-    )
-    args = parser.parse_args()
-
-    worker = AnalyzerWorker(poll_interval=args.poll_interval)
-
-    if args.once:
-        total = worker.run_once()
-        print(f"Processed {total} events")
-    else:
-        worker.run()
-
-    return 0
 
 
 if __name__ == "__main__":
