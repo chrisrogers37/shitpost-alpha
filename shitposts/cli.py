@@ -6,6 +6,7 @@ import argparse
 import logging
 from typing import Optional
 
+from shit.cli.shared_args import add_standard_arguments, validate_standard_args
 from shit.logging import (
     setup_harvester_logging as setup_centralized_harvester_logging,
     print_success,
@@ -31,42 +32,10 @@ def create_harvester_parser(description: str, epilog: str = None) -> argparse.Ar
         epilog=epilog
     )
     
-    # Harvesting mode
-    parser.add_argument(
-        "--mode", 
-        choices=["incremental", "backfill", "range"], 
-        default="incremental", 
-        help="Harvesting mode (default: incremental)"
-    )
-    
-    # Date range options
-    parser.add_argument(
-        "--from", 
-        dest="start_date", 
-        help="Start date for range mode (YYYY-MM-DD)"
-    )
-    parser.add_argument(
-        "--to", 
-        dest="end_date", 
-        help="End date for range mode (YYYY-MM-DD)"
-    )
-    
-    # Limits and options
-    parser.add_argument(
-        "--limit", 
-        type=int, 
-        help="Maximum number of posts to harvest (optional)"
-    )
-    parser.add_argument(
-        "--dry-run", 
-        action="store_true", 
-        help="Show what would be harvested without storing data to S3"
-    )
-    parser.add_argument(
-        "--verbose", "-v", 
-        action="store_true", 
-        help="Enable verbose logging"
-    )
+    # Standard arguments shared across all CLIs
+    add_standard_arguments(parser)
+
+    # Harvester-specific arguments
     parser.add_argument(
         "--max-id",
         type=str,
@@ -91,10 +60,7 @@ def validate_harvester_args(args) -> None:
     Raises:
         SystemExit: If arguments are invalid
     """
-    if args.mode == "range" and not args.start_date:
-        raise SystemExit("--from date is required for range mode")
-    
-    # Note: --to date is optional for range mode (defaults to today)
+    validate_standard_args(args)
 
 
 def setup_harvester_logging(verbose: bool = False) -> None:

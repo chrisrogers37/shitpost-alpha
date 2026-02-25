@@ -211,44 +211,37 @@ class TestCLICommands:
     @pytest.mark.asyncio
     async def test_process_s3_data_success(self, mock_args):
         """Test successful S3 data processing."""
+        mock_db_client = AsyncMock()
+        mock_session = AsyncMock()
+        mock_session_cm = MagicMock()
+        mock_session_cm.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+        mock_db_client.get_session = MagicMock(return_value=mock_session_cm)
+
+        mock_s3 = AsyncMock()
+
+        mock_processor = AsyncMock()
+        mock_processor.process_s3_to_database.return_value = {
+            'total_processed': 10,
+            'successful': 8,
+            'failed': 2
+        }
+
+        async def fake_db_and_s3(*a, **kw):
+            yield mock_db_client, mock_s3
+
+        from contextlib import asynccontextmanager
+        mock_cm = asynccontextmanager(fake_db_and_s3)
+
         with patch('shitvault.cli.print_database_start'), \
              patch('shitvault.cli.print_database_complete'), \
-             patch('shitvault.cli.settings') as mock_settings, \
-             patch('shitvault.cli.DatabaseConfig'), \
-             patch('shitvault.cli.DatabaseClient') as mock_db_client_class, \
-             patch('shitvault.cli.S3Config'), \
-             patch('shitvault.cli.S3DataLake') as mock_s3_class, \
+             patch('shitvault.cli.db_and_s3_service', mock_cm), \
              patch('shitvault.cli.DatabaseOperations'), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class:
-            
-            # Setup mocks
-            mock_db_client = AsyncMock()
-            mock_session = AsyncMock()
-            # Make get_session return a mock context manager
-            mock_session_cm = MagicMock()
-            mock_session_cm.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_session_cm.__aexit__ = AsyncMock(return_value=False)
-            # get_session is a regular method that returns an async context manager
-            mock_db_client.get_session = MagicMock(return_value=mock_session_cm)
-            mock_db_client_class.return_value = mock_db_client
-            
-            mock_s3 = AsyncMock()
-            mock_s3_class.return_value = mock_s3
-            
-            mock_processor = AsyncMock()
-            mock_processor.process_s3_to_database.return_value = {
-                'total_processed': 10,
-                'successful': 8,
-                'failed': 2
-            }
-            mock_processor_class.return_value = mock_processor
-            
+             patch('shitvault.cli.S3Processor', return_value=mock_processor):
+
             await process_s3_data(mock_args)
-            
-            mock_db_client.initialize.assert_called_once()
-            mock_s3.initialize.assert_called_once()
+
             mock_processor.process_s3_to_database.assert_called_once()
-            mock_db_client.cleanup.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_process_s3_data_with_dates(self, mock_args):
@@ -256,36 +249,33 @@ class TestCLICommands:
         mock_args.start_date = '2024-01-01'
         mock_args.end_date = '2024-01-31'
         mock_args.mode = 'range'
-        
+
+        mock_db_client = AsyncMock()
+        mock_session = AsyncMock()
+        mock_session_cm = MagicMock()
+        mock_session_cm.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+        mock_db_client.get_session = MagicMock(return_value=mock_session_cm)
+
+        mock_s3 = AsyncMock()
+
+        mock_processor = AsyncMock()
+        mock_processor.process_s3_to_database.return_value = {'total_processed': 5}
+
+        async def fake_db_and_s3(*a, **kw):
+            yield mock_db_client, mock_s3
+
+        from contextlib import asynccontextmanager
+        mock_cm = asynccontextmanager(fake_db_and_s3)
+
         with patch('shitvault.cli.print_database_start'), \
              patch('shitvault.cli.print_database_complete'), \
-             patch('shitvault.cli.settings'), \
-             patch('shitvault.cli.DatabaseConfig'), \
-             patch('shitvault.cli.DatabaseClient') as mock_db_client_class, \
-             patch('shitvault.cli.S3Config'), \
-             patch('shitvault.cli.S3DataLake') as mock_s3_class, \
+             patch('shitvault.cli.db_and_s3_service', mock_cm), \
              patch('shitvault.cli.DatabaseOperations'), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class:
-            
-            mock_db_client = AsyncMock()
-            mock_session = AsyncMock()
-            # Make get_session return a mock context manager
-            mock_session_cm = MagicMock()
-            mock_session_cm.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_session_cm.__aexit__ = AsyncMock(return_value=False)
-            # get_session is a regular method that returns an async context manager
-            mock_db_client.get_session = MagicMock(return_value=mock_session_cm)
-            mock_db_client_class.return_value = mock_db_client
-            
-            mock_s3 = AsyncMock()
-            mock_s3_class.return_value = mock_s3
-            
-            mock_processor = AsyncMock()
-            mock_processor.process_s3_to_database.return_value = {'total_processed': 5}
-            mock_processor_class.return_value = mock_processor
-            
+             patch('shitvault.cli.S3Processor', return_value=mock_processor):
+
             await process_s3_data(mock_args)
-            
+
             # Verify incremental parameter is False for range mode
             call_kwargs = mock_processor.process_s3_to_database.call_args[1]
             assert call_kwargs['incremental'] is False
@@ -293,21 +283,17 @@ class TestCLICommands:
     @pytest.mark.asyncio
     async def test_process_s3_data_error(self, mock_args):
         """Test error handling in process_s3_data."""
+        async def failing_db_and_s3(*a, **kw):
+            raise Exception("Database error")
+            yield  # noqa: unreachable — makes this an async generator
+
+        from contextlib import asynccontextmanager
+        mock_cm = asynccontextmanager(failing_db_and_s3)
+
         with patch('shitvault.cli.print_database_start'), \
              patch('shitvault.cli.print_database_error'), \
-             patch('shitvault.cli.settings'), \
-             patch('shitvault.cli.DatabaseConfig'), \
-             patch('shitvault.cli.DatabaseClient') as mock_db_client_class, \
-             patch('shitvault.cli.S3Config'), \
-             patch('shitvault.cli.S3DataLake') as mock_s3_class:
-            
-            mock_db_client = AsyncMock()
-            mock_db_client.initialize.side_effect = Exception("Database error")
-            mock_db_client_class.return_value = mock_db_client
-            
-            mock_s3 = AsyncMock()
-            mock_s3_class.return_value = mock_s3
-            
+             patch('shitvault.cli.db_and_s3_service', mock_cm):
+
             with pytest.raises(Exception, match="Database error"):
                 await process_s3_data(mock_args)
 
@@ -316,80 +302,72 @@ class TestCLICommands:
         """Test getting database statistics."""
         args = MagicMock()
         args.command = 'stats'
-        
+
+        mock_db_client = AsyncMock()
+        mock_session = AsyncMock()
+        mock_session_cm = MagicMock()
+        mock_session_cm.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+        mock_db_client.get_session = MagicMock(return_value=mock_session_cm)
+
+        mock_stats = AsyncMock()
+        mock_stats.get_database_stats.return_value = {
+            'total_shitposts': 100,
+            'total_analyses': 75
+        }
+
+        async def fake_db(*a, **kw):
+            yield mock_db_client
+
+        from contextlib import asynccontextmanager
+        mock_cm = asynccontextmanager(fake_db)
+
         with patch('shitvault.cli.print_database_start'), \
              patch('shitvault.cli.print_database_complete'), \
-             patch('shitvault.cli.settings'), \
-             patch('shitvault.cli.DatabaseConfig'), \
-             patch('shitvault.cli.DatabaseClient') as mock_db_client_class, \
+             patch('shitvault.cli.db_service', mock_cm), \
              patch('shitvault.cli.DatabaseOperations'), \
-             patch('shitvault.cli.Statistics') as mock_stats_class:
-            
-            mock_db_client = AsyncMock()
-            mock_session = AsyncMock()
-            # Make get_session return a mock context manager
-            mock_session_cm = MagicMock()
-            mock_session_cm.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_session_cm.__aexit__ = AsyncMock(return_value=False)
-            # get_session is a regular method that returns an async context manager
-            mock_db_client.get_session = MagicMock(return_value=mock_session_cm)
-            mock_db_client_class.return_value = mock_db_client
-            
-            mock_stats = AsyncMock()
-            mock_stats.get_database_stats.return_value = {
-                'total_shitposts': 100,
-                'total_analyses': 75
-            }
-            mock_stats_class.return_value = mock_stats
-            
+             patch('shitvault.cli.Statistics', return_value=mock_stats):
+
             await get_database_stats(args)
-            
-            mock_db_client.initialize.assert_called_once()
+
             mock_stats.get_database_stats.assert_called_once()
-            mock_db_client.cleanup.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_processing_stats_success(self):
         """Test getting processing statistics."""
         args = MagicMock()
         args.command = 'processing-stats'
-        
+
+        mock_db_client = AsyncMock()
+        mock_session = AsyncMock()
+        mock_session_cm = MagicMock()
+        mock_session_cm.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+        mock_db_client.get_session = MagicMock(return_value=mock_session_cm)
+
+        mock_s3 = AsyncMock()
+
+        mock_processor = AsyncMock()
+        mock_processor.get_s3_processing_stats.return_value = {
+            's3_stats': {},
+            'db_stats': {}
+        }
+
+        async def fake_db_and_s3(*a, **kw):
+            yield mock_db_client, mock_s3
+
+        from contextlib import asynccontextmanager
+        mock_cm = asynccontextmanager(fake_db_and_s3)
+
         with patch('shitvault.cli.print_database_start'), \
              patch('shitvault.cli.print_database_complete'), \
-             patch('shitvault.cli.settings'), \
-             patch('shitvault.cli.DatabaseConfig'), \
-             patch('shitvault.cli.DatabaseClient') as mock_db_client_class, \
-             patch('shitvault.cli.S3Config'), \
-             patch('shitvault.cli.S3DataLake') as mock_s3_class, \
+             patch('shitvault.cli.db_and_s3_service', mock_cm), \
              patch('shitvault.cli.DatabaseOperations'), \
-             patch('shitvault.cli.S3Processor') as mock_processor_class:
-            
-            mock_db_client = AsyncMock()
-            mock_session = AsyncMock()
-            # Make get_session return a mock context manager
-            mock_session_cm = MagicMock()
-            mock_session_cm.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_session_cm.__aexit__ = AsyncMock(return_value=False)
-            # get_session is a regular method that returns an async context manager
-            mock_db_client.get_session = MagicMock(return_value=mock_session_cm)
-            mock_db_client_class.return_value = mock_db_client
-            
-            mock_s3 = AsyncMock()
-            mock_s3_class.return_value = mock_s3
-            
-            mock_processor = AsyncMock()
-            mock_processor.get_s3_processing_stats.return_value = {
-                's3_stats': {},
-                'db_stats': {}
-            }
-            mock_processor_class.return_value = mock_processor
-            
+             patch('shitvault.cli.S3Processor', return_value=mock_processor):
+
             await get_processing_stats(args)
-            
-            mock_db_client.initialize.assert_called_once()
-            mock_s3.initialize.assert_called_once()
+
             mock_processor.get_s3_processing_stats.assert_called_once()
-            mock_db_client.cleanup.assert_called_once()
 
 
 class TestMainFunction:

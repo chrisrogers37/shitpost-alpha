@@ -7,7 +7,6 @@ Runs as a standalone worker via ``python -m shitvault.event_consumer --once``.
 
 import sys
 
-from shit.config.shitpost_settings import settings
 from shit.events.event_types import EventType, ConsumerGroup
 from shit.events.worker import EventWorker, run_worker_main
 from shit.logging import get_service_logger
@@ -34,8 +33,8 @@ class S3ProcessorWorker(EventWorker):
             Processing statistics dict.
         """
         import asyncio
-        from shit.db import DatabaseConfig, DatabaseClient, DatabaseOperations
-        from shit.s3 import S3Config, S3DataLake
+        from shit.db import DatabaseOperations
+        from shit.services import db_and_s3_service
         from shitvault.s3_processor import S3Processor
 
         s3_keys = payload.get("s3_keys", [])
@@ -46,20 +45,7 @@ class S3ProcessorWorker(EventWorker):
             return {"total_processed": 0, "successful": 0}
 
         async def _process():
-            db_config = DatabaseConfig(database_url=settings.DATABASE_URL)
-            db_client = DatabaseClient(db_config)
-            await db_client.initialize()
-
-            s3_config = S3Config(
-                bucket_name=settings.S3_BUCKET_NAME,
-                access_key_id=settings.AWS_ACCESS_KEY_ID,
-                secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                region=settings.AWS_REGION,
-            )
-            s3_data_lake = S3DataLake(s3_config)
-            await s3_data_lake.initialize()
-
-            try:
+            async with db_and_s3_service() as (db_client, s3_data_lake):
                 async with db_client.get_session() as session:
                     db_ops = DatabaseOperations(session)
                     processor = S3Processor(db_ops, s3_data_lake, source=source)
@@ -96,8 +82,6 @@ class S3ProcessorWorker(EventWorker):
                         )
 
                     return stats
-            finally:
-                await db_client.cleanup()
 
         return asyncio.run(_process())
 
