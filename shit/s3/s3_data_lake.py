@@ -107,8 +107,7 @@ class S3DataLake:
             logger.info(f"Uploading data to S3: {s3_key}")
             try:
                 await asyncio.wait_for(
-                    asyncio.get_event_loop().run_in_executor(
-                        None,
+                    asyncio.to_thread(
                         lambda: self.s3_client.client.put_object(
                             Bucket=self.config.bucket_name,
                             Key=s3_key,
@@ -148,8 +147,7 @@ class S3DataLake:
             True if object exists, False otherwise
         """
         try:
-            await asyncio.get_event_loop().run_in_executor(
-                None,
+            await asyncio.to_thread(
                 lambda: self.s3_client.client.head_object(Bucket=self.config.bucket_name, Key=s3_key)
             )
             logger.debug(f"Object exists in S3: {s3_key}")
@@ -177,8 +175,7 @@ class S3DataLake:
             Raw data dictionary or None if not found
         """
         try:
-            response = await asyncio.get_event_loop().run_in_executor(
-                None,
+            response = await asyncio.to_thread(
                 lambda: self.s3_client.client.get_object(Bucket=self.config.bucket_name, Key=s3_key)
             )
             

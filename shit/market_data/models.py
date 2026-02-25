@@ -7,7 +7,6 @@ from datetime import datetime, date
 from typing import Optional
 from sqlalchemy import Column, String, Date, DateTime, Float, BigInteger, ForeignKey, Integer, Boolean, Text
 from sqlalchemy.orm import relationship
-from decimal import Decimal
 
 from shit.db.data_models import Base, TimestampMixin, IDMixin
 

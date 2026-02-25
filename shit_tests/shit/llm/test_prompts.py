@@ -14,7 +14,6 @@ from shit.llm.prompts import (
     get_alert_prompt,
     get_custom_prompt,
     get_system_message,
-    validate_prompt_version,
     get_prompt_metadata,
     SYSTEM_MESSAGES,
     PROMPT_VERSION
@@ -274,18 +273,6 @@ class TestPromptFunctions:
         message = get_system_message()  # No parameter
         assert isinstance(message, str)
         assert message == SYSTEM_MESSAGES['financial_analyst']  # Default type
-
-    def test_validate_prompt_version_valid(self):
-        """Test prompt version validation with valid version."""
-        assert validate_prompt_version("1.0") is True
-        assert validate_prompt_version(PROMPT_VERSION) is True
-
-    def test_validate_prompt_version_invalid(self):
-        """Test prompt version validation with invalid version."""
-        assert validate_prompt_version("2.0") is False
-        assert validate_prompt_version("1.1") is False
-        assert validate_prompt_version("") is False
-        assert validate_prompt_version(None) is False
 
     def test_get_prompt_metadata(self):
         """Test prompt metadata generation."""

@@ -141,7 +141,7 @@ class CircuitBreaker:
     def _on_failure(self):
         """Handle failed execution."""
         self.failure_count += 1
-        self.last_failure_time = asyncio.get_event_loop().time()
+        self.last_failure_time = asyncio.get_running_loop().time()
         
         if self.failure_count >= self.failure_threshold:
             self.state = "OPEN"
@@ -152,7 +152,7 @@ class CircuitBreaker:
         if not self.last_failure_time:
             return True
         
-        return (asyncio.get_event_loop().time() - self.last_failure_time) >= self.recovery_timeout
+        return (asyncio.get_running_loop().time() - self.last_failure_time) >= self.recovery_timeout
 
 
 class RateLimiter:
@@ -165,7 +165,7 @@ class RateLimiter:
     
     async def acquire(self) -> bool:
         """Try to acquire a rate limit slot."""
-        now = asyncio.get_event_loop().time()
+        now = asyncio.get_running_loop().time()
         
         # Remove old calls outside the time window
         self.calls = [call_time for call_time in self.calls if now - call_time < self.time_window]
