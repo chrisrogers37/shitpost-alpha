@@ -236,9 +236,7 @@ def build_notification_channels_section() -> list:
                         className="fas fa-globe me-2",
                         style={"color": COLORS["text_muted"]},
                     ),
-                    html.Span(
-                        "Browser Notifications", style={"fontSize": "0.9rem"}
-                    ),
+                    html.Span("Browser Notifications", style={"fontSize": "0.9rem"}),
                 ],
                 style={"display": "flex", "alignItems": "center"},
             ),
@@ -467,7 +465,13 @@ def build_notification_channels_section() -> list:
         },
     )
 
-    return [browser_section, browser_status, email_section, sms_section, telegram_section]
+    return [
+        browser_section,
+        browser_status,
+        email_section,
+        sms_section,
+        telegram_section,
+    ]
 
 
 def build_quiet_hours_section() -> html.Div:
@@ -483,9 +487,7 @@ def build_quiet_hours_section() -> html.Div:
         [
             html.Div(
                 [
-                    html.Span(
-                        "Enable Quiet Hours", style={"fontSize": "0.9rem"}
-                    ),
+                    html.Span("Enable Quiet Hours", style={"fontSize": "0.9rem"}),
                     dbc.Switch(
                         id="alert-quiet-hours-toggle",
                         value=False,

@@ -98,8 +98,20 @@ shitpost_alpha/
 │   │   ├── asset_queries.py     # Screener, sparklines, asset stats
 │   │   └── insight_queries.py   # Dynamic insight cards
 │   ├── pages/              # Page modules (dashboard, assets)
+│   │   ├── dashboard.py        # Dashboard layout + callback orchestrator
+│   │   ├── dashboard_callbacks/ # Dashboard callback sub-modules
+│   │   │   ├── period.py       # Period selection + countdown
+│   │   │   ├── content.py      # KPI, screener, insights, post feed
+│   │   │   └── table.py        # Data table, row clicks, thesis expand
+│   │   └── assets.py           # Asset detail page layout + callbacks
 │   ├── components/         # Reusable UI components
 │   └── callbacks/          # Callback groups (alerts, navigation, clientside)
+│       ├── alerts.py           # Alert system orchestrator + panel components
+│       ├── alert_components.py # Alert config panel UI builders
+│       ├── alert_models.py     # AlertPreferences Pydantic model
+│       ├── alert_preferences.py # Preference management callbacks
+│       ├── alert_history.py    # History rendering callbacks
+│       └── alert_notifications.py # Browser notification callbacks
 ├── notifications/          # Alert dispatch & Telegram bot
 │   ├── alert_engine.py     # Core alert dispatch logic
 │   ├── dispatcher.py       # Multi-channel delivery (Telegram, Email, SMS)

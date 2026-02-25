@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dead code cleanup** — Removed unused `validate_prompt_version()` function from prompt module and unused `Decimal` import from market data models
 
 ### Changed
+- **Alert callbacks** - Split monolithic `register_alert_callbacks()` (479 LOC) into 3 focused sub-modules: `alert_preferences.py`, `alert_history.py`, `alert_notifications.py`
+- **Dashboard callbacks** - Split monolithic `register_dashboard_callbacks()` (460 LOC) into 3 focused sub-modules: `period.py`, `content.py`, `table.py`
+- **Alert preferences** - Replaced `build_preferences_dict()`/`extract_preferences_tuple()` pair with `AlertPreferences` Pydantic model (backward-compatible wrappers retained)
 - **Service init factory** — Added `db_service()`, `s3_service()`, `db_and_s3_service()` async context managers in `shit/services.py`, replacing 4 instances of 12-line DB+S3 init boilerplate with guaranteed cleanup
 - **Shared CLI arguments** — Added `shit/cli/shared_args.py` with `add_standard_arguments()` and `validate_standard_args()`, deduplicating argument definitions across `shitpost_ai/cli.py` and `shitposts/cli.py`
 - **Signal query builder** — Extracted shared WHERE clause construction into `_build_signal_feed_filters()` helper, eliminating duplication between `get_signal_feed()` and `get_signal_feed_count()`
