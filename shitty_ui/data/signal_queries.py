@@ -423,6 +423,69 @@ def get_weekly_signal_count() -> int:
         return 0
 
 
+def _build_signal_feed_filters(
+    sentiment_filter: Optional[str] = None,
+    confidence_min: Optional[float] = None,
+    confidence_max: Optional[float] = None,
+    asset_filter: Optional[str] = None,
+    outcome_filter: Optional[str] = None,
+) -> tuple[str, Dict[str, Any]]:
+    """
+    Build shared WHERE clause fragments for signal feed queries.
+
+    Constructs the dynamic filter portion of the WHERE clause used by both
+    get_signal_feed() and get_signal_feed_count(). The returned SQL string
+    is meant to be appended to a base query that already includes the standard
+    completed-prediction filters (analysis_status, confidence IS NOT NULL, etc.).
+
+    Args:
+        sentiment_filter: 'bullish', 'bearish', or None.
+        confidence_min: Minimum confidence (0.0-1.0).
+        confidence_max: Maximum confidence (0.0-1.0).
+        asset_filter: Specific ticker symbol (e.g. 'AAPL').
+        outcome_filter: 'correct', 'incorrect', 'evaluated', 'pending', or None.
+
+    Returns:
+        Tuple of (where_clause_str, params_dict) where where_clause_str contains
+        zero or more ' AND ...' fragments and params_dict contains the corresponding
+        bind parameters.
+    """
+    clauses = ""
+    params: Dict[str, Any] = {}
+
+    if sentiment_filter and sentiment_filter in ("bullish", "bearish"):
+        clauses += """
+            AND EXISTS (
+                SELECT 1 FROM jsonb_each_text(p.market_impact) kv
+                WHERE LOWER(kv.value) = :sentiment_filter
+            )
+        """
+        params["sentiment_filter"] = sentiment_filter.lower()
+
+    if confidence_min is not None:
+        clauses += " AND p.confidence >= :confidence_min"
+        params["confidence_min"] = confidence_min
+
+    if confidence_max is not None:
+        clauses += " AND p.confidence <= :confidence_max"
+        params["confidence_max"] = confidence_max
+
+    if asset_filter:
+        clauses += " AND po.symbol = :asset_filter"
+        params["asset_filter"] = asset_filter.upper()
+
+    if outcome_filter == "correct":
+        clauses += " AND po.correct_t7 = true"
+    elif outcome_filter == "incorrect":
+        clauses += " AND po.correct_t7 = false"
+    elif outcome_filter == "evaluated":
+        clauses += " AND po.correct_t7 IS NOT NULL"
+    elif outcome_filter == "pending":
+        clauses += " AND po.correct_t7 IS NULL"
+
+    return clauses, params
+
+
 def get_signal_feed(
     limit: int = 20,
     offset: int = 0,
@@ -483,35 +546,16 @@ def get_signal_feed(
 
     params: Dict[str, Any] = {"limit": limit, "offset": offset}
 
-    if sentiment_filter and sentiment_filter in ("bullish", "bearish"):
-        base_query += """
-            AND EXISTS (
-                SELECT 1 FROM jsonb_each_text(p.market_impact) kv
-                WHERE LOWER(kv.value) = :sentiment_filter
-            )
-        """
-        params["sentiment_filter"] = sentiment_filter.lower()
-
-    if confidence_min is not None:
-        base_query += " AND p.confidence >= :confidence_min"
-        params["confidence_min"] = confidence_min
-
-    if confidence_max is not None:
-        base_query += " AND p.confidence <= :confidence_max"
-        params["confidence_max"] = confidence_max
-
-    if asset_filter:
-        base_query += " AND po.symbol = :asset_filter"
-        params["asset_filter"] = asset_filter.upper()
-
-    if outcome_filter == "correct":
-        base_query += " AND po.correct_t7 = true"
-    elif outcome_filter == "incorrect":
-        base_query += " AND po.correct_t7 = false"
-    elif outcome_filter == "evaluated":
-        base_query += " AND po.correct_t7 IS NOT NULL"
-    elif outcome_filter == "pending":
-        base_query += " AND po.correct_t7 IS NULL"
+    # Apply shared signal feed filters
+    filter_clauses, filter_params = _build_signal_feed_filters(
+        sentiment_filter=sentiment_filter,
+        confidence_min=confidence_min,
+        confidence_max=confidence_max,
+        asset_filter=asset_filter,
+        outcome_filter=outcome_filter,
+    )
+    base_query += filter_clauses
+    params.update(filter_params)
 
     base_query += """
         ORDER BY
@@ -555,37 +599,16 @@ def get_signal_feed_count(
             AND p.assets::jsonb <> '[]'::jsonb
     """
 
-    params: Dict[str, Any] = {}
-
-    if sentiment_filter and sentiment_filter in ("bullish", "bearish"):
-        base_query += """
-            AND EXISTS (
-                SELECT 1 FROM jsonb_each_text(p.market_impact) kv
-                WHERE LOWER(kv.value) = :sentiment_filter
-            )
-        """
-        params["sentiment_filter"] = sentiment_filter.lower()
-
-    if confidence_min is not None:
-        base_query += " AND p.confidence >= :confidence_min"
-        params["confidence_min"] = confidence_min
-
-    if confidence_max is not None:
-        base_query += " AND p.confidence <= :confidence_max"
-        params["confidence_max"] = confidence_max
-
-    if asset_filter:
-        base_query += " AND po.symbol = :asset_filter"
-        params["asset_filter"] = asset_filter.upper()
-
-    if outcome_filter == "correct":
-        base_query += " AND po.correct_t7 = true"
-    elif outcome_filter == "incorrect":
-        base_query += " AND po.correct_t7 = false"
-    elif outcome_filter == "evaluated":
-        base_query += " AND po.correct_t7 IS NOT NULL"
-    elif outcome_filter == "pending":
-        base_query += " AND po.correct_t7 IS NULL"
+    # Apply shared signal feed filters
+    filter_clauses, filter_params = _build_signal_feed_filters(
+        sentiment_filter=sentiment_filter,
+        confidence_min=confidence_min,
+        confidence_max=confidence_max,
+        asset_filter=asset_filter,
+        outcome_filter=outcome_filter,
+    )
+    base_query += filter_clauses
+    params = filter_params
 
     try:
         rows, columns = _base.execute_query(text(base_query), params)
