@@ -9,10 +9,9 @@ import sys
 from datetime import datetime
 from typing import Optional
 
-from shit.config.shitpost_settings import settings
 from shit.utils.error_handling import handle_exceptions
-from shit.db import DatabaseConfig, DatabaseClient, DatabaseOperations
-from shit.s3 import S3Config, S3DataLake
+from shit.db import DatabaseOperations
+from shit.services import db_service, db_and_s3_service
 from shit.logging import (
     setup_database_logging as setup_centralized_database_logging,
     get_service_logger,
@@ -143,49 +142,34 @@ async def process_s3_data(args):
             
         logger.info(f"Processing mode: {args.mode}")
         
-        # Initialize database and S3 components
-        db_config = DatabaseConfig(database_url=settings.DATABASE_URL)
-        db_client = DatabaseClient(db_config)
-        await db_client.initialize()
-        
-        s3_config = S3Config(
-            bucket_name=settings.S3_BUCKET_NAME,
-            access_key_id=settings.AWS_ACCESS_KEY_ID,
-            secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            region=settings.AWS_REGION
-        )
-        s3_data_lake = S3DataLake(s3_config)
-        await s3_data_lake.initialize()
-        
-        logger.info("✅ Database and S3 connections initialized successfully")
-        logger.info("")
-        
-        # Create operations with proper session management
-        async with db_client.get_session() as session:
-            db_ops = DatabaseOperations(session)
-            s3_processor = S3Processor(db_ops, s3_data_lake)
-            
-            # Process S3 data
-            stats = await s3_processor.process_s3_to_database(
-                start_date=start_date,
-                end_date=end_date,
-                limit=args.limit,
-                incremental=(args.mode == 'incremental'),
-                dry_run=args.dry_run
-            )
-            
-            print_database_complete(stats)
+        # Initialize database and S3 using factory context managers
+        async with db_and_s3_service() as (db_client, s3_data_lake):
+            logger.info("✅ Database and S3 connections initialized successfully")
             logger.info("")
-            logger.info("═══════════════════════════════════════════════════════════")
-            logger.info("PROCESSING COMPLETED")
-            logger.info("═══════════════════════════════════════════════════════════")
-            logger.info(f"Total processed: {stats.get('total_processed', 0)}")
-            logger.info(f"Successful: {stats.get('successful', 0)}")
-            logger.info(f"Failed: {stats.get('failed', 0)}")
-            logger.info(f"Skipped: {stats.get('skipped', 0)}")
-        
-        # Cleanup
-        await db_client.cleanup()
+
+            # Create operations with proper session management
+            async with db_client.get_session() as session:
+                db_ops = DatabaseOperations(session)
+                s3_processor = S3Processor(db_ops, s3_data_lake)
+
+                # Process S3 data
+                stats = await s3_processor.process_s3_to_database(
+                    start_date=start_date,
+                    end_date=end_date,
+                    limit=args.limit,
+                    incremental=(args.mode == 'incremental'),
+                    dry_run=args.dry_run
+                )
+
+                print_database_complete(stats)
+                logger.info("")
+                logger.info("═══════════════════════════════════════════════════════════")
+                logger.info("PROCESSING COMPLETED")
+                logger.info("═══════════════════════════════════════════════════════════")
+                logger.info(f"Total processed: {stats.get('total_processed', 0)}")
+                logger.info(f"Successful: {stats.get('successful', 0)}")
+                logger.info(f"Failed: {stats.get('failed', 0)}")
+                logger.info(f"Skipped: {stats.get('skipped', 0)}")
         
     except Exception as e:
         print_database_error(e)
@@ -196,24 +180,18 @@ async def get_database_stats(args):
     """Get database statistics using modular architecture."""
     try:
         print_database_start(args)
-        
-        # Initialize database
-        db_config = DatabaseConfig(database_url=settings.DATABASE_URL)
-        db_client = DatabaseClient(db_config)
-        await db_client.initialize()
-        
-        # Create operations with proper session management
-        async with db_client.get_session() as session:
-            db_ops = DatabaseOperations(session)
-            stats_ops = Statistics(db_ops)
-            
-            # Get stats
-            stats = await stats_ops.get_database_stats()
-            print_database_complete(stats)
-        
-        # Cleanup
-        await db_client.cleanup()
-        
+
+        # Initialize database using factory context manager
+        async with db_service() as db_client:
+            # Create operations with proper session management
+            async with db_client.get_session() as session:
+                db_ops = DatabaseOperations(session)
+                stats_ops = Statistics(db_ops)
+
+                # Get stats
+                stats = await stats_ops.get_database_stats()
+                print_database_complete(stats)
+
     except Exception as e:
         print_database_error(e)
         raise
@@ -223,33 +201,18 @@ async def get_processing_stats(args):
     """Get processing statistics using modular architecture."""
     try:
         print_database_start(args)
-        
-        # Initialize database and S3 components
-        db_config = DatabaseConfig(database_url=settings.DATABASE_URL)
-        db_client = DatabaseClient(db_config)
-        await db_client.initialize()
-        
-        s3_config = S3Config(
-            bucket_name=settings.S3_BUCKET_NAME,
-            access_key_id=settings.AWS_ACCESS_KEY_ID,
-            secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            region=settings.AWS_REGION
-        )
-        s3_data_lake = S3DataLake(s3_config)
-        await s3_data_lake.initialize()
-        
-        # Create operations with proper session management
-        async with db_client.get_session() as session:
-            db_ops = DatabaseOperations(session)
-            s3_processor = S3Processor(db_ops, s3_data_lake)
-            
-            # Get processing stats
-            stats = await s3_processor.get_s3_processing_stats()
-            print_database_complete(stats)
-        
-        # Cleanup
-        await db_client.cleanup()
-        
+
+        # Initialize database and S3 using factory context managers
+        async with db_and_s3_service() as (db_client, s3_data_lake):
+            # Create operations with proper session management
+            async with db_client.get_session() as session:
+                db_ops = DatabaseOperations(session)
+                s3_processor = S3Processor(db_ops, s3_data_lake)
+
+                # Get processing stats
+                stats = await s3_processor.get_s3_processing_stats()
+                print_database_complete(stats)
+
     except Exception as e:
         print_database_error(e)
         raise

@@ -83,9 +83,7 @@ class TestS3ProcessorWorker:
         What it verifies: The inner _process() coroutine iterates over
         each s3_key and calls s3_data_lake.get_raw_data + processor._process_single_s3_data.
         Mocking:
-          - settings (DATABASE_URL, S3 config)
-          - DatabaseClient (initialize, get_session, cleanup)
-          - S3DataLake (initialize, get_raw_data)
+          - db_and_s3_service (yields mock db_client + s3_data_lake)
           - S3Processor._process_single_s3_data
         Assertions:
           - get_raw_data called 3 times (once per key)
@@ -98,32 +96,25 @@ class TestS3ProcessorWorker:
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
         mock_db_client = AsyncMock()
-        mock_db_client.initialize = AsyncMock()
         mock_db_client.get_session = MagicMock(return_value=mock_session)
-        mock_db_client.cleanup = AsyncMock()
 
         mock_s3 = AsyncMock()
-        mock_s3.initialize = AsyncMock()
         mock_s3.get_raw_data = AsyncMock(return_value=mock_s3_data)
 
         mock_processor = AsyncMock()
         mock_processor._process_single_s3_data = AsyncMock()
 
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def fake_db_and_s3():
+            yield mock_db_client, mock_s3
+
         with (
-            patch("shitvault.event_consumer.settings") as mock_settings,
-            patch("shit.db.DatabaseConfig"),
-            patch("shit.db.DatabaseClient", return_value=mock_db_client),
-            patch("shit.s3.S3Config"),
-            patch("shit.s3.S3DataLake", return_value=mock_s3),
+            patch("shit.services.db_and_s3_service", fake_db_and_s3),
             patch("shitvault.s3_processor.S3Processor", return_value=mock_processor),
             patch("shit.events.producer.emit_event"),
         ):
-            mock_settings.DATABASE_URL = "sqlite:///test.db"
-            mock_settings.S3_BUCKET_NAME = "test-bucket"
-            mock_settings.AWS_ACCESS_KEY_ID = "test"
-            mock_settings.AWS_SECRET_ACCESS_KEY = "test"
-            mock_settings.AWS_REGION = "us-east-1"
-
             worker = S3ProcessorWorker.__new__(S3ProcessorWorker)
             result = worker.process_event(
                 "posts_harvested",
@@ -143,7 +134,7 @@ class TestS3ProcessorWorker:
         What it verifies: After processing S3 keys, if stats["signal_ids"] is non-empty,
         emit_event is called with EventType.SIGNALS_STORED and the correct payload.
         Mocking:
-          - Same as test_process_event_iterates_all_s3_keys
+          - db_and_s3_service (yields mock db_client + s3_data_lake)
           - Mock _process_single_s3_data to populate stats["signal_ids"]
           - emit_event to capture the call
         Assertions:
@@ -155,12 +146,9 @@ class TestS3ProcessorWorker:
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
         mock_db_client = AsyncMock()
-        mock_db_client.initialize = AsyncMock()
         mock_db_client.get_session = MagicMock(return_value=mock_session)
-        mock_db_client.cleanup = AsyncMock()
 
         mock_s3 = AsyncMock()
-        mock_s3.initialize = AsyncMock()
         mock_s3.get_raw_data = AsyncMock(return_value={"id": "p1"})
 
         async def fake_process(s3_data, stats, dry_run):
@@ -170,21 +158,17 @@ class TestS3ProcessorWorker:
         mock_processor = AsyncMock()
         mock_processor._process_single_s3_data = AsyncMock(side_effect=fake_process)
 
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def fake_db_and_s3():
+            yield mock_db_client, mock_s3
+
         with (
-            patch("shitvault.event_consumer.settings") as mock_settings,
-            patch("shit.db.DatabaseConfig"),
-            patch("shit.db.DatabaseClient", return_value=mock_db_client),
-            patch("shit.s3.S3Config"),
-            patch("shit.s3.S3DataLake", return_value=mock_s3),
+            patch("shit.services.db_and_s3_service", fake_db_and_s3),
             patch("shitvault.s3_processor.S3Processor", return_value=mock_processor),
             patch("shit.events.producer.emit_event") as mock_emit,
         ):
-            mock_settings.DATABASE_URL = "sqlite:///test.db"
-            mock_settings.S3_BUCKET_NAME = "test-bucket"
-            mock_settings.AWS_ACCESS_KEY_ID = "test"
-            mock_settings.AWS_SECRET_ACCESS_KEY = "test"
-            mock_settings.AWS_REGION = "us-east-1"
-
             worker = S3ProcessorWorker.__new__(S3ProcessorWorker)
             worker.process_event(
                 "posts_harvested",
@@ -205,7 +189,7 @@ class TestS3ProcessorWorker:
         What it verifies: When S3 processing produces no signal_ids (e.g., all
         posts were duplicates/skipped), emit_event is NOT called.
         Mocking:
-          - Same infrastructure mocks
+          - db_and_s3_service (yields mock db_client + s3_data_lake)
           - _process_single_s3_data does NOT append to signal_ids
         Assertions:
           - emit_event was NOT called
@@ -215,32 +199,25 @@ class TestS3ProcessorWorker:
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
         mock_db_client = AsyncMock()
-        mock_db_client.initialize = AsyncMock()
         mock_db_client.get_session = MagicMock(return_value=mock_session)
-        mock_db_client.cleanup = AsyncMock()
 
         mock_s3 = AsyncMock()
-        mock_s3.initialize = AsyncMock()
         mock_s3.get_raw_data = AsyncMock(return_value={"id": "p1"})
 
         mock_processor = AsyncMock()
         mock_processor._process_single_s3_data = AsyncMock()  # Does nothing to stats
 
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def fake_db_and_s3():
+            yield mock_db_client, mock_s3
+
         with (
-            patch("shitvault.event_consumer.settings") as mock_settings,
-            patch("shit.db.DatabaseConfig"),
-            patch("shit.db.DatabaseClient", return_value=mock_db_client),
-            patch("shit.s3.S3Config"),
-            patch("shit.s3.S3DataLake", return_value=mock_s3),
+            patch("shit.services.db_and_s3_service", fake_db_and_s3),
             patch("shitvault.s3_processor.S3Processor", return_value=mock_processor),
             patch("shit.events.producer.emit_event") as mock_emit,
         ):
-            mock_settings.DATABASE_URL = "sqlite:///test.db"
-            mock_settings.S3_BUCKET_NAME = "test-bucket"
-            mock_settings.AWS_ACCESS_KEY_ID = "test"
-            mock_settings.AWS_SECRET_ACCESS_KEY = "test"
-            mock_settings.AWS_REGION = "us-east-1"
-
             worker = S3ProcessorWorker.__new__(S3ProcessorWorker)
             worker.process_event(
                 "posts_harvested",
@@ -249,16 +226,16 @@ class TestS3ProcessorWorker:
 
             mock_emit.assert_not_called()
 
-    def test_db_client_cleanup_called_on_success_and_failure(self):
-        """Verify db_client.cleanup() is always called via the finally block.
+    def test_exception_propagates_from_process_event(self):
+        """Verify exceptions from S3 processing propagate to the caller.
 
-        What it verifies: The try/finally in _process() ensures db_client.cleanup()
-        is called even when processing raises an exception.
+        What it verifies: When s3_data_lake.get_raw_data raises an exception
+        inside the db_and_s3_service context manager, the error propagates up
+        (cleanup is handled automatically by the context manager).
         Mocking:
-          - Same infrastructure mocks
+          - db_and_s3_service (yields mock db_client + s3_data_lake)
           - s3_data_lake.get_raw_data raises an exception
         Assertions:
-          - db_client.cleanup was called (awaited) exactly once
           - The exception propagates up
         """
         mock_session = AsyncMock()
@@ -266,29 +243,22 @@ class TestS3ProcessorWorker:
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
         mock_db_client = AsyncMock()
-        mock_db_client.initialize = AsyncMock()
         mock_db_client.get_session = MagicMock(return_value=mock_session)
-        mock_db_client.cleanup = AsyncMock()
 
         mock_s3 = AsyncMock()
-        mock_s3.initialize = AsyncMock()
         mock_s3.get_raw_data = AsyncMock(side_effect=RuntimeError("S3 exploded"))
 
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def fake_db_and_s3():
+            yield mock_db_client, mock_s3
+
         with (
-            patch("shitvault.event_consumer.settings") as mock_settings,
-            patch("shit.db.DatabaseConfig"),
-            patch("shit.db.DatabaseClient", return_value=mock_db_client),
-            patch("shit.s3.S3Config"),
-            patch("shit.s3.S3DataLake", return_value=mock_s3),
+            patch("shit.services.db_and_s3_service", fake_db_and_s3),
             patch("shitvault.s3_processor.S3Processor"),
             patch("shit.events.producer.emit_event"),
         ):
-            mock_settings.DATABASE_URL = "sqlite:///test.db"
-            mock_settings.S3_BUCKET_NAME = "test-bucket"
-            mock_settings.AWS_ACCESS_KEY_ID = "test"
-            mock_settings.AWS_SECRET_ACCESS_KEY = "test"
-            mock_settings.AWS_REGION = "us-east-1"
-
             worker = S3ProcessorWorker.__new__(S3ProcessorWorker)
 
             with pytest.raises(RuntimeError, match="S3 exploded"):
@@ -296,5 +266,3 @@ class TestS3ProcessorWorker:
                     "posts_harvested",
                     {"s3_keys": ["k1.json"], "source": "truth_social"},
                 )
-
-            mock_db_client.cleanup.assert_awaited_once()

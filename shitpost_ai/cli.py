@@ -6,6 +6,7 @@ import argparse
 import logging
 from typing import Optional
 
+from shit.cli.shared_args import add_standard_arguments, validate_standard_args
 from shit.logging import (
     setup_analyzer_logging as setup_centralized_analyzer_logging,
     print_success,
@@ -31,47 +32,15 @@ def create_analyzer_parser(description: str, epilog: str = None) -> argparse.Arg
         epilog=epilog
     )
     
-    # Analysis mode
+    # Standard arguments shared across all CLIs
+    add_standard_arguments(parser)
+
+    # Analyzer-specific arguments
     parser.add_argument(
-        "--mode", 
-        choices=["incremental", "backfill", "range"], 
-        default="incremental", 
-        help="Analysis mode (default: incremental)"
-    )
-    
-    # Date range options
-    parser.add_argument(
-        "--from", 
-        dest="start_date", 
-        help="Start date for range mode (YYYY-MM-DD)"
-    )
-    parser.add_argument(
-        "--to", 
-        dest="end_date", 
-        help="End date for range mode (YYYY-MM-DD)"
-    )
-    
-    # Limits and options
-    parser.add_argument(
-        "--limit", 
-        type=int, 
-        help="Maximum number of posts to analyze (optional)"
-    )
-    parser.add_argument(
-        "--batch-size", 
-        type=int, 
+        "--batch-size",
+        type=int,
         default=5,
         help="Number of posts to analyze per batch (default: 5)"
-    )
-    parser.add_argument(
-        "--dry-run", 
-        action="store_true", 
-        help="Show what would be analyzed without storing results to database"
-    )
-    parser.add_argument(
-        "--verbose", "-v", 
-        action="store_true", 
-        help="Enable verbose logging"
     )
     
     return parser
@@ -86,10 +55,7 @@ def validate_analyzer_args(args) -> None:
     Raises:
         SystemExit: If arguments are invalid
     """
-    if args.mode == "range" and not args.start_date:
-        raise SystemExit("--from date is required for range mode")
-    
-    # Note: --to date is optional for range mode (defaults to today)
+    validate_standard_args(args)
 
 
 def setup_analyzer_logging(verbose: bool = False) -> None:
