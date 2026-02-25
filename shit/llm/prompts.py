@@ -377,17 +377,6 @@ def get_system_message(analysis_type: str = 'financial_analyst') -> str:
     return SYSTEM_MESSAGES.get(analysis_type, SYSTEM_MESSAGES['general'])
 
 
-def validate_prompt_version(version: str) -> bool:
-    """Validate prompt version for consistency.
-    
-    Args:
-        version: Version string to validate
-        
-    Returns:
-        True if version is valid
-    """
-    return version == PROMPT_VERSION
-
 
 def get_prompt_metadata() -> Dict[str, Any]:
     """Get metadata about prompt system.

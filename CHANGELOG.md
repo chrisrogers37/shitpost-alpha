@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Asyncio deprecation warnings** — Replaced 8 instances of deprecated `asyncio.get_event_loop()` with modern alternatives (`asyncio.to_thread()` and `asyncio.get_running_loop()`) for Python 3.13 compatibility
+
+### Removed
+- **Dead code cleanup** — Removed unused `validate_prompt_version()` function from prompt module and unused `Decimal` import from market data models
+
 ### Changed
 - **Event worker CLI** — Extracted shared `run_worker_main()` helper, eliminating ~100 lines of duplicated boilerplate across 4 event consumer modules
 - **cards.py split** - Reorganized 1,930-line `shitty_ui/components/cards.py` into 8 focused modules under `shitty_ui/components/cards/` package. All existing imports work unchanged via `__init__.py` re-exports.

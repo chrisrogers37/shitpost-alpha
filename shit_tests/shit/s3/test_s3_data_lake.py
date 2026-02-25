@@ -128,23 +128,20 @@ class TestS3DataLake:
         # Mock the S3 client methods
         mock_s3_client.client.put_object = MagicMock()
         
-        # Mock asyncio.wait_for and run_in_executor
+        # Mock asyncio.wait_for and to_thread
         with patch('asyncio.wait_for') as mock_wait_for, \
-             patch('asyncio.get_event_loop') as mock_get_loop:
-            
+             patch('asyncio.to_thread') as mock_to_thread:
+
             mock_wait_for.return_value = None
-            mock_loop = MagicMock()
-            mock_get_loop.return_value = mock_loop
-            mock_loop.run_in_executor.return_value = None
-            
+            mock_to_thread.return_value = None
+
             s3_key = await data_lake.store_raw_data(sample_raw_data)
-            
+
             # Verify the S3 key was generated correctly
             assert s3_key == "test-prefix/raw/2024/01/15/123456789.json"
-            
+
             # Verify put_object was called
             mock_wait_for.assert_called_once()
-            mock_loop.run_in_executor.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_store_raw_data_missing_id(self, data_lake, mock_s3_client):
@@ -174,15 +171,13 @@ class TestS3DataLake:
         # Mock the S3 client methods
         mock_s3_client.client.put_object = MagicMock()
         
-        # Mock asyncio.wait_for and run_in_executor
+        # Mock asyncio.wait_for and to_thread
         with patch('asyncio.wait_for') as mock_wait_for, \
-             patch('asyncio.get_event_loop') as mock_get_loop:
-            
+             patch('asyncio.to_thread') as mock_to_thread:
+
             mock_wait_for.return_value = None
-            mock_loop = MagicMock()
-            mock_get_loop.return_value = mock_loop
-            mock_loop.run_in_executor.return_value = None
-            
+            mock_to_thread.return_value = None
+
             # Test with invalid timestamp
             sample_raw_data["created_at"] = "invalid-timestamp"
             
@@ -200,12 +195,10 @@ class TestS3DataLake:
         
         # Mock asyncio.wait_for to raise TimeoutError
         with patch('asyncio.wait_for') as mock_wait_for, \
-             patch('asyncio.get_event_loop') as mock_get_loop:
-            
+             patch('asyncio.to_thread') as mock_to_thread:
+
             mock_wait_for.side_effect = asyncio.TimeoutError()
-            mock_loop = MagicMock()
-            mock_get_loop.return_value = mock_loop
-            mock_loop.run_in_executor.return_value = None
+            mock_to_thread.return_value = None
             
             with pytest.raises(asyncio.TimeoutError):
                 await data_lake.store_raw_data(sample_raw_data)
@@ -215,14 +208,12 @@ class TestS3DataLake:
         """Test raw data storage with upload error."""
         await data_lake.initialize()
         
-        # Mock asyncio.wait_for and run_in_executor
+        # Mock asyncio.wait_for and to_thread
         with patch('asyncio.wait_for') as mock_wait_for, \
-             patch('asyncio.get_event_loop') as mock_get_loop:
-            
+             patch('asyncio.to_thread') as mock_to_thread:
+
             mock_wait_for.side_effect = Exception("Upload failed")
-            mock_loop = MagicMock()
-            mock_get_loop.return_value = mock_loop
-            mock_loop.run_in_executor.return_value = None
+            mock_to_thread.return_value = None
             
             with pytest.raises(Exception, match="Upload failed"):
                 await data_lake.store_raw_data(sample_raw_data)
@@ -232,37 +223,26 @@ class TestS3DataLake:
         """Test checking object existence when object exists."""
         await data_lake.initialize()
         
-        # Mock asyncio.get_event_loop and run_in_executor
-        with patch('asyncio.get_event_loop') as mock_get_loop:
-            mock_loop = MagicMock()
-            mock_get_loop.return_value = mock_loop
-            # run_in_executor returns a coroutine, so we need to mock it properly
-            mock_loop.run_in_executor = AsyncMock(return_value=None)
-            
+        # Mock asyncio.to_thread
+        with patch('asyncio.to_thread', new_callable=AsyncMock, return_value=None) as mock_to_thread:
             result = await data_lake.check_object_exists("test-key")
-            
+
             assert result == True
-            mock_loop.run_in_executor.assert_called_once()
+            mock_to_thread.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_check_object_exists_false(self, data_lake, mock_s3_client):
         """Test checking object existence when object doesn't exist."""
         await data_lake.initialize()
         
-        # Mock asyncio.get_event_loop and run_in_executor to raise ClientError
-        with patch('asyncio.get_event_loop') as mock_get_loop:
-            mock_loop = MagicMock()
-            mock_get_loop.return_value = mock_loop
-            
-            # Create a mock ClientError with NoSuchKey
-            mock_error = ClientError(
-                error_response={'Error': {'Code': 'NoSuchKey'}},
-                operation_name='HeadObject'
-            )
-            mock_loop.run_in_executor = AsyncMock(side_effect=mock_error)
-            
+        # Mock asyncio.to_thread to raise ClientError
+        mock_error = ClientError(
+            error_response={'Error': {'Code': 'NoSuchKey'}},
+            operation_name='HeadObject'
+        )
+        with patch('asyncio.to_thread', new_callable=AsyncMock, side_effect=mock_error):
             result = await data_lake.check_object_exists("test-key")
-            
+
             assert result == False
 
     @pytest.mark.asyncio
@@ -270,12 +250,8 @@ class TestS3DataLake:
         """Test checking object existence with other error."""
         await data_lake.initialize()
         
-        # Mock asyncio.get_event_loop and run_in_executor to raise other error
-        with patch('asyncio.get_event_loop') as mock_get_loop:
-            mock_loop = MagicMock()
-            mock_get_loop.return_value = mock_loop
-            mock_loop.run_in_executor = AsyncMock(side_effect=Exception("Network error"))
-            
+        # Mock asyncio.to_thread to raise other error
+        with patch('asyncio.to_thread', new_callable=AsyncMock, side_effect=Exception("Network error")):
             with pytest.raises(Exception, match="Network error"):
                 await data_lake.check_object_exists("test-key")
 
@@ -290,15 +266,10 @@ class TestS3DataLake:
         }
         mock_response['Body'].read.return_value = json.dumps(sample_raw_data).encode('utf-8')
         
-        # Mock asyncio.get_event_loop and run_in_executor
-        with patch('asyncio.get_event_loop') as mock_get_loop:
-            mock_loop = MagicMock()
-            mock_get_loop.return_value = mock_loop
-            # run_in_executor returns a coroutine, so we need to mock it properly
-            mock_loop.run_in_executor = AsyncMock(return_value=mock_response)
-            
+        # Mock asyncio.to_thread
+        with patch('asyncio.to_thread', new_callable=AsyncMock, return_value=mock_response):
             result = await data_lake.get_raw_data("test-key")
-            
+
             assert result == sample_raw_data
 
     @pytest.mark.asyncio
@@ -306,20 +277,14 @@ class TestS3DataLake:
         """Test raw data retrieval when object not found."""
         await data_lake.initialize()
         
-        # Mock asyncio.get_event_loop and run_in_executor to raise ClientError
-        with patch('asyncio.get_event_loop') as mock_get_loop:
-            mock_loop = MagicMock()
-            mock_get_loop.return_value = mock_loop
-            
-            # Create a mock ClientError with NoSuchKey
-            mock_error = ClientError(
-                error_response={'Error': {'Code': 'NoSuchKey'}},
-                operation_name='GetObject'
-            )
-            mock_loop.run_in_executor = AsyncMock(side_effect=mock_error)
-            
+        # Mock asyncio.to_thread to raise ClientError
+        mock_error = ClientError(
+            error_response={'Error': {'Code': 'NoSuchKey'}},
+            operation_name='GetObject'
+        )
+        with patch('asyncio.to_thread', new_callable=AsyncMock, side_effect=mock_error):
             result = await data_lake.get_raw_data("test-key")
-            
+
             assert result is None
 
     @pytest.mark.asyncio
@@ -327,12 +292,8 @@ class TestS3DataLake:
         """Test raw data retrieval with other error."""
         await data_lake.initialize()
         
-        # Mock asyncio.get_event_loop and run_in_executor to raise other error
-        with patch('asyncio.get_event_loop') as mock_get_loop:
-            mock_loop = MagicMock()
-            mock_get_loop.return_value = mock_loop
-            mock_loop.run_in_executor = AsyncMock(side_effect=Exception("Network error"))
-            
+        # Mock asyncio.to_thread to raise other error
+        with patch('asyncio.to_thread', new_callable=AsyncMock, side_effect=Exception("Network error")):
             with pytest.raises(Exception, match="Network error"):
                 await data_lake.get_raw_data("test-key")
 
@@ -534,15 +495,13 @@ class TestS3DataLake:
         # Mock the S3 client methods
         mock_s3_client.client.put_object = MagicMock()
         
-        # Mock asyncio.wait_for and run_in_executor
+        # Mock asyncio.wait_for and to_thread
         with patch('asyncio.wait_for') as mock_wait_for, \
-             patch('asyncio.get_event_loop') as mock_get_loop:
-            
+             patch('asyncio.to_thread') as mock_to_thread:
+
             mock_wait_for.return_value = None
-            mock_loop = MagicMock()
-            mock_get_loop.return_value = mock_loop
-            mock_loop.run_in_executor.return_value = None
-            
+            mock_to_thread.return_value = None
+
             raw_data = {
                 "id": "123456789",
                 "content": "test post",

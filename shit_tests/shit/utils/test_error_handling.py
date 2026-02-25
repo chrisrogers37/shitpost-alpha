@@ -528,14 +528,14 @@ class TestCircuitBreaker:
     async def test_should_attempt_reset_within_timeout(self):
         """Test should_attempt_reset within timeout period."""
         cb = CircuitBreaker(failure_threshold=1, recovery_timeout=1.0)
-        cb.last_failure_time = asyncio.get_event_loop().time()
+        cb.last_failure_time = asyncio.get_running_loop().time()
         assert cb._should_attempt_reset() is False
 
     @pytest.mark.asyncio
     async def test_should_attempt_reset_after_timeout(self):
         """Test should_attempt_reset after timeout period."""
         cb = CircuitBreaker(failure_threshold=1, recovery_timeout=0.1)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         cb.last_failure_time = loop.time() - 0.2  # 0.2 seconds ago
         assert cb._should_attempt_reset() is True
 

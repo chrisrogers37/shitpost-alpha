@@ -4,7 +4,6 @@ Business logic orchestrator for analyzing shitposts with enhanced context.
 """
 
 import asyncio
-import concurrent.futures
 from typing import Dict, List, Optional
 from datetime import datetime
 
@@ -525,13 +524,10 @@ class ShitpostAnalyzer:
             assets: List of ticker symbols from the prediction
         """
         try:
-            loop = asyncio.get_event_loop()
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                result = await loop.run_in_executor(
-                    executor,
-                    auto_backfill_prediction,
-                    prediction_id,
-                )
+            result = await asyncio.to_thread(
+                auto_backfill_prediction,
+                prediction_id,
+            )
 
             if result:
                 logger.info(
