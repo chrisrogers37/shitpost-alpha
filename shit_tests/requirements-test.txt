@@ -1,9 +1,9 @@
 # Test-specific dependencies for Shitpost Alpha
 
 # Core testing framework
-pytest>=7.0.0
-pytest-asyncio>=0.21.0
-pytest-cov>=4.0.0
+pytest>=8.4.0
+pytest-asyncio>=0.25.0
+pytest-cov>=6.2.0
 pytest-mock>=3.10.0
 pytest-xdist>=3.0.0  # For parallel test execution
 
@@ -12,7 +12,7 @@ factory-boy>=3.2.0  # For test data generation
 faker>=18.0.0  # For generating fake data
 freezegun>=1.2.0  # For mocking datetime
 responses>=0.23.0  # For mocking HTTP requests
-vcrpy>=6.0.0  # For recording HTTP interactions
+vcrpy>=7.0.0  # For recording HTTP interactions
 
 # Database testing
 pytest-postgresql>=5.0.0  # For PostgreSQL testing (if needed)
@@ -45,7 +45,7 @@ pytest-datadir>=1.4.0  # For test data files
 pytest-tmpdir>=1.0.0  # For temporary directories
 
 # Async testing utilities
-pytest-asyncio>=0.21.0
+pytest-asyncio>=0.25.0
 asyncio-mqtt>=0.16.0
 
 # Mock external services
