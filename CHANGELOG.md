@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dead code cleanup** — Removed unused `validate_prompt_version()` function from prompt module and unused `Decimal` import from market data models
 
 ### Changed
+- **Dependency upgrades** — Bumped 9 dependencies to current stable versions: certifi 2026.1.4, urllib3 2.6.3, anthropic 0.83.0, boto3 1.42.0, SQLAlchemy 2.0.47, pytest 8.4.0, pytest-asyncio 0.25.0, pytest-cov 6.2.0, vcrpy 7.0.0. Updated pytest minversion to 8.4.
 - **Event worker CLI** — Extracted shared `run_worker_main()` helper, eliminating ~100 lines of duplicated boilerplate across 4 event consumer modules
 - **cards.py split** - Reorganized 1,930-line `shitty_ui/components/cards.py` into 8 focused modules under `shitty_ui/components/cards/` package. All existing imports work unchanged via `__init__.py` re-exports.
 - **Alerts panel refactor** - Split `create_alert_config_panel()` into 8 sub-component builder functions in new `alert_components.py`
