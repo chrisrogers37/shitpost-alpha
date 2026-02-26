@@ -58,7 +58,6 @@ shit/
 │   └── service_loggers.py   # Service-specific loggers
 ├── market_data/             # Market price & outcome tracking
 │   ├── auto_backfill_service.py # Reactive price backfill on prediction
-│   ├── backfill_prices.py   # Manual price backfill script
 │   ├── cli.py               # Market data CLI (health-check, ticker-registry, etc.)
 │   ├── client.py            # Market data client with provider chain + retry
 │   ├── models.py            # MarketPrice, PredictionOutcome, TickerRegistry models
@@ -188,7 +187,6 @@ shit/
 - **`models.py`** - `MarketPrice` and `PredictionOutcome` SQLAlchemy models
 - **`outcome_calculator.py`** - `OutcomeCalculator` for computing prediction accuracy
 - **`auto_backfill_service.py`** - Automatic price backfill service
-- **`backfill_prices.py`** - Manual price backfill script
 - **`cli.py`** - CLI for market data operations (`python -m shit.market_data`)
 
 **Features:**

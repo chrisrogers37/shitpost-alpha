@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - **Dead code cleanup** — Removed unused `validate_prompt_version()` function from prompt module and unused `Decimal` import from market data models
+- **Dead backfill_prices module** — Deleted `shit/market_data/backfill_prices.py` (162 LOC), superseded by event-driven `auto_backfill_service.py`
 
 ### Changed
 - **Alert callbacks** - Split monolithic `register_alert_callbacks()` (479 LOC) into 3 focused sub-modules: `alert_preferences.py`, `alert_history.py`, `alert_notifications.py`
@@ -29,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Alert callback tests** - 60 new tests in `test_alert_callbacks.py` covering panel sub-components, preference serialization, and alert history card rendering
+- **Compare CLI tests** — 30 new tests in `test_compare_cli.py` covering parser arguments, list_providers output, run_comparison logic, and COMPARE_EXAMPLES constant
 
 ### Fixed
 - **Hero card weeks display** - Hero signal cards now correctly show "2w ago" for posts older than 7 days (was showing "14d ago")
