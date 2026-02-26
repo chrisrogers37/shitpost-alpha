@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dead backfill_prices module** — Deleted `shit/market_data/backfill_prices.py` (162 LOC), superseded by event-driven `auto_backfill_service.py`
 
 ### Changed
+- **OpenAI SDK v2 migration** — Upgraded `openai` dependency from v1.x to v2.x (`openai>=2.0.0,<3.0.0`), migrated `max_tokens` to `max_completion_tokens` for forward compatibility, removed dead `mock_openai_client` conftest fixture
 - **Alert callbacks** - Split monolithic `register_alert_callbacks()` (479 LOC) into 3 focused sub-modules: `alert_preferences.py`, `alert_history.py`, `alert_notifications.py`
 - **Dashboard callbacks** - Split monolithic `register_dashboard_callbacks()` (460 LOC) into 3 focused sub-modules: `period.py`, `content.py`, `table.py`
 - **Alert preferences** - Replaced `build_preferences_dict()`/`extract_preferences_tuple()` pair with `AlertPreferences` Pydantic model (backward-compatible wrappers retained)

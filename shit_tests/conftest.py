@@ -391,17 +391,6 @@ def mock_aiohttp_session():
 
 
 @pytest.fixture
-def mock_openai_client():
-    """Mock OpenAI client for testing."""
-    with patch('openai.ChatCompletion.acreate') as mock_create:
-        mock_response = AsyncMock()
-        mock_response.choices = [AsyncMock()]
-        mock_response.choices[0].message.content = '{"assets": ["TSLA"], "market_impact": {"TSLA": "bearish"}, "confidence": 0.85, "thesis": "Test analysis"}'
-        mock_create.return_value = mock_response
-        yield mock_create
-
-
-@pytest.fixture
 def mock_anthropic_client():
     """Mock Anthropic client for testing."""
     with patch('anthropic.Anthropic') as mock_anthropic:
