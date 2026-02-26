@@ -345,6 +345,33 @@ class TestLLMClient:
             assert result == "Test response"
 
     @pytest.mark.asyncio
+    async def test_call_llm_uses_max_completion_tokens(self):
+        """Verify chat.completions.create receives max_completion_tokens (not max_tokens)."""
+        with patch('openai.AsyncOpenAI') as mock_openai:
+            mock_client = AsyncMock()
+            mock_openai.return_value = mock_client
+
+            mock_init_response = MagicMock()
+            mock_init_response.choices = [MagicMock(message=MagicMock(content="OK"))]
+
+            mock_call_response = MagicMock()
+            mock_call_response.choices = [MagicMock(message=MagicMock(content="Test response"))]
+
+            mock_client.chat.completions.create = AsyncMock(
+                side_effect=[mock_init_response, mock_call_response]
+            )
+
+            client = LLMClient(provider="openai", model="gpt-4o", api_key="test-key")
+            await client.initialize()
+
+            await client._call_llm("Test prompt")
+
+            call_args = mock_client.chat.completions.create.call_args_list[1]
+            assert 'max_completion_tokens' in call_args.kwargs
+            assert call_args.kwargs['max_completion_tokens'] == 1000
+            assert 'max_tokens' not in call_args.kwargs
+
+    @pytest.mark.asyncio
     async def test_call_llm_error(self):
         """Test LLM call with error."""
         with patch('openai.AsyncOpenAI') as mock_openai:
