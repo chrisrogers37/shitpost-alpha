@@ -108,6 +108,8 @@ def create_app() -> Dash:
             dcc.Store(id="selected-asset", data=None),
             # Store for selected time period (default: 90d)
             dcc.Store(id="selected-period", data="90d"),
+            # Store for selected outcome timeframe (default: t7)
+            dcc.Store(id="selected-timeframe", data="t7"),
             # Store for last update timestamp
             dcc.Store(id="last-update-timestamp", data=None),
             # Alert system stores
