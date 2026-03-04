@@ -12,6 +12,7 @@ from constants import (
     TIMEFRAME_COLORS,
     CHART_LAYOUT,
     CHART_COLORS,
+    ANALYTICS_COLORS,
 )
 
 
@@ -453,3 +454,305 @@ def _add_annotation_legend(fig: go.Figure) -> None:
             font=dict(color=COLORS["text_muted"], size=11),
         ),
     )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Analytics chart builders (Phase 05)
+# ──────────────────────────────────────────────────────────────────────
+
+
+def build_cumulative_pnl_chart(
+    df: pd.DataFrame,
+    chart_height: int = 350,
+) -> go.Figure:
+    """Build a cumulative P&L equity curve line chart.
+
+    Shows running total P&L over time with a horizontal $0 reference line.
+    Green fill above zero, red below.
+
+    Args:
+        df: DataFrame from get_cumulative_pnl() with columns:
+            prediction_date, daily_pnl, predictions_count, cumulative_pnl.
+        chart_height: Height in pixels.
+
+    Returns:
+        go.Figure ready to be rendered by dcc.Graph.
+    """
+    if df.empty:
+        return build_empty_signal_chart("No P&L data available")
+
+    fig = go.Figure()
+
+    # --- $0 reference line ---
+    fig.add_hline(
+        y=0,
+        line_dash="dash",
+        line_color=ANALYTICS_COLORS["zero_line"],
+        line_width=1,
+    )
+
+    # --- Main equity curve ---
+    fig.add_trace(
+        go.Scatter(
+            x=df["prediction_date"],
+            y=df["cumulative_pnl"],
+            mode="lines",
+            line=dict(
+                color=ANALYTICS_COLORS["equity_line"],
+                width=2,
+            ),
+            fill="tozeroy",
+            fillcolor=ANALYTICS_COLORS["equity_fill"],
+            name="Cumulative P&L",
+            showlegend=False,
+            hovertemplate=(
+                "<b>%{x|%b %d, %Y}</b><br>"
+                "Cumulative P&L: <b>$%{y:+,.0f}</b>"
+                "<extra></extra>"
+            ),
+        )
+    )
+
+    # --- Layout ---
+    apply_chart_layout(
+        fig,
+        height=chart_height,
+        show_legend=False,
+        hovermode="x unified",
+        margin={"l": 55, "r": 20, "t": 10, "b": 40},
+        yaxis={"title": "Cumulative P&L ($)", "tickprefix": "$"},
+    )
+
+    return fig
+
+
+def build_rolling_accuracy_chart(
+    df: pd.DataFrame,
+    chart_height: int = 350,
+) -> go.Figure:
+    """Build a rolling accuracy percentage line chart.
+
+    Shows rolling-window accuracy over time so the user can see if
+    the system is improving or degrading.
+
+    Args:
+        df: DataFrame from get_rolling_accuracy() with columns:
+            prediction_date, correct, total, rolling_accuracy.
+        chart_height: Height in pixels.
+
+    Returns:
+        go.Figure ready to be rendered by dcc.Graph.
+    """
+    if df.empty or "rolling_accuracy" not in df.columns:
+        return build_empty_signal_chart("Not enough data for rolling accuracy")
+
+    fig = go.Figure()
+
+    # --- 50% reference line (coin flip baseline) ---
+    fig.add_hline(
+        y=50,
+        line_dash="dash",
+        line_color=ANALYTICS_COLORS["zero_line"],
+        line_width=1,
+        annotation_text="50% (coin flip)",
+        annotation_position="bottom right",
+        annotation_font_color=COLORS["text_muted"],
+        annotation_font_size=10,
+    )
+
+    # --- Rolling accuracy line ---
+    fig.add_trace(
+        go.Scatter(
+            x=df["prediction_date"],
+            y=df["rolling_accuracy"],
+            mode="lines",
+            line=dict(
+                color=ANALYTICS_COLORS["rolling_line"],
+                width=2,
+            ),
+            fill="tozeroy",
+            fillcolor=ANALYTICS_COLORS["rolling_fill"],
+            name="Rolling Accuracy",
+            showlegend=False,
+            hovertemplate=(
+                "<b>%{x|%b %d, %Y}</b><br>"
+                "Rolling Accuracy: <b>%{y:.1f}%</b>"
+                "<extra></extra>"
+            ),
+        )
+    )
+
+    # --- Layout ---
+    apply_chart_layout(
+        fig,
+        height=chart_height,
+        show_legend=False,
+        hovermode="x unified",
+        margin={"l": 50, "r": 20, "t": 10, "b": 40},
+        yaxis={"title": "Accuracy (%)", "range": [0, 105], "ticksuffix": "%"},
+    )
+
+    return fig
+
+
+def build_confidence_calibration_chart(
+    df: pd.DataFrame,
+    chart_height: int = 350,
+) -> go.Figure:
+    """Build a confidence calibration grouped bar chart.
+
+    Compares predicted confidence levels vs actual accuracy per bucket.
+    A well-calibrated model has bars at roughly equal heights.
+    Includes a diagonal "perfect calibration" reference line.
+
+    Args:
+        df: DataFrame from get_confidence_calibration() with columns:
+            bucket_start, total, correct, avg_confidence,
+            actual_accuracy, predicted_confidence, bucket_label.
+        chart_height: Height in pixels.
+
+    Returns:
+        go.Figure ready to be rendered by dcc.Graph.
+    """
+    if df.empty:
+        return build_empty_signal_chart("No calibration data available")
+
+    fig = go.Figure()
+
+    # --- Predicted confidence bars ---
+    fig.add_trace(
+        go.Bar(
+            x=df["bucket_label"],
+            y=df["predicted_confidence"],
+            name="Predicted Confidence",
+            marker_color=ANALYTICS_COLORS["calibration_predicted"],
+            opacity=0.7,
+            hovertemplate=("<b>%{x}</b><br>Predicted: <b>%{y:.1f}%</b><extra></extra>"),
+        )
+    )
+
+    # --- Actual accuracy bars ---
+    fig.add_trace(
+        go.Bar(
+            x=df["bucket_label"],
+            y=df["actual_accuracy"],
+            name="Actual Accuracy",
+            marker_color=ANALYTICS_COLORS["calibration_actual"],
+            opacity=0.7,
+            hovertemplate=(
+                "<b>%{x}</b><br>"
+                "Actual: <b>%{y:.1f}%</b><br>"
+                "Predictions: <b>%{customdata}</b>"
+                "<extra></extra>"
+            ),
+            customdata=df["total"],
+        )
+    )
+
+    # --- Perfect calibration reference line ---
+    # Draw a diagonal from bottom-left to top-right using bucket midpoints
+    if len(df) >= 2:
+        fig.add_trace(
+            go.Scatter(
+                x=df["bucket_label"],
+                y=df["predicted_confidence"],
+                mode="lines",
+                line=dict(
+                    color=ANALYTICS_COLORS["calibration_perfect"],
+                    width=1.5,
+                    dash="dot",
+                ),
+                name="Perfect Calibration",
+                showlegend=True,
+                hoverinfo="skip",
+            )
+        )
+
+    # --- Layout ---
+    apply_chart_layout(
+        fig,
+        height=chart_height,
+        show_legend=True,
+        barmode="group",
+        margin={"l": 50, "r": 20, "t": 10, "b": 40},
+        yaxis={"title": "Percentage (%)", "range": [0, 105], "ticksuffix": "%"},
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            font=dict(color=COLORS["text_muted"], size=11),
+        ),
+    )
+
+    return fig
+
+
+def build_backtest_equity_chart(
+    df: pd.DataFrame,
+    initial_capital: float = 10000,
+    chart_height: int = 350,
+) -> go.Figure:
+    """Build a backtest simulation equity curve chart.
+
+    Shows the hypothetical equity growth over time if following the
+    system's high-confidence recommendations.
+
+    Args:
+        df: DataFrame from get_backtest_equity_curve() with columns:
+            prediction_date, daily_pnl, trade_count, cumulative_pnl, equity.
+        initial_capital: Starting capital for the horizontal reference line.
+        chart_height: Height in pixels.
+
+    Returns:
+        go.Figure ready to be rendered by dcc.Graph.
+    """
+    if df.empty:
+        return build_empty_signal_chart("No backtest data for these settings")
+
+    fig = go.Figure()
+
+    # --- Starting capital reference line ---
+    fig.add_hline(
+        y=initial_capital,
+        line_dash="dash",
+        line_color=ANALYTICS_COLORS["backtest_start"],
+        line_width=1,
+        annotation_text=f"Start: ${initial_capital:,.0f}",
+        annotation_position="top left",
+        annotation_font_color=ANALYTICS_COLORS["backtest_start"],
+        annotation_font_size=10,
+    )
+
+    # --- Equity curve ---
+    fig.add_trace(
+        go.Scatter(
+            x=df["prediction_date"],
+            y=df["equity"],
+            mode="lines",
+            line=dict(
+                color=ANALYTICS_COLORS["backtest_line"],
+                width=2,
+            ),
+            fill="tozeroy",
+            fillcolor=ANALYTICS_COLORS["backtest_fill"],
+            name="Portfolio Value",
+            showlegend=False,
+            hovertemplate=(
+                "<b>%{x|%b %d, %Y}</b><br>Portfolio: <b>$%{y:,.0f}</b><extra></extra>"
+            ),
+        )
+    )
+
+    # --- Layout ---
+    apply_chart_layout(
+        fig,
+        height=chart_height,
+        show_legend=False,
+        hovermode="x unified",
+        margin={"l": 60, "r": 20, "t": 10, "b": 40},
+        yaxis={"title": "Portfolio Value ($)", "tickprefix": "$"},
+    )
+
+    return fig

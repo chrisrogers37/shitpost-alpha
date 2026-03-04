@@ -85,8 +85,7 @@ def get_dynamic_insights(
                 ret_str = f"{ret_val:+.2f}%"
                 if correct:
                     headline = (
-                        f"Trump mentioned {symbol}"
-                        f" -- it's {ret_str} in {tf_label}."
+                        f"Trump mentioned {symbol} -- it's {ret_str} in {tf_label}."
                     )
                     body = (
                         f"Predicted correctly with {ret_str} return."
@@ -96,8 +95,7 @@ def get_dynamic_insights(
                     ins_sentiment = "positive"
                 else:
                     headline = (
-                        f"Trump mentioned {symbol}"
-                        f" -- it went {ret_str} in {tf_label}."
+                        f"Trump mentioned {symbol} -- it went {ret_str} in {tf_label}."
                     )
                     body = (
                         "Missed by a wide margin."

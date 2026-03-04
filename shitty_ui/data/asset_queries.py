@@ -505,9 +505,7 @@ def get_asset_predictions(symbol: str, limit: int = 50) -> pd.DataFrame:
 
 
 @ttl_cache(ttl_seconds=300)  # Cache for 5 minutes
-def get_asset_stats(
-    symbol: str, timeframe: str = DEFAULT_TIMEFRAME
-) -> Dict[str, Any]:
+def get_asset_stats(symbol: str, timeframe: str = DEFAULT_TIMEFRAME) -> Dict[str, Any]:
     """
     Get aggregate performance statistics for a specific asset,
     alongside overall system averages for comparison.
