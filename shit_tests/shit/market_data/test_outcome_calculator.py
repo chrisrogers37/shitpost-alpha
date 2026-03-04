@@ -98,9 +98,30 @@ class TestExtractSentiment:
         result = calculator._extract_sentiment({"TSLA": "BEARISH"})
         assert result == "bearish"
 
-    def test_multi_asset_returns_first(self, calculator):
+    def test_multi_asset_returns_first_when_no_asset_specified(self, calculator):
         result = calculator._extract_sentiment({"AAPL": "bullish", "TSLA": "bearish"})
         assert result in ("bullish", "bearish")  # dict ordering
+
+    # --- Per-asset tests ---
+
+    def test_per_asset_exact_match(self, calculator):
+        mi = {"AAPL": "bullish", "TSLA": "bearish"}
+        assert calculator._extract_sentiment(mi, asset="AAPL") == "bullish"
+        assert calculator._extract_sentiment(mi, asset="TSLA") == "bearish"
+
+    def test_per_asset_case_insensitive(self, calculator):
+        mi = {"AAPL": "bullish", "TSLA": "bearish"}
+        assert calculator._extract_sentiment(mi, asset="aapl") == "bullish"
+        assert calculator._extract_sentiment(mi, asset="tsla") == "bearish"
+
+    def test_per_asset_falls_back_to_first_when_not_found(self, calculator):
+        mi = {"AAPL": "bullish"}
+        result = calculator._extract_sentiment(mi, asset="GOOG")
+        assert result == "bullish"  # fallback to first
+
+    def test_per_asset_handles_mixed_case_keys(self, calculator):
+        mi = {"Aapl": "bullish"}
+        assert calculator._extract_sentiment(mi, asset="AAPL") == "bullish"
 
 
 # ─── _get_source_date ──────────────────────────────────────────────
@@ -224,6 +245,24 @@ class TestCalculateOutcomeForPrediction:
         result = calculator.calculate_outcome_for_prediction(1)
         assert len(result) == 3
         assert calculator._calculate_single_outcome.call_count == 3
+
+    def test_passes_per_asset_sentiment(self, calculator, mock_session):
+        """Verify each asset gets its own sentiment from market_impact."""
+        pred = _make_prediction(
+            assets=["AAPL", "TSLA"],
+            market_impact={"AAPL": "bullish", "TSLA": "bearish"},
+        )
+        mock_session.query.return_value.filter.return_value.first.return_value = pred
+
+        mock_outcome = MagicMock(spec=PredictionOutcome)
+        calculator._calculate_single_outcome = MagicMock(return_value=mock_outcome)
+
+        calculator.calculate_outcome_for_prediction(1)
+
+        calls = calculator._calculate_single_outcome.call_args_list
+        assert len(calls) == 2
+        assert calls[0].kwargs["sentiment"] == "bullish"
+        assert calls[1].kwargs["sentiment"] == "bearish"
 
 
 # ─── _calculate_single_outcome ───────────────────────────────────────
