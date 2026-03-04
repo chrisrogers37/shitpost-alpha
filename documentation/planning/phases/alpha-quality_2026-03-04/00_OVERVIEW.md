@@ -22,7 +22,7 @@ The system has significant gaps between its intent (predict market movements fro
 | 01 | ~~Outcome Maturation Pipeline~~ | High | Medium | Low | 4 mod, 1 new | ✅ PR #104 |
 | 02 | ~~Fix Sentiment Bug & NaN Guards~~ | High | Low | Low | 6 mod, 0 new | ✅ PR #105 |
 | 03 | ~~Smart Default View & Copy Cleanup~~ | High | Medium | Medium | 8 mod, 0 new | ✅ PR #106 |
-| 04 | [Multi-Timeframe Dashboard](04_multi-timeframe-dashboard.md) | High | High | Medium | 13 mod, 2 new |
+| 04 | ~~Multi-Timeframe Dashboard~~ | High | High | Medium | 13 mod, 2 new | ✅ PR #107 |
 | 05 | [Analytics Charts](05_analytics-charts.md) | Medium | Medium | Medium | 7 mod, 3 new |
 | 06 | [Company Fundamentals & Asset Profiles](06_company-fundamentals-asset-profiles.md) | Medium | High | Medium | 9 mod, 3 new |
 | 07 | [Market-Aware Timing](07_market-aware-timing.md) | Medium | High | High | 7 mod, 3 new |
