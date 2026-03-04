@@ -77,9 +77,7 @@ def register_content_callbacks(app: Dash) -> None:
 
         # ===== Asset Screener Table =====
         try:
-            screener_df = get_asset_screener_data(
-                days=days, timeframe=timeframe
-            )
+            screener_df = get_asset_screener_data(days=days, timeframe=timeframe)
             sparkline_data = {}
             if not screener_df.empty:
                 symbols = tuple(screener_df["symbol"].tolist())
@@ -99,9 +97,7 @@ def register_content_callbacks(app: Dash) -> None:
 
         # ===== Performance Metrics with error handling =====
         try:
-            kpis = get_dashboard_kpis_with_fallback(
-                days=days, timeframe=timeframe
-            )
+            kpis = get_dashboard_kpis_with_fallback(days=days, timeframe=timeframe)
             fallback_note = kpis["fallback_label"] if kpis["is_fallback"] else ""
             tf_label = kpis.get("timeframe_label", tf["label_long"])
 
