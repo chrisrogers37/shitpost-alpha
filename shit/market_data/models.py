@@ -5,7 +5,18 @@ SQLAlchemy models for tracking stock prices and prediction outcomes.
 
 from datetime import datetime, date
 from typing import Optional
-from sqlalchemy import Column, String, Date, DateTime, Float, BigInteger, ForeignKey, Integer, Boolean, Text
+from sqlalchemy import (
+    Column,
+    String,
+    Date,
+    DateTime,
+    Float,
+    BigInteger,
+    ForeignKey,
+    Integer,
+    Boolean,
+    Text,
+)
 from sqlalchemy.orm import relationship
 
 from shit.db.data_models import Base, TimestampMixin, IDMixin
@@ -17,7 +28,9 @@ class MarketPrice(Base, IDMixin, TimestampMixin):
     __tablename__ = "market_prices"
 
     # Asset identification
-    symbol = Column(String(20), nullable=False, index=True)  # Ticker symbol (AAPL, TSLA, BTC-USD, etc.)
+    symbol = Column(
+        String(20), nullable=False, index=True
+    )  # Ticker symbol (AAPL, TSLA, BTC-USD, etc.)
     date = Column(Date, nullable=False, index=True)  # Trading date
 
     # OHLCV data (Open, High, Low, Close, Volume)
@@ -32,7 +45,9 @@ class MarketPrice(Base, IDMixin, TimestampMixin):
 
     # Data source tracking
     source = Column(String(50), default="yfinance")  # yfinance, alpha_vantage, etc.
-    last_updated = Column(DateTime, default=datetime.utcnow)  # When this data was fetched
+    last_updated = Column(
+        DateTime, default=datetime.utcnow
+    )  # When this data was fetched
 
     # Metadata
     is_market_open = Column(Boolean, default=True)  # Was market open this day?
@@ -43,9 +58,7 @@ class MarketPrice(Base, IDMixin, TimestampMixin):
         return f"<MarketPrice(symbol='{self.symbol}', date={self.date}, close=${self.close})>"
 
     # Unique constraint on symbol + date (one price record per symbol per day)
-    __table_args__ = (
-        {'sqlite_autoincrement': True},
-    )
+    __table_args__ = ({"sqlite_autoincrement": True},)
 
 
 class PredictionOutcome(Base, IDMixin, TimestampMixin):
@@ -54,19 +67,33 @@ class PredictionOutcome(Base, IDMixin, TimestampMixin):
     __tablename__ = "prediction_outcomes"
 
     # Link to prediction
-    prediction_id = Column(Integer, ForeignKey("predictions.id"), nullable=False, index=True)
+    prediction_id = Column(
+        Integer, ForeignKey("predictions.id"), nullable=False, index=True
+    )
 
     # Asset being tracked
     symbol = Column(String(20), nullable=False, index=True)  # Ticker symbol
 
     # Prediction details (denormalized for easier querying)
-    prediction_date = Column(Date, nullable=False, index=True)  # When prediction was made
-    prediction_sentiment = Column(String(20), nullable=True)  # bullish, bearish, neutral
+    prediction_date = Column(
+        Date, nullable=False, index=True
+    )  # When prediction was made
+    prediction_sentiment = Column(
+        String(20), nullable=True
+    )  # bullish, bearish, neutral
     prediction_confidence = Column(Float, nullable=True)  # 0.0-1.0
     prediction_timeframe_days = Column(Integer, nullable=True)  # Expected timeframe
 
-    # Price at prediction time
+    # Post publication timestamp (full datetime for intraday calculations)
+    post_published_at = Column(DateTime, nullable=True)
+
+    # Price at prediction time (daily close)
     price_at_prediction = Column(Float, nullable=True)  # Price when prediction was made
+
+    # Intraday snapshot prices (captured once at prediction creation)
+    price_at_post = Column(Float, nullable=True)  # Price when post was published
+    price_at_next_close = Column(Float, nullable=True)  # Next market close after post
+    price_1h_after = Column(Float, nullable=True)  # 1 hour after post
 
     # Outcomes at different timeframes (T+N days)
     price_t1 = Column(Float, nullable=True)  # Price after 1 day
@@ -74,23 +101,37 @@ class PredictionOutcome(Base, IDMixin, TimestampMixin):
     price_t7 = Column(Float, nullable=True)  # Price after 7 days
     price_t30 = Column(Float, nullable=True)  # Price after 30 days
 
-    # Returns (percentage change)
-    return_t1 = Column(Float, nullable=True)  # % change after 1 day
-    return_t3 = Column(Float, nullable=True)  # % change after 3 days
-    return_t7 = Column(Float, nullable=True)  # % change after 7 days
-    return_t30 = Column(Float, nullable=True)  # % change after 30 days
+    # Returns (percentage change) -- daily timeframes (trading days)
+    return_t1 = Column(Float, nullable=True)  # T+1 trading day
+    return_t3 = Column(Float, nullable=True)  # T+3 trading days
+    return_t7 = Column(Float, nullable=True)  # T+7 trading days
+    return_t30 = Column(Float, nullable=True)  # T+30 trading days
 
-    # Accuracy validation (was prediction correct?)
-    correct_t1 = Column(Boolean, nullable=True)  # Correct at T+1?
-    correct_t3 = Column(Boolean, nullable=True)  # Correct at T+3?
-    correct_t7 = Column(Boolean, nullable=True)  # Correct at T+7?
-    correct_t30 = Column(Boolean, nullable=True)  # Correct at T+30?
+    # Returns -- intraday timeframes
+    return_same_day = Column(
+        Float, nullable=True
+    )  # price_at_post -> price_at_next_close
+    return_1h = Column(Float, nullable=True)  # price_at_post -> price_1h_after
 
-    # Profit/Loss simulation (assuming $1000 position)
-    pnl_t1 = Column(Float, nullable=True)  # P&L after 1 day
-    pnl_t3 = Column(Float, nullable=True)  # P&L after 3 days
-    pnl_t7 = Column(Float, nullable=True)  # P&L after 7 days
-    pnl_t30 = Column(Float, nullable=True)  # P&L after 30 days
+    # Accuracy validation -- daily timeframes
+    correct_t1 = Column(Boolean, nullable=True)
+    correct_t3 = Column(Boolean, nullable=True)
+    correct_t7 = Column(Boolean, nullable=True)
+    correct_t30 = Column(Boolean, nullable=True)
+
+    # Accuracy -- intraday timeframes
+    correct_same_day = Column(Boolean, nullable=True)
+    correct_1h = Column(Boolean, nullable=True)
+
+    # Profit/Loss simulation ($1000 position) -- daily
+    pnl_t1 = Column(Float, nullable=True)
+    pnl_t3 = Column(Float, nullable=True)
+    pnl_t7 = Column(Float, nullable=True)
+    pnl_t30 = Column(Float, nullable=True)
+
+    # P&L -- intraday
+    pnl_same_day = Column(Float, nullable=True)
+    pnl_1h = Column(Float, nullable=True)
 
     # Market context (for better analysis)
     market_volatility = Column(Float, nullable=True)  # VIX or calculated volatility
@@ -107,19 +148,25 @@ class PredictionOutcome(Base, IDMixin, TimestampMixin):
     def __repr__(self):
         return f"<PredictionOutcome(symbol='{self.symbol}', sentiment='{self.prediction_sentiment}', return_t7={self.return_t7}%)>"
 
-    def calculate_return(self, price_initial: float, price_final: Optional[float]) -> Optional[float]:
+    def calculate_return(
+        self, price_initial: float, price_final: Optional[float]
+    ) -> Optional[float]:
         """Calculate percentage return between two prices."""
         if price_initial is None or price_final is None or price_initial == 0:
             return None
         return ((price_final - price_initial) / price_initial) * 100
 
-    def calculate_pnl(self, return_pct: Optional[float], position_size: float = 1000.0) -> Optional[float]:
+    def calculate_pnl(
+        self, return_pct: Optional[float], position_size: float = 1000.0
+    ) -> Optional[float]:
         """Calculate P&L for a given return percentage and position size."""
         if return_pct is None:
             return None
         return (return_pct / 100) * position_size
 
-    def is_correct(self, sentiment: str, return_pct: Optional[float], threshold: float = 0.5) -> Optional[bool]:
+    def is_correct(
+        self, sentiment: str, return_pct: Optional[float], threshold: float = 0.5
+    ) -> Optional[bool]:
         """
         Determine if prediction was correct based on sentiment and actual return.
 
@@ -136,11 +183,11 @@ class PredictionOutcome(Base, IDMixin, TimestampMixin):
 
         sentiment = sentiment.lower()
 
-        if sentiment == 'bullish':
+        if sentiment == "bullish":
             return return_pct > threshold
-        elif sentiment == 'bearish':
+        elif sentiment == "bearish":
             return return_pct < -threshold
-        elif sentiment == 'neutral':
+        elif sentiment == "neutral":
             return abs(return_pct) <= threshold
         else:
             return None
@@ -177,7 +224,9 @@ class TickerRegistry(Base, IDMixin, TimestampMixin):
     total_price_records = Column(Integer, default=0)
 
     # Metadata
-    asset_type = Column(String(20), nullable=True)  # stock, crypto, etf, commodity, index
+    asset_type = Column(
+        String(20), nullable=True
+    )  # stock, crypto, etf, commodity, index
     exchange = Column(String(20), nullable=True)  # NYSE, NASDAQ, etc.
 
     def __repr__(self):
@@ -188,8 +237,12 @@ class TickerRegistry(Base, IDMixin, TimestampMixin):
 from sqlalchemy import Index
 
 # Create composite indexes for common queries
-Index('idx_market_price_symbol_date', MarketPrice.symbol, MarketPrice.date, unique=True)
-Index('idx_prediction_outcome_symbol_date', PredictionOutcome.symbol, PredictionOutcome.prediction_date)
-Index('idx_prediction_outcome_prediction_id', PredictionOutcome.prediction_id)
-Index('idx_ticker_registry_symbol', TickerRegistry.symbol, unique=True)
-Index('idx_ticker_registry_status', TickerRegistry.status)
+Index("idx_market_price_symbol_date", MarketPrice.symbol, MarketPrice.date, unique=True)
+Index(
+    "idx_prediction_outcome_symbol_date",
+    PredictionOutcome.symbol,
+    PredictionOutcome.prediction_date,
+)
+Index("idx_prediction_outcome_prediction_id", PredictionOutcome.prediction_id)
+Index("idx_ticker_registry_symbol", TickerRegistry.symbol, unique=True)
+Index("idx_ticker_registry_status", TickerRegistry.status)
