@@ -181,6 +181,68 @@ def calculate_outcomes(limit: Optional[int], days: Optional[int], force: bool):
         raise click.Abort()
 
 
+@cli.command(name="fix-sentiments")
+@click.option("--dry-run", is_flag=True, help="Show what would be recalculated without making changes")
+def fix_sentiments(dry_run: bool):
+    """Recalculate outcomes for multi-asset predictions with incorrect sentiment.
+
+    Finds predictions with multiple assets where market_impact has per-asset
+    sentiment data, then force-refreshes their outcomes so each asset gets
+    its correct sentiment from the market_impact dict.
+    """
+    from shitvault.shitpost_models import Prediction
+    from sqlalchemy import func
+
+    print_info("Finding multi-asset predictions to fix sentiment...")
+
+    try:
+        with OutcomeCalculator() as calculator:
+            preds = (
+                calculator.session.query(Prediction)
+                .filter(
+                    Prediction.analysis_status == "completed",
+                    Prediction.assets.isnot(None),
+                    Prediction.market_impact.isnot(None),
+                    func.jsonb_array_length(Prediction.assets) > 1,
+                )
+                .all()
+            )
+
+            rprint(f"\n  Found [bold]{len(preds)}[/bold] multi-asset predictions")
+
+            if dry_run:
+                for pred in preds:
+                    rprint(
+                        f"  Would recalculate prediction {pred.id}: "
+                        f"assets={pred.assets}, market_impact={pred.market_impact}"
+                    )
+                print_info("Dry run complete — no changes made")
+                return
+
+            recalculated = 0
+            errors = 0
+
+            for pred in preds:
+                try:
+                    outcomes = calculator.calculate_outcome_for_prediction(
+                        pred.id, force_refresh=True
+                    )
+                    recalculated += len(outcomes)
+                except Exception as e:
+                    errors += 1
+                    rprint(f"  [red]Error recalculating prediction {pred.id}: {e}[/red]")
+
+            rprint(f"\n  Recalculated: [green]{recalculated}[/green] outcomes")
+            if errors:
+                rprint(f"  Errors: [red]{errors}[/red]")
+
+            print_success(f"✅ Fixed sentiments for {len(preds)} predictions")
+
+    except Exception as e:
+        print_error(f"❌ Error fixing sentiments: {e}")
+        raise click.Abort()
+
+
 @cli.command(name="mature-outcomes")
 @click.option("--limit", "-l", type=int, help="Limit number of incomplete outcomes to process")
 @click.option("--emit-event", is_flag=True, help="Emit outcomes_matured event when done")
