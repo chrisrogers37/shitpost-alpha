@@ -1,3 +1,7 @@
+✅ COMPLETE
+Started: 2026-03-04
+Completed: 2026-03-04
+
 # Phase 04: Multi-Timeframe Dashboard
 
 **PR Title:** feat: add timeframe selector and thread T+1/T+3/T+7/T+30 through all dashboard layers
@@ -22,11 +26,20 @@ This phase adds a **Timeframe Selector** button group to the dashboard, creates 
 
 ## Dependencies
 
-- **None** — This phase can be implemented independently. No other phase modifies the same files.
+- **Phase 03** (PR #106) — Added `_timeframe_for_period()` and adaptive timeframe logic. Phase 04 supersedes this with explicit timeframe selection.
 
 ## Unlocks
 
 - **None** — Standalone enhancement.
+
+---
+
+## Challenge Round Decisions (2026-03-04)
+
+1. **Remove `_timeframe_for_period()`**: Phase 03's auto-selection logic is superseded by the explicit timeframe selector. Remove from `data/base.py` and all callsites. `data/timeframe.py` becomes the single source of truth.
+2. **Replace screener `timeframe_label` with `timeframe`**: `build_screener_table()` gets `timeframe: str = "t7"` instead of `timeframe_label: str = "7d"`. Label derived internally via `get_tf_columns()`.
+3. **Implement from current code**: Plan's before/after examples are stale (Phase 03 shifted line numbers and modified content.py). Implementation follows the plan's intent against the actual current codebase.
+4. **Rename all `_t7` suffixed dict keys**: `avg_return_t7` → `avg_return`, `accuracy_t7` → `accuracy`, etc. across all query functions and their consumers (including tests).
 
 ---
 
