@@ -21,19 +21,20 @@ from components.sparkline import (
     create_sparkline_component,
     create_sparkline_placeholder,
 )
+from components.utils import safe_get
 
 
 def create_signal_card(row):
     """Create a signal card for recent predictions with time-ago format."""
-    timestamp = row.get("timestamp")
-    text_content = row.get("text", "")
+    timestamp = safe_get(row, "timestamp")
+    text_content = safe_get(row, "text", "")
     text_content = strip_urls(text_content)
     preview = text_content[:120] + "..." if len(text_content) > 120 else text_content
-    confidence = row.get("confidence", 0)
-    assets = row.get("assets", [])
-    market_impact = row.get("market_impact", {})
-    correct_t7 = row.get("correct_t7")
-    pnl_t7 = row.get("pnl_t7")
+    confidence = safe_get(row, "confidence", 0)
+    assets = safe_get(row, "assets", [])
+    market_impact = safe_get(row, "market_impact", {})
+    correct_t7 = safe_get(row, "correct_t7")
+    pnl_t7 = safe_get(row, "pnl_t7")
 
     # Determine sentiment from market_impact
     sentiment = extract_sentiment(market_impact)
@@ -137,20 +138,20 @@ def create_unified_signal_card(row, sparkline_prices: dict = None) -> html.Div:
     Returns:
         html.Div containing the rendered card.
     """
-    timestamp = row.get("timestamp")
-    text_content = row.get("text", "")
+    timestamp = safe_get(row, "timestamp")
+    text_content = safe_get(row, "text", "")
     text_content = strip_urls(text_content)
     preview = text_content[:200] + "..." if len(text_content) > 200 else text_content
-    confidence = row.get("confidence", 0)
-    assets = row.get("assets", [])
-    market_impact = row.get("market_impact", {})
-    thesis = row.get("thesis", "")
+    confidence = safe_get(row, "confidence", 0)
+    assets = safe_get(row, "assets", [])
+    market_impact = safe_get(row, "market_impact", {})
+    thesis = safe_get(row, "thesis", "")
 
     # Aggregated outcome data (from GROUP BY query)
-    outcome_count = row.get("outcome_count", 0) or 0
-    correct_count = row.get("correct_count", 0) or 0
-    incorrect_count = row.get("incorrect_count", 0) or 0
-    total_pnl_t7 = row.get("total_pnl_t7")
+    outcome_count = safe_get(row, "outcome_count", 0) or 0
+    correct_count = safe_get(row, "correct_count", 0) or 0
+    incorrect_count = safe_get(row, "incorrect_count", 0) or 0
+    total_pnl_t7 = safe_get(row, "total_pnl_t7")
 
     # Derive overall correctness from aggregated counts
     if outcome_count > 0 and correct_count + incorrect_count > 0:

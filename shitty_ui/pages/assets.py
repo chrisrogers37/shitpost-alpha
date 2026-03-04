@@ -6,6 +6,7 @@ from dash import Dash, html, dcc, Input, Output, callback_context
 import dash_bootstrap_components as dbc
 
 from constants import COLORS, CHART_CONFIG
+from components.utils import safe_format_pct, safe_format_dollar
 from components.charts import build_annotated_price_chart, build_empty_signal_chart
 from components.cards import (
     create_error_card,
@@ -343,12 +344,12 @@ def register_asset_callbacks(app: Dash):
                     dbc.Col(
                         create_metric_card(
                             "Total P&L (7-day)",
-                            f"${stats['total_pnl_t7']:,.0f}",
+                            safe_format_dollar(stats["total_pnl_t7"], fmt=",.0f"),
                             "Based on $1,000 positions",
                             "dollar-sign",
                             (
                                 COLORS["success"]
-                                if stats["total_pnl_t7"] > 0
+                                if (stats["total_pnl_t7"] or 0) > 0
                                 else COLORS["danger"]
                             ),
                         ),
@@ -358,12 +359,12 @@ def register_asset_callbacks(app: Dash):
                     dbc.Col(
                         create_metric_card(
                             "Avg 7-Day Return",
-                            f"{stats['avg_return_t7']:+.2f}%",
+                            safe_format_pct(stats["avg_return_t7"]),
                             f"Confidence: {stats['avg_confidence']:.0%}",
                             "chart-line",
                             (
                                 COLORS["success"]
-                                if stats["avg_return_t7"] > 0
+                                if (stats["avg_return_t7"] or 0) > 0
                                 else COLORS["danger"]
                             ),
                         ),

@@ -10,6 +10,7 @@ from dash import html, dcc
 
 from constants import COLORS
 from components.cards import strip_urls, get_sentiment_style
+from components.utils import safe_get
 
 
 def create_prediction_timeline_card(row: dict) -> html.Div:
@@ -22,16 +23,16 @@ def create_prediction_timeline_card(row: dict) -> html.Div:
     Returns:
         html.Div component for one timeline entry
     """
-    prediction_date = row.get("prediction_date")
-    timestamp = row.get("timestamp")
-    tweet_text = row.get("text", "")
-    sentiment = row.get("prediction_sentiment", "neutral")
-    confidence = row.get("prediction_confidence", 0)
-    return_t7 = row.get("return_t7")
-    correct_t7 = row.get("correct_t7")
-    pnl_t7 = row.get("pnl_t7")
-    price_at = row.get("price_at_prediction")
-    price_after = row.get("price_t7")
+    prediction_date = safe_get(row, "prediction_date")
+    timestamp = safe_get(row, "timestamp")
+    tweet_text = safe_get(row, "text", "")
+    sentiment = safe_get(row, "prediction_sentiment", "neutral")
+    confidence = safe_get(row, "prediction_confidence", 0)
+    return_t7 = safe_get(row, "return_t7")
+    correct_t7 = safe_get(row, "correct_t7")
+    pnl_t7 = safe_get(row, "pnl_t7")
+    price_at = safe_get(row, "price_at_prediction")
+    price_after = safe_get(row, "price_t7")
 
     # Sentiment styling
     s_style = get_sentiment_style(sentiment)
@@ -232,9 +233,9 @@ def create_related_asset_link(row: dict) -> html.Div:
     Returns:
         html.Div component
     """
-    symbol = row.get("related_symbol", "???")
-    count = row.get("co_occurrence_count", 0)
-    avg_return = row.get("avg_return_t7")
+    symbol = safe_get(row, "related_symbol", "???")
+    count = safe_get(row, "co_occurrence_count", 0)
+    avg_return = safe_get(row, "avg_return_t7")
 
     return_color = COLORS["text_muted"]
     return_str = "--"

@@ -11,6 +11,7 @@ from dash import Dash, html, Input, Output
 import dash_bootstrap_components as dbc
 
 from constants import COLORS
+from components.utils import safe_format_pct, safe_format_dollar
 from components.cards import (
     create_error_card,
     create_metric_card,
@@ -127,11 +128,11 @@ def register_content_callbacks(app: Dash) -> None:
                     dbc.Col(
                         create_metric_card(
                             COPY["kpi_avg_return_title"],
-                            f"{kpis['avg_return_t7']:+.2f}%",
+                            safe_format_pct(kpis["avg_return_t7"]),
                             COPY["kpi_avg_return_subtitle"],
                             "chart-line",
                             COLORS["success"]
-                            if kpis["avg_return_t7"] > 0
+                            if (kpis["avg_return_t7"] or 0) > 0
                             else COLORS["danger"],
                             note=fallback_note,
                         ),
@@ -143,11 +144,11 @@ def register_content_callbacks(app: Dash) -> None:
                     dbc.Col(
                         create_metric_card(
                             COPY["kpi_pnl_title"],
-                            f"${kpis['total_pnl']:+,.0f}",
+                            safe_format_dollar(kpis["total_pnl"]),
                             COPY["kpi_pnl_subtitle"],
                             "dollar-sign",
                             COLORS["success"]
-                            if kpis["total_pnl"] > 0
+                            if (kpis["total_pnl"] or 0) > 0
                             else COLORS["danger"],
                             note=fallback_note,
                         ),

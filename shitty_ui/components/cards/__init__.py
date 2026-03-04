@@ -90,11 +90,11 @@ from components.cards.signal import (  # noqa: E402
     create_unified_signal_card,
 )
 from components.cards.feed import (  # noqa: E402
-    _safe_get,
     _build_expandable_thesis,
     create_feed_signal_card,
     create_new_signals_banner,
 )
+from components.utils import safe_get  # noqa: E402
 from components.cards.post import create_post_card  # noqa: E402
 from components.cards.timeline import (  # noqa: E402
     create_prediction_timeline_card,
@@ -119,7 +119,7 @@ __all__ = [
     "create_signal_card",
     "create_unified_signal_card",
     # Feed
-    "_safe_get",
+    "safe_get",
     "_build_expandable_thesis",
     "create_feed_signal_card",
     "create_new_signals_banner",
