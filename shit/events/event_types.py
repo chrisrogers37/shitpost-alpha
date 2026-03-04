@@ -13,6 +13,7 @@ class EventType:
     SIGNALS_STORED = "signals_stored"
     PREDICTION_CREATED = "prediction_created"
     PRICES_BACKFILLED = "prices_backfilled"
+    OUTCOMES_MATURED = "outcomes_matured"
 
 
 class ConsumerGroup:
@@ -39,6 +40,9 @@ CONSUMER_GROUPS: dict[str, list[str]] = {
     ],
     EventType.PRICES_BACKFILLED: [
         # Terminal event - no downstream consumers
+    ],
+    EventType.OUTCOMES_MATURED: [
+        # Terminal event - audit trail only, no downstream consumers yet
     ],
 }
 
@@ -69,5 +73,12 @@ PAYLOAD_SCHEMAS: dict[str, dict] = {
         "prediction_id": "int - triggering prediction ID",
         "assets_backfilled": "int - number of assets backfilled",
         "outcomes_calculated": "int - number of outcomes calculated",
+    },
+    EventType.OUTCOMES_MATURED: {
+        "total_incomplete": "int - number of incomplete outcomes found",
+        "matured": "int - number of outcomes that were re-evaluated",
+        "newly_complete": "int - outcomes that reached is_complete=True",
+        "still_incomplete": "int - outcomes still waiting for future timeframes",
+        "errors": "int - number of errors encountered",
     },
 }

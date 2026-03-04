@@ -47,6 +47,11 @@
       "startCommand": "python -m shit.events cleanup",
       "cronSchedule": "0 3 * * *"
     },
+    "outcome-maturation": {
+      "source": ".",
+      "startCommand": "python -m shit.market_data mature-outcomes --emit-event",
+      "cronSchedule": "0 6 * * *"
+    },
     "shitpost-alpha-dash": {
       "source": ".",
       "startCommand": "cd shitty_ui && python app.py"

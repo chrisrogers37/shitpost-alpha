@@ -181,6 +181,46 @@ def calculate_outcomes(limit: Optional[int], days: Optional[int], force: bool):
         raise click.Abort()
 
 
+@cli.command(name="mature-outcomes")
+@click.option("--limit", "-l", type=int, help="Limit number of incomplete outcomes to process")
+@click.option("--emit-event", is_flag=True, help="Emit outcomes_matured event when done")
+def mature_outcomes(limit: Optional[int], emit_event: bool):
+    """Re-evaluate incomplete prediction outcomes to fill matured timeframes.
+
+    Finds all prediction_outcomes where is_complete=False and re-runs
+    outcome calculation for any timeframes that have now matured.
+    This fills in T+7 and T+30 values that were NULL at initial creation.
+    """
+    print_info("Maturing incomplete prediction outcomes...")
+
+    try:
+        with OutcomeCalculator() as calculator:
+            stats = calculator.mature_outcomes(
+                limit=limit, emit_event=emit_event
+            )
+
+            # Print statistics
+            rprint("\n[bold]Outcome Maturation Results:[/bold]")
+            rprint(f"  Incomplete outcomes found: {stats['total_incomplete']}")
+            rprint(f"  Outcomes re-evaluated: {stats['matured']}")
+            rprint(f"  Newly complete: [green]{stats['newly_complete']}[/green]")
+            rprint(f"  Still incomplete: [yellow]{stats['still_incomplete']}[/yellow]")
+            rprint(f"  Errors: [red]{stats['errors']}[/red]")
+
+            if stats["newly_complete"] > 0:
+                print_success(
+                    f"✅ {stats['newly_complete']} outcomes are now fully complete"
+                )
+            elif stats["matured"] > 0:
+                print_info("Some outcomes updated but still have future timeframes pending")
+            else:
+                print_info("No incomplete outcomes found to mature")
+
+    except Exception as e:
+        print_error(f"❌ Error maturing outcomes: {e}")
+        raise click.Abort()
+
+
 @cli.command()
 @click.option(
     "--timeframe",
