@@ -33,7 +33,8 @@ def get_asset_screener_data(
         incorrect, avg_return, total_pnl, accuracy, latest_sentiment,
         avg_confidence, timeframe. Sorted by total_predictions descending.
     """
-    tf_cols = get_tf_columns(timeframe)
+    # Validate timeframe key; use raw key for column interpolation
+    get_tf_columns(timeframe)
     tf = timeframe
 
     date_filter = ""
