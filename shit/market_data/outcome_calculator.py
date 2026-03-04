@@ -1,16 +1,25 @@
 """
 Prediction Outcome Calculator
 Calculates actual outcomes for predictions by comparing with real market data.
+
+Timeframe semantics (v2 -- trading-day based):
+- T+1 = 1 trading day after the post date (Friday -> Monday)
+- T+3 = 3 trading days after the post date
+- T+7 = 7 trading days after the post date (~1.5 calendar weeks)
+- T+30 = 30 trading days after the post date (~6 calendar weeks)
+- same_day = price_at_post -> next market close
+- 1h = price_at_post -> 1 hour after post
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
-import logging
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_
 
-from shit.market_data.models import PredictionOutcome, MarketPrice
+from shit.market_data.models import PredictionOutcome
 from shit.market_data.client import MarketDataClient
+from shit.market_data.market_calendar import MarketCalendar
+from shit.market_data.intraday_provider import fetch_intraday_snapshot
 from shit.db.sync_session import get_session
 from shit.logging import get_service_logger
 from shitvault.shitpost_models import Prediction  # noqa: F401
@@ -20,7 +29,11 @@ logger = get_service_logger("outcome_calculator")
 
 
 class OutcomeCalculator:
-    """Calculates prediction outcomes by comparing predictions with actual market data."""
+    """Calculates prediction outcomes by comparing predictions with actual market data.
+
+    Uses trading-day offsets (via MarketCalendar) for all timeframe calculations.
+    T+1 means "1 trading day later" (Friday -> Monday), not "1 calendar day later".
+    """
 
     def __init__(self, session: Optional[Session] = None):
         """
@@ -33,6 +46,7 @@ class OutcomeCalculator:
         self._session_context = None
         self._own_session = session is None
         self._failed_symbols: set = set()  # Cache of symbols that failed price fetch
+        self._calendar = MarketCalendar()
 
     def __enter__(self):
         if self._own_session:
@@ -58,7 +72,7 @@ class OutcomeCalculator:
         Returns:
             List of PredictionOutcome objects (one per asset)
         """
-        from shitvault.shitpost_models import Prediction
+        from shitvault.shitpost_models import Prediction  # noqa: F811
 
         # Get prediction
         prediction = (
@@ -99,6 +113,9 @@ class OutcomeCalculator:
             )
             return []
 
+        # Full datetime for intraday price lookups
+        post_datetime = self._get_source_datetime(prediction)
+
         outcomes = []
 
         # Calculate outcome for each asset
@@ -118,6 +135,7 @@ class OutcomeCalculator:
                     sentiment=sentiment,
                     confidence=prediction.confidence,
                     force_refresh=force_refresh,
+                    post_datetime=post_datetime,
                 )
                 if outcome:
                     outcomes.append(outcome)
@@ -145,6 +163,7 @@ class OutcomeCalculator:
         sentiment: Optional[str],
         confidence: Optional[float],
         force_refresh: bool = False,
+        post_datetime: Optional[datetime] = None,
     ) -> Optional[PredictionOutcome]:
         """Calculate outcome for a single asset prediction."""
 
@@ -226,7 +245,9 @@ class OutcomeCalculator:
 
         outcome.price_at_prediction = price_t0.close
 
-        # Calculate outcomes for different timeframes
+        # Calculate outcomes for trading-day timeframes
+        # NOTE: These are TRADING DAYS, not calendar days.
+        # T+1 on Friday = Monday. T+1 before a holiday skips the holiday.
         timeframes = [
             (1, "price_t1", "return_t1", "correct_t1", "pnl_t1"),
             (3, "price_t3", "return_t3", "correct_t3", "pnl_t3"),
@@ -236,8 +257,10 @@ class OutcomeCalculator:
 
         outcome.is_complete = True  # Assume complete until we find missing data
 
-        for days, price_attr, return_attr, correct_attr, pnl_attr in timeframes:
-            target_date = prediction_date + timedelta(days=days)
+        for trading_days, price_attr, return_attr, correct_attr, pnl_attr in timeframes:
+            target_date = self._calendar.trading_day_offset(
+                prediction_date, trading_days
+            )
 
             # Skip future dates
             if target_date > date.today():
@@ -248,15 +271,16 @@ class OutcomeCalculator:
             if getattr(outcome, price_attr) is not None:
                 continue
 
-            # Get price at T+N
+            # Get price at T+N (trading days)
             price_tn = self.market_client.get_price_on_date(symbol, target_date)
 
             if not price_tn:
-                # Try to fetch it
+                # Try to fetch it -- use calendar-aware window for the fetch range
+                fetch_start = self._calendar.previous_trading_day(target_date)
                 try:
                     self.market_client.fetch_price_history(
                         symbol,
-                        start_date=target_date - timedelta(days=7),
+                        start_date=fetch_start,
                         end_date=target_date,
                     )
                     price_tn = self.market_client.get_price_on_date(symbol, target_date)
@@ -285,6 +309,76 @@ class OutcomeCalculator:
                 setattr(outcome, pnl_attr, pnl)
             else:
                 outcome.is_complete = False
+
+        # -- Intraday timeframes (same-day close, +1 hour) --------------------
+        # Only attempt for predictions where we have the full post datetime
+        if post_datetime and price_t0:
+            outcome.post_published_at = post_datetime
+
+            # Only fetch intraday for outcomes that don't already have it
+            if outcome.price_at_post is None:
+                try:
+                    snapshot = fetch_intraday_snapshot(symbol, post_datetime)
+                    outcome.price_at_post = snapshot.price_at_post
+                    outcome.price_1h_after = snapshot.price_1h_after
+                    # Prefer daily close from MarketPrice over intraday last bar
+                    if outcome.price_at_next_close is None:
+                        # Get the next trading day's close for "same-day close"
+                        next_close_date = self._calendar.nearest_trading_day(
+                            post_datetime.date()
+                        )
+                        # If post is after market close, next close is next trading day
+                        if self._calendar.is_trading_day(post_datetime.date()):
+                            close_time = self._calendar.session_close_time(
+                                post_datetime.date()
+                            )
+                            if close_time and post_datetime >= close_time:
+                                next_close_date = self._calendar.next_trading_day(
+                                    post_datetime.date()
+                                )
+                        next_close_price = self.market_client.get_price_on_date(
+                            symbol, next_close_date
+                        )
+                        if next_close_price:
+                            outcome.price_at_next_close = next_close_price.close
+                        elif snapshot.price_at_next_close:
+                            outcome.price_at_next_close = snapshot.price_at_next_close
+                except Exception as e:
+                    logger.debug(
+                        f"Intraday snapshot failed for {symbol}: {e}",
+                        extra={"symbol": symbol, "error": str(e)},
+                    )
+
+            # Calculate intraday returns (from price_at_post, not price_at_prediction)
+            base_price = outcome.price_at_post
+            if base_price and base_price > 0:
+                # Same-day close return
+                if outcome.price_at_next_close is not None:
+                    outcome.return_same_day = outcome.calculate_return(
+                        base_price, outcome.price_at_next_close
+                    )
+                    outcome.correct_same_day = (
+                        outcome.is_correct(sentiment, outcome.return_same_day)
+                        if sentiment
+                        else None
+                    )
+                    outcome.pnl_same_day = outcome.calculate_pnl(
+                        outcome.return_same_day, position_size=1000.0
+                    )
+
+                # 1-hour return
+                if outcome.price_1h_after is not None:
+                    outcome.return_1h = outcome.calculate_return(
+                        base_price, outcome.price_1h_after
+                    )
+                    outcome.correct_1h = (
+                        outcome.is_correct(sentiment, outcome.return_1h)
+                        if sentiment
+                        else None
+                    )
+                    outcome.pnl_1h = outcome.calculate_pnl(
+                        outcome.return_1h, position_size=1000.0
+                    )
 
         outcome.last_price_update = date.today()
 
@@ -324,7 +418,7 @@ class OutcomeCalculator:
         Returns:
             Dict with statistics about processed predictions
         """
-        from shitvault.shitpost_models import Prediction
+        from shitvault.shitpost_models import Prediction  # noqa: F811
 
         query = self.session.query(Prediction).filter(
             Prediction.analysis_status == "completed"
@@ -380,7 +474,7 @@ class OutcomeCalculator:
                 )
                 stats["errors"] += 1
 
-        logger.info(f"Completed outcome calculation", extra=stats)
+        logger.info("Completed outcome calculation", extra=stats)
 
         return stats
 
@@ -537,6 +631,45 @@ class OutcomeCalculator:
             "accuracy": round(accuracy, 2),
         }
 
+    def _get_source_datetime(self, prediction) -> Optional[datetime]:
+        """Get the full datetime of the source post publication.
+
+        Unlike ``_get_source_date`` which returns only a date, this returns
+        the full datetime including time-of-day -- needed for intraday
+        price lookups (price_at_post, price_1h_after).
+
+        Returns:
+            Timezone-aware datetime (UTC), or None.
+        """
+        # Truth Social shitpost timestamp
+        try:
+            if prediction.shitpost and prediction.shitpost.timestamp:
+                ts = prediction.shitpost.timestamp
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                return ts
+        except Exception:
+            pass
+
+        # Source-agnostic signal published_at
+        try:
+            if prediction.signal and prediction.signal.published_at:
+                ts = prediction.signal.published_at
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                return ts
+        except Exception:
+            pass
+
+        # Fallback: prediction creation time
+        if prediction.created_at:
+            ts = prediction.created_at
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            return ts
+
+        return None
+
     def _get_source_date(self, prediction) -> Optional[date]:
         """Get the correct anchor date for a prediction from the original post timestamp.
 
@@ -544,31 +677,14 @@ class OutcomeCalculator:
         Truth Social / another platform), NOT prediction.created_at (when
         analysis was performed).  Falls back to created_at only when no source
         timestamp is available.
+
+        Delegates to ``_get_source_datetime`` for the actual timestamp extraction,
+        then returns just the date portion.
         """
-        # Truth Social shitpost timestamp
-        try:
-            if prediction.shitpost and prediction.shitpost.timestamp:
-                return prediction.shitpost.timestamp.date()
-        except Exception:
-            pass
-
-        # Source-agnostic signal published_at
-        try:
-            if prediction.signal and prediction.signal.published_at:
-                return prediction.signal.published_at.date()
-        except Exception:
-            pass
-
-        # Fallback: prediction creation time (analysis time)
-        if prediction.created_at:
-            logger.debug(
-                f"Prediction {prediction.id}: falling back to created_at "
-                f"(no shitpost/signal timestamp found)",
-                extra={"prediction_id": prediction.id},
-            )
-            return prediction.created_at.date()
-
-        return None
+        dt = self._get_source_datetime(prediction)
+        if dt is None:
+            return None
+        return dt.date()
 
     def _extract_sentiment(
         self, market_impact: Dict[str, Any], asset: Optional[str] = None
