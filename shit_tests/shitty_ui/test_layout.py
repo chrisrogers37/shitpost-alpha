@@ -186,9 +186,9 @@ class TestCreateApp:
             "evaluated_predictions": 0,
             "correct_predictions": 0,
             "incorrect_predictions": 0,
-            "accuracy_t7": 0.0,
-            "avg_return_t7": 0.0,
-            "total_pnl_t7": 0.0,
+            "accuracy": 0.0,
+            "avg_return": 0.0,
+            "total_pnl": 0.0,
             "avg_confidence": 0.0,
         }
         mock_conf_acc.return_value = pd.DataFrame()
@@ -232,9 +232,9 @@ class TestCreateApp:
             "evaluated_predictions": 0,
             "correct_predictions": 0,
             "incorrect_predictions": 0,
-            "accuracy_t7": 0.0,
-            "avg_return_t7": 0.0,
-            "total_pnl_t7": 0.0,
+            "accuracy": 0.0,
+            "avg_return": 0.0,
+            "total_pnl": 0.0,
             "avg_confidence": 0.0,
         }
         mock_conf_acc.return_value = pd.DataFrame()
@@ -550,9 +550,9 @@ class TestRegisterCallbacks:
             "evaluated_predictions": 0,
             "correct_predictions": 0,
             "incorrect_predictions": 0,
-            "accuracy_t7": 0.0,
-            "avg_return_t7": 0.0,
-            "total_pnl_t7": 0.0,
+            "accuracy": 0.0,
+            "avg_return": 0.0,
+            "total_pnl": 0.0,
             "avg_confidence": 0.0,
         }
         mock_conf_acc.return_value = pd.DataFrame()
@@ -844,9 +844,9 @@ class TestLoadingStates:
             "evaluated_predictions": 0,
             "correct_predictions": 0,
             "incorrect_predictions": 0,
-            "accuracy_t7": 0.0,
-            "avg_return_t7": 0.0,
-            "total_pnl_t7": 0.0,
+            "accuracy": 0.0,
+            "avg_return": 0.0,
+            "total_pnl": 0.0,
             "avg_confidence": 0.0,
         }
         mock_conf_acc.return_value = pd.DataFrame()
@@ -894,9 +894,9 @@ class TestTimePeriodSelector:
             "evaluated_predictions": 0,
             "correct_predictions": 0,
             "incorrect_predictions": 0,
-            "accuracy_t7": 0.0,
-            "avg_return_t7": 0.0,
-            "total_pnl_t7": 0.0,
+            "accuracy": 0.0,
+            "avg_return": 0.0,
+            "total_pnl": 0.0,
             "avg_confidence": 0.0,
         }
         mock_conf_acc.return_value = pd.DataFrame()
@@ -944,9 +944,9 @@ class TestRefreshIndicator:
             "evaluated_predictions": 0,
             "correct_predictions": 0,
             "incorrect_predictions": 0,
-            "accuracy_t7": 0.0,
-            "avg_return_t7": 0.0,
-            "total_pnl_t7": 0.0,
+            "accuracy": 0.0,
+            "avg_return": 0.0,
+            "total_pnl": 0.0,
             "avg_confidence": 0.0,
         }
         mock_conf_acc.return_value = pd.DataFrame()
@@ -1677,8 +1677,8 @@ class TestClientSideRoutes:
     }
     _mock_perf = {
         "total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0,
-        "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0,
-        "total_pnl_t7": 0.0, "avg_confidence": 0.0,
+        "incorrect_predictions": 0, "accuracy": 0.0, "avg_return": 0.0,
+        "total_pnl": 0.0, "avg_confidence": 0.0,
     }
 
     @patch("data.get_prediction_stats")
@@ -1894,7 +1894,7 @@ class TestCSSExternalFile:
     ):
         """Test that index_string no longer has an embedded <style> block."""
         mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy": 0.0, "avg_return": 0.0, "total_pnl": 0.0, "avg_confidence": 0.0}
         mock_conf_acc.return_value = pd.DataFrame()
         mock_asset_acc.return_value = pd.DataFrame()
         mock_signals.return_value = pd.DataFrame()
@@ -1919,7 +1919,7 @@ class TestViewportMetaTag:
     ):
         """Test that app index_string contains viewport meta tag for mobile."""
         mock_stats.return_value = {"total_posts": 0, "analyzed_posts": 0, "completed_analyses": 0, "bypassed_posts": 0, "avg_confidence": 0.0, "high_confidence_predictions": 0}
-        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy_t7": 0.0, "avg_return_t7": 0.0, "total_pnl_t7": 0.0, "avg_confidence": 0.0}
+        mock_perf.return_value = {"total_outcomes": 0, "evaluated_predictions": 0, "correct_predictions": 0, "incorrect_predictions": 0, "accuracy": 0.0, "avg_return": 0.0, "total_pnl": 0.0, "avg_confidence": 0.0}
         mock_conf_acc.return_value = pd.DataFrame()
         mock_asset_acc.return_value = pd.DataFrame()
         mock_signals.return_value = pd.DataFrame()

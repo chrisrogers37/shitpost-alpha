@@ -1052,11 +1052,11 @@ class TestNanResilience:
         assert "nan" not in text.lower()
 
     def test_related_asset_link_nan_return(self):
-        """Related asset link handles NaN avg_return_t7."""
+        """Related asset link handles NaN avg_return."""
         card = create_related_asset_link({
             "related_symbol": "TSLA",
             "co_occurrence_count": 3,
-            "avg_return_t7": float("nan"),
+            "avg_return": float("nan"),
         })
         text = _extract_text(card)
         assert "nan" not in text.lower()

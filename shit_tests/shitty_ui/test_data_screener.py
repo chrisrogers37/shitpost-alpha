@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
 from data import get_asset_screener_data, get_screener_sparkline_prices
-from data.base import _timeframe_for_period
 
 
 @pytest.fixture(autouse=True)
@@ -186,30 +185,8 @@ class TestGetScreenerSparklinePrices:
         assert len(df) == 3
 
 
-class TestTimeframeForPeriod:
-    """Tests for _timeframe_for_period helper."""
-
-    def test_7d_returns_t1(self):
-        assert _timeframe_for_period(7) == "t1"
-
-    def test_30d_returns_t3(self):
-        assert _timeframe_for_period(30) == "t3"
-
-    def test_90d_returns_t7(self):
-        assert _timeframe_for_period(90) == "t7"
-
-    def test_none_returns_t7(self):
-        assert _timeframe_for_period(None) == "t7"
-
-    def test_1d_returns_t1(self):
-        assert _timeframe_for_period(1) == "t1"
-
-    def test_14d_returns_t3(self):
-        assert _timeframe_for_period(14) == "t3"
-
-
-class TestAdaptiveTimeframeScreener:
-    """Tests for adaptive timeframe in get_asset_screener_data."""
+class TestExplicitTimeframeScreener:
+    """Tests for explicit timeframe parameter in get_asset_screener_data."""
 
     @pytest.fixture(autouse=True)
     def _clear(self):
@@ -218,26 +195,26 @@ class TestAdaptiveTimeframeScreener:
         get_asset_screener_data.clear_cache()
 
     @patch("data.base.execute_query")
-    def test_7d_uses_t1_columns(self, mock_query):
+    def test_t1_uses_t1_columns(self, mock_query):
         mock_query.return_value = ([], [])
-        get_asset_screener_data(days=7)
+        get_asset_screener_data(timeframe="t1")
         query_text = str(mock_query.call_args[0][0])
         assert "correct_t1" in query_text
         assert "return_t1" in query_text
         assert "pnl_t1" in query_text
 
     @patch("data.base.execute_query")
-    def test_30d_uses_t3_columns(self, mock_query):
+    def test_t3_uses_t3_columns(self, mock_query):
         mock_query.return_value = ([], [])
-        get_asset_screener_data(days=30)
+        get_asset_screener_data(timeframe="t3")
         query_text = str(mock_query.call_args[0][0])
         assert "correct_t3" in query_text
         assert "return_t3" in query_text
 
     @patch("data.base.execute_query")
-    def test_alltime_uses_t7_columns(self, mock_query):
+    def test_default_uses_t7_columns(self, mock_query):
         mock_query.return_value = ([], [])
-        get_asset_screener_data(days=None)
+        get_asset_screener_data()
         query_text = str(mock_query.call_args[0][0])
         assert "correct_t7" in query_text
 
@@ -256,6 +233,6 @@ class TestAdaptiveTimeframeScreener:
                 "latest_sentiment",
             ],
         )
-        df = get_asset_screener_data(days=7)
+        df = get_asset_screener_data(timeframe="t1")
         assert "timeframe" in df.columns
         assert df.iloc[0]["timeframe"] == "t1"
