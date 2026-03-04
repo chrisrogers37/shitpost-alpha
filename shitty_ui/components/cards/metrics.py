@@ -131,16 +131,16 @@ def create_performance_summary(stats: Dict[str, Any]) -> html.Div:
     Returns:
         html.Div with comparison metrics
     """
-    asset_accuracy = stats.get("accuracy_t7", 0)
-    overall_accuracy = stats.get("overall_accuracy_t7", 0)
+    asset_accuracy = stats.get("accuracy", 0)
+    overall_accuracy = stats.get("overall_accuracy", 0)
     accuracy_diff = asset_accuracy - overall_accuracy
 
-    asset_return = stats.get("avg_return_t7", 0)
-    overall_return = stats.get("overall_avg_return_t7", 0)
+    asset_return = stats.get("avg_return", 0)
+    overall_return = stats.get("overall_avg_return", 0)
     return_diff = asset_return - overall_return
 
-    best = stats.get("best_return_t7")
-    worst = stats.get("worst_return_t7")
+    best = stats.get("best_return")
+    worst = stats.get("worst_return")
 
     return html.Div(
         [

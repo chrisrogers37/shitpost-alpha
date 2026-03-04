@@ -228,14 +228,14 @@ def create_related_asset_link(row: dict) -> html.Div:
     Create a clickable link for a related asset.
 
     Args:
-        row: Dictionary with keys: related_symbol, co_occurrence_count, avg_return_t7
+        row: Dictionary with keys: related_symbol, co_occurrence_count, avg_return
 
     Returns:
         html.Div component
     """
     symbol = safe_get(row, "related_symbol", "???")
     count = safe_get(row, "co_occurrence_count", 0)
-    avg_return = safe_get(row, "avg_return_t7")
+    avg_return = safe_get(row, "avg_return")
 
     return_color = COLORS["text_muted"]
     return_str = "--"
