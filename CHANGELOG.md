@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`OUTCOMES_MATURED` event type** — New terminal event emitted after maturation runs, available for future downstream consumers
 
 ### Fixed
+- **Sentiment extraction bug** — Per-asset sentiment now correctly looked up from `market_impact` dict instead of applying first sentiment to all assets; added `fix-sentiments` CLI command to recalculate affected multi-asset outcomes
+- **NaN display guards** — Extracted `safe_get()` to shared `components/utils.py` with `safe_format_pct()` and `safe_format_dollar()` helpers; applied across all UI card components to prevent "+nan%" and "$nan" display
 - **Incomplete outcomes never re-evaluated** — Fixed early-return logic in `_calculate_single_outcome()` that skipped re-evaluation of incomplete outcomes, causing T+7 and T+30 data to permanently stay NULL
 - **Asyncio deprecation warnings** — Replaced 8 instances of deprecated `asyncio.get_event_loop()` with modern alternatives (`asyncio.to_thread()` and `asyncio.get_running_loop()`) for Python 3.13 compatibility
 
