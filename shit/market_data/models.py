@@ -5,7 +5,18 @@ SQLAlchemy models for tracking stock prices and prediction outcomes.
 
 from datetime import datetime, date
 from typing import Optional
-from sqlalchemy import Column, String, Date, DateTime, Float, BigInteger, ForeignKey, Integer, Boolean, Text
+from sqlalchemy import (
+    Column,
+    String,
+    Date,
+    DateTime,
+    Float,
+    BigInteger,
+    ForeignKey,
+    Integer,
+    Boolean,
+    Text,
+)
 from sqlalchemy.orm import relationship
 
 from shit.db.data_models import Base, TimestampMixin, IDMixin
@@ -17,7 +28,9 @@ class MarketPrice(Base, IDMixin, TimestampMixin):
     __tablename__ = "market_prices"
 
     # Asset identification
-    symbol = Column(String(20), nullable=False, index=True)  # Ticker symbol (AAPL, TSLA, BTC-USD, etc.)
+    symbol = Column(
+        String(20), nullable=False, index=True
+    )  # Ticker symbol (AAPL, TSLA, BTC-USD, etc.)
     date = Column(Date, nullable=False, index=True)  # Trading date
 
     # OHLCV data (Open, High, Low, Close, Volume)
@@ -32,7 +45,9 @@ class MarketPrice(Base, IDMixin, TimestampMixin):
 
     # Data source tracking
     source = Column(String(50), default="yfinance")  # yfinance, alpha_vantage, etc.
-    last_updated = Column(DateTime, default=datetime.utcnow)  # When this data was fetched
+    last_updated = Column(
+        DateTime, default=datetime.utcnow
+    )  # When this data was fetched
 
     # Metadata
     is_market_open = Column(Boolean, default=True)  # Was market open this day?
@@ -43,9 +58,7 @@ class MarketPrice(Base, IDMixin, TimestampMixin):
         return f"<MarketPrice(symbol='{self.symbol}', date={self.date}, close=${self.close})>"
 
     # Unique constraint on symbol + date (one price record per symbol per day)
-    __table_args__ = (
-        {'sqlite_autoincrement': True},
-    )
+    __table_args__ = ({"sqlite_autoincrement": True},)
 
 
 class PredictionOutcome(Base, IDMixin, TimestampMixin):
@@ -54,14 +67,20 @@ class PredictionOutcome(Base, IDMixin, TimestampMixin):
     __tablename__ = "prediction_outcomes"
 
     # Link to prediction
-    prediction_id = Column(Integer, ForeignKey("predictions.id"), nullable=False, index=True)
+    prediction_id = Column(
+        Integer, ForeignKey("predictions.id"), nullable=False, index=True
+    )
 
     # Asset being tracked
     symbol = Column(String(20), nullable=False, index=True)  # Ticker symbol
 
     # Prediction details (denormalized for easier querying)
-    prediction_date = Column(Date, nullable=False, index=True)  # When prediction was made
-    prediction_sentiment = Column(String(20), nullable=True)  # bullish, bearish, neutral
+    prediction_date = Column(
+        Date, nullable=False, index=True
+    )  # When prediction was made
+    prediction_sentiment = Column(
+        String(20), nullable=True
+    )  # bullish, bearish, neutral
     prediction_confidence = Column(Float, nullable=True)  # 0.0-1.0
     prediction_timeframe_days = Column(Integer, nullable=True)  # Expected timeframe
 
@@ -107,19 +126,25 @@ class PredictionOutcome(Base, IDMixin, TimestampMixin):
     def __repr__(self):
         return f"<PredictionOutcome(symbol='{self.symbol}', sentiment='{self.prediction_sentiment}', return_t7={self.return_t7}%)>"
 
-    def calculate_return(self, price_initial: float, price_final: Optional[float]) -> Optional[float]:
+    def calculate_return(
+        self, price_initial: float, price_final: Optional[float]
+    ) -> Optional[float]:
         """Calculate percentage return between two prices."""
         if price_initial is None or price_final is None or price_initial == 0:
             return None
         return ((price_final - price_initial) / price_initial) * 100
 
-    def calculate_pnl(self, return_pct: Optional[float], position_size: float = 1000.0) -> Optional[float]:
+    def calculate_pnl(
+        self, return_pct: Optional[float], position_size: float = 1000.0
+    ) -> Optional[float]:
         """Calculate P&L for a given return percentage and position size."""
         if return_pct is None:
             return None
         return (return_pct / 100) * position_size
 
-    def is_correct(self, sentiment: str, return_pct: Optional[float], threshold: float = 0.5) -> Optional[bool]:
+    def is_correct(
+        self, sentiment: str, return_pct: Optional[float], threshold: float = 0.5
+    ) -> Optional[bool]:
         """
         Determine if prediction was correct based on sentiment and actual return.
 
@@ -136,11 +161,11 @@ class PredictionOutcome(Base, IDMixin, TimestampMixin):
 
         sentiment = sentiment.lower()
 
-        if sentiment == 'bullish':
+        if sentiment == "bullish":
             return return_pct > threshold
-        elif sentiment == 'bearish':
+        elif sentiment == "bearish":
             return return_pct < -threshold
-        elif sentiment == 'neutral':
+        elif sentiment == "neutral":
             return abs(return_pct) <= threshold
         else:
             return None
@@ -155,6 +180,7 @@ class TickerRegistry(Base, IDMixin, TimestampMixin):
     - Status tracking (active, inactive, invalid)
     - Audit trail of when each ticker was first seen
     - Source prediction linkage for debugging
+    - Company fundamental data from yfinance
     """
 
     __tablename__ = "ticker_registry"
@@ -176,20 +202,42 @@ class TickerRegistry(Base, IDMixin, TimestampMixin):
     price_data_end = Column(Date, nullable=True)
     total_price_records = Column(Integer, default=0)
 
-    # Metadata
-    asset_type = Column(String(20), nullable=True)  # stock, crypto, etf, commodity, index
+    # Metadata (existing)
+    asset_type = Column(
+        String(20), nullable=True
+    )  # stock, crypto, etf, commodity, index
     exchange = Column(String(20), nullable=True)  # NYSE, NASDAQ, etc.
 
+    # Company fundamentals (populated by FundamentalsProvider)
+    company_name = Column(String(255), nullable=True)  # e.g. "Apple Inc."
+    sector = Column(String(100), nullable=True)  # e.g. "Technology"
+    industry = Column(String(100), nullable=True)  # e.g. "Consumer Electronics"
+    market_cap = Column(BigInteger, nullable=True)  # Market capitalization in USD
+    pe_ratio = Column(Float, nullable=True)  # Trailing P/E ratio
+    forward_pe = Column(Float, nullable=True)  # Forward P/E ratio
+    dividend_yield = Column(Float, nullable=True)  # Dividend yield (0.0-1.0)
+    beta = Column(Float, nullable=True)  # Beta coefficient
+    description = Column(Text, nullable=True)  # Short business summary
+    fundamentals_updated_at = Column(
+        DateTime, nullable=True
+    )  # Last fundamentals refresh
+
     def __repr__(self):
-        return f"<TickerRegistry(symbol='{self.symbol}', status='{self.status}', first_seen={self.first_seen_date})>"
+        name_part = f" ({self.company_name})" if self.company_name else ""
+        return f"<TickerRegistry(symbol='{self.symbol}'{name_part}, status='{self.status}')>"
 
 
 # Indexes for efficient querying
 from sqlalchemy import Index
 
 # Create composite indexes for common queries
-Index('idx_market_price_symbol_date', MarketPrice.symbol, MarketPrice.date, unique=True)
-Index('idx_prediction_outcome_symbol_date', PredictionOutcome.symbol, PredictionOutcome.prediction_date)
-Index('idx_prediction_outcome_prediction_id', PredictionOutcome.prediction_id)
-Index('idx_ticker_registry_symbol', TickerRegistry.symbol, unique=True)
-Index('idx_ticker_registry_status', TickerRegistry.status)
+Index("idx_market_price_symbol_date", MarketPrice.symbol, MarketPrice.date, unique=True)
+Index(
+    "idx_prediction_outcome_symbol_date",
+    PredictionOutcome.symbol,
+    PredictionOutcome.prediction_date,
+)
+Index("idx_prediction_outcome_prediction_id", PredictionOutcome.prediction_id)
+Index("idx_ticker_registry_symbol", TickerRegistry.symbol, unique=True)
+Index("idx_ticker_registry_status", TickerRegistry.status)
+Index("idx_ticker_registry_sector", TickerRegistry.sector)

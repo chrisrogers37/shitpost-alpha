@@ -104,6 +104,59 @@ def _sentiment_badge(sentiment: Optional[str]) -> html.Span:
     )
 
 
+# ── Sector badge ─────────────────────────────────────────────────────
+
+# Sector abbreviation map for compact display
+_SECTOR_ABBREV: Dict[str, str] = {
+    "Technology": "TECH",
+    "Healthcare": "HLTH",
+    "Financial Services": "FIN",
+    "Consumer Cyclical": "CYCL",
+    "Consumer Defensive": "DEF",
+    "Communication Services": "COMM",
+    "Energy": "ENGY",
+    "Industrials": "INDL",
+    "Basic Materials": "MATL",
+    "Real Estate": "REAL",
+    "Utilities": "UTIL",
+}
+
+
+def _screener_sector_badge(sector: Optional[str]) -> html.Span:
+    """Render a compact sector badge for the screener table.
+
+    Args:
+        sector: Sector name from yfinance (e.g., "Technology"). None renders a dash.
+
+    Returns:
+        html.Span with abbreviated sector name.
+    """
+    if not sector:
+        return html.Span(
+            "-",
+            style={"color": COLORS["text_muted"], "fontSize": "0.75rem"},
+        )
+
+    label = _SECTOR_ABBREV.get(sector, sector[:4].upper())
+
+    return html.Span(
+        label,
+        title=sector,  # Full name on hover
+        style={
+            "backgroundColor": f"{COLORS['navy']}30",
+            "color": COLORS["text_muted"],
+            "fontSize": "0.65rem",
+            "padding": "2px 6px",
+            "borderRadius": "4px",
+            "fontWeight": "500",
+            "letterSpacing": "0.03em",
+            "textTransform": "uppercase",
+            "display": "inline-block",
+            "cursor": "default",
+        },
+    )
+
+
 # ── Sparkline cell ────────────────────────────────────────────────────
 
 
@@ -197,6 +250,7 @@ def _sort_header(
 def build_screener_table(
     screener_df: pd.DataFrame,
     sparkline_data: Dict[str, pd.DataFrame],
+    sector_data: Optional[Dict[str, str]] = None,
     sort_column: str = "total_predictions",
     sort_ascending: bool = False,
     timeframe_label: str = "7d",
@@ -206,6 +260,7 @@ def build_screener_table(
     Args:
         screener_df: DataFrame from get_asset_screener_data().
         sparkline_data: Dict from get_screener_sparkline_prices().
+        sector_data: Dict mapping symbol -> sector name (optional).
         sort_column: Column key to sort by.
         sort_ascending: Sort direction.
 
@@ -253,6 +308,15 @@ def build_screener_table(
                 html.Th(
                     "Asset",
                     style={**_HEADER_STYLE, "textAlign": "left", "width": "80px"},
+                ),
+                html.Th(
+                    "Sector",
+                    className="screener-hide-mobile",
+                    style={
+                        **_HEADER_STYLE,
+                        "textAlign": "left",
+                        "width": "100px",
+                    },
                 ),
                 html.Th(
                     "30d Price",
@@ -323,6 +387,17 @@ def build_screener_table(
                         ),
                         style={
                             "padding": "10px 12px",
+                            "verticalAlign": "middle",
+                        },
+                    ),
+                    # Sector badge
+                    html.Td(
+                        _screener_sector_badge(
+                            sector_data.get(symbol) if sector_data else None
+                        ),
+                        className="screener-hide-mobile",
+                        style={
+                            "padding": "10px 8px",
                             "verticalAlign": "middle",
                         },
                     ),
