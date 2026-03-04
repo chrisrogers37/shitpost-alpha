@@ -3,7 +3,7 @@
 from dash import Dash, html, dcc
 import dash_bootstrap_components as dbc
 
-from constants import COLORS, HIERARCHY
+from constants import COLORS, HIERARCHY, CHART_CONFIG
 from components.controls import create_filter_controls
 from components.header import create_header, create_footer
 from brand_copy import COPY
@@ -198,6 +198,199 @@ def create_dashboard_page() -> html.Div:
                             "boxShadow": HIERARCHY["secondary"]["shadow"],
                         },
                     ),
+                    # ========== Analytics Charts (Secondary tier, collapsible) ==========
+                    dbc.Card(
+                        [
+                            dbc.CardHeader(
+                                [
+                                    dbc.Button(
+                                        [
+                                            html.I(
+                                                className="fas fa-chevron-right me-2 collapse-chevron",
+                                                id="collapse-analytics-chevron",
+                                            ),
+                                            html.I(className="fas fa-chart-area me-2"),
+                                            COPY["analytics_header"],
+                                            html.Small(
+                                                f" - {COPY['analytics_section_subtitle']}",
+                                                style={
+                                                    "color": COLORS["text_muted"],
+                                                    "fontWeight": "normal",
+                                                },
+                                            ),
+                                        ],
+                                        id="collapse-analytics-button",
+                                        color="link",
+                                        className="text-white fw-bold p-0 collapse-toggle-btn",
+                                    ),
+                                ],
+                                className="fw-bold",
+                                style={
+                                    "backgroundColor": HIERARCHY["secondary"][
+                                        "background"
+                                    ]
+                                },
+                            ),
+                            dbc.Collapse(
+                                dbc.CardBody(
+                                    [
+                                        # Tab navigation for chart types
+                                        dbc.Tabs(
+                                            [
+                                                dbc.Tab(
+                                                    label=COPY["analytics_pnl_tab"],
+                                                    tab_id="tab-pnl",
+                                                ),
+                                                dbc.Tab(
+                                                    label=COPY["analytics_rolling_tab"],
+                                                    tab_id="tab-rolling",
+                                                ),
+                                                dbc.Tab(
+                                                    label=COPY[
+                                                        "analytics_calibration_tab"
+                                                    ],
+                                                    tab_id="tab-calibration",
+                                                ),
+                                                dbc.Tab(
+                                                    label=COPY[
+                                                        "analytics_backtest_tab"
+                                                    ],
+                                                    tab_id="tab-backtest",
+                                                ),
+                                            ],
+                                            id="analytics-tabs",
+                                            active_tab="tab-pnl",
+                                            className="mb-3",
+                                        ),
+                                        # Backtest controls (visible only on backtest tab)
+                                        html.Div(
+                                            [
+                                                dbc.Row(
+                                                    [
+                                                        dbc.Col(
+                                                            [
+                                                                html.Label(
+                                                                    COPY[
+                                                                        "analytics_backtest_capital_label"
+                                                                    ],
+                                                                    style={
+                                                                        "color": COLORS[
+                                                                            "text_muted"
+                                                                        ],
+                                                                        "fontSize": "0.8rem",
+                                                                        "marginBottom": "4px",
+                                                                    },
+                                                                ),
+                                                                dbc.Input(
+                                                                    id="backtest-capital-input",
+                                                                    type="number",
+                                                                    value=10000,
+                                                                    min=1000,
+                                                                    max=1000000,
+                                                                    step=1000,
+                                                                    style={
+                                                                        "backgroundColor": COLORS[
+                                                                            "bg"
+                                                                        ],
+                                                                        "color": COLORS[
+                                                                            "text"
+                                                                        ],
+                                                                        "border": f"1px solid {COLORS['border']}",
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            md=4,
+                                                            xs=6,
+                                                        ),
+                                                        dbc.Col(
+                                                            [
+                                                                html.Label(
+                                                                    COPY[
+                                                                        "analytics_backtest_confidence_label"
+                                                                    ],
+                                                                    style={
+                                                                        "color": COLORS[
+                                                                            "text_muted"
+                                                                        ],
+                                                                        "fontSize": "0.8rem",
+                                                                        "marginBottom": "4px",
+                                                                    },
+                                                                ),
+                                                                dcc.Slider(
+                                                                    id="backtest-confidence-slider",
+                                                                    min=0.5,
+                                                                    max=0.95,
+                                                                    step=0.05,
+                                                                    value=0.75,
+                                                                    marks={
+                                                                        0.5: "50%",
+                                                                        0.6: "60%",
+                                                                        0.7: "70%",
+                                                                        0.75: "75%",
+                                                                        0.8: "80%",
+                                                                        0.9: "90%",
+                                                                        0.95: "95%",
+                                                                    },
+                                                                    tooltip={
+                                                                        "placement": "bottom",
+                                                                        "always_visible": False,
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            md=6,
+                                                            xs=12,
+                                                        ),
+                                                    ],
+                                                    className="g-3 align-items-end",
+                                                ),
+                                                # "Run Backtest" button instead of live slider updates
+                                                dbc.Button(
+                                                    "Run Backtest",
+                                                    id="backtest-run-btn",
+                                                    color="primary",
+                                                    size="sm",
+                                                    className="mt-2",
+                                                ),
+                                            ],
+                                            id="backtest-controls-container",
+                                            style={
+                                                "display": "none",
+                                                "marginBottom": "16px",
+                                            },
+                                        ),
+                                        # Chart container
+                                        dcc.Loading(
+                                            type="circle",
+                                            color=COLORS["accent"],
+                                            children=dcc.Graph(
+                                                id="analytics-chart",
+                                                config=CHART_CONFIG,
+                                            ),
+                                        ),
+                                        # Backtest summary stats (below chart, only on backtest tab)
+                                        html.Div(
+                                            id="backtest-summary-container",
+                                            style={"display": "none"},
+                                        ),
+                                    ],
+                                    style={
+                                        "backgroundColor": HIERARCHY["secondary"][
+                                            "background"
+                                        ],
+                                        "padding": "12px",
+                                    },
+                                ),
+                                id="collapse-analytics",
+                                is_open=False,
+                            ),
+                        ],
+                        className="mb-4",
+                        style={
+                            "backgroundColor": HIERARCHY["secondary"]["background"],
+                            "borderTop": HIERARCHY["secondary"]["accent_top"],
+                            "boxShadow": HIERARCHY["secondary"]["shadow"],
+                        },
+                    ),
                     # ========== Latest Posts (Tertiary tier) ==========
                     dbc.Card(
                         [
@@ -304,8 +497,10 @@ def register_dashboard_callbacks(app: Dash):
         register_period_callbacks,
         register_content_callbacks,
         register_table_callbacks,
+        register_analytics_callbacks,
     )
 
     register_period_callbacks(app)
     register_content_callbacks(app)
     register_table_callbacks(app)
+    register_analytics_callbacks(app)
