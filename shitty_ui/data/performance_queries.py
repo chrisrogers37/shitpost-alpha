@@ -114,14 +114,21 @@ def get_prediction_stats() -> Dict[str, Any]:
 
 
 @ttl_cache(ttl_seconds=300)  # Cache for 5 minutes
-def get_performance_metrics(days: int = None) -> Dict[str, Any]:
+def get_performance_metrics(
+    days: int = None, timeframe: str = DEFAULT_TIMEFRAME
+) -> Dict[str, Any]:
     """
     Get overall prediction performance metrics from prediction_outcomes table.
 
     Args:
         days: Number of days to look back (None = all time)
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
     """
-    # Build date filter
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+    return_col = tf["return_col"]
+    pnl_col = tf["pnl_col"]
+
     date_filter = ""
     params: Dict[str, Any] = {}
 
@@ -132,11 +139,11 @@ def get_performance_metrics(days: int = None) -> Dict[str, Any]:
     query = text(f"""
         SELECT
             COUNT(*) as total_outcomes,
-            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct_t7,
-            COUNT(CASE WHEN correct_t7 = false THEN 1 END) as incorrect_t7,
-            COUNT(CASE WHEN correct_t7 IS NOT NULL THEN 1 END) as evaluated_t7,
-            AVG(CASE WHEN correct_t7 IS NOT NULL THEN return_t7 END) as avg_return_t7,
-            SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END) as total_pnl_t7,
+            COUNT(CASE WHEN {correct_col} = true THEN 1 END) as correct_count,
+            COUNT(CASE WHEN {correct_col} = false THEN 1 END) as incorrect_count,
+            COUNT(CASE WHEN {correct_col} IS NOT NULL THEN 1 END) as evaluated_count,
+            AVG(CASE WHEN {correct_col} IS NOT NULL THEN {return_col} END) as avg_return,
+            SUM(CASE WHEN {pnl_col} IS NOT NULL THEN {pnl_col} ELSE 0 END) as total_pnl,
             AVG(prediction_confidence) as avg_confidence
         FROM prediction_outcomes
         {date_filter}
@@ -146,7 +153,7 @@ def get_performance_metrics(days: int = None) -> Dict[str, Any]:
         rows, columns = _base.execute_query(query, params)
         if rows and rows[0]:
             row = rows[0]
-            total = row[3] or 0  # evaluated_t7
+            total = row[3] or 0
             correct = row[1] or 0
             accuracy = (correct / total * 100) if total > 0 else 0
 
@@ -155,9 +162,9 @@ def get_performance_metrics(days: int = None) -> Dict[str, Any]:
                 "evaluated_predictions": total,
                 "correct_predictions": correct,
                 "incorrect_predictions": row[2] or 0,
-                "accuracy_t7": round(accuracy, 1),
-                "avg_return_t7": round(float(row[4]), 2) if row[4] else 0.0,
-                "total_pnl_t7": round(float(row[5]), 2) if row[5] else 0.0,
+                "accuracy": round(accuracy, 1),
+                "avg_return": round(float(row[4]), 2) if row[4] else 0.0,
+                "total_pnl": round(float(row[5]), 2) if row[5] else 0.0,
                 "avg_confidence": round(float(row[6]), 2) if row[6] else 0.0,
             }
     except Exception as e:
@@ -168,9 +175,9 @@ def get_performance_metrics(days: int = None) -> Dict[str, Any]:
         "evaluated_predictions": 0,
         "correct_predictions": 0,
         "incorrect_predictions": 0,
-        "accuracy_t7": 0.0,
-        "avg_return_t7": 0.0,
-        "total_pnl_t7": 0.0,
+        "accuracy": 0.0,
+        "avg_return": 0.0,
+        "total_pnl": 0.0,
         "avg_confidence": 0.0,
     }
 
@@ -282,14 +289,21 @@ def get_dashboard_kpis_with_fallback(
 
 
 @ttl_cache(ttl_seconds=300)  # Cache for 5 minutes
-def get_accuracy_by_confidence(days: int = None) -> pd.DataFrame:
+def get_accuracy_by_confidence(
+    days: int = None, timeframe: str = DEFAULT_TIMEFRAME
+) -> pd.DataFrame:
     """
     Get prediction accuracy broken down by confidence level.
 
     Args:
         days: Number of days to look back (None = all time)
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
     """
-    # Build date filter
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+    return_col = tf["return_col"]
+    pnl_col = tf["pnl_col"]
+
     date_filter = ""
     params: Dict[str, Any] = {}
 
@@ -305,12 +319,12 @@ def get_accuracy_by_confidence(days: int = None) -> pd.DataFrame:
                 ELSE 'High (>75%)'
             END as confidence_level,
             COUNT(*) as total,
-            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct,
-            COUNT(CASE WHEN correct_t7 = false THEN 1 END) as incorrect,
-            ROUND(AVG(CASE WHEN return_t7 IS NOT NULL THEN return_t7 END)::numeric, 2) as avg_return,
-            ROUND(SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END)::numeric, 2) as total_pnl
+            COUNT(CASE WHEN {correct_col} = true THEN 1 END) as correct,
+            COUNT(CASE WHEN {correct_col} = false THEN 1 END) as incorrect,
+            ROUND(AVG(CASE WHEN {return_col} IS NOT NULL THEN {return_col} END)::numeric, 2) as avg_return,
+            ROUND(SUM(CASE WHEN {pnl_col} IS NOT NULL THEN {pnl_col} ELSE 0 END)::numeric, 2) as total_pnl
         FROM prediction_outcomes
-        WHERE correct_t7 IS NOT NULL
+        WHERE {correct_col} IS NOT NULL
         {date_filter}
         GROUP BY
             CASE
@@ -338,15 +352,22 @@ def get_accuracy_by_confidence(days: int = None) -> pd.DataFrame:
 
 
 @ttl_cache(ttl_seconds=300)  # Cache for 5 minutes
-def get_accuracy_by_asset(limit: int = 15, days: int = None) -> pd.DataFrame:
+def get_accuracy_by_asset(
+    limit: int = 15, days: int = None, timeframe: str = DEFAULT_TIMEFRAME
+) -> pd.DataFrame:
     """
     Get prediction accuracy broken down by asset.
 
     Args:
         limit: Maximum number of assets to return
         days: Number of days to look back (None = all time)
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
     """
-    # Build date filter
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+    return_col = tf["return_col"]
+    pnl_col = tf["pnl_col"]
+
     date_filter = ""
     params: Dict[str, Any] = {"limit": limit}
 
@@ -358,12 +379,12 @@ def get_accuracy_by_asset(limit: int = 15, days: int = None) -> pd.DataFrame:
         SELECT
             symbol,
             COUNT(*) as total_predictions,
-            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct,
-            COUNT(CASE WHEN correct_t7 = false THEN 1 END) as incorrect,
-            ROUND(AVG(CASE WHEN return_t7 IS NOT NULL THEN return_t7 END)::numeric, 2) as avg_return,
-            ROUND(SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END)::numeric, 2) as total_pnl
+            COUNT(CASE WHEN {correct_col} = true THEN 1 END) as correct,
+            COUNT(CASE WHEN {correct_col} = false THEN 1 END) as incorrect,
+            ROUND(AVG(CASE WHEN {return_col} IS NOT NULL THEN {return_col} END)::numeric, 2) as avg_return,
+            ROUND(SUM(CASE WHEN {pnl_col} IS NOT NULL THEN {pnl_col} ELSE 0 END)::numeric, 2) as total_pnl
         FROM prediction_outcomes
-        WHERE correct_t7 IS NOT NULL
+        WHERE {correct_col} IS NOT NULL
         {date_filter}
         GROUP BY symbol
         HAVING COUNT(*) >= 2
@@ -470,17 +491,23 @@ def get_top_predicted_asset() -> Optional[str]:
         return None
 
 
-def get_cumulative_pnl(days: int = None) -> pd.DataFrame:
+def get_cumulative_pnl(
+    days: int = None, timeframe: str = DEFAULT_TIMEFRAME
+) -> pd.DataFrame:
     """
     Get cumulative P&L over time for equity curve visualization.
 
     Args:
         days: Number of days to look back (None = all time)
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
 
     Returns:
         DataFrame with columns: prediction_date, daily_pnl, predictions_count, cumulative_pnl
     """
-    # Build date filter
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+    pnl_col = tf["pnl_col"]
+
     date_filter = ""
     params: Dict[str, Any] = {}
 
@@ -491,10 +518,10 @@ def get_cumulative_pnl(days: int = None) -> pd.DataFrame:
     query = text(f"""
         SELECT
             prediction_date,
-            SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END) as daily_pnl,
+            SUM(CASE WHEN {pnl_col} IS NOT NULL THEN {pnl_col} ELSE 0 END) as daily_pnl,
             COUNT(*) as predictions_count
         FROM prediction_outcomes
-        WHERE correct_t7 IS NOT NULL
+        WHERE {correct_col} IS NOT NULL
         {date_filter}
         GROUP BY prediction_date
         ORDER BY prediction_date ASC
@@ -511,18 +538,23 @@ def get_cumulative_pnl(days: int = None) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def get_rolling_accuracy(window: int = 30, days: int = None) -> pd.DataFrame:
+def get_rolling_accuracy(
+    window: int = 30, days: int = None, timeframe: str = DEFAULT_TIMEFRAME
+) -> pd.DataFrame:
     """
     Get rolling accuracy over time.
 
     Args:
         window: Rolling window size in days
         days: Total days to look back (None = all time)
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
 
     Returns:
         DataFrame with: prediction_date, correct, total, rolling_accuracy
     """
-    # Build date filter
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+
     date_filter = ""
     params: Dict[str, Any] = {}
 
@@ -533,10 +565,10 @@ def get_rolling_accuracy(window: int = 30, days: int = None) -> pd.DataFrame:
     query = text(f"""
         SELECT
             prediction_date,
-            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct,
-            COUNT(CASE WHEN correct_t7 IS NOT NULL THEN 1 END) as total
+            COUNT(CASE WHEN {correct_col} = true THEN 1 END) as correct,
+            COUNT(CASE WHEN {correct_col} IS NOT NULL THEN 1 END) as total
         FROM prediction_outcomes
-        WHERE correct_t7 IS NOT NULL
+        WHERE {correct_col} IS NOT NULL
         {date_filter}
         GROUP BY prediction_date
         ORDER BY prediction_date ASC
@@ -561,9 +593,12 @@ def get_rolling_accuracy(window: int = 30, days: int = None) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def get_win_loss_streaks() -> Dict[str, int]:
+def get_win_loss_streaks(timeframe: str = DEFAULT_TIMEFRAME) -> Dict[str, int]:
     """
     Calculate current and max win/loss streaks.
+
+    Args:
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
 
     Returns:
         Dict with:
@@ -571,12 +606,15 @@ def get_win_loss_streaks() -> Dict[str, int]:
             max_win_streak: longest consecutive correct predictions
             max_loss_streak: longest consecutive incorrect predictions
     """
-    query = text("""
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+
+    query = text(f"""
         SELECT
             prediction_date,
-            correct_t7
+            {correct_col}
         FROM prediction_outcomes
-        WHERE correct_t7 IS NOT NULL
+        WHERE {correct_col} IS NOT NULL
         ORDER BY prediction_date ASC, created_at ASC
     """)
 
@@ -616,7 +654,9 @@ def get_win_loss_streaks() -> Dict[str, int]:
         return {"current_streak": 0, "max_win_streak": 0, "max_loss_streak": 0}
 
 
-def get_confidence_calibration(buckets: int = 10) -> pd.DataFrame:
+def get_confidence_calibration(
+    buckets: int = 10, timeframe: str = DEFAULT_TIMEFRAME
+) -> pd.DataFrame:
     """
     Get confidence calibration data (predicted confidence vs actual accuracy).
 
@@ -626,21 +666,25 @@ def get_confidence_calibration(buckets: int = 10) -> pd.DataFrame:
 
     Args:
         buckets: Number of confidence buckets (default 10 = 0-10%, 10-20%, etc.)
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
 
     Returns:
         DataFrame with: bucket_start, total, correct, avg_confidence,
                         actual_accuracy, predicted_confidence, bucket_label
     """
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+
     bucket_size = 1.0 / buckets
 
-    query = text("""
+    query = text(f"""
         SELECT
             FLOOR(prediction_confidence / :bucket_size) * :bucket_size as bucket_start,
             COUNT(*) as total,
-            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct,
+            COUNT(CASE WHEN {correct_col} = true THEN 1 END) as correct,
             AVG(prediction_confidence) as avg_confidence
         FROM prediction_outcomes
-        WHERE correct_t7 IS NOT NULL
+        WHERE {correct_col} IS NOT NULL
             AND prediction_confidence IS NOT NULL
         GROUP BY FLOOR(prediction_confidence / :bucket_size)
         ORDER BY bucket_start ASC
@@ -661,27 +705,35 @@ def get_confidence_calibration(buckets: int = 10) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def get_monthly_performance(months: int = 12) -> pd.DataFrame:
+def get_monthly_performance(
+    months: int = 12, timeframe: str = DEFAULT_TIMEFRAME
+) -> pd.DataFrame:
     """
     Get monthly performance summary.
 
     Args:
         months: Number of months to look back
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
 
     Returns:
         DataFrame with: month, total_predictions, correct, incorrect,
                         avg_return, total_pnl, accuracy
     """
-    query = text("""
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+    return_col = tf["return_col"]
+    pnl_col = tf["pnl_col"]
+
+    query = text(f"""
         SELECT
             DATE_TRUNC('month', prediction_date) as month,
             COUNT(*) as total_predictions,
-            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct,
-            COUNT(CASE WHEN correct_t7 = false THEN 1 END) as incorrect,
-            ROUND(AVG(return_t7)::numeric, 2) as avg_return,
-            ROUND(SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END)::numeric, 2) as total_pnl
+            COUNT(CASE WHEN {correct_col} = true THEN 1 END) as correct,
+            COUNT(CASE WHEN {correct_col} = false THEN 1 END) as incorrect,
+            ROUND(AVG({return_col})::numeric, 2) as avg_return,
+            ROUND(SUM(CASE WHEN {pnl_col} IS NOT NULL THEN {pnl_col} ELSE 0 END)::numeric, 2) as total_pnl
         FROM prediction_outcomes
-        WHERE correct_t7 IS NOT NULL
+        WHERE {correct_col} IS NOT NULL
         GROUP BY DATE_TRUNC('month', prediction_date)
         ORDER BY month DESC
         LIMIT :months
@@ -700,16 +752,22 @@ def get_monthly_performance(months: int = 12) -> pd.DataFrame:
 
 
 @ttl_cache(ttl_seconds=300)
-def get_high_confidence_metrics(days: int = None) -> Dict[str, Any]:
+def get_high_confidence_metrics(
+    days: int = None, timeframe: str = DEFAULT_TIMEFRAME
+) -> Dict[str, Any]:
     """
     Get win rate and count for high-confidence predictions (>=0.75).
 
     Args:
         days: Number of days to look back (None = all time)
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
 
     Returns:
         Dict with win_rate, total, correct, incorrect
     """
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+
     date_filter = ""
     params: Dict[str, Any] = {}
 
@@ -720,11 +778,11 @@ def get_high_confidence_metrics(days: int = None) -> Dict[str, Any]:
     query = text(f"""
         SELECT
             COUNT(*) as total,
-            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct,
-            COUNT(CASE WHEN correct_t7 = false THEN 1 END) as incorrect
+            COUNT(CASE WHEN {correct_col} = true THEN 1 END) as correct,
+            COUNT(CASE WHEN {correct_col} = false THEN 1 END) as incorrect
         FROM prediction_outcomes
         WHERE prediction_confidence >= 0.75
-            AND correct_t7 IS NOT NULL
+            AND {correct_col} IS NOT NULL
             {date_filter}
     """)
 
@@ -747,11 +805,14 @@ def get_high_confidence_metrics(days: int = None) -> Dict[str, Any]:
 
 
 @ttl_cache(ttl_seconds=300)
-def get_empty_state_context() -> Dict[str, Any]:
+def get_empty_state_context(timeframe: str = DEFAULT_TIMEFRAME) -> Dict[str, Any]:
     """Get contextual counts for smart empty state messages.
 
     Returns lightweight aggregate counts used by empty-state components
     to guide users toward timeframes and pages that have data.
+
+    Args:
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
 
     Returns:
         Dict with keys:
@@ -759,11 +820,14 @@ def get_empty_state_context() -> Dict[str, Any]:
             total_pending: int -- outcomes awaiting maturation
             total_high_confidence: int -- all-time high-confidence signals (>=0.75)
     """
-    query = text("""
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+
+    query = text(f"""
         SELECT
-            COUNT(CASE WHEN correct_t7 IS NOT NULL THEN 1 END) AS total_evaluated,
-            COUNT(CASE WHEN correct_t7 IS NULL THEN 1 END) AS total_pending,
-            COUNT(CASE WHEN prediction_confidence >= 0.75 AND correct_t7 IS NOT NULL THEN 1 END) AS total_high_confidence
+            COUNT(CASE WHEN {correct_col} IS NOT NULL THEN 1 END) AS total_evaluated,
+            COUNT(CASE WHEN {correct_col} IS NULL THEN 1 END) AS total_pending,
+            COUNT(CASE WHEN prediction_confidence >= 0.75 AND {correct_col} IS NOT NULL THEN 1 END) AS total_high_confidence
         FROM prediction_outcomes
     """)
 
@@ -786,16 +850,23 @@ def get_empty_state_context() -> Dict[str, Any]:
 
 
 @ttl_cache(ttl_seconds=300)
-def get_best_performing_asset(days: int = None) -> Dict[str, Any]:
+def get_best_performing_asset(
+    days: int = None, timeframe: str = DEFAULT_TIMEFRAME
+) -> Dict[str, Any]:
     """
     Get the best performing asset by total P&L.
 
     Args:
         days: Number of days to look back (None = all time)
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
 
     Returns:
         Dict with symbol, total_pnl, accuracy, prediction_count
     """
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+    pnl_col = tf["pnl_col"]
+
     date_filter = ""
     params: Dict[str, Any] = {}
 
@@ -806,15 +877,15 @@ def get_best_performing_asset(days: int = None) -> Dict[str, Any]:
     query = text(f"""
         SELECT
             symbol,
-            ROUND(SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END)::numeric, 2) as total_pnl,
+            ROUND(SUM(CASE WHEN {pnl_col} IS NOT NULL THEN {pnl_col} ELSE 0 END)::numeric, 2) as total_pnl,
             COUNT(*) as prediction_count,
-            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct
+            COUNT(CASE WHEN {correct_col} = true THEN 1 END) as correct
         FROM prediction_outcomes
-        WHERE correct_t7 IS NOT NULL
+        WHERE {correct_col} IS NOT NULL
             {date_filter}
         GROUP BY symbol
         HAVING COUNT(*) >= 2
-        ORDER BY SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END) DESC
+        ORDER BY SUM(CASE WHEN {pnl_col} IS NOT NULL THEN {pnl_col} ELSE 0 END) DESC
         LIMIT 1
     """)
 
@@ -835,16 +906,22 @@ def get_best_performing_asset(days: int = None) -> Dict[str, Any]:
     return {"symbol": "N/A", "total_pnl": 0.0, "prediction_count": 0, "accuracy": 0.0}
 
 
-def get_accuracy_over_time(days: int = None) -> pd.DataFrame:
+def get_accuracy_over_time(
+    days: int = None, timeframe: str = DEFAULT_TIMEFRAME
+) -> pd.DataFrame:
     """
     Get prediction accuracy aggregated by week for line chart.
 
     Args:
         days: Number of days to look back (None = all time)
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
 
     Returns:
         DataFrame with columns: week, total, correct, accuracy
     """
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+
     date_filter = ""
     params: Dict[str, Any] = {}
 
@@ -856,9 +933,9 @@ def get_accuracy_over_time(days: int = None) -> pd.DataFrame:
         SELECT
             DATE_TRUNC('week', prediction_date) as week,
             COUNT(*) as total,
-            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct
+            COUNT(CASE WHEN {correct_col} = true THEN 1 END) as correct
         FROM prediction_outcomes
-        WHERE correct_t7 IS NOT NULL
+        WHERE {correct_col} IS NOT NULL
             {date_filter}
         GROUP BY DATE_TRUNC('week', prediction_date)
         HAVING COUNT(*) >= 1
@@ -882,6 +959,7 @@ def get_backtest_simulation(
     initial_capital: float = 10000,
     min_confidence: float = 0.75,
     days: int = 90,
+    timeframe: str = DEFAULT_TIMEFRAME,
 ) -> Dict[str, Any]:
     """
     Simulate P&L if following high-confidence signals with a given capital.
@@ -892,10 +970,16 @@ def get_backtest_simulation(
         initial_capital: Starting capital
         min_confidence: Minimum confidence threshold for trades
         days: Number of days to look back
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
 
     Returns:
         Dict with final_value, total_return_pct, trade_count, wins, losses, win_rate
     """
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+    return_col = tf["return_col"]
+    pnl_col = tf["pnl_col"]
+
     date_filter = ""
     params: Dict[str, Any] = {"min_confidence": min_confidence}
 
@@ -905,13 +989,13 @@ def get_backtest_simulation(
 
     query = text(f"""
         SELECT
-            return_t7,
-            correct_t7,
-            pnl_t7
+            {return_col},
+            {correct_col},
+            {pnl_col}
         FROM prediction_outcomes
         WHERE prediction_confidence >= :min_confidence
-            AND correct_t7 IS NOT NULL
-            AND return_t7 IS NOT NULL
+            AND {correct_col} IS NOT NULL
+            AND {return_col} IS NOT NULL
             {date_filter}
         ORDER BY prediction_date ASC
     """)
@@ -964,16 +1048,22 @@ def get_backtest_simulation(
         }
 
 
-def get_sentiment_accuracy(days: int = None) -> pd.DataFrame:
+def get_sentiment_accuracy(
+    days: int = None, timeframe: str = DEFAULT_TIMEFRAME
+) -> pd.DataFrame:
     """
     Get accuracy breakdown by sentiment type with counts.
 
     Args:
         days: Number of days to look back (None = all time)
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
 
     Returns:
         DataFrame with columns: sentiment, total, correct, accuracy
     """
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+
     date_filter = ""
     params: Dict[str, Any] = {}
 
@@ -985,10 +1075,10 @@ def get_sentiment_accuracy(days: int = None) -> pd.DataFrame:
         SELECT
             prediction_sentiment as sentiment,
             COUNT(*) as total,
-            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct
+            COUNT(CASE WHEN {correct_col} = true THEN 1 END) as correct
         FROM prediction_outcomes
         WHERE prediction_sentiment IS NOT NULL
-            AND correct_t7 IS NOT NULL
+            AND {correct_col} IS NOT NULL
             {date_filter}
         GROUP BY prediction_sentiment
         ORDER BY COUNT(*) DESC
