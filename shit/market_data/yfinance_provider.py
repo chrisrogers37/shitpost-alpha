@@ -42,23 +42,31 @@ class YFinanceProvider(PriceProvider):
             if hist.empty:
                 logger.warning(
                     f"yfinance returned empty data for {symbol}",
-                    extra={"symbol": symbol}
+                    extra={"symbol": symbol},
                 )
                 return []
 
             records = []
             for idx, row in hist.iterrows():
-                price_date = idx.date() if hasattr(idx, 'date') else idx
+                price_date = idx.date() if hasattr(idx, "date") else idx
 
                 record = RawPriceRecord(
                     symbol=symbol,
                     date=price_date,
-                    open=float(row['Open']) if 'Open' in row and row['Open'] is not None else None,
-                    high=float(row['High']) if 'High' in row and row['High'] is not None else None,
-                    low=float(row['Low']) if 'Low' in row and row['Low'] is not None else None,
-                    close=float(row['Close']) if 'Close' in row else 0.0,
-                    volume=int(row['Volume']) if 'Volume' in row and row['Volume'] is not None else None,
-                    adjusted_close=float(row['Close']) if 'Close' in row else None,
+                    open=float(row["Open"])
+                    if "Open" in row and row["Open"] is not None
+                    else None,
+                    high=float(row["High"])
+                    if "High" in row and row["High"] is not None
+                    else None,
+                    low=float(row["Low"])
+                    if "Low" in row and row["Low"] is not None
+                    else None,
+                    close=float(row["Close"]) if "Close" in row else 0.0,
+                    volume=int(row["Volume"])
+                    if "Volume" in row and row["Volume"] is not None
+                    else None,
+                    adjusted_close=float(row["Close"]) if "Close" in row else None,
                     source="yfinance",
                 )
                 records.append(record)
@@ -66,4 +74,82 @@ class YFinanceProvider(PriceProvider):
             return records
 
         except Exception as e:
-            raise ProviderError("yfinance", f"Failed to fetch {symbol}: {e}", original_error=e)
+            raise ProviderError(
+                "yfinance", f"Failed to fetch {symbol}: {e}", original_error=e
+            )
+
+    def fetch_intraday_prices(
+        self,
+        symbol: str,
+        target_date: date,
+        interval: str = "1h",
+    ) -> List[RawPriceRecord]:
+        """Fetch intraday price data from yfinance for a specific date.
+
+        yfinance limitations:
+        - 1m data: last 30 days only
+        - 1h data: last 730 days
+        - Data may not be available for all symbols (e.g., some ETFs)
+
+        Args:
+            symbol: Ticker symbol (e.g., 'AAPL')
+            target_date: The date to fetch intraday data for
+            interval: Price interval ('1h', '5m', '1m'). Default '1h'.
+
+        Returns:
+            List of RawPriceRecord with intraday timestamps.
+            Records have ``bar_datetime`` set to the bar's datetime.
+        """
+        try:
+            ticker = yf.Ticker(symbol)
+            start = target_date
+            end = target_date + timedelta(days=1)
+            hist = ticker.history(start=start, end=end, interval=interval)
+
+            if hist.empty:
+                logger.debug(
+                    f"yfinance returned no intraday data for {symbol} on {target_date}",
+                    extra={
+                        "symbol": symbol,
+                        "date": str(target_date),
+                        "interval": interval,
+                    },
+                )
+                return []
+
+            records = []
+            for idx, row in hist.iterrows():
+                bar_dt = idx.to_pydatetime() if hasattr(idx, "to_pydatetime") else idx
+                # Store the bar date (not the intraday timestamp) for RawPriceRecord
+                bar_date = bar_dt.date() if hasattr(bar_dt, "date") else bar_dt
+
+                record = RawPriceRecord(
+                    symbol=symbol,
+                    date=bar_date,
+                    open=float(row["Open"])
+                    if "Open" in row and row["Open"] is not None
+                    else None,
+                    high=float(row["High"])
+                    if "High" in row and row["High"] is not None
+                    else None,
+                    low=float(row["Low"])
+                    if "Low" in row and row["Low"] is not None
+                    else None,
+                    close=float(row["Close"]) if "Close" in row else 0.0,
+                    volume=int(row["Volume"])
+                    if "Volume" in row and row["Volume"] is not None
+                    else None,
+                    adjusted_close=None,
+                    source="yfinance_intraday",
+                    bar_datetime=bar_dt,
+                )
+                records.append(record)
+
+            return records
+
+        except Exception as e:
+            logger.warning(
+                f"Failed to fetch intraday data for {symbol} on {target_date}: {e}",
+                extra={"symbol": symbol, "date": str(target_date), "error": str(e)},
+            )
+            return []
