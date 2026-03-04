@@ -11,26 +11,30 @@ from sqlalchemy import text
 from typing import Dict, Any, Optional
 
 import data.base as _base
-from data.base import ttl_cache, logger, _timeframe_for_period
+from data.base import ttl_cache, logger
+from data.timeframe import get_tf_columns, DEFAULT_TIMEFRAME
 
 
 @ttl_cache(ttl_seconds=300)
-def get_asset_screener_data(days: int = None) -> pd.DataFrame:
+def get_asset_screener_data(
+    days: int = None, timeframe: str = DEFAULT_TIMEFRAME
+) -> pd.DataFrame:
     """Get combined asset screener data for the dashboard table.
 
     Joins per-asset accuracy metrics with the latest prediction sentiment
-    for each asset, plus average confidence. Uses adaptive timeframe
-    columns based on the selected period to avoid structurally empty results.
+    for each asset, plus average confidence.
 
     Args:
         days: Number of days to look back (None = all time).
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
 
     Returns:
         DataFrame with columns: symbol, total_predictions, correct,
         incorrect, avg_return, total_pnl, accuracy, latest_sentiment,
         avg_confidence, timeframe. Sorted by total_predictions descending.
     """
-    tf = _timeframe_for_period(days)
+    tf_cols = get_tf_columns(timeframe)
+    tf = timeframe
 
     date_filter = ""
     params: Dict[str, Any] = {}
