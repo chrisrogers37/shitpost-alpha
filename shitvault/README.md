@@ -111,19 +111,7 @@ Stores LLM analysis results for each shitpost.
 - `llm_model` - "gpt-4", "claude-3", etc.
 - `analysis_timestamp` - When analysis was performed
 
-#### 3. `market_movements`
-Tracks actual market movements to validate predictions.
-
-**Key Fields:**
-- `id` - Primary key
-- `prediction_id` - Foreign key to `predictions.id`
-- `asset` - Ticker symbol
-- `price_at_prediction` - Price when prediction was made
-- `price_after_24h`, `price_after_72h` - Future prices
-- `movement_24h`, `movement_72h` - Percentage changes
-- `prediction_correct_24h`, `prediction_correct_72h` - Accuracy flags
-
-#### 4. `subscribers`
+#### 3. `subscribers`
 Manages SMS alert subscriptions.
 
 **Key Fields:**
@@ -227,9 +215,6 @@ Stores LLM analysis results with enhanced metrics.
 - Engagement and viral scoring
 - LLM provider metadata
 
-#### `MarketMovement`
-Tracks actual market movements for prediction validation.
-
 #### `Subscriber`
 Manages SMS alert subscriptions and preferences.
 
@@ -241,7 +226,7 @@ Stores feedback on LLM prediction accuracy.
 ```python
 def shitpost_to_dict(shitpost: TruthSocialShitpost) -> Dict[str, Any]
 def prediction_to_dict(prediction: Prediction) -> Dict[str, Any]
-def market_movement_to_dict(movement: MarketMovement) -> Dict[str, Any]
+
 ```
 
 ## 🚀 Usage Examples

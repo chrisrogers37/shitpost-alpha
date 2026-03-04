@@ -86,7 +86,7 @@ Shitpost Alpha monitors Donald Trump's Truth Social posts in real-time, analyzes
 | `market_prices` | Historical OHLCV price data | `symbol`, `date`, `close`, `volume` |
 | `prediction_outcomes` | Validated prediction accuracy | `prediction_id` (FK), `symbol`, `return_t7`, `correct_t7`, `pnl_t7` |
 | `ticker_registry` | Tracked ticker symbols | `symbol` (unique), `status`, `first_seen_date`, `source_prediction_id` (FK) |
-| `market_movements` | Market movements after predictions | `prediction_id` (FK), `asset`, `movement_24h`, `movement_72h` |
+
 | `telegram_subscriptions` | Telegram bot subscribers | `chat_id` (unique), `is_active`, `alert_preferences` (JSON) |
 
 **Important Indexes**:
