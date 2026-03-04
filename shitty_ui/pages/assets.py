@@ -318,12 +318,12 @@ def register_asset_callbacks(app: Dash):
                     dbc.Col(
                         create_metric_card(
                             "Prediction Accuracy",
-                            f"{stats['accuracy_t7']:.1f}%",
+                            f"{stats['accuracy']:.1f}%",
                             f"{stats['correct_predictions']}/{stats['total_predictions']} correct",
                             "bullseye",
                             (
                                 COLORS["success"]
-                                if stats["accuracy_t7"] > 60
+                                if stats["accuracy"] > 60
                                 else COLORS["danger"]
                             ),
                         ),
@@ -343,13 +343,13 @@ def register_asset_callbacks(app: Dash):
                     ),
                     dbc.Col(
                         create_metric_card(
-                            "Total P&L (7-day)",
-                            safe_format_dollar(stats["total_pnl_t7"], fmt=",.0f"),
+                            "Total P&L",
+                            safe_format_dollar(stats["total_pnl"], fmt=",.0f"),
                             "Based on $1,000 positions",
                             "dollar-sign",
                             (
                                 COLORS["success"]
-                                if (stats["total_pnl_t7"] or 0) > 0
+                                if (stats["total_pnl"] or 0) > 0
                                 else COLORS["danger"]
                             ),
                         ),
@@ -358,13 +358,13 @@ def register_asset_callbacks(app: Dash):
                     ),
                     dbc.Col(
                         create_metric_card(
-                            "Avg 7-Day Return",
-                            safe_format_pct(stats["avg_return_t7"]),
+                            "Avg Return",
+                            safe_format_pct(stats["avg_return"]),
                             f"Confidence: {stats['avg_confidence']:.0%}",
                             "chart-line",
                             (
                                 COLORS["success"]
-                                if (stats["avg_return_t7"] or 0) > 0
+                                if (stats["avg_return"] or 0) > 0
                                 else COLORS["danger"]
                             ),
                         ),

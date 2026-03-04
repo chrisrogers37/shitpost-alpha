@@ -11,26 +11,31 @@ from sqlalchemy import text
 from typing import Dict, Any, Optional
 
 import data.base as _base
-from data.base import ttl_cache, logger, _timeframe_for_period
+from data.base import ttl_cache, logger
+from data.timeframe import get_tf_columns, DEFAULT_TIMEFRAME
 
 
 @ttl_cache(ttl_seconds=300)
-def get_asset_screener_data(days: int = None) -> pd.DataFrame:
+def get_asset_screener_data(
+    days: int = None, timeframe: str = DEFAULT_TIMEFRAME
+) -> pd.DataFrame:
     """Get combined asset screener data for the dashboard table.
 
     Joins per-asset accuracy metrics with the latest prediction sentiment
-    for each asset, plus average confidence. Uses adaptive timeframe
-    columns based on the selected period to avoid structurally empty results.
+    for each asset, plus average confidence.
 
     Args:
         days: Number of days to look back (None = all time).
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
 
     Returns:
         DataFrame with columns: symbol, total_predictions, correct,
         incorrect, avg_return, total_pnl, accuracy, latest_sentiment,
         avg_confidence, timeframe. Sorted by total_predictions descending.
     """
-    tf = _timeframe_for_period(days)
+    # Validate timeframe key; use raw key for column interpolation
+    get_tf_columns(timeframe)
+    tf = timeframe
 
     date_filter = ""
     params: Dict[str, Any] = {}
@@ -150,7 +155,10 @@ def get_screener_sparkline_prices(symbols: tuple) -> Dict[str, pd.DataFrame]:
 
 
 def get_similar_predictions(
-    asset: str = None, limit: int = 10, days: int = None
+    asset: str = None,
+    limit: int = 10,
+    days: int = None,
+    timeframe: str = DEFAULT_TIMEFRAME,
 ) -> pd.DataFrame:
     """
     Get predictions for a specific asset with their outcomes.
@@ -160,9 +168,16 @@ def get_similar_predictions(
         asset: Asset symbol to filter by
         limit: Maximum number of predictions to return
         days: Number of days to look back (None = all time)
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
     """
     if not asset:
         return pd.DataFrame()
+
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+    return_col = tf["return_col"]
+    pnl_col = tf["pnl_col"]
+    price_col = tf["price_col"]
 
     # Build date filter
     date_filter = ""
@@ -183,16 +198,16 @@ def get_similar_predictions(
             po.prediction_sentiment,
             po.return_t1,
             po.return_t3,
-            po.return_t7,
-            po.correct_t7,
-            po.pnl_t7,
+            po.{return_col},
+            po.{correct_col},
+            po.{pnl_col},
             po.price_at_prediction,
-            po.price_t7
+            po.{price_col}
         FROM prediction_outcomes po
         INNER JOIN predictions p ON po.prediction_id = p.id
         INNER JOIN truth_social_shitposts tss ON p.shitpost_id = tss.shitpost_id
         WHERE po.symbol = :asset
-            AND po.correct_t7 IS NOT NULL
+            AND po.{correct_col} IS NOT NULL
             {date_filter}
         ORDER BY tss.timestamp DESC
         LIMIT :limit
@@ -490,55 +505,51 @@ def get_asset_predictions(symbol: str, limit: int = 50) -> pd.DataFrame:
 
 
 @ttl_cache(ttl_seconds=300)  # Cache for 5 minutes
-def get_asset_stats(symbol: str) -> Dict[str, Any]:
+def get_asset_stats(
+    symbol: str, timeframe: str = DEFAULT_TIMEFRAME
+) -> Dict[str, Any]:
     """
     Get aggregate performance statistics for a specific asset,
     alongside overall system averages for comparison.
 
     Args:
         symbol: Ticker symbol (e.g., 'AAPL')
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
 
     Returns:
-        Dictionary with keys:
-          - total_predictions (int)
-          - correct_predictions (int)
-          - incorrect_predictions (int)
-          - accuracy_t7 (float, percentage)
-          - avg_return_t7 (float, percentage)
-          - total_pnl_t7 (float, dollar amount)
-          - avg_confidence (float, 0-1)
-          - bullish_count (int)
-          - bearish_count (int)
-          - neutral_count (int)
-          - best_return_t7 (float or None)
-          - worst_return_t7 (float or None)
-          - overall_accuracy_t7 (float, percentage, system-wide)
-          - overall_avg_return_t7 (float, percentage, system-wide)
+        Dictionary with generic keys (no _t7 suffix):
+          accuracy, avg_return, total_pnl, best_return, worst_return,
+          overall_accuracy, overall_avg_return, etc.
         Returns zeroed dict on error.
     """
-    query = text("""
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+    return_col = tf["return_col"]
+    pnl_col = tf["pnl_col"]
+
+    query = text(f"""
         WITH asset_stats AS (
             SELECT
                 COUNT(*) AS total_predictions,
-                COUNT(CASE WHEN correct_t7 = true THEN 1 END) AS correct,
-                COUNT(CASE WHEN correct_t7 = false THEN 1 END) AS incorrect,
-                COUNT(CASE WHEN correct_t7 IS NOT NULL THEN 1 END) AS evaluated,
-                AVG(CASE WHEN correct_t7 IS NOT NULL THEN return_t7 END) AS avg_return,
-                SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END) AS total_pnl,
+                COUNT(CASE WHEN {correct_col} = true THEN 1 END) AS correct,
+                COUNT(CASE WHEN {correct_col} = false THEN 1 END) AS incorrect,
+                COUNT(CASE WHEN {correct_col} IS NOT NULL THEN 1 END) AS evaluated,
+                AVG(CASE WHEN {correct_col} IS NOT NULL THEN {return_col} END) AS avg_return,
+                SUM(CASE WHEN {pnl_col} IS NOT NULL THEN {pnl_col} ELSE 0 END) AS total_pnl,
                 AVG(prediction_confidence) AS avg_confidence,
                 COUNT(CASE WHEN prediction_sentiment = 'bullish' THEN 1 END) AS bullish_count,
                 COUNT(CASE WHEN prediction_sentiment = 'bearish' THEN 1 END) AS bearish_count,
                 COUNT(CASE WHEN prediction_sentiment = 'neutral' THEN 1 END) AS neutral_count,
-                MAX(return_t7) AS best_return,
-                MIN(return_t7) AS worst_return
+                MAX({return_col}) AS best_return,
+                MIN({return_col}) AS worst_return
             FROM prediction_outcomes
             WHERE symbol = :symbol
         ),
         overall_stats AS (
             SELECT
-                COUNT(CASE WHEN correct_t7 IS NOT NULL THEN 1 END) AS overall_evaluated,
-                COUNT(CASE WHEN correct_t7 = true THEN 1 END) AS overall_correct,
-                AVG(CASE WHEN correct_t7 IS NOT NULL THEN return_t7 END) AS overall_avg_return
+                COUNT(CASE WHEN {correct_col} IS NOT NULL THEN 1 END) AS overall_evaluated,
+                COUNT(CASE WHEN {correct_col} = true THEN 1 END) AS overall_correct,
+                AVG(CASE WHEN {correct_col} IS NOT NULL THEN {return_col} END) AS overall_avg_return
             FROM prediction_outcomes
         )
         SELECT
@@ -580,17 +591,17 @@ def get_asset_stats(symbol: str) -> Dict[str, Any]:
                 "total_predictions": row[0] or 0,
                 "correct_predictions": correct,
                 "incorrect_predictions": row[2] or 0,
-                "accuracy_t7": round(accuracy, 1),
-                "avg_return_t7": round(float(row[4]), 2) if row[4] else 0.0,
-                "total_pnl_t7": round(float(row[5]), 2) if row[5] else 0.0,
+                "accuracy": round(accuracy, 1),
+                "avg_return": round(float(row[4]), 2) if row[4] else 0.0,
+                "total_pnl": round(float(row[5]), 2) if row[5] else 0.0,
                 "avg_confidence": round(float(row[6]), 2) if row[6] else 0.0,
                 "bullish_count": row[7] or 0,
                 "bearish_count": row[8] or 0,
                 "neutral_count": row[9] or 0,
-                "best_return_t7": round(float(row[10]), 2) if row[10] else None,
-                "worst_return_t7": round(float(row[11]), 2) if row[11] else None,
-                "overall_accuracy_t7": round(overall_accuracy, 1),
-                "overall_avg_return_t7": (round(float(row[14]), 2) if row[14] else 0.0),
+                "best_return": round(float(row[10]), 2) if row[10] else None,
+                "worst_return": round(float(row[11]), 2) if row[11] else None,
+                "overall_accuracy": round(overall_accuracy, 1),
+                "overall_avg_return": (round(float(row[14]), 2) if row[14] else 0.0),
             }
     except Exception as e:
         logger.error(f"Error loading asset stats for {symbol}: {e}")
@@ -599,21 +610,23 @@ def get_asset_stats(symbol: str) -> Dict[str, Any]:
         "total_predictions": 0,
         "correct_predictions": 0,
         "incorrect_predictions": 0,
-        "accuracy_t7": 0.0,
-        "avg_return_t7": 0.0,
-        "total_pnl_t7": 0.0,
+        "accuracy": 0.0,
+        "avg_return": 0.0,
+        "total_pnl": 0.0,
         "avg_confidence": 0.0,
         "bullish_count": 0,
         "bearish_count": 0,
         "neutral_count": 0,
-        "best_return_t7": None,
-        "worst_return_t7": None,
-        "overall_accuracy_t7": 0.0,
-        "overall_avg_return_t7": 0.0,
+        "best_return": None,
+        "worst_return": None,
+        "overall_accuracy": 0.0,
+        "overall_avg_return": 0.0,
     }
 
 
-def get_related_assets(symbol: str, limit: int = 8) -> pd.DataFrame:
+def get_related_assets(
+    symbol: str, limit: int = 8, timeframe: str = DEFAULT_TIMEFRAME
+) -> pd.DataFrame:
     """
     Get assets that frequently appear in the same predictions as the given symbol.
 
@@ -625,11 +638,14 @@ def get_related_assets(symbol: str, limit: int = 8) -> pd.DataFrame:
         limit: Maximum number of related assets to return
 
     Returns:
-        DataFrame with columns: related_symbol, co_occurrence_count, avg_return_t7
+        DataFrame with columns: related_symbol, co_occurrence_count, avg_return
         Sorted by co_occurrence_count descending.
         Returns empty DataFrame on error.
     """
-    query = text("""
+    tf = get_tf_columns(timeframe)
+    return_col = tf["return_col"]
+
+    query = text(f"""
         WITH target_predictions AS (
             -- Find all prediction IDs that mention this symbol
             SELECT p.id AS prediction_id
@@ -642,7 +658,7 @@ def get_related_assets(symbol: str, limit: int = 8) -> pd.DataFrame:
             SELECT
                 po.symbol AS related_symbol,
                 COUNT(DISTINCT po.prediction_id) AS co_occurrence_count,
-                AVG(po.return_t7) AS avg_return_t7
+                AVG(po.{return_col}) AS avg_return
             FROM prediction_outcomes po
             INNER JOIN target_predictions tp
                 ON po.prediction_id = tp.prediction_id
@@ -653,7 +669,7 @@ def get_related_assets(symbol: str, limit: int = 8) -> pd.DataFrame:
         SELECT
             related_symbol,
             co_occurrence_count,
-            ROUND(avg_return_t7::numeric, 2) AS avg_return_t7
+            ROUND(avg_return::numeric, 2) AS avg_return
         FROM co_occurring_assets
         ORDER BY co_occurrence_count DESC
         LIMIT :limit

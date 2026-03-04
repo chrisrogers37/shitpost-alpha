@@ -11,10 +11,13 @@ from typing import List, Dict, Any
 
 import data.base as _base
 from data.base import ttl_cache, logger
+from data.timeframe import get_tf_columns, DEFAULT_TIMEFRAME
 
 
 @ttl_cache(ttl_seconds=300)
-def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
+def get_dynamic_insights(
+    days: int = None, timeframe: str = DEFAULT_TIMEFRAME
+) -> List[Dict[str, Any]]:
     """Generate a pool of dynamic insight candidates for the dashboard.
 
     Queries for multiple insight types and returns them as structured dicts.
@@ -31,11 +34,17 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
 
     Args:
         days: Number of days to look back (None = all time).
+        timeframe: Outcome timeframe key ("t1", "t3", "t7", "t30").
 
     Returns:
         List of insight dicts, unranked (caller sorts by priority + recency).
         Returns empty list if no data available.
     """
+    tf = get_tf_columns(timeframe)
+    correct_col = tf["correct_col"]
+    return_col = tf["return_col"]
+    pnl_col = tf["pnl_col"]
+    tf_label = tf["label_long"].lower()
     insights: List[Dict[str, Any]] = []
 
     date_filter = ""
@@ -50,16 +59,16 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
             SELECT
                 po.symbol,
                 po.prediction_sentiment,
-                po.return_t7,
-                po.correct_t7,
-                po.pnl_t7,
+                po.{return_col},
+                po.{correct_col},
+                po.{pnl_col},
                 po.prediction_date,
                 po.prediction_confidence,
                 tss.timestamp AS post_timestamp
             FROM prediction_outcomes po
             INNER JOIN predictions p ON po.prediction_id = p.id
             INNER JOIN truth_social_shitposts tss ON p.shitpost_id = tss.shitpost_id
-            WHERE po.correct_t7 IS NOT NULL
+            WHERE po.{correct_col} IS NOT NULL
                 {date_filter}
             ORDER BY po.prediction_date DESC
             LIMIT 1
@@ -68,27 +77,31 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
         if rows and rows[0]:
             r = rows[0]
             symbol = r[0]
-            return_t7 = float(r[2]) if r[2] is not None else None
+            ret_val = float(r[2]) if r[2] is not None else None
             correct = r[3]
             post_ts = r[7]
 
-            if return_t7 is not None:
-                ret_str = f"{return_t7:+.2f}%"
+            if ret_val is not None:
+                ret_str = f"{ret_val:+.2f}%"
                 if correct:
-                    headline = f"Trump mentioned {symbol} -- it's {ret_str} in 7 days."
+                    headline = (
+                        f"Trump mentioned {symbol}"
+                        f" -- it's {ret_str} in {tf_label}."
+                    )
                     body = (
                         f"Predicted correctly with {ret_str} return."
-                        if return_t7 > 2
+                        if ret_val > 2
                         else f"Called it. {ret_str} return."
                     )
                     ins_sentiment = "positive"
                 else:
                     headline = (
-                        f"Trump mentioned {symbol} -- it went {ret_str} in 7 days."
+                        f"Trump mentioned {symbol}"
+                        f" -- it went {ret_str} in {tf_label}."
                     )
                     body = (
                         "Missed by a wide margin."
-                        if return_t7 < -2
+                        if ret_val < -2
                         else "Close to the threshold."
                     )
                     ins_sentiment = "negative"
@@ -115,20 +128,20 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
 
         best_worst_query = text(f"""
             (
-                SELECT symbol, return_t7, correct_t7, prediction_date, 'best' AS rank_type
+                SELECT symbol, {return_col}, {correct_col}, prediction_date, 'best' AS rank_type
                 FROM prediction_outcomes
-                WHERE correct_t7 IS NOT NULL AND return_t7 IS NOT NULL
+                WHERE {correct_col} IS NOT NULL AND {return_col} IS NOT NULL
                     {date_filter_bare}
-                ORDER BY return_t7 DESC
+                ORDER BY {return_col} DESC
                 LIMIT 1
             )
             UNION ALL
             (
-                SELECT symbol, return_t7, correct_t7, prediction_date, 'worst' AS rank_type
+                SELECT symbol, {return_col}, {correct_col}, prediction_date, 'worst' AS rank_type
                 FROM prediction_outcomes
-                WHERE correct_t7 IS NOT NULL AND return_t7 IS NOT NULL
+                WHERE {correct_col} IS NOT NULL AND {return_col} IS NOT NULL
                     {date_filter_bare}
-                ORDER BY return_t7 ASC
+                ORDER BY {return_col} ASC
                 LIMIT 1
             )
         """)
@@ -167,9 +180,9 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
         accuracy_query = text(f"""
             SELECT
                 COUNT(*) AS total,
-                COUNT(CASE WHEN correct_t7 = true THEN 1 END) AS correct
+                COUNT(CASE WHEN {correct_col} = true THEN 1 END) AS correct
             FROM prediction_outcomes
-            WHERE correct_t7 IS NOT NULL
+            WHERE {correct_col} IS NOT NULL
                 {date_filter_bare}
         """)
         rows, columns = _base.execute_query(accuracy_query, params)
@@ -217,9 +230,9 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
             SELECT
                 symbol,
                 COUNT(*) AS pred_count,
-                ROUND(AVG(return_t7)::numeric, 2) AS avg_return
+                ROUND(AVG({return_col})::numeric, 2) AS avg_return
             FROM prediction_outcomes
-            WHERE correct_t7 IS NOT NULL
+            WHERE {correct_col} IS NOT NULL
                 {date_filter_bare}
             GROUP BY symbol
             HAVING COUNT(*) >= 3
@@ -264,13 +277,13 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
 
     # ---- Insight 5: Recent high-confidence signal ----
     try:
-        hot_signal_query = text("""
+        hot_signal_query = text(f"""
             SELECT
                 po.symbol,
                 po.prediction_sentiment,
                 po.prediction_confidence,
-                po.correct_t7,
-                po.return_t7,
+                po.{correct_col},
+                po.{return_col},
                 tss.timestamp AS post_timestamp
             FROM prediction_outcomes po
             INNER JOIN predictions p ON po.prediction_id = p.id
@@ -285,22 +298,23 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
             sentiment = (rows[0][1] or "neutral").lower()
             confidence = float(rows[0][2]) if rows[0][2] is not None else 0.0
             correct = rows[0][3]
-            return_t7 = float(rows[0][4]) if rows[0][4] is not None else None
+            ret_val = float(rows[0][4]) if rows[0][4] is not None else None
             post_ts = rows[0][5]
 
             conf_pct = f"{confidence:.0%}"
+            tf_short = tf["label_short"]
             if correct is None:
                 headline = f"High-confidence call: {sentiment.upper()} on {symbol} ({conf_pct}). Awaiting results."
                 body = "Outcome pending -- check back after maturation."
                 ins_sentiment = "neutral"
             elif correct:
-                ret_str = f"{return_t7:+.2f}%" if return_t7 is not None else "N/A"
-                headline = f"High-confidence call on {symbol} ({conf_pct}) was RIGHT. {ret_str} in 7d."
+                ret_str = f"{ret_val:+.2f}%" if ret_val is not None else "N/A"
+                headline = f"High-confidence call on {symbol} ({conf_pct}) was RIGHT. {ret_str} in {tf_short}."
                 body = "High-confidence signal validated."
                 ins_sentiment = "positive"
             else:
-                ret_str = f"{return_t7:+.2f}%" if return_t7 is not None else "N/A"
-                headline = f"High-confidence call on {symbol} ({conf_pct}) was WRONG. {ret_str} in 7d."
+                ret_str = f"{ret_val:+.2f}%" if ret_val is not None else "N/A"
+                headline = f"High-confidence call on {symbol} ({conf_pct}) was WRONG. {ret_str} in {tf_short}."
                 body = "High confidence did not translate to accuracy here."
                 ins_sentiment = "negative"
 

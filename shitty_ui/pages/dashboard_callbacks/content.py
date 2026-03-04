@@ -24,6 +24,7 @@ from data import (
     load_recent_posts,
     get_dashboard_kpis_with_fallback,
     get_dynamic_insights,
+    get_tf_columns,
 )
 from components.screener import build_screener_table
 from components.insights import create_insight_cards
@@ -46,11 +47,13 @@ def register_content_callbacks(app: Dash) -> None:
         [
             Input("refresh-interval", "n_intervals"),
             Input("selected-period", "data"),
+            Input("selected-timeframe", "data"),
         ],
     )
-    def update_dashboard(n_intervals, period):
+    def update_dashboard(n_intervals, period, timeframe):
         """Update main dashboard components with error boundaries."""
         errors = []
+        timeframe = timeframe or "t7"
 
         # Convert period to days
         days_map = {"7d": 7, "30d": 30, "90d": 90, "all": None}
@@ -59,9 +62,13 @@ def register_content_callbacks(app: Dash) -> None:
         # Current timestamp for refresh indicator
         current_time = datetime.now().isoformat()
 
+        # Resolve timeframe display label
+        tf = get_tf_columns(timeframe)
+        tf_label_short = tf["label_short"]
+
         # ===== Dynamic Insight Cards =====
         try:
-            insight_pool = get_dynamic_insights(days=days)
+            insight_pool = get_dynamic_insights(days=days, timeframe=timeframe)
             insight_cards = create_insight_cards(insight_pool, max_cards=3)
         except Exception as e:
             errors.append(f"Insight cards: {e}")
@@ -70,24 +77,20 @@ def register_content_callbacks(app: Dash) -> None:
 
         # ===== Asset Screener Table =====
         try:
-            screener_df = get_asset_screener_data(days=days)
+            screener_df = get_asset_screener_data(
+                days=days, timeframe=timeframe
+            )
             sparkline_data = {}
             if not screener_df.empty:
                 symbols = tuple(screener_df["symbol"].tolist())
                 sparkline_data = get_screener_sparkline_prices(symbols=symbols)
-
-            # Determine display label for timeframe column
-            tf_map = {"t1": "1d", "t3": "3d", "t7": "7d"}
-            screener_tf = "7d"
-            if not screener_df.empty and "timeframe" in screener_df.columns:
-                screener_tf = tf_map.get(screener_df["timeframe"].iloc[0], "7d")
 
             screener_table = build_screener_table(
                 screener_df=screener_df,
                 sparkline_data=sparkline_data,
                 sort_column="total_predictions",
                 sort_ascending=False,
-                timeframe_label=screener_tf,
+                timeframe_label=tf_label_short,
             )
         except Exception as e:
             errors.append(f"Asset screener: {e}")
@@ -96,9 +99,11 @@ def register_content_callbacks(app: Dash) -> None:
 
         # ===== Performance Metrics with error handling =====
         try:
-            kpis = get_dashboard_kpis_with_fallback(days=days)
+            kpis = get_dashboard_kpis_with_fallback(
+                days=days, timeframe=timeframe
+            )
             fallback_note = kpis["fallback_label"] if kpis["is_fallback"] else ""
-            tf_label = kpis.get("timeframe_label", "7-day")
+            tf_label = kpis.get("timeframe_label", tf["label_long"])
 
             # Create KPI metrics row
             metrics_row = dbc.Row(
@@ -136,11 +141,11 @@ def register_content_callbacks(app: Dash) -> None:
                     dbc.Col(
                         create_metric_card(
                             COPY["kpi_avg_return_title"],
-                            safe_format_pct(kpis["avg_return_t7"]),
+                            safe_format_pct(kpis["avg_return"]),
                             COPY["kpi_avg_return_subtitle"].format(tf_label=tf_label),
                             "chart-line",
                             COLORS["success"]
-                            if (kpis["avg_return_t7"] or 0) > 0
+                            if (kpis["avg_return"] or 0) > 0
                             else COLORS["danger"],
                             note=fallback_note,
                         ),

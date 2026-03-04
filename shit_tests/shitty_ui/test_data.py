@@ -189,11 +189,11 @@ class TestGetPerformanceMetrics:
             [(100, 60, 40, 100, 2.5, 2500.0, 0.72)],
             [
                 "total_outcomes",
-                "correct_t7",
-                "incorrect_t7",
-                "evaluated_t7",
-                "avg_return_t7",
-                "total_pnl_t7",
+                "correct",
+                "incorrect",
+                "evaluated",
+                "avg_return",
+                "total_pnl",
                 "avg_confidence",
             ],
         )
@@ -203,9 +203,9 @@ class TestGetPerformanceMetrics:
         assert isinstance(result, dict)
         assert result["total_outcomes"] == 100
         assert result["correct_predictions"] == 60
-        assert result["accuracy_t7"] == 60.0
-        assert result["avg_return_t7"] == 2.5
-        assert result["total_pnl_t7"] == 2500.0
+        assert result["accuracy"] == 60.0
+        assert result["avg_return"] == 2.5
+        assert result["total_pnl"] == 2500.0
 
     @patch("data.base.execute_query")
     def test_calculates_accuracy_correctly(self, mock_execute):
@@ -216,18 +216,18 @@ class TestGetPerformanceMetrics:
             [(50, 35, 15, 50, 1.5, 1500.0, 0.65)],
             [
                 "total_outcomes",
-                "correct_t7",
-                "incorrect_t7",
-                "evaluated_t7",
-                "avg_return_t7",
-                "total_pnl_t7",
+                "correct",
+                "incorrect",
+                "evaluated",
+                "avg_return",
+                "total_pnl",
                 "avg_confidence",
             ],
         )
 
         result = get_performance_metrics()
 
-        assert result["accuracy_t7"] == 70.0  # 35/50 = 70%
+        assert result["accuracy"] == 70.0  # 35/50 = 70%
 
     @patch("data.base.execute_query")
     def test_handles_zero_evaluated(self, mock_execute):
@@ -238,18 +238,18 @@ class TestGetPerformanceMetrics:
             [(0, 0, 0, 0, None, 0.0, None)],
             [
                 "total_outcomes",
-                "correct_t7",
-                "incorrect_t7",
-                "evaluated_t7",
-                "avg_return_t7",
-                "total_pnl_t7",
+                "correct",
+                "incorrect",
+                "evaluated",
+                "avg_return",
+                "total_pnl",
                 "avg_confidence",
             ],
         )
 
         result = get_performance_metrics()
 
-        assert result["accuracy_t7"] == 0.0
+        assert result["accuracy"] == 0.0
 
     @patch("data.base.execute_query")
     def test_returns_defaults_on_error(self, mock_execute):
@@ -261,7 +261,7 @@ class TestGetPerformanceMetrics:
         result = get_performance_metrics()
 
         assert result["total_outcomes"] == 0
-        assert result["accuracy_t7"] == 0.0
+        assert result["accuracy"] == 0.0
 
 
 class TestGetDashboardKpis:
@@ -274,7 +274,7 @@ class TestGetDashboardKpis:
 
         mock_execute.return_value = (
             [(80, 48, 2.15, 1720.0)],
-            ["total_signals", "correct_count", "avg_return_t7", "total_pnl"],
+            ["total_signals", "correct_count", "avg_return", "total_pnl"],
         )
 
         get_dashboard_kpis.clear_cache()
@@ -283,7 +283,7 @@ class TestGetDashboardKpis:
         assert isinstance(result, dict)
         assert result["total_signals"] == 80
         assert result["accuracy_pct"] == 60.0  # 48/80 = 60%
-        assert result["avg_return_t7"] == 2.15
+        assert result["avg_return"] == 2.15
         assert result["total_pnl"] == 1720.0
 
     @patch("data.base.execute_query")
@@ -293,7 +293,7 @@ class TestGetDashboardKpis:
 
         mock_execute.return_value = (
             [(200, 130, 1.8, 3200.0)],
-            ["total_signals", "correct_count", "avg_return_t7", "total_pnl"],
+            ["total_signals", "correct_count", "avg_return", "total_pnl"],
         )
 
         get_dashboard_kpis.clear_cache()
@@ -308,7 +308,7 @@ class TestGetDashboardKpis:
 
         mock_execute.return_value = (
             [(0, 0, None, 0.0)],
-            ["total_signals", "correct_count", "avg_return_t7", "total_pnl"],
+            ["total_signals", "correct_count", "avg_return", "total_pnl"],
         )
 
         get_dashboard_kpis.clear_cache()
@@ -316,7 +316,7 @@ class TestGetDashboardKpis:
 
         assert result["total_signals"] == 0
         assert result["accuracy_pct"] == 0.0
-        assert result["avg_return_t7"] == 0.0
+        assert result["avg_return"] == 0.0
         assert result["total_pnl"] == 0.0
 
     @patch("data.base.execute_query")
@@ -331,7 +331,7 @@ class TestGetDashboardKpis:
 
         assert result["total_signals"] == 0
         assert result["accuracy_pct"] == 0.0
-        assert result["avg_return_t7"] == 0.0
+        assert result["avg_return"] == 0.0
         assert result["total_pnl"] == 0.0
 
     @patch("data.base.execute_query")
@@ -341,7 +341,7 @@ class TestGetDashboardKpis:
 
         mock_execute.return_value = (
             [(10, 6, 1.5, 600.0)],
-            ["total_signals", "correct_count", "avg_return_t7", "total_pnl"],
+            ["total_signals", "correct_count", "avg_return", "total_pnl"],
         )
 
         get_dashboard_kpis.clear_cache()
@@ -359,7 +359,7 @@ class TestGetDashboardKpis:
 
         mock_execute.return_value = (
             [(500, 300, 2.0, 15000.0)],
-            ["total_signals", "correct_count", "avg_return_t7", "total_pnl"],
+            ["total_signals", "correct_count", "avg_return", "total_pnl"],
         )
 
         get_dashboard_kpis.clear_cache()
@@ -377,14 +377,14 @@ class TestGetDashboardKpis:
 
         mock_execute.return_value = (
             [(50, 20, -1.5, -750.0)],
-            ["total_signals", "correct_count", "avg_return_t7", "total_pnl"],
+            ["total_signals", "correct_count", "avg_return", "total_pnl"],
         )
 
         get_dashboard_kpis.clear_cache()
         result = get_dashboard_kpis()
 
         assert result["total_pnl"] == -750.0
-        assert result["avg_return_t7"] == -1.5
+        assert result["avg_return"] == -1.5
         assert result["accuracy_pct"] == 40.0  # 20/50 = 40%
 
     @patch("data.base.execute_query")
@@ -394,13 +394,13 @@ class TestGetDashboardKpis:
 
         mock_execute.return_value = (
             [(0, 0, None, None)],
-            ["total_signals", "correct_count", "avg_return_t7", "total_pnl"],
+            ["total_signals", "correct_count", "avg_return", "total_pnl"],
         )
 
         get_dashboard_kpis.clear_cache()
         result = get_dashboard_kpis()
 
-        assert result["avg_return_t7"] == 0.0
+        assert result["avg_return"] == 0.0
         assert result["total_pnl"] == 0.0
 
 
@@ -818,11 +818,11 @@ class TestTimePeriodFiltering:
             [(50, 30, 20, 50, 2.5, 2500.0, 0.72)],
             [
                 "total_outcomes",
-                "correct_t7",
-                "incorrect_t7",
-                "evaluated_t7",
-                "avg_return_t7",
-                "total_pnl_t7",
+                "correct",
+                "incorrect",
+                "evaluated",
+                "avg_return",
+                "total_pnl",
                 "avg_confidence",
             ],
         )
@@ -842,11 +842,11 @@ class TestTimePeriodFiltering:
             [(100, 60, 40, 100, 2.5, 2500.0, 0.72)],
             [
                 "total_outcomes",
-                "correct_t7",
-                "incorrect_t7",
-                "evaluated_t7",
-                "avg_return_t7",
-                "total_pnl_t7",
+                "correct",
+                "incorrect",
+                "evaluated",
+                "avg_return",
+                "total_pnl",
                 "avg_confidence",
             ],
         )
@@ -1655,12 +1655,12 @@ class TestGetAssetStats:
         assert isinstance(result, dict)
         assert result["total_predictions"] == 20
         assert result["correct_predictions"] == 14
-        assert result["accuracy_t7"] == 70.0  # 14/20 = 70%
+        assert result["accuracy"] == 70.0  # 14/20 = 70%
         assert result["bullish_count"] == 12
         assert result["bearish_count"] == 6
-        assert result["best_return_t7"] == 8.5
-        assert result["worst_return_t7"] == -3.2
-        assert result["overall_accuracy_t7"] == 60.0  # 600/1000 = 60%
+        assert result["best_return"] == 8.5
+        assert result["worst_return"] == -3.2
+        assert result["overall_accuracy"] == 60.0  # 600/1000 = 60%
 
     @patch("data.base.execute_query")
     def test_handles_zero_evaluated(self, mock_execute):
@@ -1709,8 +1709,8 @@ class TestGetAssetStats:
         get_asset_stats.clear_cache()
         result = get_asset_stats("UNKNOWN")
 
-        assert result["accuracy_t7"] == 0.0
-        assert result["best_return_t7"] is None
+        assert result["accuracy"] == 0.0
+        assert result["best_return"] is None
 
     @patch("data.base.execute_query")
     def test_returns_defaults_on_error(self, mock_execute):
@@ -1723,8 +1723,8 @@ class TestGetAssetStats:
         result = get_asset_stats("AAPL")
 
         assert result["total_predictions"] == 0
-        assert result["accuracy_t7"] == 0.0
-        assert result["overall_accuracy_t7"] == 0.0
+        assert result["accuracy"] == 0.0
+        assert result["overall_accuracy"] == 0.0
 
 
 class TestGetRelatedAssets:
@@ -1741,7 +1741,7 @@ class TestGetRelatedAssets:
                 ("MSFT", 12, 1.8),
                 ("AMZN", 8, -0.5),
             ],
-            ["related_symbol", "co_occurrence_count", "avg_return_t7"],
+            ["related_symbol", "co_occurrence_count", "avg_return"],
         )
 
         result = get_related_assets("AAPL", limit=10)
@@ -3034,14 +3034,14 @@ class TestGetDashboardKpisWithFallback:
         mock_kpis.return_value = {
             "total_signals": 10,
             "accuracy_pct": 60.0,
-            "avg_return_t7": 1.5,
+            "avg_return": 1.5,
             "total_pnl": 500.0,
         }
         result = get_dashboard_kpis_with_fallback(days=7)
         assert result["total_signals"] == 10
         assert result["is_fallback"] is False
         assert result["fallback_label"] == ""
-        mock_kpis.assert_called_once_with(days=7)
+        mock_kpis.assert_called_once_with(days=7, timeframe="t7")
 
     @patch("data.performance_queries.get_dashboard_kpis")
     def test_falls_back_to_alltime_when_period_empty(self, mock_kpis):
@@ -3049,16 +3049,16 @@ class TestGetDashboardKpisWithFallback:
         from data import get_dashboard_kpis_with_fallback
 
         mock_kpis.side_effect = [
-            {"total_signals": 0, "accuracy_pct": 0.0, "avg_return_t7": 0.0, "total_pnl": 0.0},
-            {"total_signals": 80, "accuracy_pct": 55.0, "avg_return_t7": 1.2, "total_pnl": 1000.0},
+            {"total_signals": 0, "accuracy_pct": 0.0, "avg_return": 0.0, "total_pnl": 0.0},
+            {"total_signals": 80, "accuracy_pct": 55.0, "avg_return": 1.2, "total_pnl": 1000.0},
         ]
         result = get_dashboard_kpis_with_fallback(days=7)
         assert result["total_signals"] == 80
         assert result["is_fallback"] is True
         assert result["fallback_label"] == "Showing all-time data"
         assert mock_kpis.call_count == 2
-        mock_kpis.assert_any_call(days=7)
-        mock_kpis.assert_any_call(days=None)
+        mock_kpis.assert_any_call(days=7, timeframe="t7")
+        mock_kpis.assert_any_call(days=None, timeframe="t7")
 
     @patch("data.performance_queries.get_dashboard_kpis")
     def test_no_fallback_when_days_is_none(self, mock_kpis):
@@ -3068,12 +3068,12 @@ class TestGetDashboardKpisWithFallback:
         mock_kpis.return_value = {
             "total_signals": 0,
             "accuracy_pct": 0.0,
-            "avg_return_t7": 0.0,
+            "avg_return": 0.0,
             "total_pnl": 0.0,
         }
         result = get_dashboard_kpis_with_fallback(days=None)
         assert result["is_fallback"] is False
-        mock_kpis.assert_called_once_with(days=None)
+        mock_kpis.assert_called_once_with(days=None, timeframe="t7")
 
     @patch("data.performance_queries.get_dashboard_kpis")
     def test_preserves_all_original_keys(self, mock_kpis):
@@ -3083,13 +3083,13 @@ class TestGetDashboardKpisWithFallback:
         mock_kpis.return_value = {
             "total_signals": 5,
             "accuracy_pct": 70.0,
-            "avg_return_t7": 2.0,
+            "avg_return": 2.0,
             "total_pnl": 300.0,
         }
         result = get_dashboard_kpis_with_fallback(days=30)
         assert "total_signals" in result
         assert "accuracy_pct" in result
-        assert "avg_return_t7" in result
+        assert "avg_return" in result
         assert "total_pnl" in result
         assert "is_fallback" in result
         assert "fallback_label" in result

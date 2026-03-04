@@ -10,7 +10,16 @@ Internal structure:
     data/performance_queries.py -- KPIs, accuracy, P&L, streaks
     data/asset_queries.py     -- Screener, sparklines, asset stats
     data/insight_queries.py   -- Dynamic insight cards
+    data/timeframe.py         -- Timeframe column mapping helper
 """
+
+# --- Timeframe helpers ---
+from data.timeframe import (  # noqa: F401
+    get_tf_columns,
+    TIMEFRAME_OPTIONS,
+    VALID_TIMEFRAMES,
+    DEFAULT_TIMEFRAME,
+)
 
 # --- Base infrastructure ---
 from data.base import (  # noqa: F401
@@ -114,6 +123,11 @@ def clear_all_caches() -> None:
 
 
 __all__ = [
+    # Timeframe
+    "get_tf_columns",
+    "TIMEFRAME_OPTIONS",
+    "VALID_TIMEFRAMES",
+    "DEFAULT_TIMEFRAME",
     # Base
     "execute_query",
     "ttl_cache",

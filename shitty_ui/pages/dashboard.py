@@ -18,48 +18,106 @@ def create_dashboard_page() -> html.Div:
             # Main content container
             html.Div(
                 [
-                    # Time Period Selector Row
+                    # Time Period & Timeframe Selector Row
                     html.Div(
                         [
-                            html.Span(
-                                "Time Period: ",
-                                style={
-                                    "color": COLORS["text_muted"],
-                                    "marginRight": "10px",
-                                    "fontSize": "0.9rem",
-                                },
-                            ),
-                            dbc.ButtonGroup(
+                            # Outcome Timeframe selector (left)
+                            html.Div(
                                 [
-                                    dbc.Button(
-                                        "7D",
-                                        id="period-7d",
-                                        color="secondary",
-                                        outline=True,
-                                        size="sm",
+                                    html.Span(
+                                        "Outcome Window: ",
+                                        style={
+                                            "color": COLORS["text_muted"],
+                                            "marginRight": "10px",
+                                            "fontSize": "0.9rem",
+                                        },
                                     ),
-                                    dbc.Button(
-                                        "30D",
-                                        id="period-30d",
-                                        color="secondary",
-                                        outline=True,
-                                        size="sm",
-                                    ),
-                                    dbc.Button(
-                                        "90D",
-                                        id="period-90d",
-                                        color="primary",
-                                        size="sm",
-                                    ),
-                                    dbc.Button(
-                                        "All",
-                                        id="period-all",
-                                        color="secondary",
-                                        outline=True,
+                                    dbc.ButtonGroup(
+                                        [
+                                            dbc.Button(
+                                                "T+1",
+                                                id="tf-t1",
+                                                color="secondary",
+                                                outline=True,
+                                                size="sm",
+                                            ),
+                                            dbc.Button(
+                                                "T+3",
+                                                id="tf-t3",
+                                                color="secondary",
+                                                outline=True,
+                                                size="sm",
+                                            ),
+                                            dbc.Button(
+                                                "T+7",
+                                                id="tf-t7",
+                                                color="primary",
+                                                size="sm",
+                                            ),
+                                            dbc.Button(
+                                                "T+30",
+                                                id="tf-t30",
+                                                color="secondary",
+                                                outline=True,
+                                                size="sm",
+                                            ),
+                                        ],
                                         size="sm",
                                     ),
                                 ],
-                                size="sm",
+                                style={
+                                    "display": "flex",
+                                    "alignItems": "center",
+                                },
+                            ),
+                            # Time Period selector (right)
+                            html.Div(
+                                [
+                                    html.Span(
+                                        "Time Period: ",
+                                        style={
+                                            "color": COLORS["text_muted"],
+                                            "marginRight": "10px",
+                                            "fontSize": "0.9rem",
+                                        },
+                                    ),
+                                    dbc.ButtonGroup(
+                                        [
+                                            dbc.Button(
+                                                "7D",
+                                                id="period-7d",
+                                                color="secondary",
+                                                outline=True,
+                                                size="sm",
+                                            ),
+                                            dbc.Button(
+                                                "30D",
+                                                id="period-30d",
+                                                color="secondary",
+                                                outline=True,
+                                                size="sm",
+                                            ),
+                                            dbc.Button(
+                                                "90D",
+                                                id="period-90d",
+                                                color="primary",
+                                                size="sm",
+                                            ),
+                                            dbc.Button(
+                                                "All",
+                                                id="period-all",
+                                                color="secondary",
+                                                outline=True,
+                                                size="sm",
+                                            ),
+                                        ],
+                                        size="sm",
+                                    ),
+                                ],
+                                style={
+                                    "display": "flex",
+                                    "alignItems": "center",
+                                },
                             ),
                         ],
                         className="period-selector",
@@ -67,7 +125,9 @@ def create_dashboard_page() -> html.Div:
                             "marginBottom": "20px",
                             "display": "flex",
                             "alignItems": "center",
-                            "justifyContent": "flex-end",
+                            "justifyContent": "space-between",
+                            "flexWrap": "wrap",
+                            "gap": "12px",
                         },
                     ),
                     # Dynamic Insight Cards (above KPIs, answer "so what right now?")

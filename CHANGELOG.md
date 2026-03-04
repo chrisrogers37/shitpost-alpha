@@ -8,11 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Adaptive timeframe screener** — Screener and KPIs now use period-appropriate timeframes (T+1 for 7D, T+3 for 30D, T+7 for 90D/All) instead of hardcoded T+7, preventing structurally empty results when viewing short periods
-- **Shared `_timeframe_for_period()` helper** — Centralized timeframe mapping in `data/base.py` used by both screener and KPI queries
+- **Multi-timeframe dashboard** — New "Outcome Window" toggle (T+1, T+3, T+7, T+30) on the dashboard lets users view KPIs, screener, and insights across any prediction timeframe instead of only T+7
+- **Timeframe column mapping module** — `data/timeframe.py` provides `get_tf_columns()`, `TIMEFRAME_OPTIONS`, `VALID_TIMEFRAMES`, and `DEFAULT_TIMEFRAME` as single source of truth for timeframe→column mapping
+- 12 new tests for timeframe module (`test_timeframe.py`)
 
 ### Changed
+- **All query functions parameterized** — 20+ functions in `performance_queries.py`, `asset_queries.py`, and `insight_queries.py` now accept an explicit `timeframe` parameter (default "t7") instead of hardcoded T+7 column references
+- **Generic dict keys** — Return dicts use generic names (`accuracy`, `avg_return`, `total_pnl`) instead of `_t7` suffixed names. UI components and tests updated accordingly
 - **Professional dashboard copy** — Replaced 14 self-deprecating COPY entries in `brand_copy.py` and 9 insight body strings in `insight_queries.py` with professional, data-focused language. KPI subtitles now dynamically reflect the active timeframe.
+
+### Removed
+- **`_timeframe_for_period()` helper** — Removed auto-selection logic from `data/base.py`; replaced by explicit user-controlled timeframe selection via the UI toggle
 
 ### Removed
 - **Dead `MarketMovement` model** — Removed unused `MarketMovement` class, `market_movement_to_dict()`, and relationship from `Prediction`. Superseded by `PredictionOutcome` (database table preserved).
