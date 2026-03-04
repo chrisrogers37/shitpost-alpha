@@ -76,11 +76,18 @@ def register_content_callbacks(app: Dash) -> None:
                 symbols = tuple(screener_df["symbol"].tolist())
                 sparkline_data = get_screener_sparkline_prices(symbols=symbols)
 
+            # Determine display label for timeframe column
+            tf_map = {"t1": "1d", "t3": "3d", "t7": "7d"}
+            screener_tf = "7d"
+            if not screener_df.empty and "timeframe" in screener_df.columns:
+                screener_tf = tf_map.get(screener_df["timeframe"].iloc[0], "7d")
+
             screener_table = build_screener_table(
                 screener_df=screener_df,
                 sparkline_data=sparkline_data,
                 sort_column="total_predictions",
                 sort_ascending=False,
+                timeframe_label=screener_tf,
             )
         except Exception as e:
             errors.append(f"Asset screener: {e}")
@@ -91,6 +98,7 @@ def register_content_callbacks(app: Dash) -> None:
         try:
             kpis = get_dashboard_kpis_with_fallback(days=days)
             fallback_note = kpis["fallback_label"] if kpis["is_fallback"] else ""
+            tf_label = kpis.get("timeframe_label", "7-day")
 
             # Create KPI metrics row
             metrics_row = dbc.Row(
@@ -113,7 +121,7 @@ def register_content_callbacks(app: Dash) -> None:
                         create_metric_card(
                             COPY["kpi_accuracy_title"],
                             f"{kpis['accuracy_pct']:.1f}%",
-                            COPY["kpi_accuracy_subtitle"],
+                            COPY["kpi_accuracy_subtitle"].format(tf_label=tf_label),
                             "bullseye",
                             COLORS["success"]
                             if kpis["accuracy_pct"] > 50
@@ -129,7 +137,7 @@ def register_content_callbacks(app: Dash) -> None:
                         create_metric_card(
                             COPY["kpi_avg_return_title"],
                             safe_format_pct(kpis["avg_return_t7"]),
-                            COPY["kpi_avg_return_subtitle"],
+                            COPY["kpi_avg_return_subtitle"].format(tf_label=tf_label),
                             "chart-line",
                             COLORS["success"]
                             if (kpis["avg_return_t7"] or 0) > 0
@@ -145,7 +153,7 @@ def register_content_callbacks(app: Dash) -> None:
                         create_metric_card(
                             COPY["kpi_pnl_title"],
                             safe_format_dollar(kpis["total_pnl"]),
-                            COPY["kpi_pnl_subtitle"],
+                            COPY["kpi_pnl_subtitle"].format(tf_label=tf_label),
                             "dollar-sign",
                             COLORS["success"]
                             if (kpis["total_pnl"] or 0) > 0

@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Adaptive timeframe screener** — Screener and KPIs now use period-appropriate timeframes (T+1 for 7D, T+3 for 30D, T+7 for 90D/All) instead of hardcoded T+7, preventing structurally empty results when viewing short periods
+- **Shared `_timeframe_for_period()` helper** — Centralized timeframe mapping in `data/base.py` used by both screener and KPI queries
+
+### Changed
+- **Professional dashboard copy** — Replaced 14 self-deprecating COPY entries in `brand_copy.py` and 9 insight body strings in `insight_queries.py` with professional, data-focused language. KPI subtitles now dynamically reflect the active timeframe.
+
+### Removed
+- **Dead `MarketMovement` model** — Removed unused `MarketMovement` class, `market_movement_to_dict()`, and relationship from `Prediction`. Superseded by `PredictionOutcome` (database table preserved).
+
+### Added
 - **Outcome maturation pipeline** — New `mature-outcomes` CLI command and daily Railway cron service that re-evaluates incomplete prediction outcomes as timeframes mature (T+7, T+30), fixing permanently NULL outcome data
 - **`OUTCOMES_MATURED` event type** — New terminal event emitted after maturation runs, available for future downstream consumers
 

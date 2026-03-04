@@ -110,7 +110,7 @@ class TestGetDynamicInsights:
         latest = [i for i in result if i["type"] == "latest_call"]
         assert len(latest) == 1
         assert latest[0]["sentiment"] == "negative"
-        assert "Ouch" in latest[0]["body"]
+        assert "Missed" in latest[0]["body"]
 
     @patch("data.base.execute_query")
     def test_system_pulse_requires_minimum_predictions(self, mock_query):

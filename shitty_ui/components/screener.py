@@ -199,6 +199,7 @@ def build_screener_table(
     sparkline_data: Dict[str, pd.DataFrame],
     sort_column: str = "total_predictions",
     sort_ascending: bool = False,
+    timeframe_label: str = "7d",
 ) -> html.Div:
     """Build the full asset screener table from pre-fetched data.
 
@@ -220,8 +221,8 @@ def build_screener_table(
                         style={"color": COLORS["text_muted"]},
                     ),
                     html.Span(
-                        "No asset data yet. The market hasn't had time "
-                        "to prove us wrong.",
+                        "No asset data for this period. Try a wider time range "
+                        "or check back after predictions mature.",
                         style={
                             "color": COLORS["text_muted"],
                             "fontSize": "0.9rem",
@@ -267,7 +268,7 @@ def build_screener_table(
                     "Sentiment",
                     style={**_HEADER_STYLE, "textAlign": "center", "width": "100px"},
                 ),
-                _sort_header("7d Return", "avg_return", "right"),
+                _sort_header(f"{timeframe_label} Return", "avg_return", "right"),
                 _sort_header("Total P&L", "total_pnl", "right"),
                 _sort_header("Win Rate", "accuracy", "right"),
                 _sort_header(

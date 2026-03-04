@@ -286,12 +286,6 @@ python -m shitposts --mode backfill --from 2024-01-01 --to 2024-12-31
 - Engagement at analysis: `replies_at_analysis`, `reblogs_at_analysis`, `favourites_at_analysis`, `upvotes_at_analysis`
 - LLM metadata: `llm_provider`, `llm_model`, `analysis_timestamp`
 
-**`market_movements`** - Tracks actual market movements after predictions
-- `id`, `prediction_id` (FK → predictions.id)
-- `asset`, `price_at_prediction`, `price_after_24h`, `price_after_72h`
-- `movement_24h`, `movement_72h` (percentage changes)
-- `prediction_correct_24h`, `prediction_correct_72h` (boolean)
-
 **`market_prices`** - Historical OHLCV price data (from yfinance)
 - `id`, `symbol`, `date` (unique together)
 - OHLCV: `open`, `high`, `low`, `close`, `volume`, `adjusted_close`

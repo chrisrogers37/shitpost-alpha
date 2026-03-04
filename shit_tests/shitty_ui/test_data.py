@@ -3055,7 +3055,7 @@ class TestGetDashboardKpisWithFallback:
         result = get_dashboard_kpis_with_fallback(days=7)
         assert result["total_signals"] == 80
         assert result["is_fallback"] is True
-        assert result["fallback_label"] == "All-time"
+        assert result["fallback_label"] == "Showing all-time data"
         assert mock_kpis.call_count == 2
         mock_kpis.assert_any_call(days=7)
         mock_kpis.assert_any_call(days=None)

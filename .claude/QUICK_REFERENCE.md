@@ -84,7 +84,7 @@ Truth Social API → S3 Data Lake → PostgreSQL → LLM Analysis → Database �
 | `prediction_outcomes` | Validated prediction accuracy with returns |
 | `ticker_registry` | Tracked ticker symbols with lifecycle management |
 | `telegram_subscriptions` | Telegram bot subscribers and preferences |
-| `market_movements` | Market movements after predictions |
+
 
 **Key Indexes**:
 - `truth_social_shitposts`: (`shitpost_id` unique), (`timestamp`)

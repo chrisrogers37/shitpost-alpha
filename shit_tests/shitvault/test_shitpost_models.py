@@ -10,12 +10,10 @@ from sqlalchemy import inspect
 from shitvault.shitpost_models import (
     TruthSocialShitpost,
     Prediction,
-    MarketMovement,
     Subscriber,
     LLMFeedback,
     shitpost_to_dict,
     prediction_to_dict,
-    market_movement_to_dict
 )
 from shit.db.data_models import Base
 
@@ -340,65 +338,6 @@ class TestPrediction:
         assert len(shitpost_id_col.foreign_keys) > 0
 
 
-class TestMarketMovement:
-    """Test cases for MarketMovement model."""
-
-    def test_model_creation(self):
-        """Test creating a MarketMovement instance."""
-        movement = MarketMovement(
-            prediction_id=1,
-            asset="TSLA",
-            price_at_prediction=250.50,
-            price_after_24h=260.75,
-            price_after_72h=255.25,
-            movement_24h=4.08,
-            movement_72h=1.90
-        )
-        
-        assert movement.prediction_id == 1
-        assert movement.asset == "TSLA"
-        assert movement.price_at_prediction == 250.50
-        assert movement.price_after_24h == 260.75
-        assert movement.price_after_72h == 255.25
-        assert movement.movement_24h == 4.08
-        assert movement.movement_72h == 1.90
-
-    def test_model_with_prediction_accuracy(self):
-        """Test model with prediction accuracy flags."""
-        movement = MarketMovement(
-            prediction_id=1,
-            asset="TSLA",
-            prediction_correct_24h=True,
-            prediction_correct_72h=False
-        )
-        
-        assert movement.prediction_correct_24h is True
-        assert movement.prediction_correct_72h is False
-
-    def test_model_repr(self):
-        """Test model string representation."""
-        movement = MarketMovement(
-            prediction_id=1,
-            asset="TSLA",
-            movement_24h=4.08
-        )
-        
-        repr_str = repr(movement)
-        assert "MarketMovement" in repr_str
-        assert "TSLA" in repr_str
-
-    def test_table_name(self):
-        """Test correct table name."""
-        assert MarketMovement.__tablename__ == "market_movements"
-
-    def test_foreign_key_constraint(self):
-        """Test that prediction_id has foreign key constraint."""
-        mapper = inspect(MarketMovement)
-        prediction_id_col = mapper.columns['prediction_id']
-        assert prediction_id_col.foreign_keys is not None
-        assert len(prediction_id_col.foreign_keys) > 0
-
-
 class TestSubscriber:
     """Test cases for Subscriber model."""
 
@@ -589,22 +528,6 @@ class TestUtilityFunctions:
         assert result['confidence'] == 0.85
         assert result['analysis_status'] == "completed"
 
-    def test_market_movement_to_dict(self):
-        """Test converting MarketMovement to dictionary."""
-        movement = MarketMovement(
-            prediction_id=1,
-            asset="TSLA",
-            price_at_prediction=250.50,
-            movement_24h=4.08
-        )
-        
-        result = market_movement_to_dict(movement)
-        
-        assert isinstance(result, dict)
-        assert result['prediction_id'] == 1
-        assert result['asset'] == "TSLA"
-        assert result['price_at_prediction'] == 250.50
-        assert result['movement_24h'] == 4.08
 
 
 class TestModelRelationships:
@@ -622,17 +545,6 @@ class TestModelRelationships:
         relationships = mapper.relationships
         assert 'shitpost' in relationships.keys()
 
-    def test_prediction_has_market_movements_relationship(self):
-        """Test Prediction has market_movements relationship."""
-        mapper = inspect(Prediction)
-        relationships = mapper.relationships
-        assert 'market_movements' in relationships.keys()
-
-    def test_market_movement_has_prediction_relationship(self):
-        """Test MarketMovement has prediction relationship."""
-        mapper = inspect(MarketMovement)
-        relationships = mapper.relationships
-        assert 'prediction' in relationships.keys()
 
 
 class TestModelInheritance:
@@ -652,14 +564,6 @@ class TestModelInheritance:
         """Test Prediction inherits from Base, IDMixin, TimestampMixin."""
         assert issubclass(Prediction, Base)
         mapper = inspect(Prediction)
-        assert 'id' in mapper.columns.keys()
-        assert 'created_at' in mapper.columns.keys()
-        assert 'updated_at' in mapper.columns.keys()
-
-    def test_market_movement_inherits_mixins(self):
-        """Test MarketMovement inherits from Base, IDMixin, TimestampMixin."""
-        assert issubclass(MarketMovement, Base)
-        mapper = inspect(MarketMovement)
         assert 'id' in mapper.columns.keys()
         assert 'created_at' in mapper.columns.keys()
         assert 'updated_at' in mapper.columns.keys()

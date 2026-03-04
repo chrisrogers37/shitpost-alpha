@@ -30,7 +30,7 @@ Always activate the venv and use the sync session for database operations:
 # Standard connection pattern
 from shit.db.sync_session import get_session, create_tables, engine
 from shitvault.shitpost_models import (
-    TruthSocialShitpost, Prediction, MarketMovement,
+    TruthSocialShitpost, Prediction,
     Subscriber, LLMFeedback, TelegramSubscription,
 )
 from shitvault.signal_models import Signal
@@ -56,7 +56,7 @@ from shit.market_data.models import MarketPrice, PredictionOutcome, TickerRegist
 | `market_prices` | OHLCV price history | `symbol`, `date` (unique composite), `open/high/low/close/volume` |
 | `prediction_outcomes` | Did prediction work? | `prediction_id` (FK), `symbol`, `price_at_prediction`, `price_t1/t3/t7/t30`, `return_t1/t3/t7/t30`, `correct_t1/t3/t7/t30`, `pnl_t1/t3/t7/t30` |
 | `ticker_registry` | Tracked ticker lifecycle | `symbol` (unique), `status`, `first_seen_date` |
-| `market_movements` | Legacy movement tracking | `prediction_id` (FK), `asset`, `price_at_prediction`, `movement_24h/72h` |
+
 
 ### Alerts & Meta
 | Table | Purpose | Key Columns |
@@ -70,7 +70,6 @@ from shit.market_data.models import MarketPrice, PredictionOutcome, TickerRegist
 truth_social_shitposts.shitpost_id <--FK-- predictions.shitpost_id
 signals.signal_id                  <--FK-- predictions.signal_id
 predictions.id                     <--FK-- prediction_outcomes.prediction_id
-predictions.id                     <--FK-- market_movements.prediction_id
 predictions.id                     <--FK-- ticker_registry.source_prediction_id
 ```
 
@@ -83,7 +82,7 @@ When you need to update models or understand the current schema definition:
 | File | Contains |
 |------|----------|
 | `shit/db/data_models.py` | `Base`, `IDMixin`, `TimestampMixin` -- base classes for all models |
-| `shitvault/shitpost_models.py` | `TruthSocialShitpost`, `Prediction`, `MarketMovement`, `Subscriber`, `LLMFeedback`, `TelegramSubscription` |
+| `shitvault/shitpost_models.py` | `TruthSocialShitpost`, `Prediction`, `Subscriber`, `LLMFeedback`, `TelegramSubscription` |
 | `shitvault/signal_models.py` | `Signal` -- source-agnostic content model |
 | `shit/market_data/models.py` | `MarketPrice`, `PredictionOutcome`, `TickerRegistry` |
 | `shit/db/sync_session.py` | `engine`, `get_session()`, `create_tables()` -- sync DB access |
@@ -310,7 +309,7 @@ from sqlalchemy import text
 with engine.connect() as conn:
     for table in ['truth_social_shitposts', 'predictions', 'market_prices',
                   'prediction_outcomes', 'ticker_registry', 'signals',
-                  'telegram_subscriptions', 'market_movements',
+                  'telegram_subscriptions',
                   'subscribers', 'llm_feedback']:
         try:
             result = conn.execute(text(f"SELECT COUNT(*) FROM {table}"))
