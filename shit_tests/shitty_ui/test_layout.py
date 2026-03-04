@@ -1170,60 +1170,60 @@ class TestCreateFeedSignalCard:
 
 
 class TestSafeGet:
-    """Tests for _safe_get NaN-handling helper."""
+    """Tests for safe_get NaN-handling helper."""
 
     def test_returns_value_when_present(self):
         """Test normal dict access."""
-        from components.cards import _safe_get
+        from components.cards import safe_get
 
-        assert _safe_get({"key": "value"}, "key") == "value"
+        assert safe_get({"key": "value"}, "key") == "value"
 
     def test_returns_default_when_missing(self):
         """Test missing key returns default."""
-        from components.cards import _safe_get
+        from components.cards import safe_get
 
-        assert _safe_get({"other": "value"}, "key", "default") == "default"
+        assert safe_get({"other": "value"}, "key", "default") == "default"
 
     def test_returns_default_for_nan(self):
         """Test NaN is normalized to default."""
-        from components.cards import _safe_get
+        from components.cards import safe_get
 
-        assert _safe_get({"key": float("nan")}, "key", "default") == "default"
+        assert safe_get({"key": float("nan")}, "key", "default") == "default"
 
     def test_returns_default_for_none(self):
         """Test None is normalized to default."""
-        from components.cards import _safe_get
+        from components.cards import safe_get
 
-        assert _safe_get({"key": None}, "key", "default") == "default"
+        assert safe_get({"key": None}, "key", "default") == "default"
 
     def test_preserves_zero(self):
         """Test that 0 is NOT replaced with default."""
-        from components.cards import _safe_get
+        from components.cards import safe_get
 
-        assert _safe_get({"key": 0}, "key", 99) == 0
+        assert safe_get({"key": 0}, "key", 99) == 0
 
     def test_preserves_empty_string(self):
         """Test that empty string is NOT replaced with default."""
-        from components.cards import _safe_get
+        from components.cards import safe_get
 
-        assert _safe_get({"key": ""}, "key", "default") == ""
+        assert safe_get({"key": ""}, "key", "default") == ""
 
     def test_preserves_false(self):
         """Test that False is NOT replaced with default."""
-        from components.cards import _safe_get
+        from components.cards import safe_get
 
-        assert _safe_get({"key": False}, "key", True) is False
+        assert safe_get({"key": False}, "key", True) is False
 
     def test_works_with_pandas_series(self):
         """Test with Pandas Series (the actual use case)."""
         import pandas as pd
-        from components.cards import _safe_get
+        from components.cards import safe_get
 
         series = pd.Series({"a": 1, "b": float("nan"), "c": "hello"})
-        assert _safe_get(series, "a") == 1
-        assert _safe_get(series, "b", "default") == "default"
-        assert _safe_get(series, "c") == "hello"
-        assert _safe_get(series, "missing", "default") == "default"
+        assert safe_get(series, "a") == 1
+        assert safe_get(series, "b", "default") == "default"
+        assert safe_get(series, "c") == "hello"
+        assert safe_get(series, "missing", "default") == "default"
 
 
 class TestSignalFeedCallbackErrorHandling:

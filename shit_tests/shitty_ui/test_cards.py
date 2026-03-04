@@ -15,6 +15,7 @@ from components.cards import (
     create_signal_card,
     create_post_card,
     create_prediction_timeline_card,
+    create_related_asset_link,
     create_feed_signal_card,
     create_empty_state_html,
     create_unified_signal_card,
@@ -1000,3 +1001,63 @@ class TestHeroCardMobileWidth:
         """Test that hero card flex property allows shrinking (flex-basis 0)."""
         card = create_hero_signal_card(_make_row())
         assert "1 1 0" in card.style.get("flex", "")
+
+
+class TestNanResilience:
+    """Verify cards don't render 'nan' when row values are NaN."""
+
+    def test_timeline_card_nan_return(self):
+        """Timeline card should show '--' not '+nan%' when return_t7 is NaN."""
+        card = create_prediction_timeline_card(
+            _make_timeline_row(return_t7=float("nan"), pnl_t7=float("nan"))
+        )
+        text = _extract_text(card)
+        assert "nan" not in text.lower()
+
+    def test_timeline_card_nan_price(self):
+        """Timeline card handles NaN prices without crashing."""
+        card = create_prediction_timeline_card(
+            _make_timeline_row(
+                price_at_prediction=float("nan"),
+                price_t7=float("nan"),
+            )
+        )
+        text = _extract_text(card)
+        assert "nan" not in text.lower()
+
+    def test_hero_card_nan_confidence(self):
+        """Hero card handles NaN confidence without crashing."""
+        card = create_hero_signal_card(_make_row(confidence=float("nan")))
+        text = _extract_text(card)
+        assert "nan" not in text.lower()
+
+    def test_signal_card_nan_pnl(self):
+        """Signal card handles NaN pnl_t7 without crashing."""
+        card = create_signal_card(_make_row(pnl_t7=float("nan")))
+        text = _extract_text(card)
+        assert "nan" not in text.lower()
+
+    def test_unified_card_nan_total_pnl(self):
+        """Unified card handles NaN total_pnl_t7 without crashing."""
+        card = create_unified_signal_card(
+            _make_row(total_pnl_t7=float("nan"))
+        )
+        text = _extract_text(card)
+        assert "nan" not in text.lower()
+
+    def test_feed_card_nan_return(self):
+        """Feed card handles NaN return_t7 without crashing."""
+        card = create_feed_signal_card(_make_row(return_t7=float("nan")))
+        text = _extract_text(card)
+        assert "nan" not in text.lower()
+
+    def test_related_asset_link_nan_return(self):
+        """Related asset link handles NaN avg_return_t7."""
+        card = create_related_asset_link({
+            "related_symbol": "TSLA",
+            "co_occurrence_count": 3,
+            "avg_return_t7": float("nan"),
+        })
+        text = _extract_text(card)
+        assert "nan" not in text.lower()
+        assert "--" in text

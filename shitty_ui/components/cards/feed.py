@@ -5,7 +5,6 @@ thesis, and return/P&L metrics. Also includes the new-signals banner and
 shared helpers used by both feed and post cards.
 """
 
-import math
 from datetime import datetime, timedelta, timezone
 
 from dash import html
@@ -21,24 +20,7 @@ from components.sparkline import (
     create_sparkline_component,
     create_sparkline_placeholder,
 )
-
-
-def _safe_get(row, key, default=None):
-    """
-    NaN-safe field extraction from a Pandas Series or dict.
-
-    Pandas Series.get() returns NaN (not the default) when the key exists
-    but the value is NaN. This helper normalizes NaN to the provided default.
-    """
-    value = row.get(key, default)
-    if value is None:
-        return default
-    try:
-        if isinstance(value, float) and math.isnan(value):
-            return default
-    except (TypeError, ValueError):
-        pass
-    return value
+from components.utils import safe_get
 
 
 def _build_expandable_thesis(
@@ -136,17 +118,17 @@ def create_feed_signal_card(
     Returns:
         html.Div containing the rendered card.
     """
-    timestamp = _safe_get(row, "timestamp")
-    post_text = _safe_get(row, "text", "")
-    confidence = _safe_get(row, "confidence", 0) or 0
-    assets = _safe_get(row, "assets", [])
-    market_impact = _safe_get(row, "market_impact", {})
-    symbol = _safe_get(row, "symbol")
-    prediction_sentiment = _safe_get(row, "prediction_sentiment")
-    return_t7 = _safe_get(row, "return_t7")
-    correct_t7 = _safe_get(row, "correct_t7")
-    pnl_t7 = _safe_get(row, "pnl_t7")
-    thesis = _safe_get(row, "thesis", "")
+    timestamp = safe_get(row, "timestamp")
+    post_text = safe_get(row, "text", "")
+    confidence = safe_get(row, "confidence", 0) or 0
+    assets = safe_get(row, "assets", [])
+    market_impact = safe_get(row, "market_impact", {})
+    symbol = safe_get(row, "symbol")
+    prediction_sentiment = safe_get(row, "prediction_sentiment")
+    return_t7 = safe_get(row, "return_t7")
+    correct_t7 = safe_get(row, "correct_t7")
+    pnl_t7 = safe_get(row, "pnl_t7")
+    thesis = safe_get(row, "thesis", "")
 
     # Determine if "New" badge should show (post < 24 hours old)
     is_new = False

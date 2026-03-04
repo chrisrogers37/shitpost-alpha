@@ -14,23 +14,24 @@ from components.helpers import (
     create_outcome_badge,
     format_asset_display,
 )
+from components.utils import safe_get
 
 
 def create_hero_signal_card(row) -> html.Div:
     """Create a hero signal card for a high-confidence prediction."""
-    timestamp = row.get("timestamp")
-    text_content = row.get("text", "")
+    timestamp = safe_get(row, "timestamp")
+    text_content = safe_get(row, "text", "")
     text_content = strip_urls(text_content)
     preview = text_content[:200] + "..." if len(text_content) > 200 else text_content
-    confidence = row.get("confidence", 0)
-    assets = row.get("assets", [])
-    market_impact = row.get("market_impact", {})
+    confidence = safe_get(row, "confidence", 0)
+    assets = safe_get(row, "assets", [])
+    market_impact = safe_get(row, "market_impact", {})
     # Derive outcome from aggregated counts (new dedup columns)
     # Fall back to correct_t7 for backward compatibility
-    outcome_count = row.get("outcome_count", 0) or 0
-    correct_count = row.get("correct_count", 0) or 0
-    incorrect_count = row.get("incorrect_count", 0) or 0
-    total_pnl_t7 = row.get("total_pnl_t7")
+    outcome_count = safe_get(row, "outcome_count", 0) or 0
+    correct_count = safe_get(row, "correct_count", 0) or 0
+    incorrect_count = safe_get(row, "incorrect_count", 0) or 0
+    total_pnl_t7 = safe_get(row, "total_pnl_t7")
 
     if outcome_count > 0 and correct_count + incorrect_count > 0:
         # At least some outcomes evaluated -- majority wins
@@ -62,7 +63,7 @@ def create_hero_signal_card(row) -> html.Div:
     }.get(sentiment, "minus")
 
     # Outcome badge -- uses aggregated P&L when available
-    pnl_display = total_pnl_t7 if total_pnl_t7 is not None else row.get("pnl_t7")
+    pnl_display = total_pnl_t7 if total_pnl_t7 is not None else safe_get(row, "pnl_t7")
     outcome = create_outcome_badge(correct_t7, pnl_display, font_size="0.8rem")
 
     return html.Div(

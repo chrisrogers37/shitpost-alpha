@@ -99,18 +99,18 @@ class OutcomeCalculator:
             )
             return []
 
-        # Get sentiment from market_impact
-        sentiment = (
-            self._extract_sentiment(prediction.market_impact)
-            if prediction.market_impact
-            else None
-        )
-
         outcomes = []
 
         # Calculate outcome for each asset
         for asset in prediction.assets:
             try:
+                # Extract per-asset sentiment from market_impact
+                sentiment = (
+                    self._extract_sentiment(prediction.market_impact, asset=asset)
+                    if prediction.market_impact
+                    else None
+                )
+
                 outcome = self._calculate_single_outcome(
                     prediction_id=prediction_id,
                     symbol=asset,
@@ -570,15 +570,44 @@ class OutcomeCalculator:
 
         return None
 
-    def _extract_sentiment(self, market_impact: Dict[str, Any]) -> Optional[str]:
-        """Extract primary sentiment from market_impact dict."""
+    def _extract_sentiment(
+        self, market_impact: Dict[str, Any], asset: Optional[str] = None
+    ) -> Optional[str]:
+        """Extract sentiment from market_impact dict, optionally for a specific asset.
+
+        Args:
+            market_impact: Dict mapping asset tickers to sentiment strings,
+                e.g. {"AAPL": "bullish", "TSLA": "bearish"}.
+            asset: If provided, look up this specific asset's sentiment.
+                Tries exact match, then case-insensitive match.
+                Falls back to the first sentiment if the asset is not found.
+
+        Returns:
+            Lowercase sentiment string, or None if market_impact is empty.
+        """
         if not market_impact:
             return None
 
-        # market_impact is typically {asset: sentiment}
         sentiments = list(market_impact.values())
         if not sentiments:
             return None
 
-        # Return most common sentiment, or first one
-        return sentiments[0].lower() if sentiments else None
+        if asset is not None:
+            # Try exact match first
+            sentiment = market_impact.get(asset)
+            if sentiment is None:
+                sentiment = market_impact.get(asset.upper())
+            if sentiment is None:
+                sentiment = market_impact.get(asset.lower())
+            if sentiment is None:
+                # Case-insensitive key iteration
+                asset_upper = asset.upper()
+                for key, val in market_impact.items():
+                    if key.upper() == asset_upper:
+                        sentiment = val
+                        break
+            if sentiment is not None and isinstance(sentiment, str):
+                return sentiment.lower()
+            # Asset not found in market_impact — fall back to first sentiment
+
+        return sentiments[0].lower() if isinstance(sentiments[0], str) else None
