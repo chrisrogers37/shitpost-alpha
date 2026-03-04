@@ -6,8 +6,8 @@ import os
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
 import pytest
-from datetime import date, datetime, timedelta
-from unittest.mock import MagicMock, patch, call
+from datetime import date
+from unittest.mock import MagicMock, patch
 from sqlalchemy.orm import Session
 
 from shit.market_data.outcome_calculator import OutcomeCalculator
@@ -200,7 +200,7 @@ class TestFixedEarlyReturn:
         mock_price = MagicMock(close=100.0)
         calculator.market_client.get_price_on_date.return_value = mock_price
 
-        result = calculator._calculate_single_outcome(
+        calculator._calculate_single_outcome(
             prediction_id=1,
             symbol="AAPL",
             prediction_date=date(2025, 6, 15),
@@ -272,7 +272,7 @@ class TestSkipFilledTimeframes:
             mock_price_tn,  # T+30 (was NULL)
         ]
 
-        result = calculator._calculate_single_outcome(
+        calculator._calculate_single_outcome(
             prediction_id=1,
             symbol="AAPL",
             prediction_date=date(2025, 6, 15),
