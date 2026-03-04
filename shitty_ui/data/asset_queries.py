@@ -11,7 +11,7 @@ from sqlalchemy import text
 from typing import Dict, Any, Optional
 
 import data.base as _base
-from data.base import ttl_cache, logger
+from data.base import ttl_cache, logger, _timeframe_for_period
 
 
 @ttl_cache(ttl_seconds=300)
@@ -19,8 +19,8 @@ def get_asset_screener_data(days: int = None) -> pd.DataFrame:
     """Get combined asset screener data for the dashboard table.
 
     Joins per-asset accuracy metrics with the latest prediction sentiment
-    for each asset, plus average confidence. Returns a single DataFrame
-    ready for table rendering.
+    for each asset, plus average confidence. Uses adaptive timeframe
+    columns based on the selected period to avoid structurally empty results.
 
     Args:
         days: Number of days to look back (None = all time).
@@ -28,8 +28,10 @@ def get_asset_screener_data(days: int = None) -> pd.DataFrame:
     Returns:
         DataFrame with columns: symbol, total_predictions, correct,
         incorrect, avg_return, total_pnl, accuracy, latest_sentiment,
-        avg_confidence. Sorted by total_predictions descending.
+        avg_confidence, timeframe. Sorted by total_predictions descending.
     """
+    tf = _timeframe_for_period(days)
+
     date_filter = ""
     params: Dict[str, Any] = {}
 
@@ -37,20 +39,20 @@ def get_asset_screener_data(days: int = None) -> pd.DataFrame:
         date_filter = "AND po.prediction_date >= :start_date"
         params["start_date"] = (datetime.now() - timedelta(days=days)).date()
 
-    query = text(f"""
+    query_template = """
         WITH asset_metrics AS (
             SELECT
                 po.symbol,
                 COUNT(*) as total_predictions,
-                COUNT(CASE WHEN po.correct_t7 = true THEN 1 END) as correct,
-                COUNT(CASE WHEN po.correct_t7 = false THEN 1 END) as incorrect,
-                ROUND(AVG(CASE WHEN po.return_t7 IS NOT NULL
-                    THEN po.return_t7 END)::numeric, 2) as avg_return,
-                ROUND(SUM(CASE WHEN po.pnl_t7 IS NOT NULL
-                    THEN po.pnl_t7 ELSE 0 END)::numeric, 2) as total_pnl,
+                COUNT(CASE WHEN po.correct_{tf} = true THEN 1 END) as correct,
+                COUNT(CASE WHEN po.correct_{tf} = false THEN 1 END) as incorrect,
+                ROUND(AVG(CASE WHEN po.return_{tf} IS NOT NULL
+                    THEN po.return_{tf} END)::numeric, 2) as avg_return,
+                ROUND(SUM(CASE WHEN po.pnl_{tf} IS NOT NULL
+                    THEN po.pnl_{tf} ELSE 0 END)::numeric, 2) as total_pnl,
                 ROUND(AVG(po.prediction_confidence)::numeric, 2) as avg_confidence
             FROM prediction_outcomes po
-            WHERE po.correct_t7 IS NOT NULL
+            WHERE po.correct_{tf} IS NOT NULL
             {date_filter}
             GROUP BY po.symbol
             HAVING COUNT(*) >= 2
@@ -60,7 +62,7 @@ def get_asset_screener_data(days: int = None) -> pd.DataFrame:
                 po.symbol,
                 po.prediction_sentiment
             FROM prediction_outcomes po
-            WHERE po.correct_t7 IS NOT NULL
+            WHERE po.correct_{tf} IS NOT NULL
             {date_filter}
             ORDER BY po.symbol, po.prediction_date DESC
         )
@@ -76,13 +78,15 @@ def get_asset_screener_data(days: int = None) -> pd.DataFrame:
         FROM asset_metrics am
         LEFT JOIN latest_sentiment ls ON am.symbol = ls.symbol
         ORDER BY am.total_predictions DESC
-    """)
+    """
+    query = text(query_template.format(tf=tf, date_filter=date_filter))
 
     try:
         rows, columns = _base.execute_query(query, params)
         df = pd.DataFrame(rows, columns=columns)
         if not df.empty:
             df["accuracy"] = (df["correct"] / df["total_predictions"] * 100).round(1)
+            df["timeframe"] = tf
         return df
     except Exception as e:
         logger.error(f"Error loading asset screener data: {e}")

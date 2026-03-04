@@ -12,7 +12,7 @@ from sqlalchemy import text
 from typing import List, Dict, Any, Optional
 
 import data.base as _base
-from data.base import ttl_cache, logger, DATABASE_URL
+from data.base import ttl_cache, logger, DATABASE_URL, _timeframe_for_period
 
 
 @ttl_cache(ttl_seconds=600)  # Cache for 10 minutes
@@ -176,25 +176,25 @@ def get_performance_metrics(days: int = None) -> Dict[str, Any]:
 
 @ttl_cache(ttl_seconds=300)  # Cache for 5 minutes
 def get_dashboard_kpis(days: int = None) -> Dict[str, Any]:
-    """
-    Get the four key metrics for the main dashboard KPI cards.
+    """Get the four key metrics for the main dashboard KPI cards.
 
-    Returns only evaluated predictions (where correct_t7 is not NULL),
-    which ensures metrics reflect real outcomes, not pending predictions.
-    Matches the same data source used by the Performance page.
+    Returns only evaluated predictions (where the appropriate timeframe
+    outcome is not NULL). Uses adaptive timeframe: T+1 for 7D, T+3 for
+    30D, T+7 for 90D and all-time.
 
     Args:
         days: Number of days to look back (None = all time).
-              Note: uses prediction_date, so a 7-day window returns
-              predictions made 7 days ago that have since been evaluated.
 
     Returns:
         Dict with keys:
             total_signals: int - count of evaluated prediction-outcome rows
-            accuracy_pct: float - percentage of correct_t7 = true
-            avg_return_t7: float - mean 7-day return (percentage)
-            total_pnl: float - sum of pnl_t7 (dollar amount)
+            accuracy_pct: float - percentage correct at chosen timeframe
+            avg_return_t7: float - mean return at chosen timeframe (percentage)
+            total_pnl: float - sum of P&L at chosen timeframe (dollar amount)
+            timeframe: str - which timeframe was used ("t1", "t3", or "t7")
     """
+    tf = _timeframe_for_period(days)
+
     date_filter = ""
     params: Dict[str, Any] = {}
 
@@ -202,16 +202,17 @@ def get_dashboard_kpis(days: int = None) -> Dict[str, Any]:
         date_filter = "AND prediction_date >= :start_date"
         params["start_date"] = (datetime.now() - timedelta(days=days)).date()
 
-    query = text(f"""
+    query_template = """
         SELECT
             COUNT(*) as total_signals,
-            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct_count,
-            AVG(return_t7) as avg_return_t7,
-            SUM(CASE WHEN pnl_t7 IS NOT NULL THEN pnl_t7 ELSE 0 END) as total_pnl
+            COUNT(CASE WHEN correct_{tf} = true THEN 1 END) as correct_count,
+            AVG(return_{tf}) as avg_return,
+            SUM(CASE WHEN pnl_{tf} IS NOT NULL THEN pnl_{tf} ELSE 0 END) as total_pnl
         FROM prediction_outcomes
-        WHERE correct_t7 IS NOT NULL
+        WHERE correct_{tf} IS NOT NULL
         {date_filter}
-    """)
+    """
+    query = text(query_template.format(tf=tf, date_filter=date_filter))
 
     try:
         rows, columns = _base.execute_query(query, params)
@@ -226,6 +227,7 @@ def get_dashboard_kpis(days: int = None) -> Dict[str, Any]:
                 "accuracy_pct": round(accuracy, 1),
                 "avg_return_t7": round(float(row[2]), 2) if row[2] else 0.0,
                 "total_pnl": round(float(row[3]), 2) if row[3] else 0.0,
+                "timeframe": tf,
             }
     except Exception as e:
         logger.error(f"Error loading dashboard KPIs: {e}")
@@ -235,6 +237,7 @@ def get_dashboard_kpis(days: int = None) -> Dict[str, Any]:
         "accuracy_pct": 0.0,
         "avg_return_t7": 0.0,
         "total_pnl": 0.0,
+        "timeframe": tf,
     }
 
 
@@ -248,9 +251,16 @@ def get_dashboard_kpis_with_fallback(days: int | None = 90) -> dict:
         days: Number of days to filter. None = all time.
 
     Returns:
-        Dict with KPI values plus is_fallback (bool) and fallback_label (str).
+        Dict with KPI values plus:
+            is_fallback: bool - True if showing all-time data instead of requested period
+            fallback_label: str - Display label (empty if not fallback)
+            timeframe_label: str - Human-readable label for the active timeframe
     """
     kpis = get_dashboard_kpis(days=days)
+    tf = kpis.get("timeframe", "t7")
+
+    tf_labels = {"t1": "1-day", "t3": "3-day", "t7": "7-day"}
+    kpis["timeframe_label"] = tf_labels.get(tf, "7-day")
 
     # If period has evaluated signals, return as-is
     if kpis["total_signals"] > 0 or days is None:
@@ -260,8 +270,10 @@ def get_dashboard_kpis_with_fallback(days: int | None = 90) -> dict:
 
     # Fall back to all-time
     kpis = get_dashboard_kpis(days=None)
+    tf = kpis.get("timeframe", "t7")
+    kpis["timeframe_label"] = tf_labels.get(tf, "7-day")
     kpis["is_fallback"] = True
-    kpis["fallback_label"] = "All-time"
+    kpis["fallback_label"] = "Showing all-time data"
     return kpis
 
 

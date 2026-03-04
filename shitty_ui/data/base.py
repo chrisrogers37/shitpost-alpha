@@ -58,6 +58,25 @@ def ttl_cache(ttl_seconds: int = 300):
     return decorator
 
 
+def _timeframe_for_period(days: int | None) -> str:
+    """Return the outcome timeframe suffix appropriate for the given period.
+
+    Shorter periods use faster-maturing outcomes to avoid structurally
+    empty results (e.g., 7D period can't show T+7 outcomes).
+
+    Args:
+        days: Number of days in the selected period (None = all time).
+
+    Returns:
+        Suffix string: "t1", "t3", or "t7".
+    """
+    if days is not None and days <= 7:
+        return "t1"
+    elif days is not None and days <= 30:
+        return "t3"
+    return "t7"
+
+
 def execute_query(query, params=None):
     """Execute query using appropriate session type."""
     try:
