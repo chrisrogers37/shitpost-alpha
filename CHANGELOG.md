@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Market-aware timing** — Outcome calculations now use trading-day offsets instead of calendar days (T+1 on Friday = Monday, holidays skipped)
+  - `MarketCalendar` wrapper around `exchange_calendars` for NYSE session scheduling with naive fallbacks
+  - `IntradayPriceSnapshot` + `fetch_intraday_snapshot()` for same-day/1h outcome tracking via yfinance 1h bars
+  - `bar_datetime` formal field on `RawPriceRecord` dataclass for intraday bar timestamps
+  - `_get_source_datetime` as primary method on `OutcomeCalculator` (UTC-aware datetime extraction)
+  - New `PredictionOutcome` columns: `post_published_at`, `price_at_post`, `price_at_next_close`, `price_1h_after`, `return_same_day`, `return_1h`, `correct_same_day`, `correct_1h`, `pnl_same_day`, `pnl_1h`
+  - `get_price_on_date` uses MarketCalendar for backward lookback on non-trading days
+  - 64 new tests across `test_market_calendar.py` (44), `test_intraday_provider.py` (9), and new outcome calculator test classes (11)
 - **Multi-timeframe dashboard** — New "Outcome Window" toggle (T+1, T+3, T+7, T+30) on the dashboard lets users view KPIs, screener, and insights across any prediction timeframe instead of only T+7
 - **Timeframe column mapping module** — `data/timeframe.py` provides `get_tf_columns()`, `TIMEFRAME_OPTIONS`, `VALID_TIMEFRAMES`, and `DEFAULT_TIMEFRAME` as single source of truth for timeframe→column mapping
 - 12 new tests for timeframe module (`test_timeframe.py`)
