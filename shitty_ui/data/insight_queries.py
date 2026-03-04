@@ -76,13 +76,13 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
                 ret_str = f"{return_t7:+.2f}%"
                 if correct:
                     headline = f"Trump mentioned {symbol} -- it's {ret_str} in 7 days."
-                    body = "Cha-ching." if return_t7 > 2 else "Not bad."
+                    body = f"Predicted correctly with {ret_str} return." if return_t7 > 2 else f"Called it. {ret_str} return."
                     ins_sentiment = "positive"
                 else:
                     headline = (
                         f"Trump mentioned {symbol} -- it went {ret_str} in 7 days."
                     )
-                    body = "Ouch." if return_t7 < -2 else "Close, but no cigar."
+                    body = "Missed by a wide margin." if return_t7 < -2 else "Close to the threshold."
                     ins_sentiment = "negative"
 
                 insights.append(
@@ -134,7 +134,7 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
             worst_ret = float(worst_row[1])
 
             headline = f"Best: {best_sym} {best_ret:+.2f}%. Worst: {worst_sym} {worst_ret:+.2f}%."
-            body = "Can't win 'em all."
+            body = "Range of outcomes across the period."
 
             insights.append(
                 {
@@ -171,13 +171,13 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
             accuracy = round(correct / total * 100, 1)
 
             if accuracy > 55:
-                body = "Not bad for a shitpost-powered AI."
+                body = f"Outperforming random baseline by {accuracy - 50:.0f} percentage points."
                 ins_sentiment = "positive"
             elif accuracy > 45:
-                body = f"Coin flip is 50%. We're {'barely beating' if accuracy > 50 else 'losing to'} random."
+                body = f"Near the 50% baseline. {'Slightly above' if accuracy > 50 else 'Slightly below'} random."
                 ins_sentiment = "neutral"
             else:
-                body = "Maybe we should just flip a coin."
+                body = "Below 50% baseline. Model underperforming in this period."
                 ins_sentiment = "negative"
 
             period_label = f"last {days} days" if days else "all time"
@@ -231,9 +231,9 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
             )
             headline = f"{symbol} is our most-called asset ({count} predictions), {ret_comment}."
             body = (
-                "Trump can't stop talking about it."
+                f"Most frequently referenced asset with {count} total mentions."
                 if count > 10
-                else "Keeps showing up."
+                else "Recurring asset in recent analysis."
             )
 
             insights.append(
@@ -283,17 +283,17 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
             conf_pct = f"{confidence:.0%}"
             if correct is None:
                 headline = f"High-confidence call: {sentiment.upper()} on {symbol} ({conf_pct}). Awaiting results."
-                body = "The suspense is killing us."
+                body = "Outcome pending -- check back after maturation."
                 ins_sentiment = "neutral"
             elif correct:
                 ret_str = f"{return_t7:+.2f}%" if return_t7 is not None else "N/A"
                 headline = f"High-confidence call on {symbol} ({conf_pct}) was RIGHT. {ret_str} in 7d."
-                body = "Even a broken AI is right twice a day."
+                body = "High-confidence signal validated."
                 ins_sentiment = "positive"
             else:
                 ret_str = f"{return_t7:+.2f}%" if return_t7 is not None else "N/A"
                 headline = f"High-confidence call on {symbol} ({conf_pct}) was WRONG. {ret_str} in 7d."
-                body = "Confidence != competence."
+                body = "High confidence did not translate to accuracy here."
                 ins_sentiment = "negative"
 
             insights.append(
