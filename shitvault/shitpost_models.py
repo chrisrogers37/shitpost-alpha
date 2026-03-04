@@ -159,8 +159,6 @@ class Prediction(Base, IDMixin, TimestampMixin):
     # Relationships
     shitpost = relationship("TruthSocialShitpost", back_populates="predictions")
     signal = relationship("Signal", back_populates="predictions", foreign_keys=[signal_id])
-    market_movements = relationship("MarketMovement", back_populates="prediction")
-
     @property
     def content_id(self) -> str:
         """Return the signal or shitpost ID, whichever is set."""
@@ -168,35 +166,6 @@ class Prediction(Base, IDMixin, TimestampMixin):
 
     def __repr__(self):
         return f"<Prediction(id={self.id}, confidence={self.confidence}, assets={self.assets})>"
-
-
-class MarketMovement(Base, IDMixin, TimestampMixin):
-    """Model for tracking actual market movements after shitpost predictions."""
-
-    __tablename__ = "market_movements"
-    prediction_id = Column(
-        Integer, ForeignKey("predictions.id"), nullable=False
-    )  # Foreign key to Prediction
-
-    # Market data
-    asset = Column(String(20), nullable=False)  # Ticker symbol
-    price_at_prediction = Column(Float, nullable=True)  # Price when prediction was made
-    price_after_24h = Column(Float, nullable=True)  # Price 24 hours later
-    price_after_72h = Column(Float, nullable=True)  # Price 72 hours later
-
-    # Movement calculations
-    movement_24h = Column(Float, nullable=True)  # Percentage change
-    movement_72h = Column(Float, nullable=True)  # Percentage change
-
-    # Prediction accuracy
-    prediction_correct_24h = Column(Boolean, nullable=True)  # Was prediction correct?
-    prediction_correct_72h = Column(Boolean, nullable=True)  # Was prediction correct?
-
-    # Relationships
-    prediction = relationship("Prediction", back_populates="market_movements")
-
-    def __repr__(self):
-        return f"<MarketMovement(id={self.id}, asset='{self.asset}', movement_24h={self.movement_24h}%)>"
 
 
 class Subscriber(Base, IDMixin, TimestampMixin):
@@ -324,6 +293,3 @@ def prediction_to_dict(prediction: Prediction) -> Dict[str, Any]:
     return model_to_dict(prediction)
 
 
-def market_movement_to_dict(movement: MarketMovement) -> Dict[str, Any]:
-    """Convert MarketMovement to dictionary."""
-    return model_to_dict(movement)

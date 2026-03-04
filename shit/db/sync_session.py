@@ -72,7 +72,6 @@ def create_tables():
     from shitvault.shitpost_models import (
         TruthSocialShitpost,
         Prediction,
-        MarketMovement,
         Subscriber,
         LLMFeedback,
         TelegramSubscription,
