@@ -169,11 +169,17 @@ class OutcomeCalculator:
         )
 
         if existing and not force_refresh:
-            logger.debug(
-                f"Outcome already exists for prediction {prediction_id}, symbol {symbol}",
-                extra={"prediction_id": prediction_id, "symbol": symbol},
-            )
-            return existing
+            if existing.is_complete:
+                logger.debug(
+                    f"Outcome already complete for prediction {prediction_id}, symbol {symbol}",
+                    extra={"prediction_id": prediction_id, "symbol": symbol},
+                )
+                return existing
+            else:
+                logger.debug(
+                    f"Outcome incomplete for prediction {prediction_id}, symbol {symbol} — re-evaluating",
+                    extra={"prediction_id": prediction_id, "symbol": symbol},
+                )
 
         # Create or update outcome
         outcome = (
@@ -236,6 +242,10 @@ class OutcomeCalculator:
             # Skip future dates
             if target_date > date.today():
                 outcome.is_complete = False
+                continue
+
+            # Skip timeframes that are already filled (avoid redundant API calls)
+            if getattr(outcome, price_attr) is not None:
                 continue
 
             # Get price at T+N
@@ -371,6 +381,107 @@ class OutcomeCalculator:
                 stats["errors"] += 1
 
         logger.info(f"Completed outcome calculation", extra=stats)
+
+        return stats
+
+    def mature_outcomes(
+        self,
+        limit: Optional[int] = None,
+        emit_event: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Re-evaluate incomplete prediction outcomes to fill in matured timeframes.
+
+        Queries prediction_outcomes WHERE is_complete = False, and for each row
+        re-runs the outcome calculation to fill in any timeframes that have
+        matured since the last evaluation (e.g., T+7 and T+30).
+
+        Unlike calculate_outcomes_for_all_predictions() which starts from
+        predictions, this method starts from existing outcome rows that are
+        known to be incomplete — making it much more targeted and efficient.
+
+        Args:
+            limit: Maximum number of incomplete outcomes to process.
+            emit_event: If True, emit an outcomes_matured event when done.
+
+        Returns:
+            Dict with maturation statistics.
+        """
+        query = self.session.query(PredictionOutcome).filter(
+            PredictionOutcome.is_complete == False  # noqa: E712
+        )
+
+        if limit:
+            query = query.limit(limit)
+
+        incomplete_outcomes = query.all()
+
+        logger.info(
+            f"Found {len(incomplete_outcomes)} incomplete outcomes to mature",
+            extra={"count": len(incomplete_outcomes), "limit": limit},
+        )
+
+        stats = {
+            "total_incomplete": len(incomplete_outcomes),
+            "matured": 0,
+            "newly_complete": 0,
+            "still_incomplete": 0,
+            "errors": 0,
+            "skipped": 0,
+        }
+
+        # Collect unique prediction IDs so we process each prediction once
+        prediction_ids = list({o.prediction_id for o in incomplete_outcomes})
+
+        logger.info(
+            f"Processing {len(prediction_ids)} unique predictions with incomplete outcomes",
+            extra={"prediction_count": len(prediction_ids)},
+        )
+
+        for prediction_id in prediction_ids:
+            try:
+                outcomes = self.calculate_outcome_for_prediction(
+                    prediction_id=prediction_id,
+                    force_refresh=False,  # The fixed early-return handles incomplete rows
+                )
+
+                for outcome in outcomes:
+                    stats["matured"] += 1
+                    if outcome.is_complete:
+                        stats["newly_complete"] += 1
+                    else:
+                        stats["still_incomplete"] += 1
+
+            except Exception as e:
+                self.session.rollback()
+                logger.error(
+                    f"Error maturing outcomes for prediction {prediction_id}: {e}",
+                    extra={"prediction_id": prediction_id, "error": str(e)},
+                    exc_info=True,
+                )
+                stats["errors"] += 1
+
+        logger.info("Outcome maturation complete", extra=stats)
+
+        # Optionally emit event for downstream consumers
+        if emit_event and stats["matured"] > 0:
+            try:
+                from shit.events.producer import emit_event as _emit_event
+                from shit.events.event_types import EventType
+
+                _emit_event(
+                    event_type=EventType.OUTCOMES_MATURED,
+                    payload={
+                        "total_incomplete": stats["total_incomplete"],
+                        "matured": stats["matured"],
+                        "newly_complete": stats["newly_complete"],
+                        "still_incomplete": stats["still_incomplete"],
+                        "errors": stats["errors"],
+                    },
+                    source_service="outcome_maturation",
+                )
+            except Exception as e:
+                logger.warning(f"Failed to emit outcomes_matured event: {e}")
 
         return stats
 

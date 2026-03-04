@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Outcome maturation pipeline** — New `mature-outcomes` CLI command and daily Railway cron service that re-evaluates incomplete prediction outcomes as timeframes mature (T+7, T+30), fixing permanently NULL outcome data
+- **`OUTCOMES_MATURED` event type** — New terminal event emitted after maturation runs, available for future downstream consumers
+
 ### Fixed
+- **Incomplete outcomes never re-evaluated** — Fixed early-return logic in `_calculate_single_outcome()` that skipped re-evaluation of incomplete outcomes, causing T+7 and T+30 data to permanently stay NULL
 - **Asyncio deprecation warnings** — Replaced 8 instances of deprecated `asyncio.get_event_loop()` with modern alternatives (`asyncio.to_thread()` and `asyncio.get_running_loop()`) for Python 3.13 compatibility
 
 ### Removed
