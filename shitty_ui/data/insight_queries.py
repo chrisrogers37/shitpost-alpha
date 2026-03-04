@@ -76,13 +76,21 @@ def get_dynamic_insights(days: int = None) -> List[Dict[str, Any]]:
                 ret_str = f"{return_t7:+.2f}%"
                 if correct:
                     headline = f"Trump mentioned {symbol} -- it's {ret_str} in 7 days."
-                    body = f"Predicted correctly with {ret_str} return." if return_t7 > 2 else f"Called it. {ret_str} return."
+                    body = (
+                        f"Predicted correctly with {ret_str} return."
+                        if return_t7 > 2
+                        else f"Called it. {ret_str} return."
+                    )
                     ins_sentiment = "positive"
                 else:
                     headline = (
                         f"Trump mentioned {symbol} -- it went {ret_str} in 7 days."
                     )
-                    body = "Missed by a wide margin." if return_t7 < -2 else "Close to the threshold."
+                    body = (
+                        "Missed by a wide margin."
+                        if return_t7 < -2
+                        else "Close to the threshold."
+                    )
                     ins_sentiment = "negative"
 
                 insights.append(
