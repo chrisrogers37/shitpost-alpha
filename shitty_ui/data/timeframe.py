@@ -68,7 +68,6 @@ def get_tf_columns(timeframe: str = "t7") -> Dict[str, str]:
     """
     if timeframe not in TIMEFRAME_OPTIONS:
         raise ValueError(
-            f"Invalid timeframe '{timeframe}'. "
-            f"Valid options: {VALID_TIMEFRAMES}"
+            f"Invalid timeframe '{timeframe}'. Valid options: {VALID_TIMEFRAMES}"
         )
     return dict(TIMEFRAME_OPTIONS[timeframe])

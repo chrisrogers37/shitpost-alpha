@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New `PredictionOutcome` columns: `post_published_at`, `price_at_post`, `price_at_next_close`, `price_1h_after`, `return_same_day`, `return_1h`, `correct_same_day`, `correct_1h`, `pnl_same_day`, `pnl_1h`
   - `get_price_on_date` uses MarketCalendar for backward lookback on non-trading days
   - 64 new tests across `test_market_calendar.py` (44), `test_intraday_provider.py` (9), and new outcome calculator test classes (11)
+- **Analytics Charts Section** - New collapsible "Show Me The Money" section on the dashboard
+  - Cumulative P&L equity curve chart showing running total P&L over time
+  - Rolling accuracy chart showing 30-day rolling prediction accuracy trend
+  - Confidence calibration chart comparing predicted confidence vs actual accuracy
+  - Interactive backtest simulator with configurable starting capital and confidence threshold
+  - All charts respect the global Time Period selector
+  - Backtest tab shows summary stats (final value, return %, trades, win rate)
 - **Multi-timeframe dashboard** — New "Outcome Window" toggle (T+1, T+3, T+7, T+30) on the dashboard lets users view KPIs, screener, and insights across any prediction timeframe instead of only T+7
 - **Timeframe column mapping module** — `data/timeframe.py` provides `get_tf_columns()`, `TIMEFRAME_OPTIONS`, `VALID_TIMEFRAMES`, and `DEFAULT_TIMEFRAME` as single source of truth for timeframe→column mapping
 - 12 new tests for timeframe module (`test_timeframe.py`)
