@@ -6,7 +6,7 @@ import os
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
 import pytest
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
 from sqlalchemy.orm import Session
 
@@ -23,6 +23,15 @@ def mock_session():
 def calculator(mock_session):
     calc = OutcomeCalculator(session=mock_session)
     calc.market_client = MagicMock()
+    # Mock the market calendar to behave like simple date arithmetic for existing tests
+    mock_calendar = MagicMock()
+    mock_calendar.trading_day_offset.side_effect = lambda d, n: d + timedelta(days=n)
+    mock_calendar.previous_trading_day.side_effect = lambda d: d - timedelta(days=1)
+    mock_calendar.nearest_trading_day.side_effect = lambda d: d
+    mock_calendar.is_trading_day.return_value = True
+    mock_calendar.session_close_time.return_value = None
+    mock_calendar.next_trading_day.side_effect = lambda d: d + timedelta(days=1)
+    calc._calendar = mock_calendar
     return calc
 
 
@@ -71,7 +80,11 @@ class TestMatureOutcomes:
         o1 = _make_incomplete_outcome(prediction_id=1, symbol="AAPL")
         o2 = _make_incomplete_outcome(prediction_id=1, symbol="TSLA")
         o3 = _make_incomplete_outcome(prediction_id=2, symbol="GOOG")
-        mock_session.query.return_value.filter.return_value.all.return_value = [o1, o2, o3]
+        mock_session.query.return_value.filter.return_value.all.return_value = [
+            o1,
+            o2,
+            o3,
+        ]
 
         # Mock calculate_outcome_for_prediction to return outcomes
         mock_outcome_complete = MagicMock(is_complete=True)
@@ -168,11 +181,15 @@ class TestMatureOutcomes:
 class TestFixedEarlyReturn:
     """Tests for the fixed early-return in _calculate_single_outcome."""
 
-    def test_returns_existing_when_complete_and_no_force(self, calculator, mock_session):
+    def test_returns_existing_when_complete_and_no_force(
+        self, calculator, mock_session
+    ):
         """Complete outcomes are still returned immediately without re-evaluation."""
         existing = MagicMock(spec=PredictionOutcome)
         existing.is_complete = True
-        mock_session.query.return_value.filter.return_value.first.return_value = existing
+        mock_session.query.return_value.filter.return_value.first.return_value = (
+            existing
+        )
 
         result = calculator._calculate_single_outcome(
             prediction_id=1,
@@ -191,10 +208,12 @@ class TestFixedEarlyReturn:
         existing.is_complete = False
         existing.price_at_prediction = 100.0
         existing.price_t1 = 101.0  # Already filled
-        existing.price_t3 = None   # Not yet filled
+        existing.price_t3 = None  # Not yet filled
         existing.price_t7 = None
         existing.price_t30 = None
-        mock_session.query.return_value.filter.return_value.first.return_value = existing
+        mock_session.query.return_value.filter.return_value.first.return_value = (
+            existing
+        )
 
         # Provide price data for the re-evaluation
         mock_price = MagicMock(close=100.0)
@@ -216,7 +235,9 @@ class TestFixedEarlyReturn:
         existing = MagicMock(spec=PredictionOutcome)
         existing.is_complete = True
         existing.price_at_prediction = 100.0
-        mock_session.query.return_value.filter.return_value.first.return_value = existing
+        mock_session.query.return_value.filter.return_value.first.return_value = (
+            existing
+        )
 
         mock_price = MagicMock(close=100.0)
         calculator.market_client.get_price_on_date.return_value = mock_price
@@ -258,7 +279,9 @@ class TestSkipFilledTimeframes:
             pnl_t1=10.0,
             is_complete=False,
         )
-        mock_session.query.return_value.filter.return_value.first.return_value = existing
+        mock_session.query.return_value.filter.return_value.first.return_value = (
+            existing
+        )
 
         # Price data for unfilled timeframes
         mock_price_t0 = MagicMock(close=100.0)
@@ -295,16 +318,19 @@ class TestMatureOutcomesCLI:
     @pytest.fixture
     def runner(self):
         from click.testing import CliRunner
+
         return CliRunner()
 
     def test_command_exists(self, runner):
         from shit.market_data.cli import cli
+
         result = runner.invoke(cli, ["mature-outcomes", "--help"])
         assert result.exit_code == 0
         assert "Re-evaluate incomplete prediction outcomes" in result.output
 
     def test_command_in_cli_help(self, runner):
         from shit.market_data.cli import cli
+
         result = runner.invoke(cli, ["--help"])
         assert "mature-outcomes" in result.output
 
@@ -329,9 +355,7 @@ class TestMatureOutcomesCLI:
         assert result.exit_code == 0
         assert "Incomplete outcomes found: 5" in result.output
         assert "Newly complete: 2" in result.output
-        mock_calc.mature_outcomes.assert_called_once_with(
-            limit=None, emit_event=False
-        )
+        mock_calc.mature_outcomes.assert_called_once_with(limit=None, emit_event=False)
 
     @patch("shit.market_data.cli.OutcomeCalculator")
     def test_with_limit(self, mock_calc_class, runner):
@@ -352,9 +376,7 @@ class TestMatureOutcomesCLI:
 
         result = runner.invoke(cli, ["mature-outcomes", "--limit", "10"])
         assert result.exit_code == 0
-        mock_calc.mature_outcomes.assert_called_once_with(
-            limit=10, emit_event=False
-        )
+        mock_calc.mature_outcomes.assert_called_once_with(limit=10, emit_event=False)
 
     @patch("shit.market_data.cli.OutcomeCalculator")
     def test_with_emit_event_flag(self, mock_calc_class, runner):
@@ -375,9 +397,7 @@ class TestMatureOutcomesCLI:
 
         result = runner.invoke(cli, ["mature-outcomes", "--emit-event"])
         assert result.exit_code == 0
-        mock_calc.mature_outcomes.assert_called_once_with(
-            limit=None, emit_event=True
-        )
+        mock_calc.mature_outcomes.assert_called_once_with(limit=None, emit_event=True)
 
     @patch("shit.market_data.cli.OutcomeCalculator")
     def test_error_handling(self, mock_calc_class, runner):

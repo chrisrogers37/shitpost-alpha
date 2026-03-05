@@ -5,7 +5,7 @@ Defines the interface for market data sources (yfinance, Alpha Vantage, etc.).
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import List, Optional
 
 from shit.logging import get_service_logger
@@ -19,6 +19,7 @@ class RawPriceRecord:
 
     This is a plain data transfer object -- no SQLAlchemy dependency.
     """
+
     symbol: str
     date: date
     open: Optional[float]
@@ -28,6 +29,7 @@ class RawPriceRecord:
     volume: Optional[int]
     adjusted_close: Optional[float]
     source: str  # e.g. "yfinance", "alphavantage"
+    bar_datetime: Optional[datetime] = None  # Full datetime for intraday bars
 
 
 class PriceProvider(ABC):
@@ -74,7 +76,12 @@ class PriceProvider(ABC):
 class ProviderError(Exception):
     """Raised when a price provider fails to fetch data."""
 
-    def __init__(self, provider_name: str, message: str, original_error: Optional[Exception] = None):
+    def __init__(
+        self,
+        provider_name: str,
+        message: str,
+        original_error: Optional[Exception] = None,
+    ):
         self.provider_name = provider_name
         self.original_error = original_error
         super().__init__(f"[{provider_name}] {message}")
@@ -118,30 +125,37 @@ class ProviderChain:
             try:
                 logger.info(
                     f"Attempting {provider.name} for {symbol}",
-                    extra={"provider": provider.name, "symbol": symbol}
+                    extra={"provider": provider.name, "symbol": symbol},
                 )
                 records = provider.fetch_prices(symbol, start_date, end_date)
                 if records:
                     logger.info(
                         f"{provider.name} returned {len(records)} records for {symbol}",
-                        extra={"provider": provider.name, "symbol": symbol, "count": len(records)}
+                        extra={
+                            "provider": provider.name,
+                            "symbol": symbol,
+                            "count": len(records),
+                        },
                     )
                     return records
                 else:
                     logger.warning(
                         f"{provider.name} returned empty results for {symbol}",
-                        extra={"provider": provider.name, "symbol": symbol}
+                        extra={"provider": provider.name, "symbol": symbol},
                     )
             except Exception as e:
                 logger.warning(
                     f"{provider.name} failed for {symbol}: {e}",
-                    extra={"provider": provider.name, "symbol": symbol, "error": str(e)}
+                    extra={
+                        "provider": provider.name,
+                        "symbol": symbol,
+                        "error": str(e),
+                    },
                 )
                 errors.append(ProviderError(provider.name, str(e), original_error=e))
 
         # All providers failed
         error_summary = "; ".join(str(e) for e in errors)
         raise ProviderError(
-            "all_providers",
-            f"All providers failed for {symbol}: {error_summary}"
+            "all_providers", f"All providers failed for {symbol}: {error_summary}"
         )

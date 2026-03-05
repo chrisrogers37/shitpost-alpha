@@ -12,7 +12,10 @@ from sqlalchemy import and_
 
 from shit.market_data.models import MarketPrice
 from shit.market_data.price_provider import (
-    PriceProvider, ProviderChain, RawPriceRecord, ProviderError,
+    PriceProvider,
+    ProviderChain,
+    RawPriceRecord,
+    ProviderError,
 )
 from shit.market_data.yfinance_provider import YFinanceProvider
 from shit.market_data.alphavantage_provider import AlphaVantageProvider
@@ -121,7 +124,11 @@ class MarketDataClient:
 
         logger.info(
             f"Fetching price history for {symbol}",
-            extra={"symbol": symbol, "start_date": str(start_date), "end_date": str(end_date)}
+            extra={
+                "symbol": symbol,
+                "start_date": str(start_date),
+                "end_date": str(end_date),
+            },
         )
 
         # Check if we already have this data (unless force refresh)
@@ -130,7 +137,7 @@ class MarketDataClient:
             if len(existing) > 0:
                 logger.info(
                     f"Found {len(existing)} existing prices for {symbol}, skipping fetch",
-                    extra={"symbol": symbol, "count": len(existing)}
+                    extra={"symbol": symbol, "count": len(existing)},
                 )
                 return existing
 
@@ -140,7 +147,7 @@ class MarketDataClient:
         if not raw_records:
             logger.warning(
                 f"No price data found for {symbol} from any provider",
-                extra={"symbol": symbol}
+                extra={"symbol": symbol},
             )
             return []
 
@@ -151,7 +158,7 @@ class MarketDataClient:
 
             logger.info(
                 f"Successfully stored {len(prices)} prices for {symbol}",
-                extra={"symbol": symbol, "count": len(prices)}
+                extra={"symbol": symbol, "count": len(prices)},
             )
             return prices
 
@@ -185,23 +192,33 @@ class MarketDataClient:
 
         for attempt in range(max_retries + 1):
             try:
-                return self._provider_chain.fetch_with_fallback(symbol, start_date, end_date)
+                return self._provider_chain.fetch_with_fallback(
+                    symbol, start_date, end_date
+                )
             except ProviderError as e:
                 last_error = e
 
                 if attempt == max_retries:
                     logger.error(
                         f"All providers failed for {symbol} after {max_retries + 1} attempts: {e}",
-                        extra={"symbol": symbol, "attempts": max_retries + 1, "error": str(e)}
+                        extra={
+                            "symbol": symbol,
+                            "attempts": max_retries + 1,
+                            "error": str(e),
+                        },
                     )
                     _send_failure_alert(symbol, str(e))
                     return []
 
-                wait_time = delay * (backoff ** attempt)
+                wait_time = delay * (backoff**attempt)
                 logger.warning(
                     f"Provider chain failed for {symbol} (attempt {attempt + 1}/{max_retries + 1}), "
                     f"retrying in {wait_time:.1f}s: {e}",
-                    extra={"symbol": symbol, "attempt": attempt + 1, "wait_time": wait_time}
+                    extra={
+                        "symbol": symbol,
+                        "attempt": attempt + 1,
+                        "wait_time": wait_time,
+                    },
                 )
                 time.sleep(wait_time)
 
@@ -217,12 +234,16 @@ class MarketDataClient:
 
         for record in records:
             # Check if price already exists
-            existing_price = self.session.query(MarketPrice).filter(
-                and_(
-                    MarketPrice.symbol == record.symbol,
-                    MarketPrice.date == record.date,
+            existing_price = (
+                self.session.query(MarketPrice)
+                .filter(
+                    and_(
+                        MarketPrice.symbol == record.symbol,
+                        MarketPrice.date == record.date,
+                    )
                 )
-            ).first()
+                .first()
+            )
 
             if existing_price and not force_refresh:
                 prices.append(existing_price)
@@ -252,60 +273,81 @@ class MarketDataClient:
         return prices
 
     def get_price_on_date(
-        self,
-        symbol: str,
-        target_date: date,
-        lookback_days: int = 7
+        self, symbol: str, target_date: date, lookback_days: int = 7
     ) -> Optional[MarketPrice]:
-        """Get price for a specific date, with fallback for market closed days."""
-        price = self.session.query(MarketPrice).filter(
-            and_(
-                MarketPrice.symbol == symbol,
-                MarketPrice.date == target_date
-            )
-        ).first()
+        """Get price for a specific date, with fallback for non-trading days.
+
+        Uses the market calendar to walk backward through actual trading days
+        rather than calendar days. If target_date is a weekend or holiday,
+        this returns the most recent trading day's close.
+        """
+        from shit.market_data.market_calendar import MarketCalendar
+
+        price = (
+            self.session.query(MarketPrice)
+            .filter(and_(MarketPrice.symbol == symbol, MarketPrice.date == target_date))
+            .first()
+        )
 
         if price:
             return price
 
         logger.debug(
-            f"No price found for {symbol} on {target_date}, checking previous days",
-            extra={"symbol": symbol, "target_date": str(target_date)}
+            f"No price found for {symbol} on {target_date}, checking previous trading days",
+            extra={"symbol": symbol, "target_date": str(target_date)},
         )
 
-        for days_back in range(1, lookback_days + 1):
-            check_date = target_date - timedelta(days=days_back)
-            price = self.session.query(MarketPrice).filter(
-                and_(
-                    MarketPrice.symbol == symbol,
-                    MarketPrice.date == check_date
+        # Use market calendar to find the most recent trading day
+        calendar = MarketCalendar()
+        check_date = target_date
+        for _ in range(lookback_days):
+            try:
+                check_date = calendar.previous_trading_day(check_date)
+            except Exception:
+                # Fallback to naive walk if calendar fails
+                check_date = check_date - timedelta(days=1)
+                while check_date.weekday() >= 5:
+                    check_date -= timedelta(days=1)
+
+            price = (
+                self.session.query(MarketPrice)
+                .filter(
+                    and_(MarketPrice.symbol == symbol, MarketPrice.date == check_date)
                 )
-            ).first()
+                .first()
+            )
 
             if price:
                 logger.debug(
-                    f"Found price for {symbol} on {check_date} ({days_back} days before {target_date})",
-                    extra={"symbol": symbol, "price_date": str(check_date)}
+                    f"Found price for {symbol} on {check_date} (nearest trading day before {target_date})",
+                    extra={"symbol": symbol, "price_date": str(check_date)},
                 )
                 return price
 
         logger.warning(
-            f"No price found for {symbol} within {lookback_days} days of {target_date}",
-            extra={"symbol": symbol, "target_date": str(target_date), "lookback_days": lookback_days}
+            f"No price found for {symbol} within {lookback_days} trading days of {target_date}",
+            extra={
+                "symbol": symbol,
+                "target_date": str(target_date),
+                "lookback_days": lookback_days,
+            },
         )
         return None
 
     def get_latest_price(self, symbol: str) -> Optional[MarketPrice]:
         """Get the most recent price for a symbol."""
-        return self.session.query(MarketPrice).filter(
-            MarketPrice.symbol == symbol
-        ).order_by(MarketPrice.date.desc()).first()
+        return (
+            self.session.query(MarketPrice)
+            .filter(MarketPrice.symbol == symbol)
+            .order_by(MarketPrice.date.desc())
+            .first()
+        )
 
     def update_prices_for_symbols(
         self,
         symbols: List[str],
         start_date: Optional[date] = None,
-        end_date: Optional[date] = None
+        end_date: Optional[date] = None,
     ) -> Dict[str, int]:
         """Update prices for multiple symbols."""
         if start_date is None:
@@ -321,38 +363,42 @@ class MarketDataClient:
             except Exception as e:
                 logger.error(
                     f"Failed to update prices for {symbol}: {e}",
-                    extra={"symbol": symbol, "error": str(e)}
+                    extra={"symbol": symbol, "error": str(e)},
                 )
                 results[symbol] = 0
 
         return results
 
     def _get_existing_prices(
-        self,
-        symbol: str,
-        start_date: date,
-        end_date: date
+        self, symbol: str, start_date: date, end_date: date
     ) -> List[MarketPrice]:
         """Get existing prices in database for date range."""
-        return self.session.query(MarketPrice).filter(
-            and_(
-                MarketPrice.symbol == symbol,
-                MarketPrice.date >= start_date,
-                MarketPrice.date <= end_date
+        return (
+            self.session.query(MarketPrice)
+            .filter(
+                and_(
+                    MarketPrice.symbol == symbol,
+                    MarketPrice.date >= start_date,
+                    MarketPrice.date <= end_date,
+                )
             )
-        ).order_by(MarketPrice.date).all()
+            .order_by(MarketPrice.date)
+            .all()
+        )
 
     def get_price_stats(self, symbol: str) -> Dict[str, Any]:
         """Get statistics about stored prices for a symbol."""
         from sqlalchemy import func
 
-        stats = self.session.query(
-            func.count(MarketPrice.id).label('count'),
-            func.min(MarketPrice.date).label('earliest_date'),
-            func.max(MarketPrice.date).label('latest_date')
-        ).filter(
-            MarketPrice.symbol == symbol
-        ).first()
+        stats = (
+            self.session.query(
+                func.count(MarketPrice.id).label("count"),
+                func.min(MarketPrice.date).label("earliest_date"),
+                func.max(MarketPrice.date).label("latest_date"),
+            )
+            .filter(MarketPrice.symbol == symbol)
+            .first()
+        )
 
         if not stats or stats.count == 0:
             return {
@@ -360,7 +406,7 @@ class MarketDataClient:
                 "count": 0,
                 "earliest_date": None,
                 "latest_date": None,
-                "latest_price": None
+                "latest_price": None,
             }
 
         latest = self.get_latest_price(symbol)
@@ -370,5 +416,5 @@ class MarketDataClient:
             "count": stats.count,
             "earliest_date": stats.earliest_date,
             "latest_date": stats.latest_date,
-            "latest_price": latest.close if latest else None
+            "latest_price": latest.close if latest else None,
         }

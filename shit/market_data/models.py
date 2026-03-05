@@ -84,8 +84,16 @@ class PredictionOutcome(Base, IDMixin, TimestampMixin):
     prediction_confidence = Column(Float, nullable=True)  # 0.0-1.0
     prediction_timeframe_days = Column(Integer, nullable=True)  # Expected timeframe
 
-    # Price at prediction time
+    # Post publication timestamp (full datetime for intraday calculations)
+    post_published_at = Column(DateTime, nullable=True)
+
+    # Price at prediction time (daily close)
     price_at_prediction = Column(Float, nullable=True)  # Price when prediction was made
+
+    # Intraday snapshot prices (captured once at prediction creation)
+    price_at_post = Column(Float, nullable=True)  # Price when post was published
+    price_at_next_close = Column(Float, nullable=True)  # Next market close after post
+    price_1h_after = Column(Float, nullable=True)  # 1 hour after post
 
     # Outcomes at different timeframes (T+N days)
     price_t1 = Column(Float, nullable=True)  # Price after 1 day
@@ -93,23 +101,37 @@ class PredictionOutcome(Base, IDMixin, TimestampMixin):
     price_t7 = Column(Float, nullable=True)  # Price after 7 days
     price_t30 = Column(Float, nullable=True)  # Price after 30 days
 
-    # Returns (percentage change)
-    return_t1 = Column(Float, nullable=True)  # % change after 1 day
-    return_t3 = Column(Float, nullable=True)  # % change after 3 days
-    return_t7 = Column(Float, nullable=True)  # % change after 7 days
-    return_t30 = Column(Float, nullable=True)  # % change after 30 days
+    # Returns (percentage change) -- daily timeframes (trading days)
+    return_t1 = Column(Float, nullable=True)  # T+1 trading day
+    return_t3 = Column(Float, nullable=True)  # T+3 trading days
+    return_t7 = Column(Float, nullable=True)  # T+7 trading days
+    return_t30 = Column(Float, nullable=True)  # T+30 trading days
 
-    # Accuracy validation (was prediction correct?)
-    correct_t1 = Column(Boolean, nullable=True)  # Correct at T+1?
-    correct_t3 = Column(Boolean, nullable=True)  # Correct at T+3?
-    correct_t7 = Column(Boolean, nullable=True)  # Correct at T+7?
-    correct_t30 = Column(Boolean, nullable=True)  # Correct at T+30?
+    # Returns -- intraday timeframes
+    return_same_day = Column(
+        Float, nullable=True
+    )  # price_at_post -> price_at_next_close
+    return_1h = Column(Float, nullable=True)  # price_at_post -> price_1h_after
 
-    # Profit/Loss simulation (assuming $1000 position)
-    pnl_t1 = Column(Float, nullable=True)  # P&L after 1 day
-    pnl_t3 = Column(Float, nullable=True)  # P&L after 3 days
-    pnl_t7 = Column(Float, nullable=True)  # P&L after 7 days
-    pnl_t30 = Column(Float, nullable=True)  # P&L after 30 days
+    # Accuracy validation -- daily timeframes
+    correct_t1 = Column(Boolean, nullable=True)
+    correct_t3 = Column(Boolean, nullable=True)
+    correct_t7 = Column(Boolean, nullable=True)
+    correct_t30 = Column(Boolean, nullable=True)
+
+    # Accuracy -- intraday timeframes
+    correct_same_day = Column(Boolean, nullable=True)
+    correct_1h = Column(Boolean, nullable=True)
+
+    # Profit/Loss simulation ($1000 position) -- daily
+    pnl_t1 = Column(Float, nullable=True)
+    pnl_t3 = Column(Float, nullable=True)
+    pnl_t7 = Column(Float, nullable=True)
+    pnl_t30 = Column(Float, nullable=True)
+
+    # P&L -- intraday
+    pnl_same_day = Column(Float, nullable=True)
+    pnl_1h = Column(Float, nullable=True)
 
     # Market context (for better analysis)
     market_volatility = Column(Float, nullable=True)  # VIX or calculated volatility
@@ -202,7 +224,7 @@ class TickerRegistry(Base, IDMixin, TimestampMixin):
     price_data_end = Column(Date, nullable=True)
     total_price_records = Column(Integer, default=0)
 
-    # Metadata (existing)
+    # Metadata
     asset_type = Column(
         String(20), nullable=True
     )  # stock, crypto, etf, commodity, index

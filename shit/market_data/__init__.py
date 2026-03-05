@@ -16,6 +16,7 @@ from shit.market_data.yfinance_provider import YFinanceProvider
 from shit.market_data.alphavantage_provider import AlphaVantageProvider
 from shit.market_data.fundamentals_provider import FundamentalsProvider
 from shit.market_data.health import run_health_check, HealthReport
+from shit.market_data.market_calendar import MarketCalendar
 
 __all__ = [
     "MarketPrice",
@@ -32,4 +33,5 @@ __all__ = [
     "FundamentalsProvider",
     "run_health_check",
     "HealthReport",
+    "MarketCalendar",
 ]

@@ -293,12 +293,20 @@ python -m shitposts --mode backfill --from 2024-01-01 --to 2024-12-31
 
 **`prediction_outcomes`** - Validated prediction accuracy with returns
 - `id`, `prediction_id` (FK → predictions.id), `symbol`
-- Prediction snapshot: `prediction_date`, `prediction_sentiment`, `prediction_confidence`
-- Price evolution: `price_at_prediction`, `price_t1`, `price_t3`, `price_t7`, `price_t30`
-- Returns: `return_t1`, `return_t3`, `return_t7`, `return_t30` (percentage change)
-- Accuracy: `correct_t1`, `correct_t3`, `correct_t7`, `correct_t30` (boolean)
-- P&L simulation: `pnl_t1`, `pnl_t3`, `pnl_t7`, `pnl_t30` ($1000 position)
+- Prediction snapshot: `prediction_date`, `prediction_sentiment`, `prediction_confidence`, `prediction_timeframe_days`
+- Post timing: `post_published_at` (datetime) -- Full datetime for intraday calculations
+- Price at prediction: `price_at_prediction` (daily close on prediction date)
+- Intraday snapshots: `price_at_post`, `price_at_next_close`, `price_1h_after` (ephemeral, captured once)
+- Price evolution (trading days): `price_t1`, `price_t3`, `price_t7`, `price_t30`
+- Returns -- daily (trading days): `return_t1`, `return_t3`, `return_t7`, `return_t30` (percentage change)
+- Returns -- intraday: `return_same_day` (post→next close), `return_1h` (post→1h after)
+- Accuracy -- daily: `correct_t1`, `correct_t3`, `correct_t7`, `correct_t30` (boolean)
+- Accuracy -- intraday: `correct_same_day`, `correct_1h` (boolean)
+- P&L simulation -- daily: `pnl_t1`, `pnl_t3`, `pnl_t7`, `pnl_t30` ($1000 position)
+- P&L simulation -- intraday: `pnl_same_day`, `pnl_1h` ($1000 position)
+- Market context: `market_volatility`, `sector`
 - `is_complete` (boolean) -- All timeframes tracked?
+- `last_price_update`, `notes`
 
 **`signals`** - Source-agnostic content model for multi-platform support
 - `id`, `signal_id` (string, unique) -- Platform-specific content ID

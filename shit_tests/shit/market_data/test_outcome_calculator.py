@@ -1,7 +1,7 @@
 """Tests for OutcomeCalculator (shit/market_data/outcome_calculator.py)."""
 
 import pytest
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,15 @@ def mock_session():
 def calculator(mock_session):
     calc = OutcomeCalculator(session=mock_session)
     calc.market_client = MagicMock()
+    # Mock the market calendar to behave like simple date arithmetic for existing tests
+    mock_calendar = MagicMock()
+    mock_calendar.trading_day_offset.side_effect = lambda d, n: d + timedelta(days=n)
+    mock_calendar.previous_trading_day.side_effect = lambda d: d - timedelta(days=1)
+    mock_calendar.nearest_trading_day.side_effect = lambda d: d
+    mock_calendar.is_trading_day.return_value = True
+    mock_calendar.session_close_time.return_value = None
+    mock_calendar.next_trading_day.side_effect = lambda d: d + timedelta(days=1)
+    calc._calendar = mock_calendar
     return calc
 
 
@@ -344,7 +353,7 @@ class TestCalculateSingleOutcome:
         calculator.market_client.get_price_on_date.return_value = None
         calculator.market_client.fetch_price_history.return_value = []
 
-        result = calculator._calculate_single_outcome(
+        calculator._calculate_single_outcome(
             prediction_id=1,
             symbol="AAPL",
             prediction_date=date(2025, 6, 15),
@@ -465,3 +474,249 @@ class TestGetAccuracyStats:
         result = calculator.get_accuracy_stats()
         assert result["accuracy"] == 0.0
         assert result["pending"] == 2
+
+
+# -- _get_source_datetime ---------------------------------------------------
+
+
+class TestGetSourceDatetime:
+    def test_returns_datetime_from_shitpost(self, calculator):
+        pred = _make_prediction(
+            shitpost_timestamp=datetime(2025, 6, 14, 9, 30, 0),
+        )
+        result = calculator._get_source_datetime(pred)
+        assert result == datetime(2025, 6, 14, 9, 30, 0, tzinfo=timezone.utc)
+
+    def test_returns_none_when_no_timestamps(self, calculator):
+        pred = _make_prediction(shitpost=None, signal=None, created_at=None)
+        result = calculator._get_source_datetime(pred)
+        assert result is None
+
+    def test_returns_datetime_from_signal(self, calculator):
+        signal = MagicMock()
+        signal.published_at = datetime(2025, 7, 1, 8, 0, 0)
+
+        pred = _make_prediction(shitpost=None, signal=signal)
+        result = calculator._get_source_datetime(pred)
+        assert result == datetime(2025, 7, 1, 8, 0, 0, tzinfo=timezone.utc)
+
+    def test_falls_back_to_created_at(self, calculator):
+        pred = _make_prediction(
+            shitpost=None,
+            signal=None,
+            created_at=datetime(2025, 6, 15, 10, 0, 0),
+        )
+        result = calculator._get_source_datetime(pred)
+        assert result == datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+
+    def test_preserves_timezone_if_already_aware(self, calculator):
+        pred = _make_prediction(
+            shitpost_timestamp=datetime(2025, 6, 14, 9, 30, 0, tzinfo=timezone.utc),
+        )
+        result = calculator._get_source_datetime(pred)
+        assert result.tzinfo == timezone.utc
+
+    def test_get_source_date_delegates_to_get_source_datetime(self, calculator):
+        """Verify _get_source_date returns the date of _get_source_datetime's result."""
+        pred = _make_prediction(
+            shitpost_timestamp=datetime(2025, 6, 14, 23, 59, 0),
+        )
+        date_result = calculator._get_source_date(pred)
+        dt_result = calculator._get_source_datetime(pred)
+        assert date_result == dt_result.date()
+
+
+# -- Trading-day timeframes --------------------------------------------------
+
+
+class TestTradingDayTimeframes:
+    """Verify that outcome calculation uses trading days, not calendar days."""
+
+    @patch("shit.market_data.outcome_calculator.fetch_intraday_snapshot")
+    @patch("shit.market_data.outcome_calculator.date")
+    def test_friday_prediction_t1_is_monday(
+        self, mock_date, mock_intraday, calculator, mock_session
+    ):
+        """T+1 on Friday should use Monday's close, not Saturday."""
+        mock_date.today.return_value = date(2025, 7, 20)
+        mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+        mock_intraday.return_value = MagicMock(
+            price_at_post=None, price_1h_after=None, price_at_next_close=None
+        )
+
+        # Override calendar mock to use real trading-day logic
+        from shit.market_data.market_calendar import MarketCalendar
+
+        real_cal = MarketCalendar()
+        calculator._calendar = real_cal
+
+        mock_session.query.return_value.filter.return_value.first.return_value = None
+        mock_price = MagicMock(close=100.0)
+        calculator.market_client.get_price_on_date.return_value = mock_price
+
+        calculator._calculate_single_outcome(
+            prediction_id=1,
+            symbol="AAPL",
+            prediction_date=date(2025, 6, 13),  # Friday
+            sentiment="bullish",
+            confidence=0.8,
+        )
+
+        # Verify T+1 call was for Monday June 16, not Saturday June 14
+        calls = calculator.market_client.get_price_on_date.call_args_list
+        # First call is price_at_prediction (June 13)
+        # Second call should be T+1 = June 16 (Monday)
+        t1_call_date = calls[1][0][1]  # second positional arg of second call
+        assert t1_call_date == date(2025, 6, 16)
+
+    @patch("shit.market_data.outcome_calculator.fetch_intraday_snapshot")
+    @patch("shit.market_data.outcome_calculator.date")
+    def test_holiday_skip(self, mock_date, mock_intraday, calculator, mock_session):
+        """T+1 before July 4 holiday should skip to the next trading day."""
+        mock_date.today.return_value = date(2025, 7, 20)
+        mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+        mock_intraday.return_value = MagicMock(
+            price_at_post=None, price_1h_after=None, price_at_next_close=None
+        )
+
+        from shit.market_data.market_calendar import MarketCalendar
+
+        real_cal = MarketCalendar()
+        calculator._calendar = real_cal
+
+        mock_session.query.return_value.filter.return_value.first.return_value = None
+        mock_price = MagicMock(close=100.0)
+        calculator.market_client.get_price_on_date.return_value = mock_price
+
+        calculator._calculate_single_outcome(
+            prediction_id=1,
+            symbol="AAPL",
+            prediction_date=date(2025, 7, 3),  # Thursday before July 4
+            sentiment="bullish",
+            confidence=0.8,
+        )
+
+        calls = calculator.market_client.get_price_on_date.call_args_list
+        # T+1 should be July 7 (Monday), skipping July 4 (holiday) and weekend
+        t1_call_date = calls[1][0][1]
+        assert t1_call_date == date(2025, 7, 7)
+
+
+# -- Intraday calculations --------------------------------------------------
+
+
+class TestIntradayCalculations:
+    """Verify intraday snapshot integration in _calculate_single_outcome."""
+
+    @patch("shit.market_data.outcome_calculator.fetch_intraday_snapshot")
+    @patch("shit.market_data.outcome_calculator.date")
+    def test_intraday_fields_populated_when_post_datetime_provided(
+        self, mock_date, mock_intraday, calculator, mock_session
+    ):
+        mock_date.today.return_value = date(2025, 7, 20)
+        mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+
+        # Set up intraday snapshot
+        mock_snapshot = MagicMock()
+        mock_snapshot.price_at_post = 149.0
+        mock_snapshot.price_1h_after = 151.0
+        mock_snapshot.price_at_next_close = 150.0
+        mock_intraday.return_value = mock_snapshot
+
+        mock_session.query.return_value.filter.return_value.first.return_value = None
+        mock_price = MagicMock(close=100.0)
+        calculator.market_client.get_price_on_date.return_value = mock_price
+
+        post_dt = datetime(2025, 6, 15, 14, 0, 0, tzinfo=timezone.utc)
+        result = calculator._calculate_single_outcome(
+            prediction_id=1,
+            symbol="AAPL",
+            prediction_date=date(2025, 6, 15),
+            sentiment="bullish",
+            confidence=0.8,
+            post_datetime=post_dt,
+        )
+
+        assert result is not None
+        assert result.post_published_at == post_dt
+        assert result.price_at_post == 149.0
+        assert result.price_1h_after == 151.0
+
+    @patch("shit.market_data.outcome_calculator.fetch_intraday_snapshot")
+    @patch("shit.market_data.outcome_calculator.date")
+    def test_intraday_skipped_when_no_post_datetime(
+        self, mock_date, mock_intraday, calculator, mock_session
+    ):
+        mock_date.today.return_value = date(2025, 7, 20)
+        mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+
+        mock_session.query.return_value.filter.return_value.first.return_value = None
+        mock_price = MagicMock(close=100.0)
+        calculator.market_client.get_price_on_date.return_value = mock_price
+
+        result = calculator._calculate_single_outcome(
+            prediction_id=1,
+            symbol="AAPL",
+            prediction_date=date(2025, 6, 15),
+            sentiment="bullish",
+            confidence=0.8,
+            post_datetime=None,  # No post datetime
+        )
+
+        assert result is not None
+        # Intraday should not be attempted
+        mock_intraday.assert_not_called()
+
+    @patch("shit.market_data.outcome_calculator.fetch_intraday_snapshot")
+    @patch("shit.market_data.outcome_calculator.date")
+    def test_intraday_returns_calculated(
+        self, mock_date, mock_intraday, calculator, mock_session
+    ):
+        mock_date.today.return_value = date(2025, 7, 20)
+        mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+
+        mock_snapshot = MagicMock()
+        mock_snapshot.price_at_post = 100.0
+        mock_snapshot.price_1h_after = 102.0
+        mock_snapshot.price_at_next_close = 105.0
+        mock_intraday.return_value = mock_snapshot
+
+        mock_session.query.return_value.filter.return_value.first.return_value = None
+
+        # price_t0 = 100, timeframe prices = 110
+        # For the intraday "next close" lookup, return a different daily close
+        mock_price_t0 = MagicMock(close=100.0)
+        mock_price_tn = MagicMock(close=110.0)
+        mock_daily_close = MagicMock(close=105.0)  # same as snapshot for consistency
+
+        # Control which dates return which prices:
+        # 1st call: price_at_prediction (t0)
+        # 2nd-5th: timeframe prices (t1,t3,t7,t30)
+        # 6th: intraday "next close date" lookup -> daily close of 105
+        calculator.market_client.get_price_on_date.side_effect = [
+            mock_price_t0,  # price at prediction
+            mock_price_tn,  # T+1
+            mock_price_tn,  # T+3
+            mock_price_tn,  # T+7
+            mock_price_tn,  # T+30
+            mock_daily_close,  # next close date for intraday
+        ]
+
+        post_dt = datetime(2025, 6, 15, 14, 0, 0, tzinfo=timezone.utc)
+        result = calculator._calculate_single_outcome(
+            prediction_id=1,
+            symbol="AAPL",
+            prediction_date=date(2025, 6, 15),
+            sentiment="bullish",
+            confidence=0.8,
+            post_datetime=post_dt,
+        )
+
+        assert result is not None
+        # return_1h: (102 - 100) / 100 * 100 = 2.0%
+        assert result.return_1h == 2.0
+        assert result.correct_1h is True  # bullish + positive
+        # return_same_day: (105 - 100) / 100 * 100 = 5.0%
+        # (105 comes from the daily close MarketPrice, which is preferred over snapshot)
+        assert result.return_same_day == 5.0
+        assert result.correct_same_day is True
