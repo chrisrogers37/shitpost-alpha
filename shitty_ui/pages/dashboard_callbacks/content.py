@@ -21,6 +21,7 @@ from brand_copy import COPY
 from data import (
     get_asset_screener_data,
     get_screener_sparkline_prices,
+    get_screener_sectors,
     load_recent_posts,
     get_dashboard_kpis_with_fallback,
     get_dynamic_insights,
@@ -79,13 +80,16 @@ def register_content_callbacks(app: Dash) -> None:
         try:
             screener_df = get_asset_screener_data(days=days, timeframe=timeframe)
             sparkline_data = {}
+            sector_data = {}
             if not screener_df.empty:
                 symbols = tuple(screener_df["symbol"].tolist())
                 sparkline_data = get_screener_sparkline_prices(symbols=symbols)
+                sector_data = get_screener_sectors()
 
             screener_table = build_screener_table(
                 screener_df=screener_df,
                 sparkline_data=sparkline_data,
+                sector_data=sector_data,
                 sort_column="total_predictions",
                 sort_ascending=False,
                 timeframe_label=tf_label_short,

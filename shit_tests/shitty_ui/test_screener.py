@@ -15,6 +15,8 @@ from components.screener import (
     _hex_to_rgb,
     _text_color,
     _sentiment_badge,
+    _screener_sector_badge,
+    _SECTOR_ABBREV,
     _SUCCESS_RGB,
     _DANGER_RGB,
 )
@@ -180,15 +182,11 @@ class TestBuildScreenerTable:
     """Tests for the main screener table builder."""
 
     def test_returns_div_with_data(self):
-        result = build_screener_table(
-            _make_screener_df(), _make_sparkline_data()
-        )
+        result = build_screener_table(_make_screener_df(), _make_sparkline_data())
         assert isinstance(result, html.Div)
 
     def test_table_has_correct_row_count(self):
-        result = build_screener_table(
-            _make_screener_df(5), _make_sparkline_data()
-        )
+        result = build_screener_table(_make_screener_df(5), _make_sparkline_data())
         table = result.children
         assert isinstance(table, html.Table)
         tbody = table.children[1]
@@ -206,9 +204,9 @@ class TestBuildScreenerTable:
         result = build_screener_table(df, sparklines)
         table = result.children
         tbody = table.children[1]
-        # Row 2 (CMCSA) should have a placeholder in cell 1 (sparkline)
+        # Row 2 (CMCSA) should have a placeholder in cell 2 (sparkline, after sector)
         cmcsa_row = tbody.children[2]
-        spark_cell = cmcsa_row.children[1]
+        spark_cell = cmcsa_row.children[2]
         # Placeholder is an html.Div, not a dcc.Graph
         assert not isinstance(spark_cell.children, dcc.Graph)
 
@@ -235,72 +233,121 @@ class TestBuildScreenerTable:
         assert first_ticker.children == "CMCSA"
 
     def test_row_has_screener_row_class(self):
-        result = build_screener_table(
-            _make_screener_df(1), {}
-        )
+        result = build_screener_table(_make_screener_df(1), {})
         table = result.children
         tbody = table.children[1]
         row = tbody.children[0]
         assert row.className == "screener-row"
 
     def test_row_has_pattern_match_id(self):
-        result = build_screener_table(
-            _make_screener_df(1), {}
-        )
+        result = build_screener_table(_make_screener_df(1), {})
         table = result.children
         tbody = table.children[1]
         row = tbody.children[0]
         assert row.id == {"type": "screener-row", "index": "XLE"}
 
     def test_asset_link_href(self):
-        result = build_screener_table(
-            _make_screener_df(1), {}
-        )
+        result = build_screener_table(_make_screener_df(1), {})
         table = result.children
         tbody = table.children[1]
         row = tbody.children[0]
         link = row.children[0].children  # First td -> dcc.Link
         assert link.href == "/assets/XLE"
 
-    def test_header_has_eight_columns(self):
-        result = build_screener_table(
-            _make_screener_df(1), {}
-        )
+    def test_header_has_nine_columns(self):
+        result = build_screener_table(_make_screener_df(1), {})
         table = result.children
         thead = table.children[0]
         header_row = thead.children
-        assert len(header_row.children) == 8
+        assert len(header_row.children) == 9
 
     def test_sparkline_cell_has_hide_class(self):
         """Sparkline column should have screener-hide-mobile class."""
-        result = build_screener_table(
-            _make_screener_df(1), _make_sparkline_data()
-        )
+        result = build_screener_table(_make_screener_df(1), _make_sparkline_data())
         table = result.children
         tbody = table.children[1]
-        spark_td = tbody.children[0].children[1]
+        spark_td = tbody.children[0].children[2]  # After sector column
         assert "screener-hide-mobile" in spark_td.className
 
     def test_confidence_cell_has_hide_class(self):
         """Confidence column should have screener-hide-mobile class."""
-        result = build_screener_table(
-            _make_screener_df(1), {}
-        )
+        result = build_screener_table(_make_screener_df(1), {})
         table = result.children
         tbody = table.children[1]
-        # Confidence is the last column (index 7)
-        conf_td = tbody.children[0].children[7]
+        # Confidence is the last column (index 8, after adding sector)
+        conf_td = tbody.children[0].children[8]
         assert "screener-hide-mobile" in conf_td.className
 
     def test_heat_mapped_return_positive_has_green_bg(self):
         """Positive avg_return should get green background."""
         result = build_screener_table(
-            _make_screener_df(1), {}  # XLE has avg_return=2.48
+            _make_screener_df(1),
+            {},  # XLE has avg_return=2.48
         )
         table = result.children
         tbody = table.children[1]
-        # 7d Return is column index 4
-        return_td = tbody.children[0].children[4]
+        # 7d Return is column index 5 (after sector column)
+        return_td = tbody.children[0].children[5]
         bg = return_td.style["backgroundColor"]
         r, g, b = _SUCCESS_RGB
         assert f"rgba({r}, {g}, {b}," in bg
+
+
+# ── screener_sector_badge ────────────────────────────────────────────
+
+
+class TestScreenerSectorBadge:
+    """Tests for _screener_sector_badge helper."""
+
+    def test_renders_known_sector_abbreviation(self):
+        badge = _screener_sector_badge("Technology")
+        assert badge.children == "TECH"
+
+    def test_renders_unknown_sector_truncated(self):
+        badge = _screener_sector_badge("Quantum Computing")
+        assert badge.children == "QUAN"
+
+    def test_renders_dash_for_none_sector(self):
+        badge = _screener_sector_badge(None)
+        assert badge.children == "-"
+
+    def test_sector_badge_has_tooltip(self):
+        badge = _screener_sector_badge("Financial Services")
+        assert badge.title == "Financial Services"
+        assert badge.children == "FIN"
+
+
+# ── build_screener_table with sectors ────────────────────────────────
+
+
+class TestBuildScreenerTableWithSectors:
+    """Tests for sector integration in the screener table."""
+
+    def test_table_has_sector_column_header(self):
+        result = build_screener_table(_make_screener_df(1), {})
+        table = result.children
+        thead = table.children[0]
+        header_row = thead.children
+        # Sector is the second column header (index 1)
+        sector_th = header_row.children[1]
+        assert sector_th.children == "Sector"
+
+    def test_rows_include_sector_badges(self):
+        sector_data = {"XLE": "Energy", "DIS": "Communication Services"}
+        result = build_screener_table(_make_screener_df(2), {}, sector_data=sector_data)
+        table = result.children
+        tbody = table.children[1]
+        # XLE row: sector cell at index 1
+        xle_sector_td = tbody.children[0].children[1]
+        assert xle_sector_td.children.children == "ENGY"
+        # DIS row: sector cell at index 1
+        dis_sector_td = tbody.children[1].children[1]
+        assert dis_sector_td.children.children == "COMM"
+
+    def test_works_without_sector_data(self):
+        """sector_data=None should render dashes for all sectors."""
+        result = build_screener_table(_make_screener_df(1), {}, sector_data=None)
+        table = result.children
+        tbody = table.children[1]
+        sector_td = tbody.children[0].children[1]
+        assert sector_td.children.children == "-"

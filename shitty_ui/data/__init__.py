@@ -83,6 +83,8 @@ from data.asset_queries import (  # noqa: F401
     get_asset_predictions,
     get_asset_stats,
     get_related_assets,
+    get_ticker_fundamentals,
+    get_screener_sectors,
 )
 
 # --- Insight queries ---
@@ -117,11 +119,13 @@ def clear_all_caches() -> None:
     get_top_predicted_asset.clear_cache()  # type: ignore
     get_empty_state_context.clear_cache()  # type: ignore
 
-    # Asset queries (4 cached functions)
+    # Asset queries (6 cached functions)
     get_asset_stats.clear_cache()  # type: ignore
     get_asset_screener_data.clear_cache()  # type: ignore
     get_screener_sparkline_prices.clear_cache()  # type: ignore
     get_sparkline_prices.clear_cache()  # type: ignore
+    get_ticker_fundamentals.clear_cache()  # type: ignore
+    get_screener_sectors.clear_cache()  # type: ignore
 
     # Insight queries (1 cached function)
     get_dynamic_insights.clear_cache()  # type: ignore
@@ -189,6 +193,8 @@ __all__ = [
     "get_asset_predictions",
     "get_asset_stats",
     "get_related_assets",
+    "get_ticker_fundamentals",
+    "get_screener_sectors",
     # Insight queries
     "get_dynamic_insights",
     # Backtest queries

@@ -62,7 +62,9 @@ class TickerRegistryService:
 
                 if existing:
                     already_known.append(symbol)
-                    logger.debug(f"Ticker {symbol} already registered (status={existing.status})")
+                    logger.debug(
+                        f"Ticker {symbol} already registered (status={existing.status})"
+                    )
                     continue
 
                 # Register new ticker
@@ -78,14 +80,36 @@ class TickerRegistryService:
                 newly_registered.append(symbol)
                 logger.info(
                     f"Registered new ticker: {symbol}",
-                    extra={"symbol": symbol, "source_prediction_id": source_prediction_id},
+                    extra={
+                        "symbol": symbol,
+                        "source_prediction_id": source_prediction_id,
+                    },
                 )
 
             try:
                 session.commit()
             except IntegrityError:
                 session.rollback()
-                logger.info("IntegrityError during ticker registration, handling concurrent insert")
+                logger.info(
+                    "IntegrityError during ticker registration, handling concurrent insert"
+                )
+
+        # Populate fundamentals for newly registered tickers (best-effort, non-blocking)
+        if newly_registered:
+            try:
+                from shit.market_data.fundamentals_provider import FundamentalsProvider
+
+                provider = FundamentalsProvider()
+                for symbol in newly_registered:
+                    try:
+                        provider.update_fundamentals(symbol, force=True)
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to fetch fundamentals for new ticker {symbol}: {e}",
+                            extra={"symbol": symbol},
+                        )
+            except Exception as e:
+                logger.warning(f"Failed to initialize FundamentalsProvider: {e}")
 
         return (newly_registered, already_known)
 

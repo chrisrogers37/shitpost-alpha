@@ -622,6 +622,86 @@ def get_asset_stats(symbol: str, timeframe: str = DEFAULT_TIMEFRAME) -> Dict[str
     }
 
 
+@ttl_cache(ttl_seconds=600)  # Cache for 10 minutes (fundamentals change slowly)
+def get_ticker_fundamentals(symbol: str) -> Dict[str, Any]:
+    """Get company fundamental data from the ticker registry.
+
+    Args:
+        symbol: Ticker symbol (e.g., 'AAPL').
+
+    Returns:
+        Dictionary with keys: company_name, sector, industry, market_cap,
+        pe_ratio, forward_pe, dividend_yield, beta, exchange, asset_type,
+        description, fundamentals_updated_at.
+        Returns dict with all None values if ticker not found.
+    """
+    query = text("""
+        SELECT
+            company_name,
+            sector,
+            industry,
+            market_cap,
+            pe_ratio,
+            forward_pe,
+            dividend_yield,
+            beta,
+            exchange,
+            asset_type,
+            description,
+            fundamentals_updated_at
+        FROM ticker_registry
+        WHERE symbol = :symbol
+    """)
+
+    empty = {
+        "company_name": None,
+        "sector": None,
+        "industry": None,
+        "market_cap": None,
+        "pe_ratio": None,
+        "forward_pe": None,
+        "dividend_yield": None,
+        "beta": None,
+        "exchange": None,
+        "asset_type": None,
+        "description": None,
+        "fundamentals_updated_at": None,
+    }
+
+    try:
+        rows, columns = _base.execute_query(query, {"symbol": symbol.upper()})
+        if rows and rows[0]:
+            row = rows[0]
+            return {col: row[i] for i, col in enumerate(columns)}
+    except Exception as e:
+        logger.error(f"Error loading fundamentals for {symbol}: {e}")
+
+    return empty
+
+
+@ttl_cache(ttl_seconds=300)
+def get_screener_sectors() -> Dict[str, str]:
+    """Get sector mapping for all active tickers.
+
+    Returns:
+        Dict mapping symbol -> sector (e.g., {"AAPL": "Technology", "XOM": "Energy"}).
+        Tickers without sector data are excluded.
+    """
+    query = text("""
+        SELECT symbol, sector
+        FROM ticker_registry
+        WHERE status = 'active'
+            AND sector IS NOT NULL
+    """)
+
+    try:
+        rows, columns = _base.execute_query(query)
+        return {row[0]: row[1] for row in rows} if rows else {}
+    except Exception as e:
+        logger.error(f"Error loading screener sectors: {e}")
+        return {}
+
+
 def get_related_assets(
     symbol: str, limit: int = 8, timeframe: str = DEFAULT_TIMEFRAME
 ) -> pd.DataFrame:

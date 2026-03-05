@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Company Fundamentals & Asset Profiles** — Automatic yfinance-powered company data population for all tracked tickers
+  - New `FundamentalsProvider` service fetches sector, industry, market cap, P/E, beta, dividend yield, and description from yfinance
+  - 10 new columns on `ticker_registry`: `company_name`, `sector`, `industry`, `market_cap`, `pe_ratio`, `forward_pe`, `dividend_yield`, `beta`, `description`, `fundamentals_updated_at`
+  - Fundamentals auto-populate on ticker registration (best-effort, non-blocking)
+  - Staleness-based caching: re-fetches if data is older than 24 hours
+  - Asset detail page now shows company subtitle, sector badge, and full profile card with key metrics
+  - Screener table gains a Sector column with 4-char abbreviated sector badges
+  - 35 new tests covering FundamentalsProvider, ticker registry hook, sector badges, and screener integration
 - **Analytics Charts Section** - New collapsible "Show Me The Money" section on the dashboard
   - Cumulative P&L equity curve chart showing running total P&L over time
   - Rolling accuracy chart showing 30-day rolling prediction accuracy trend
