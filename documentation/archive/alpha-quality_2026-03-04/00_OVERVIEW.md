@@ -23,9 +23,9 @@ The system has significant gaps between its intent (predict market movements fro
 | 02 | ~~Fix Sentiment Bug & NaN Guards~~ | High | Low | Low | 6 mod, 0 new | ✅ PR #105 |
 | 03 | ~~Smart Default View & Copy Cleanup~~ | High | Medium | Medium | 8 mod, 0 new | ✅ PR #106 |
 | 04 | ~~Multi-Timeframe Dashboard~~ | High | High | Medium | 13 mod, 2 new | ✅ PR #107 |
-| 05 | [Analytics Charts](05_analytics-charts.md) | Medium | Medium | Medium | 7 mod, 3 new |
-| 06 | [Company Fundamentals & Asset Profiles](06_company-fundamentals-asset-profiles.md) | Medium | High | Medium | 9 mod, 3 new |
-| 07 | [Market-Aware Timing](07_market-aware-timing.md) | Medium | High | High | 7 mod, 3 new |
+| 05 | ~~Analytics Charts~~ | Medium | Medium | Medium | 7 mod, 3 new | ✅ PR #108 |
+| 06 | ~~Company Fundamentals & Asset Profiles~~ | Medium | High | Medium | 9 mod, 3 new | ✅ PR #109 |
+| 07 | ~~Market-Aware Timing~~ | Medium | High | High | 7 mod, 3 new | ✅ PR #110 |
 
 ## Dependency Graph
 
