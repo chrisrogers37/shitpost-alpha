@@ -1,6 +1,6 @@
 """
 Market Data Module
-Fetches stock prices and calculates prediction outcomes.
+Fetches stock prices, company fundamentals, and calculates prediction outcomes.
 """
 
 from shit.market_data.models import MarketPrice, PredictionOutcome, TickerRegistry
@@ -14,6 +14,7 @@ from shit.market_data.price_provider import (
 )
 from shit.market_data.yfinance_provider import YFinanceProvider
 from shit.market_data.alphavantage_provider import AlphaVantageProvider
+from shit.market_data.fundamentals_provider import FundamentalsProvider
 from shit.market_data.health import run_health_check, HealthReport
 from shit.market_data.market_calendar import MarketCalendar
 
@@ -29,6 +30,7 @@ __all__ = [
     "ProviderError",
     "YFinanceProvider",
     "AlphaVantageProvider",
+    "FundamentalsProvider",
     "run_health_check",
     "HealthReport",
     "MarketCalendar",

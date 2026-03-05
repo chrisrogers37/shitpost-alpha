@@ -1,6 +1,7 @@
 """Asset deep dive page layout and callbacks."""
 
 import traceback
+from typing import Optional
 
 from dash import Dash, html, dcc, Input, Output, callback_context
 import dash_bootstrap_components as dbc
@@ -23,6 +24,7 @@ from data import (
     get_asset_stats,
     get_price_with_signals,
     get_related_assets,
+    get_ticker_fundamentals,
 )
 
 
@@ -53,6 +55,12 @@ def create_asset_page(symbol: str) -> html.Div:
                         type="default",
                         color=COLORS["accent"],
                         children=html.Div(id="asset-stat-cards", className="mb-4"),
+                    ),
+                    # Company Profile card (populated by callback)
+                    dcc.Loading(
+                        type="default",
+                        color=COLORS["accent"],
+                        children=html.Div(id="asset-company-profile", className="mb-4"),
                     ),
                     # Price chart + Performance summary
                     dbc.Row(
@@ -211,7 +219,7 @@ def create_asset_page(symbol: str) -> html.Div:
 def create_asset_header(symbol: str) -> html.Div:
     """
     Create the header bar for an asset page.
-    Includes back navigation, symbol name, and a placeholder for
+    Includes back navigation, symbol name, company name, and a placeholder for
     current price (populated by callback).
 
     Args:
@@ -241,7 +249,7 @@ def create_asset_header(symbol: str) -> html.Div:
                     "marginBottom": "10px",
                 },
             ),
-            # Symbol + Price
+            # Symbol + Company Name + Price
             html.Div(
                 [
                     html.Div(
@@ -266,12 +274,23 @@ def create_asset_header(symbol: str) -> html.Div:
                         ],
                         style={"display": "flex", "alignItems": "baseline"},
                     ),
+                    # Company name + sector badge (populated by callback)
+                    html.Div(
+                        id="asset-company-subtitle",
+                        style={
+                            "display": "flex",
+                            "alignItems": "center",
+                            "gap": "8px",
+                            "marginTop": "2px",
+                        },
+                    ),
                     html.P(
                         COPY["asset_page_subtitle"].format(symbol=symbol),
                         style={
                             "color": COLORS["text_muted"],
                             "margin": 0,
                             "fontSize": "0.9rem",
+                            "marginTop": "4px",
                         },
                     ),
                 ]
@@ -294,6 +313,8 @@ def register_asset_callbacks(app: Dash):
         [
             Output("asset-stat-cards", "children"),
             Output("asset-current-price", "children"),
+            Output("asset-company-subtitle", "children"),
+            Output("asset-company-profile", "children"),
             Output("asset-performance-summary", "children"),
             Output("asset-signal-summary", "children"),
             Output("asset-prediction-timeline", "children"),
@@ -308,9 +329,14 @@ def register_asset_callbacks(app: Dash):
         """
         if not symbol:
             empty = html.P("No asset selected.", style={"color": COLORS["text_muted"]})
-            return empty, "", empty, empty, empty, empty
+            return empty, "", [], html.Div(), empty, empty, empty, empty
 
         try:
+            # --- COMPANY FUNDAMENTALS ---
+            fundamentals = get_ticker_fundamentals(symbol)
+            company_subtitle = _build_company_subtitle(fundamentals)
+            company_profile = _build_company_profile_card(fundamentals)
+
             # --- STAT CARDS ---
             stats = get_asset_stats(symbol)
             stat_cards = dbc.Row(
@@ -430,6 +456,8 @@ def register_asset_callbacks(app: Dash):
             return (
                 stat_cards,
                 current_price_text,
+                company_subtitle,
+                company_profile,
                 performance_summary,
                 signal_summary,
                 timeline_cards,
@@ -439,7 +467,16 @@ def register_asset_callbacks(app: Dash):
         except Exception as e:
             print(f"Error loading asset page for {symbol}: {traceback.format_exc()}")
             error_card = create_error_card(f"Unable to load data for {symbol}", str(e))
-            return error_card, "", error_card, error_card, error_card, error_card
+            return (
+                error_card,
+                "",
+                [],
+                html.Div(),
+                error_card,
+                error_card,
+                error_card,
+                error_card,
+            )
 
     @app.callback(
         Output("asset-price-chart", "figure"),
@@ -695,4 +732,209 @@ def _mini_stat_card(value: str, label: str, color: str) -> html.Div:
             "borderRadius": "8px",
             "border": f"1px solid {COLORS['border']}",
         },
+    )
+
+
+def _format_market_cap(market_cap: Optional[int]) -> str:
+    """Format market cap as human-readable string.
+
+    Args:
+        market_cap: Market capitalization in USD.
+
+    Returns:
+        Formatted string like "$2.8T", "$150.3B", "$4.2M", or "N/A".
+    """
+    if market_cap is None:
+        return "N/A"
+    if market_cap >= 1_000_000_000_000:
+        return f"${market_cap / 1_000_000_000_000:.1f}T"
+    if market_cap >= 1_000_000_000:
+        return f"${market_cap / 1_000_000_000:.1f}B"
+    if market_cap >= 1_000_000:
+        return f"${market_cap / 1_000_000:.1f}M"
+    return f"${market_cap:,.0f}"
+
+
+def _sector_badge(sector: Optional[str]) -> html.Span:
+    """Render a compact sector badge.
+
+    Args:
+        sector: Sector name (e.g. "Technology"). None renders nothing.
+
+    Returns:
+        html.Span badge component, or empty Span if sector is None.
+    """
+    if not sector:
+        return html.Span()
+
+    return html.Span(
+        sector,
+        style={
+            "backgroundColor": f"{COLORS['navy']}40",
+            "color": COLORS["text"],
+            "fontSize": "0.75rem",
+            "padding": "2px 10px",
+            "borderRadius": "9999px",
+            "fontWeight": "500",
+            "letterSpacing": "0.02em",
+            "display": "inline-block",
+        },
+    )
+
+
+def _build_company_subtitle(fundamentals: dict) -> list:
+    """Build the company name + sector badge row for the header.
+
+    Args:
+        fundamentals: Dict from get_ticker_fundamentals().
+
+    Returns:
+        List of Dash components for the subtitle div.
+    """
+    children = []
+
+    company_name = fundamentals.get("company_name")
+    if company_name:
+        children.append(
+            html.Span(
+                company_name,
+                style={
+                    "color": COLORS["text_muted"],
+                    "fontSize": "1rem",
+                    "fontWeight": "400",
+                },
+            )
+        )
+
+    sector = fundamentals.get("sector")
+    if sector:
+        children.append(_sector_badge(sector))
+
+    return children
+
+
+def _build_company_profile_card(fundamentals: dict) -> html.Div:
+    """Build the Company Profile card for the asset page.
+
+    Shows sector, industry, market cap, P/E, dividend yield, beta, and description.
+    Returns an empty Div if no fundamental data is available.
+
+    Args:
+        fundamentals: Dict from get_ticker_fundamentals().
+
+    Returns:
+        dbc.Card component or empty html.Div.
+    """
+    # Check if any meaningful data exists
+    has_data = any(
+        fundamentals.get(key) is not None
+        for key in ["company_name", "sector", "market_cap", "pe_ratio", "description"]
+    )
+
+    if not has_data:
+        return html.Div()  # No fundamentals, render nothing
+
+    # Build metric items
+    metrics = []
+
+    def _add_metric(label: str, value: str, icon: str):
+        metrics.append(
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.I(
+                                className=f"fas fa-{icon} me-2",
+                                style={"color": COLORS["accent"], "width": "16px"},
+                            ),
+                            html.Span(
+                                label,
+                                style={
+                                    "color": COLORS["text_muted"],
+                                    "fontSize": "0.8rem",
+                                },
+                            ),
+                        ],
+                        style={"display": "flex", "alignItems": "center"},
+                    ),
+                    html.Div(
+                        value,
+                        style={
+                            "color": COLORS["text"],
+                            "fontSize": "0.9rem",
+                            "fontWeight": "600",
+                            "marginTop": "2px",
+                        },
+                    ),
+                ],
+                style={
+                    "padding": "8px 0",
+                    "borderBottom": f"1px solid {COLORS['border']}",
+                },
+            )
+        )
+
+    if fundamentals.get("sector"):
+        _add_metric("Sector", fundamentals["sector"], "layer-group")
+
+    if fundamentals.get("industry"):
+        _add_metric("Industry", fundamentals["industry"], "industry")
+
+    if fundamentals.get("market_cap") is not None:
+        _add_metric(
+            "Market Cap", _format_market_cap(fundamentals["market_cap"]), "coins"
+        )
+
+    if fundamentals.get("pe_ratio") is not None:
+        pe_str = f"{fundamentals['pe_ratio']:.1f}"
+        if fundamentals.get("forward_pe") is not None:
+            pe_str += f" / {fundamentals['forward_pe']:.1f} fwd"
+        _add_metric("P/E Ratio", pe_str, "calculator")
+
+    if fundamentals.get("dividend_yield") is not None:
+        _add_metric(
+            "Dividend Yield",
+            f"{fundamentals['dividend_yield'] * 100:.2f}%",
+            "percentage",
+        )
+
+    if fundamentals.get("beta") is not None:
+        _add_metric("Beta", f"{fundamentals['beta']:.2f}", "wave-square")
+
+    if fundamentals.get("exchange"):
+        _add_metric("Exchange", fundamentals["exchange"], "building-columns")
+
+    # Build the card
+    card_body_children = []
+
+    if metrics:
+        card_body_children.append(html.Div(metrics))
+
+    # Description (truncated)
+    if fundamentals.get("description"):
+        card_body_children.append(
+            html.P(
+                fundamentals["description"],
+                style={
+                    "color": COLORS["text_muted"],
+                    "fontSize": "0.8rem",
+                    "lineHeight": "1.5",
+                    "marginTop": "12px",
+                    "marginBottom": "0",
+                },
+            )
+        )
+
+    return dbc.Card(
+        [
+            dbc.CardHeader(
+                [
+                    html.I(className="fas fa-building me-2"),
+                    "Company Profile",
+                ],
+                className="fw-bold",
+            ),
+            dbc.CardBody(card_body_children),
+        ],
+        style={"backgroundColor": COLORS["secondary"]},
     )

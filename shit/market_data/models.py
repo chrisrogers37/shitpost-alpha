@@ -202,6 +202,7 @@ class TickerRegistry(Base, IDMixin, TimestampMixin):
     - Status tracking (active, inactive, invalid)
     - Audit trail of when each ticker was first seen
     - Source prediction linkage for debugging
+    - Company fundamental data from yfinance
     """
 
     __tablename__ = "ticker_registry"
@@ -229,8 +230,23 @@ class TickerRegistry(Base, IDMixin, TimestampMixin):
     )  # stock, crypto, etf, commodity, index
     exchange = Column(String(20), nullable=True)  # NYSE, NASDAQ, etc.
 
+    # Company fundamentals (populated by FundamentalsProvider)
+    company_name = Column(String(255), nullable=True)  # e.g. "Apple Inc."
+    sector = Column(String(100), nullable=True)  # e.g. "Technology"
+    industry = Column(String(100), nullable=True)  # e.g. "Consumer Electronics"
+    market_cap = Column(BigInteger, nullable=True)  # Market capitalization in USD
+    pe_ratio = Column(Float, nullable=True)  # Trailing P/E ratio
+    forward_pe = Column(Float, nullable=True)  # Forward P/E ratio
+    dividend_yield = Column(Float, nullable=True)  # Dividend yield (0.0-1.0)
+    beta = Column(Float, nullable=True)  # Beta coefficient
+    description = Column(Text, nullable=True)  # Short business summary
+    fundamentals_updated_at = Column(
+        DateTime, nullable=True
+    )  # Last fundamentals refresh
+
     def __repr__(self):
-        return f"<TickerRegistry(symbol='{self.symbol}', status='{self.status}', first_seen={self.first_seen_date})>"
+        name_part = f" ({self.company_name})" if self.company_name else ""
+        return f"<TickerRegistry(symbol='{self.symbol}'{name_part}, status='{self.status}')>"
 
 
 # Indexes for efficient querying
@@ -246,3 +262,4 @@ Index(
 Index("idx_prediction_outcome_prediction_id", PredictionOutcome.prediction_id)
 Index("idx_ticker_registry_symbol", TickerRegistry.symbol, unique=True)
 Index("idx_ticker_registry_status", TickerRegistry.status)
+Index("idx_ticker_registry_sector", TickerRegistry.sector)

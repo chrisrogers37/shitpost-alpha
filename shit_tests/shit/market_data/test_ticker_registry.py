@@ -59,7 +59,10 @@ class TestRegisterTickers:
         ctx, session = _mock_session()
         existing = MagicMock(status="active")
         # First call returns None (new), second returns existing
-        session.query.return_value.filter.return_value.first.side_effect = [None, existing]
+        session.query.return_value.filter.return_value.first.side_effect = [
+            None,
+            existing,
+        ]
 
         with patch(SESSION_PATCH, return_value=ctx):
             service = TickerRegistryService()
@@ -299,9 +302,17 @@ class TestUpdatePriceMetadata:
         query_mock = MagicMock()
         session.query.side_effect = [
             # First query chain: TickerRegistry lookup
-            MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=entry)))),
+            MagicMock(
+                filter=MagicMock(
+                    return_value=MagicMock(first=MagicMock(return_value=entry))
+                )
+            ),
             # Second query chain: stats lookup
-            MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=stats_result)))),
+            MagicMock(
+                filter=MagicMock(
+                    return_value=MagicMock(first=MagicMock(return_value=stats_result))
+                )
+            ),
         ]
 
         with patch(SESSION_PATCH, return_value=ctx):
@@ -328,8 +339,16 @@ class TestUpdatePriceMetadata:
         stats_result.count = 0
 
         session.query.side_effect = [
-            MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=entry)))),
-            MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=stats_result)))),
+            MagicMock(
+                filter=MagicMock(
+                    return_value=MagicMock(first=MagicMock(return_value=entry))
+                )
+            ),
+            MagicMock(
+                filter=MagicMock(
+                    return_value=MagicMock(first=MagicMock(return_value=stats_result))
+                )
+            ),
         ]
 
         with patch(SESSION_PATCH, return_value=ctx):
@@ -371,3 +390,62 @@ class TestGetRegistryStats:
         assert result["active"] == 0
         assert result["invalid"] == 0
         assert result["inactive"] == 0
+
+
+class TestRegisterTickersFundamentals:
+    """Tests for the fundamentals auto-populate hook in register_tickers."""
+
+    FUNDAMENTALS_PATCH = "shit.market_data.fundamentals_provider.FundamentalsProvider"
+
+    def test_triggers_fundamentals_fetch_for_new_tickers(self):
+        ctx, session = _mock_session()
+        session.query.return_value.filter.return_value.first.return_value = None
+
+        with (
+            patch(SESSION_PATCH, return_value=ctx),
+            patch(self.FUNDAMENTALS_PATCH) as mock_provider_cls,
+        ):
+            mock_provider = MagicMock()
+            mock_provider_cls.return_value = mock_provider
+
+            service = TickerRegistryService()
+            newly, known = service.register_tickers(["AAPL", "TSLA"])
+
+        # Should call update_fundamentals for each new ticker
+        assert mock_provider.update_fundamentals.call_count == 2
+        mock_provider.update_fundamentals.assert_any_call("AAPL", force=True)
+        mock_provider.update_fundamentals.assert_any_call("TSLA", force=True)
+
+    def test_fundamentals_failure_does_not_break_registration(self):
+        ctx, session = _mock_session()
+        session.query.return_value.filter.return_value.first.return_value = None
+
+        with (
+            patch(SESSION_PATCH, return_value=ctx),
+            patch(self.FUNDAMENTALS_PATCH) as mock_provider_cls,
+        ):
+            mock_provider = MagicMock()
+            mock_provider.update_fundamentals.side_effect = Exception("yfinance down")
+            mock_provider_cls.return_value = mock_provider
+
+            service = TickerRegistryService()
+            newly, known = service.register_tickers(["AAPL"])
+
+        # Registration should still succeed despite fundamentals failure
+        assert newly == ["AAPL"]
+        session.add.assert_called_once()
+
+    def test_does_not_fetch_fundamentals_when_no_new_tickers(self):
+        ctx, session = _mock_session()
+        existing = MagicMock(status="active")
+        session.query.return_value.filter.return_value.first.return_value = existing
+
+        with (
+            patch(SESSION_PATCH, return_value=ctx),
+            patch(self.FUNDAMENTALS_PATCH) as mock_provider_cls,
+        ):
+            service = TickerRegistryService()
+            newly, known = service.register_tickers(["AAPL"])
+
+        # No new tickers, so FundamentalsProvider should not be instantiated
+        mock_provider_cls.assert_not_called()
