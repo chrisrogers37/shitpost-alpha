@@ -58,7 +58,6 @@ def ttl_cache(ttl_seconds: int = 300):
     return decorator
 
 
-
 def execute_query(query, params=None):
     """Execute query using appropriate session type."""
     try:

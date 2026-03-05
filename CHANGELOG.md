@@ -16,7 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Asset detail page now shows company subtitle, sector badge, and full profile card with key metrics
   - Screener table gains a Sector column with 4-char abbreviated sector badges
   - 35 new tests covering FundamentalsProvider, ticker registry hook, sector badges, and screener integration
-
+- **Analytics Charts Section** - New collapsible "Show Me The Money" section on the dashboard
+  - Cumulative P&L equity curve chart showing running total P&L over time
+  - Rolling accuracy chart showing 30-day rolling prediction accuracy trend
+  - Confidence calibration chart comparing predicted confidence vs actual accuracy
+  - Interactive backtest simulator with configurable starting capital and confidence threshold
+  - All charts respect the global Time Period selector
+  - Backtest tab shows summary stats (final value, return %, trades, win rate)
 - **Multi-timeframe dashboard** — New "Outcome Window" toggle (T+1, T+3, T+7, T+30) on the dashboard lets users view KPIs, screener, and insights across any prediction timeframe instead of only T+7
 - **Timeframe column mapping module** — `data/timeframe.py` provides `get_tf_columns()`, `TIMEFRAME_OPTIONS`, `VALID_TIMEFRAMES`, and `DEFAULT_TIMEFRAME` as single source of truth for timeframe→column mapping
 - 12 new tests for timeframe module (`test_timeframe.py`)

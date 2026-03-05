@@ -92,6 +92,11 @@ from data.insight_queries import (  # noqa: F401
     get_dynamic_insights,
 )
 
+# --- Backtest queries ---
+from data.backtest_queries import (  # noqa: F401
+    get_backtest_equity_curve,
+)
+
 
 def clear_all_caches() -> None:
     """Clear all data layer caches. Call when forcing a full refresh.
@@ -124,6 +129,9 @@ def clear_all_caches() -> None:
 
     # Insight queries (1 cached function)
     get_dynamic_insights.clear_cache()  # type: ignore
+
+    # Backtest queries (1 cached function)
+    get_backtest_equity_curve.clear_cache()  # type: ignore
 
 
 __all__ = [
@@ -189,4 +197,6 @@ __all__ = [
     "get_screener_sectors",
     # Insight queries
     "get_dynamic_insights",
+    # Backtest queries
+    "get_backtest_equity_curve",
 ]

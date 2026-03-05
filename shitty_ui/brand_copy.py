@@ -33,6 +33,18 @@ COPY = {
     "tab_accuracy": "Accuracy Over Time",
     "tab_confidence": "By Confidence Level",
     "tab_asset": "By Asset (click to drill down)",
+    # ===== Dashboard: Analytics Charts Section =====
+    "analytics_section_subtitle": "equity curves, accuracy trends, and backtesting (the real stuff)",
+    "analytics_pnl_tab": "Equity Curve",
+    "analytics_rolling_tab": "Rolling Accuracy",
+    "analytics_calibration_tab": "Calibration",
+    "analytics_backtest_tab": "Backtest Simulator",
+    "analytics_empty_pnl": "No P&L data yet. Predictions need 7+ trading days to mature.",
+    "analytics_empty_rolling": "Not enough data points for rolling accuracy.",
+    "analytics_empty_calibration": "No calibration data. Need evaluated predictions first.",
+    "analytics_empty_backtest": "No backtest data for these settings.",
+    "analytics_backtest_capital_label": "Starting Capital ($)",
+    "analytics_backtest_confidence_label": "Min Confidence",
     # ===== Dashboard: Posts + Feed Columns =====
     "latest_posts_header": "Latest Shitposts",
     "latest_posts_subtitle": "fresh off Truth Social, with our AI's hot take on your portfolio",

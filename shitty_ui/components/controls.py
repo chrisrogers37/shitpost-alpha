@@ -72,4 +72,3 @@ def create_filter_controls():
         ],
         className="g-3",
     )
-

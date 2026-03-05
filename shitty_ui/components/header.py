@@ -19,8 +19,14 @@ def create_header():
                             dcc.Link(
                                 html.H1(
                                     [
-                                        html.Span("$hitpost ", style={"color": COLORS["accent"]}),
-                                        html.Span("Alpha", style={"color": COLORS["accent_gold"]}),
+                                        html.Span(
+                                            "$hitpost ",
+                                            style={"color": COLORS["accent"]},
+                                        ),
+                                        html.Span(
+                                            "Alpha",
+                                            style={"color": COLORS["accent_gold"]},
+                                        ),
                                     ],
                                     style={
                                         "fontSize": "1.75rem",
@@ -161,7 +167,10 @@ def create_footer():
             html.P(
                 [
                     html.A(
-                        [html.I(className="fab fa-github me-1"), COPY["footer_source_link"]],
+                        [
+                            html.I(className="fab fa-github me-1"),
+                            COPY["footer_source_link"],
+                        ],
                         href="https://github.com/chrisrogers37/shitpost-alpha",
                         target="_blank",
                         style={"color": COLORS["accent"], "textDecoration": "none"},
@@ -171,4 +180,3 @@ def create_footer():
             ),
         ]
     )
-

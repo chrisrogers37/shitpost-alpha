@@ -72,10 +72,24 @@ def register_webhook_route(app):
         return jsonify(health), status_code
 
 
-_STATIC_EXTENSIONS = frozenset((
-    ".css", ".js", ".json", ".png", ".jpg", ".jpeg", ".gif",
-    ".ico", ".svg", ".woff", ".woff2", ".ttf", ".map", ".gz",
-))
+_STATIC_EXTENSIONS = frozenset(
+    (
+        ".css",
+        ".js",
+        ".json",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".ico",
+        ".svg",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".map",
+        ".gz",
+    )
+)
 
 
 def register_client_routes(app):
