@@ -247,6 +247,7 @@ config/secrets.json
 # Frontend build artifacts
 node_modules/
 frontend/dist/
+*.tsbuildinfo
 
 # Test artifacts (mock-generated directories)
 MagicMock/
