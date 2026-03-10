@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **React + FastAPI frontend rebuild** — Complete UI redesign departing from Plotly Dash to a React + FastAPI architecture
+  - New `api/` module: FastAPI backend with feed, price, and telegram webhook endpoints
+  - New `frontend/` module: React 19 + TypeScript + Vite SPA with single-post-at-a-time feed experience
+  - Offset-based feed navigation with left/right arrow buttons and keyboard shortcuts (ArrowLeft/ArrowRight)
+  - Per-ticker price chart using TradingView Lightweight Charts with gold "POST" marker at signal timestamp
+  - Metric bubbles showing returns, P&L, and correctness across T+1, T+3, T+7, T+30 timeframes
+  - Ticker selector pills colored by bullish/bearish sentiment
+  - TanStack Query for data fetching with adjacent post prefetching for instant navigation
+  - Framer Motion slide transitions between posts
+  - Hyper-American patriotic branding: Oswald display font, eagle header, gold accents, patriotic dividers
+  - UI copy: "CONVICTION" gauge, "FREEDOM METRICS", "LIBERTY GAINS", dispatch-themed navigation
+  - Railway deployment config for new `shitpost-alpha-web` service alongside existing Dash app
+  - FastAPI serves built React app as static files in production
+
+### Added
 - **Market-aware timing** — Outcome calculations now use trading-day offsets instead of calendar days (T+1 on Friday = Monday, holidays skipped)
   - `MarketCalendar` wrapper around `exchange_calendars` for NYSE session scheduling with naive fallbacks
   - `IntradayPriceSnapshot` + `fetch_intraday_snapshot()` for same-day/1h outcome tracking via yfinance 1h bars

@@ -244,6 +244,10 @@ config/secrets.json
 # Claude Code local settings (user-specific)
 .claude/settings.local.json
 
+# Frontend build artifacts
+node_modules/
+frontend/dist/
+
 # Test artifacts (mock-generated directories)
 MagicMock/
 
