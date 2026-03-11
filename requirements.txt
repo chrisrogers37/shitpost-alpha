@@ -58,3 +58,7 @@ dash-bootstrap-components>=2.0.0,<3.0.0
 
 # Async utilities
 asyncio-throttle>=1.0.0
+
+# FastAPI web server (new React frontend API)
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0

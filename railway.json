@@ -55,6 +55,11 @@
     "shitpost-alpha-dash": {
       "source": ".",
       "startCommand": "cd shitty_ui && python app.py"
+    },
+    "shitpost-alpha-web": {
+      "source": ".",
+      "buildCommand": "cd frontend && npm ci && npm run build",
+      "startCommand": "uvicorn api.main:app --host 0.0.0.0 --port $PORT"
     }
   }
 }
