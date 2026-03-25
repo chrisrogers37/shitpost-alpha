@@ -5,7 +5,7 @@ const containerStyle: CSSProperties = {
   gap: "4px",
   justifyContent: "center",
   marginTop: "16px",
-  background: "var(--bg-sunken)",
+  background: "#F1F5F9",
   borderRadius: "8px",
   padding: "3px",
   width: "fit-content",
@@ -44,8 +44,8 @@ export function TimeframeToggle({ selected, onSelect }: Props) {
           fontFamily: "var(--font-mono)",
           fontWeight: 600,
           cursor: "pointer",
-          background: isActive ? "var(--color-gold)" : "transparent",
-          color: isActive ? "var(--bg-page)" : "var(--text-muted)",
+          background: isActive ? "#2563EB" : "transparent",
+          color: isActive ? "#FFFFFF" : "#64748B",
           transition: "all 0.15s ease",
         };
 

@@ -6,11 +6,10 @@ import { formatNumber } from "../utils/format";
 const cardStyle: CSSProperties = {
   background: "var(--bg-card)",
   border: "1px solid var(--border)",
-  borderTop: "3px solid #3B82F6",
-  borderRadius: "16px",
+  borderLeft: "4px solid var(--color-blue)",
+  borderRadius: "12px",
   padding: "24px",
-  position: "relative",
-  overflow: "hidden",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
 
 const metaStyle: CSSProperties = {
@@ -23,14 +22,14 @@ const metaStyle: CSSProperties = {
 };
 
 const usernameStyle: CSSProperties = {
-  fontWeight: 600,
-  color: "var(--color-gold)",
+  fontWeight: 700,
+  color: "var(--color-navy)",
 };
 
 const textStyle: CSSProperties = {
-  fontSize: "1.1rem",
+  fontSize: "1.05rem",
   lineHeight: 1.6,
-  fontWeight: 500,
+  fontWeight: 400,
   color: "var(--text-primary)",
   whiteSpace: "pre-wrap",
   wordBreak: "break-word",
@@ -55,20 +54,8 @@ interface Props {
 }
 
 export function ShitpostCard({ post }: Props) {
-  const totalEngagement =
-    post.engagement.replies +
-    post.engagement.reblogs +
-    post.engagement.favourites;
-
-  // Gold glow for high engagement
-  const glowIntensity = Math.min(totalEngagement / 50000, 1);
-  const glowStyle: CSSProperties = {
-    ...cardStyle,
-    boxShadow: `0 0 ${20 + glowIntensity * 30}px rgba(255, 215, 0, ${0.03 + glowIntensity * 0.1})`,
-  };
-
   return (
-    <div style={glowStyle}>
+    <div style={cardStyle}>
       <div style={metaStyle}>
         <span>
           <span style={usernameStyle}>@{post.username}</span>

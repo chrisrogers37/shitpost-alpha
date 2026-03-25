@@ -4,7 +4,7 @@ const footerStyle: CSSProperties = {
   textAlign: "center",
   padding: "24px 16px 32px",
   fontSize: "0.7rem",
-  color: "var(--text-muted)",
+  color: "#94A3B8",
   maxWidth: "600px",
   margin: "0 auto",
   lineHeight: 1.6,

@@ -55,22 +55,22 @@ export function MetricBubbles({ outcome }: Props) {
           const isPending = ret == null;
 
           const bgColor = isPending
-            ? "var(--bg-sunken)"
+            ? "#F8FAFC"
             : isPositive
-              ? "rgba(34, 197, 94, 0.12)"
-              : "rgba(220, 38, 38, 0.12)";
+              ? "rgba(22, 163, 74, 0.08)"
+              : "rgba(220, 38, 38, 0.08)";
 
           const borderColor = isPending
-            ? "var(--border)"
+            ? "#E2E8F0"
             : isPositive
-              ? "rgba(34, 197, 94, 0.3)"
+              ? "rgba(22, 163, 74, 0.3)"
               : "rgba(220, 38, 38, 0.3)";
 
           const textColor = isPending
-            ? "var(--text-muted)"
+            ? "#94A3B8"
             : isPositive
-              ? "var(--color-money)"
-              : "var(--color-red)";
+              ? "#16A34A"
+              : "#DC2626";
 
           const bubbleStyle: CSSProperties = {
             background: bgColor,
@@ -88,7 +88,7 @@ export function MetricBubbles({ outcome }: Props) {
                 style={{
                   fontSize: "0.65rem",
                   fontWeight: 600,
-                  color: "var(--text-muted)",
+                  color: "#94A3B8",
                   letterSpacing: "0.05em",
                   marginBottom: "4px",
                 }}
@@ -121,14 +121,14 @@ export function MetricBubbles({ outcome }: Props) {
                   style={{
                     fontSize: "0.65rem",
                     marginTop: "4px",
-                    color: correct ? "var(--color-money)" : "var(--color-red)",
+                    color: correct ? "#16A34A" : "#DC2626",
                   }}
                 >
                   {correct ? "\u2713 Correct" : "\u2717 Wrong"}
                 </div>
               )}
               {isPending && (
-                <div style={{ fontSize: "0.6rem", marginTop: "4px", color: "var(--color-gold)" }}>
+                <div style={{ fontSize: "0.6rem", marginTop: "4px", color: "#2563EB" }}>
                   Pending
                 </div>
               )}

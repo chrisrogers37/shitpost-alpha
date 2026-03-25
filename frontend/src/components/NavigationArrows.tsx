@@ -5,8 +5,8 @@ const arrowBase: CSSProperties = {
   top: "50%",
   transform: "translateY(-50%)",
   zIndex: 10,
-  background: "rgba(59, 130, 246, 0.15)",
-  border: "1px solid rgba(59, 130, 246, 0.4)",
+  background: "#FFFFFF",
+  border: "1px solid #CBD5E1",
   borderRadius: "50%",
   width: "44px",
   height: "44px",
@@ -14,13 +14,14 @@ const arrowBase: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   cursor: "pointer",
-  color: "var(--text-primary)",
+  color: "#1E3A5F",
   fontSize: "1.2rem",
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
   transition: "all 0.15s ease",
 };
 
 const disabledStyle: CSSProperties = {
-  opacity: 0.2,
+  opacity: 0.3,
   cursor: "default",
   pointerEvents: "none",
 };

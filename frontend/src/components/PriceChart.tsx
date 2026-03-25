@@ -12,10 +12,10 @@ const containerStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "12px",
   overflow: "hidden",
-  background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderTop: "3px solid rgba(255, 255, 255, 0.3)",
+  background: "#FFFFFF",
+  border: "1px solid #CBD5E1",
   padding: "8px",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
 
 const loadingStyle: CSSProperties = {
@@ -23,7 +23,7 @@ const loadingStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  color: "var(--text-muted)",
+  color: "#64748B",
   fontSize: "0.85rem",
 };
 
@@ -41,7 +41,6 @@ export function PriceChart({ symbol, days, postTimestamp }: Props) {
   useEffect(() => {
     if (!containerRef.current || !data || data.candles.length === 0) return;
 
-    // Clean up previous chart
     if (chartRef.current) {
       chartRef.current.remove();
       chartRef.current = null;
@@ -51,32 +50,31 @@ export function PriceChart({ symbol, days, postTimestamp }: Props) {
       width: containerRef.current.clientWidth,
       height: 300,
       layout: {
-        background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "#94A3B8",
+        background: { type: ColorType.Solid, color: "#FFFFFF" },
+        textColor: "#64748B",
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: "rgba(59, 130, 246, 0.12)" },
-        horzLines: { color: "rgba(59, 130, 246, 0.12)" },
+        vertLines: { color: "#F1F5F9" },
+        horzLines: { color: "#F1F5F9" },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
       },
       rightPriceScale: {
-        borderColor: "rgba(30, 48, 80, 0.6)",
+        borderColor: "#E2E8F0",
       },
       timeScale: {
-        borderColor: "rgba(30, 48, 80, 0.6)",
+        borderColor: "#E2E8F0",
         timeVisible: false,
       },
     });
 
-    // Candlestick series — green up, red down
     const candleSeries = chart.addCandlestickSeries({
-      upColor: "#22C55E",
+      upColor: "#16A34A",
       downColor: "#DC2626",
-      wickUpColor: "#22C55E",
+      wickUpColor: "#16A34A",
       wickDownColor: "#DC2626",
       borderVisible: false,
     });
@@ -91,7 +89,6 @@ export function PriceChart({ symbol, days, postTimestamp }: Props) {
 
     candleSeries.setData(candleData);
 
-    // Volume histogram
     const volumeSeries = chart.addHistogramSeries({
       priceFormat: { type: "volume" },
       priceScaleId: "volume",
@@ -107,19 +104,19 @@ export function PriceChart({ symbol, days, postTimestamp }: Props) {
         value: c.volume,
         color:
           c.close >= c.open
-            ? "rgba(34, 197, 94, 0.25)"
-            : "rgba(220, 38, 38, 0.25)",
+            ? "rgba(22, 163, 74, 0.2)"
+            : "rgba(220, 38, 38, 0.2)",
       })),
     );
 
-    // Post marker — gold arrow with "POST" label
+    // Post marker — red arrow
     if (data.post_date_index != null && data.candles[data.post_date_index]) {
       const postCandle = data.candles[data.post_date_index];
       candleSeries.setMarkers([
         {
           time: postCandle.date,
           position: "aboveBar",
-          color: "#FFD700",
+          color: "#DC2626",
           shape: "arrowDown",
           text: "POST",
         },
@@ -129,7 +126,6 @@ export function PriceChart({ symbol, days, postTimestamp }: Props) {
     chart.timeScale().fitContent();
     chartRef.current = chart;
 
-    // Resize handler
     const handleResize = () => {
       if (containerRef.current && chartRef.current) {
         chartRef.current.applyOptions({

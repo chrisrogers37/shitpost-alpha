@@ -5,10 +5,11 @@ import { formatConfidence } from "../utils/format";
 const panelStyle: CSSProperties = {
   background: "var(--bg-card)",
   border: "1px solid var(--border)",
-  borderTop: "3px solid #EF4444",
+  borderLeft: "4px solid var(--color-red)",
   borderRadius: "12px",
   padding: "20px",
   marginTop: "12px",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
 
 const headerRow: CSSProperties = {
@@ -30,18 +31,17 @@ const labelStyle: CSSProperties = {
 const convictionStyle: CSSProperties = {
   fontFamily: "var(--font-mono)",
   fontSize: "1.1rem",
-  fontWeight: 600,
+  fontWeight: 700,
 };
 
 const thesisTextStyle: CSSProperties = {
-  fontSize: "0.85rem",
-  lineHeight: 1.6,
-  color: "var(--text-primary)",
-  marginTop: "4px",
-  padding: "12px",
+  fontSize: "0.88rem",
+  lineHeight: 1.7,
+  color: "var(--text-secondary)",
+  padding: "14px 16px",
   background: "var(--bg-sunken)",
   borderRadius: "8px",
-  borderLeft: "3px solid var(--color-gold)",
+  borderLeft: "3px solid var(--color-blue)",
 };
 
 interface Props {
@@ -49,10 +49,9 @@ interface Props {
 }
 
 export function PredictionPanel({ prediction }: Props) {
+  const confidence = prediction.confidence ?? 0;
   const confidenceColor =
-    (prediction.confidence ?? 0) >= 0.7
-      ? "var(--color-gold)"
-      : "var(--text-primary)";
+    confidence >= 0.7 ? "var(--color-red)" : "var(--text-muted)";
 
   return (
     <div style={panelStyle}>
