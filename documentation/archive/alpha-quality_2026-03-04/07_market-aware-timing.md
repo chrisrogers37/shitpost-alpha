@@ -355,6 +355,7 @@ Add a new method `fetch_intraday_prices` after the existing `fetch_prices` metho
                 # Store the bar date (not the intraday timestamp) for RawPriceRecord
                 bar_date = bar_dt.date() if hasattr(bar_dt, 'date') else bar_dt
 
+                # REVISED (challenge round): bar_datetime is a formal optional field on RawPriceRecord
                 record = RawPriceRecord(
                     symbol=symbol,
                     date=bar_date,
@@ -365,9 +366,8 @@ Add a new method `fetch_intraday_prices` after the existing `fetch_prices` metho
                     volume=int(row['Volume']) if 'Volume' in row and row['Volume'] is not None else None,
                     adjusted_close=None,
                     source="yfinance_intraday",
+                    bar_datetime=bar_dt,
                 )
-                # Attach the full bar timestamp as a custom attribute
-                record.bar_datetime = bar_dt
                 records.append(record)
 
             return records
@@ -804,9 +804,11 @@ class OutcomeCalculator:
         return self
 ```
 
-#### 6c. Add `_get_source_datetime` method
+#### 6c. Add `_get_source_datetime` method and refactor `_get_source_date`
 
-Add this new method after `_get_source_date` (after line 460):
+**REVISED (challenge round):** Make `_get_source_datetime` the primary method. Refactor `_get_source_date` to call `_get_source_datetime(pred).date()` so there is one source of truth for timestamp extraction logic.
+
+Add this new method after `_get_source_date` (after line 460), then update `_get_source_date` to delegate to it:
 
 ```python
     def _get_source_datetime(self, prediction) -> Optional[datetime]:
@@ -1731,7 +1733,7 @@ Add under `## [Unreleased]`:
 
 **Impact on dashboard**: The dashboard queries reference `return_t7`, `correct_t7`, etc. These column names are unchanged. The dashboard will seamlessly display outcomes calculated under either regime. Over time, as old outcomes age out and new trading-day outcomes accumulate, the metrics will become more accurate.
 
-**Recommendation**: After deploying this phase, consider running `calculate-outcomes --force --days-back 90` to recalculate recent outcomes using trading-day logic. This is optional and costs nothing (no API calls for already-stored prices).
+**Requirement**: After deploying this phase, run `calculate-outcomes --force` to retroactively recalculate ALL historical outcomes using trading-day logic. This ensures consistency — no mixing of calendar-day and trading-day regimes. This costs nothing (no API calls for already-stored prices).
 
 ---
 
@@ -1768,6 +1770,6 @@ Add under `## [Unreleased]`:
 
 6. **Do NOT add the new intraday columns to dashboard queries yet**. This phase focuses on data capture and outcome calculation. Dashboard integration for `return_same_day` and `return_1h` should be a separate phase to keep the PR focused.
 
-7. **Do NOT use `bar_datetime` as a formal field on `RawPriceRecord`**. It is attached as a dynamic attribute because `RawPriceRecord` is a frozen-like dataclass designed for daily prices. Changing its schema would break the `PriceProvider` interface contract.
+7. ~~**Do NOT use `bar_datetime` as a formal field on `RawPriceRecord`**.~~ **REVISED (challenge round):** Add `bar_datetime: Optional[datetime] = None` as a formal optional field on `RawPriceRecord`. This is backward compatible (defaults to None), type-safe, and self-documenting. All existing code that creates RawPriceRecord without bar_datetime still works. The dynamic attribute approach was fragile.
 
 8. **Do NOT forget to handle the `post_datetime=None` case in `_calculate_single_outcome`**. If the post datetime is unavailable (legacy predictions), the intraday block must be entirely skipped. Never pass `None` to `fetch_intraday_snapshot`.

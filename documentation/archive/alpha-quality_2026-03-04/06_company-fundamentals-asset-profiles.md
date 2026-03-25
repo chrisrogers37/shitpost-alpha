@@ -25,7 +25,7 @@ This phase closes that gap by:
 3. Auto-populating fundamentals when tickers are registered
 4. Displaying company profiles on the asset detail page
 5. Adding sector badges and filtering to the screener
-6. Providing a CLI command for batch population
+6. ~~Providing a CLI command for batch population~~ **TRIMMED (challenge round):** Auto-populate hook handles new tickers. For existing tickers, use a one-time script in PR description.
 
 ---
 
@@ -590,7 +590,11 @@ __all__ = [
 
 ---
 
-### Step 5: Add CLI Command for Batch Population
+### ~~Step 5: Add CLI Command for Batch Population~~ — TRIMMED (challenge round)
+
+**This step has been removed.** The auto-populate hook (Step 3) handles new tickers automatically. For existing tickers, include a one-time population script in the PR description using `FundamentalsProvider().update_all_fundamentals(force=True)` via `python -c "..."`. No formal CLI command needed.
+
+### Original Step 5 (preserved for reference, DO NOT IMPLEMENT):
 
 **File:** `/Users/chris/Projects/shitpost-alpha/shit/market_data/cli.py`
 

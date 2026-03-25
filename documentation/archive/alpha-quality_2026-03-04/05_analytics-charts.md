@@ -681,6 +681,14 @@ Insert the following block between line 140 and line 141 (after the screener car
                                                     ],
                                                     className="g-3 align-items-end",
                                                 ),
+                                                # REVISED (challenge round): "Run Backtest" button instead of live slider updates
+                                                dbc.Button(
+                                                    "Run Backtest",
+                                                    id="backtest-run-btn",
+                                                    color="primary",
+                                                    size="sm",
+                                                    className="mt-2",
+                                                ),
                                             ],
                                             id="backtest-controls-container",
                                             style={"display": "none", "marginBottom": "16px"},
@@ -868,8 +876,9 @@ def register_analytics_callbacks(app: Dash) -> None:
             Input("analytics-tabs", "active_tab"),
             Input("selected-period", "data"),
             Input("collapse-analytics", "is_open"),
-            Input("backtest-capital-input", "value"),
-            Input("backtest-confidence-slider", "value"),
+            Input("backtest-run-btn", "n_clicks"),  # REVISED (challenge round): button instead of live slider Input
+            State("backtest-capital-input", "value"),  # State, not Input — only reads on button click
+            State("backtest-confidence-slider", "value"),  # State, not Input
         ],
     )
     def update_analytics_chart(
