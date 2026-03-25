@@ -1,16 +1,16 @@
-/** Design tokens — hyper-American patriotic finance theme. */
+/** Design tokens — Stars & Stripes American finance theme. */
 
 export const colors = {
-  bgPage: "#0B1215",
-  bgCard: "#141E22",
-  bgSunken: "#0E1719",
-  money: "#85BB65",
+  bgPage: "#0A0E1A",
+  bgCard: "#111827",
+  bgSunken: "#0D1117",
+  money: "#22C55E",
   gold: "#FFD700",
-  navy: "#002868",
-  red: "#B22234",
-  textPrimary: "#F5F1E8",
-  textMuted: "#8B9A7E",
-  border: "#2A3A2E",
+  navy: "#1E3A5F",
+  red: "#DC2626",
+  textPrimary: "#F8FAFC",
+  textMuted: "#94A3B8",
+  border: "#1E3050",
 } as const;
 
 export const fonts = {

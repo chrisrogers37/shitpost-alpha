@@ -59,7 +59,13 @@ if os.path.isdir(_frontend_dir):
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
-        """SPA fallback — serve index.html for all non-API routes."""
+        """Serve static files from dist/, fall back to index.html for SPA routing."""
+        # Serve actual files (eagle.svg, favicon, etc.) if they exist
+        if full_path:
+            file_path = os.path.join(_frontend_dir, full_path)
+            if os.path.isfile(file_path):
+                return FileResponse(file_path)
+        # SPA fallback — serve index.html for client-side routing
         index = os.path.join(_frontend_dir, "index.html")
         if os.path.isfile(index):
             return FileResponse(index)

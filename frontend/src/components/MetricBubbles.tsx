@@ -57,14 +57,14 @@ export function MetricBubbles({ outcome }: Props) {
           const bgColor = isPending
             ? "var(--bg-sunken)"
             : isPositive
-              ? "rgba(133, 187, 101, 0.12)"
-              : "rgba(178, 34, 52, 0.12)";
+              ? "rgba(34, 197, 94, 0.12)"
+              : "rgba(220, 38, 38, 0.12)";
 
           const borderColor = isPending
             ? "var(--border)"
             : isPositive
-              ? "rgba(133, 187, 101, 0.3)"
-              : "rgba(178, 34, 52, 0.3)";
+              ? "rgba(34, 197, 94, 0.3)"
+              : "rgba(220, 38, 38, 0.3)";
 
           const textColor = isPending
             ? "var(--text-muted)"

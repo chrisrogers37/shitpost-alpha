@@ -21,9 +21,9 @@ const options: { label: string; value: Timeframe }[] = [
 ];
 
 export const timeframeToDays: Record<Timeframe, number> = {
-  "1d": 5,
-  "7d": 14,
-  "30d": 45,
+  "1d": 7,
+  "7d": 30,
+  "30d": 90,
 };
 
 interface Props {

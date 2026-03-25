@@ -1,4 +1,4 @@
-import { CSSProperties, useState } from "react";
+import { CSSProperties } from "react";
 import type { Prediction } from "../types/api";
 import { formatConfidence } from "../utils/format";
 
@@ -32,25 +32,15 @@ const convictionStyle: CSSProperties = {
   fontWeight: 600,
 };
 
-const thesisToggle: CSSProperties = {
-  background: "none",
-  border: "none",
-  color: "var(--text-muted)",
-  fontSize: "0.8rem",
-  cursor: "pointer",
-  padding: "8px 0 0",
-  textDecoration: "underline",
-  textUnderlineOffset: "2px",
-};
-
-const thesisText: CSSProperties = {
+const thesisTextStyle: CSSProperties = {
   fontSize: "0.85rem",
   lineHeight: 1.6,
-  color: "var(--text-muted)",
-  marginTop: "8px",
+  color: "var(--text-primary)",
+  marginTop: "4px",
   padding: "12px",
   background: "var(--bg-sunken)",
   borderRadius: "8px",
+  borderLeft: "3px solid var(--color-gold)",
 };
 
 interface Props {
@@ -58,8 +48,6 @@ interface Props {
 }
 
 export function PredictionPanel({ prediction }: Props) {
-  const [showThesis, setShowThesis] = useState(false);
-
   const confidenceColor =
     (prediction.confidence ?? 0) >= 0.7
       ? "var(--color-gold)"
@@ -75,15 +63,7 @@ export function PredictionPanel({ prediction }: Props) {
       </div>
 
       {prediction.thesis && (
-        <>
-          <button
-            style={thesisToggle}
-            onClick={() => setShowThesis(!showThesis)}
-          >
-            {showThesis ? "Hide thesis" : "Read full thesis"}
-          </button>
-          {showThesis && <div style={thesisText}>{prediction.thesis}</div>}
-        </>
+        <div style={thesisTextStyle}>{prediction.thesis}</div>
       )}
     </div>
   );

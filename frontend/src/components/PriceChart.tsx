@@ -51,32 +51,32 @@ export function PriceChart({ symbol, days, postTimestamp }: Props) {
       height: 300,
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "#8B9A7E",
+        textColor: "#94A3B8",
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: "rgba(42, 58, 46, 0.3)" },
-        horzLines: { color: "rgba(42, 58, 46, 0.3)" },
+        vertLines: { color: "rgba(30, 48, 80, 0.4)" },
+        horzLines: { color: "rgba(30, 48, 80, 0.4)" },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
       },
       rightPriceScale: {
-        borderColor: "rgba(42, 58, 46, 0.5)",
+        borderColor: "rgba(30, 48, 80, 0.6)",
       },
       timeScale: {
-        borderColor: "rgba(42, 58, 46, 0.5)",
+        borderColor: "rgba(30, 48, 80, 0.6)",
         timeVisible: false,
       },
     });
 
-    // Candlestick series
+    // Candlestick series — green up, red down
     const candleSeries = chart.addCandlestickSeries({
-      upColor: "#85BB65",
-      downColor: "#B22234",
-      wickUpColor: "#85BB65",
-      wickDownColor: "#B22234",
+      upColor: "#22C55E",
+      downColor: "#DC2626",
+      wickUpColor: "#22C55E",
+      wickDownColor: "#DC2626",
       borderVisible: false,
     });
 
@@ -106,12 +106,12 @@ export function PriceChart({ symbol, days, postTimestamp }: Props) {
         value: c.volume,
         color:
           c.close >= c.open
-            ? "rgba(133, 187, 101, 0.25)"
-            : "rgba(178, 34, 52, 0.25)",
+            ? "rgba(34, 197, 94, 0.25)"
+            : "rgba(220, 38, 38, 0.25)",
       })),
     );
 
-    // Post marker
+    // Post marker — gold arrow with "POST" label
     if (data.post_date_index != null && data.candles[data.post_date_index]) {
       const postCandle = data.candles[data.post_date_index];
       candleSeries.setMarkers([
