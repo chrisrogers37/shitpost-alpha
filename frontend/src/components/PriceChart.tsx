@@ -14,6 +14,7 @@ const containerStyle: CSSProperties = {
   overflow: "hidden",
   background: "var(--bg-card)",
   border: "1px solid var(--border)",
+  borderTop: "3px solid rgba(255, 255, 255, 0.3)",
   padding: "8px",
 };
 
@@ -56,8 +57,8 @@ export function PriceChart({ symbol, days, postTimestamp }: Props) {
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: "rgba(30, 48, 80, 0.4)" },
-        horzLines: { color: "rgba(30, 48, 80, 0.4)" },
+        vertLines: { color: "rgba(59, 130, 246, 0.12)" },
+        horzLines: { color: "rgba(59, 130, 246, 0.12)" },
       },
       crosshair: {
         mode: CrosshairMode.Normal,

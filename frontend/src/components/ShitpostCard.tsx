@@ -6,6 +6,7 @@ import { formatNumber } from "../utils/format";
 const cardStyle: CSSProperties = {
   background: "var(--bg-card)",
   border: "1px solid var(--border)",
+  borderTop: "3px solid #3B82F6",
   borderRadius: "16px",
   padding: "24px",
   position: "relative",

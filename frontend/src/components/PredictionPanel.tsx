@@ -5,6 +5,7 @@ import { formatConfidence } from "../utils/format";
 const panelStyle: CSSProperties = {
   background: "var(--bg-card)",
   border: "1px solid var(--border)",
+  borderTop: "3px solid #EF4444",
   borderRadius: "12px",
   padding: "20px",
   marginTop: "12px",
