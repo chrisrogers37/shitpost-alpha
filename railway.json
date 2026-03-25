@@ -52,10 +52,6 @@
       "startCommand": "python -m shit.market_data mature-outcomes --emit-event",
       "cronSchedule": "0 6 * * *"
     },
-    "shitpost-alpha-dash": {
-      "source": ".",
-      "startCommand": "cd shitty_ui && python app.py"
-    },
     "shitpost-alpha-web": {
       "source": ".",
       "buildCommand": "cd frontend && npm ci && npm run build",

@@ -131,15 +131,22 @@ class MarketDataClient:
             },
         )
 
-        # Check if we already have this data (unless force refresh)
+        # Check if we already have fresh data (unless force refresh)
         if not force_refresh:
             existing = self._get_existing_prices(symbol, start_date, end_date)
             if len(existing) > 0:
+                latest_date = max(r.date for r in existing)
+                # Only skip fetch if data is fresh (within 1 trading day)
+                if latest_date >= date.today() - timedelta(days=3):
+                    logger.info(
+                        f"Found {len(existing)} fresh prices for {symbol} (latest: {latest_date}), skipping fetch",
+                        extra={"symbol": symbol, "count": len(existing), "latest": str(latest_date)},
+                    )
+                    return existing
                 logger.info(
-                    f"Found {len(existing)} existing prices for {symbol}, skipping fetch",
-                    extra={"symbol": symbol, "count": len(existing)},
+                    f"Found {len(existing)} stale prices for {symbol} (latest: {latest_date}), refreshing",
+                    extra={"symbol": symbol, "count": len(existing), "latest": str(latest_date)},
                 )
-                return existing
 
         # Fetch from providers with retry logic
         raw_records = self._fetch_with_retry(symbol, start_date, end_date)
