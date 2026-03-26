@@ -40,6 +40,9 @@ def _make_prediction(**overrides):
     pred.confidence = overrides.get("confidence", 0.85)
     pred.created_at = overrides.get("created_at", datetime(2025, 6, 15, 10, 0, 0))
 
+    # Denormalized post_timestamp (None by default to test fallback paths)
+    pred.post_timestamp = overrides.get("post_timestamp", None)
+
     # Source timestamps (shitpost / signal)
     shitpost = overrides.get("shitpost", MagicMock())
     if "shitpost" not in overrides:

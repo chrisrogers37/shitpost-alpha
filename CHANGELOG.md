@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Data model remediation** — Full data model audit and remediation based on 30 findings across 10 tables
+  - 4 missing indexes on `predictions` table (`shitpost_id`, `signal_id`, `analysis_status`, `created_at`)
+  - Denormalized `post_timestamp` on `predictions` to eliminate N+1 lazy loading in OutcomeCalculator
+  - CHECK constraints: `analysis_status` enum, `confidence` range [0,1], dual-FK exclusivity
+  - UNIQUE constraint on `prediction_outcomes(prediction_id, symbol)`
+  - CHECK constraint on `ticker_registry.status` enum
+  - SQL migration scripts in `scripts/` for production deployment (001-006)
+- **Signals migration planning document** — `documentation/planning/SIGNALS_MIGRATION.md`
+  - Complete query inventory (21 queries across 6 files)
+  - Column mapping: truth_social_shitposts → signals (100% coverage)
+  - 5-phase migration strategy with rollback plan
+  - Multi-source architecture vision (Twitter, congressional filings, etc.)
+
+### Changed
+- **MarketDataClient._store_raw_records()** — Replaced N+1 per-record duplicate checks with batch query (1 SELECT total instead of N)
+- **Dashboard asset filtering** — Moved Python-side JSON asset filtering to SQL `WHERE p.assets::jsonb ? :ticker` in `load_filtered_posts()`
+
+### Removed
+- **Subscriber model** — Dead table with zero code references (SMS alerts, never activated)
+- **LLMFeedback model** — Dead table with zero code references (never activated)
+- **SIGNALS_TABLE constant** — Declared in `shitty_ui/data/base.py` but never referenced by any query
+
+### Fixed
+- **CLAUDE.md documentation drift** — `telegram_subscriptions.chat_id` documented as `bigint` but ORM uses `String(50)`
+
+### Added
 - **React + FastAPI frontend rebuild** — Complete UI redesign departing from Plotly Dash to a React + FastAPI architecture
   - New `api/` module: FastAPI backend with feed, price, and telegram webhook endpoints
   - New `frontend/` module: React 19 + TypeScript + Vite SPA with single-post-at-a-time feed experience

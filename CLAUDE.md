@@ -326,12 +326,12 @@ python -m shitposts --mode backfill --from 2024-01-01 --to 2024-12-31
 - `asset_type`, `exchange`
 
 **`telegram_subscriptions`** - Telegram bot subscribers
-- `id`, `chat_id` (bigint, unique), `username`, `first_name`
+- `id`, `chat_id` (string(50), unique), `username`, `first_name`
 - `is_active` (boolean), `alert_preferences` (JSON)
 - `consecutive_errors` (int), `last_alert_sent_at`, `alerts_sent_count`
 
-**`subscribers`** - SMS alert subscribers (schema defined, not yet active)
-**`llm_feedback`** - LLM performance feedback (schema defined, not yet active)
+~~**`subscribers`**~~ - Removed (was SMS alerts, never activated)
+~~**`llm_feedback`**~~ - Removed (was LLM feedback, never activated)
 
 **Indexes**:
 - `signals`: (`signal_id` unique), (`source`, `published_at`)

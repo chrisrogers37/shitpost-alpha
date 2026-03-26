@@ -8,15 +8,18 @@ Note: Field names match Truth Social API structure for direct mapping.
 from datetime import datetime
 from typing import Dict, Any
 from sqlalchemy import (
+    CheckConstraint,
     Column,
+    Float,
+    ForeignKey,
+    Index,
     Integer,
+    JSON,
     String,
     Text,
     DateTime,
     Boolean,
-    Float,
-    JSON,
-    ForeignKey,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -104,6 +107,21 @@ class Prediction(Base, IDMixin, TimestampMixin):
     """Model for LLM predictions/analysis of shitposts."""
 
     __tablename__ = "predictions"
+    __table_args__ = (
+        CheckConstraint(
+            "analysis_status IN ('completed', 'bypassed', 'error', 'pending')",
+            name="ck_predictions_analysis_status",
+        ),
+        CheckConstraint(
+            "confidence IS NULL OR (confidence >= 0.0 AND confidence <= 1.0)",
+            name="ck_predictions_confidence_range",
+        ),
+        CheckConstraint(
+            "shitpost_id IS NOT NULL OR signal_id IS NOT NULL",
+            name="ck_predictions_has_content_ref",
+        ),
+    )
+
     # Legacy FK -- nullable now, will be removed after full migration
     shitpost_id = Column(
         String(255), ForeignKey("truth_social_shitposts.shitpost_id"), nullable=True
@@ -112,6 +130,9 @@ class Prediction(Base, IDMixin, TimestampMixin):
     signal_id = Column(
         String(255), ForeignKey("signals.signal_id"), nullable=True
     )
+
+    # Denormalized source post timestamp (avoids N+1 loading shitpost/signal)
+    post_timestamp = Column(DateTime(timezone=True), nullable=True)
 
     # Analysis results
     assets = Column(JSON, default=list)  # List of asset tickers
@@ -166,52 +187,6 @@ class Prediction(Base, IDMixin, TimestampMixin):
 
     def __repr__(self):
         return f"<Prediction(id={self.id}, confidence={self.confidence}, assets={self.assets})>"
-
-
-class Subscriber(Base, IDMixin, TimestampMixin):
-    """Model for SMS alert subscribers."""
-
-    __tablename__ = "subscribers"
-    phone_number = Column(String(20), unique=True, nullable=False)
-    name = Column(String(100), nullable=True)
-    email = Column(String(255), nullable=True)
-
-    # Preferences
-    is_active = Column(Boolean, default=True)
-    confidence_threshold = Column(Float, default=0.7)  # Minimum confidence for alerts
-    alert_frequency = Column(
-        String(20), default="all"
-    )  # all, high_confidence, daily_summary
-
-    # Rate limiting
-    last_alert_sent = Column(DateTime, nullable=True)
-    alerts_sent_today = Column(Integer, default=0)
-
-    def __repr__(self):
-        return f"<Subscriber(id={self.id}, phone='{self.phone_number}', active={self.is_active})>"
-
-
-class LLMFeedback(Base, IDMixin, TimestampMixin):
-    """Model for storing LLM performance feedback on shitpost analysis."""
-
-    __tablename__ = "llm_feedback"
-    prediction_id = Column(
-        Integer, ForeignKey("predictions.id"), nullable=False
-    )  # Foreign key to Prediction
-
-    # Feedback data
-    feedback_type = Column(
-        String(50), nullable=False
-    )  # accuracy, relevance, confidence
-    feedback_score = Column(Float, nullable=False)  # 0.0-1.0 score
-    feedback_notes = Column(Text, nullable=True)  # Human feedback notes
-
-    # Metadata
-    feedback_source = Column(String(50), default="system")  # system, human, automated
-    feedback_timestamp = Column(DateTime, default=datetime.utcnow)
-
-    def __repr__(self):
-        return f"<LLMFeedback(id={self.id}, type='{self.feedback_type}', score={self.feedback_score})>"
 
 
 class TelegramSubscription(Base, IDMixin, TimestampMixin):
@@ -291,5 +266,13 @@ def shitpost_to_dict(shitpost: TruthSocialShitpost) -> Dict[str, Any]:
 def prediction_to_dict(prediction: Prediction) -> Dict[str, Any]:
     """Convert Prediction to dictionary."""
     return model_to_dict(prediction)
+
+
+# Indexes for efficient querying on predictions table
+# PostgreSQL does NOT auto-index FK columns — only the referenced key gets one
+Index("idx_predictions_shitpost_id", Prediction.shitpost_id)
+Index("idx_predictions_signal_id", Prediction.signal_id)
+Index("idx_predictions_analysis_status", Prediction.analysis_status)
+Index("idx_predictions_created_at", Prediction.created_at)
 
 

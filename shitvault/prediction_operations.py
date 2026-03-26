@@ -56,10 +56,18 @@ class PredictionOperations:
                 if favourites > 0:
                     viral_score = reblogs / favourites
             
+            # Extract source post timestamp for denormalization
+            post_ts = None
+            if content_data:
+                post_ts = DatabaseUtils.parse_timestamp(
+                    content_data.get('timestamp') or content_data.get('published_at')
+                )
+
             prediction = Prediction(
                 # Dual-FK: set whichever is appropriate
                 shitpost_id=content_id if not use_signal else None,
                 signal_id=content_id if use_signal else None,
+                post_timestamp=post_ts,
                 assets=analysis_data.get('assets', []),
                 market_impact=analysis_data.get('market_impact', {}),
                 confidence=analysis_data.get('confidence', 0.0),
@@ -132,10 +140,16 @@ class PredictionOperations:
 
             reason = str(bypass_reason) if bypass_reason else "Content not analyzable"
 
+            # Extract source post timestamp for denormalization
+            post_ts = DatabaseUtils.parse_timestamp(
+                content_data.get('timestamp') or content_data.get('published_at')
+            )
+
             prediction = Prediction(
                 # Dual-FK: set whichever is appropriate
                 shitpost_id=content_id if not use_signal else None,
                 signal_id=content_id if use_signal else None,
+                post_timestamp=post_ts,
                 analysis_status='bypassed',
                 analysis_comment=reason,
                 # Set minimal required fields for bypassed posts

@@ -139,24 +139,19 @@ def load_filtered_posts(
         else:
             params["date_to_plus_one"] = date_to + timedelta(days=1)
 
+    if assets_filter:
+        # Filter by asset tickers in SQL using jsonb containment
+        placeholders = " OR ".join(
+            f"p.assets::jsonb ? :asset_{i}" for i in range(len(assets_filter))
+        )
+        query = text(str(query) + f" AND ({placeholders})")
+        for i, asset in enumerate(assets_filter):
+            params[f"asset_{i}"] = asset
+
     query = text(str(query) + " ORDER BY tss.timestamp DESC LIMIT :limit")
 
     rows, columns = _base.execute_query(query, params)
     df = pd.DataFrame(rows, columns=columns)
-
-    # Post-process asset filtering (since it's JSON, easier to do in Python)
-    if assets_filter and not df.empty:
-
-        def has_asset(assets_json, target_assets):
-            if pd.isna(assets_json) or not assets_json:
-                return False
-            try:
-                assets = assets_json if isinstance(assets_json, list) else []
-                return any(asset in assets for asset in target_assets)
-            except (TypeError, ValueError):
-                return False
-
-        df = df[df["assets"].apply(lambda x: has_asset(x, assets_filter))]
 
     return df
 

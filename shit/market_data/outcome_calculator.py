@@ -641,6 +641,14 @@ class OutcomeCalculator:
         Returns:
             Timezone-aware datetime (UTC), or None.
         """
+        # Prefer denormalized post_timestamp (avoids N+1 lazy loading)
+        if getattr(prediction, 'post_timestamp', None):
+            ts = prediction.post_timestamp
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            return ts
+
+        # Fallback: traverse ORM relationships (legacy path)
         # Truth Social shitpost timestamp
         try:
             if prediction.shitpost and prediction.shitpost.timestamp:

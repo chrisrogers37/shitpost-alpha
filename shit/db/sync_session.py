@@ -72,8 +72,6 @@ def create_tables():
     from shitvault.shitpost_models import (
         TruthSocialShitpost,
         Prediction,
-        Subscriber,
-        LLMFeedback,
         TelegramSubscription,
     )
     from shit.market_data.models import MarketPrice, PredictionOutcome, TickerRegistry
