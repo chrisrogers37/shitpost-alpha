@@ -241,8 +241,10 @@ logs/
 secrets.json
 config/secrets.json
 
-# Claude Code local settings (user-specific)
+# Claude Code local settings and temp worktrees
 .claude/settings.local.json
+.claude/worktrees/
+.claude/plans/
 
 # Frontend build artifacts
 node_modules/
