@@ -11,7 +11,9 @@
   --text-primary: #0F172A;
   --text-secondary: #334155;
   --text-muted: #64748B;
+  --text-faint: #94A3B8;
   --border: #CBD5E1;
+  --border-light: #E2E8F0;
 
   --font-display: 'Oswald', 'Bebas Neue', sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -49,7 +51,7 @@ body {
 /* Patriotic divider */
 .patriotic-divider {
   height: 4px;
-  background: linear-gradient(90deg, #DC2626 0%, #DC2626 33%, #1E3A5F 33%, #1E3A5F 66%, #2563EB 66%, #2563EB 100%);
+  background: linear-gradient(90deg, var(--color-red) 0%, var(--color-red) 33%, var(--color-navy) 33%, var(--color-navy) 66%, var(--color-blue) 66%, var(--color-blue) 100%);
   border-radius: 2px;
 }
 

@@ -4,36 +4,39 @@ Fetches live OHLCV data from yfinance for fresh charts.
 Falls back to the market_prices database table if yfinance fails.
 """
 
+import time
 from datetime import datetime, timedelta, date
 from typing import Any, Optional
 
-import yfinance as yf
-
 from api.dependencies import execute_query, logger
+
+# TTL cache: avoid hammering yfinance on repeated requests
+_price_cache: dict[tuple[str, int], tuple[list[dict[str, Any]], float]] = {}
+_CACHE_TTL = 300  # 5 minutes
 
 
 def _fetch_from_yfinance(symbol: str, start: date, end: date) -> list[dict[str, Any]]:
-    """Fetch OHLCV candles directly from yfinance."""
-    ticker = yf.Ticker(symbol)
-    hist = ticker.history(start=start, end=end + timedelta(days=1))
+    """Fetch OHLCV candles via the existing YFinanceProvider."""
+    from shit.market_data.yfinance_provider import YFinanceProvider
+    from shit.market_data.price_provider import ProviderError
 
-    if hist.empty:
-        return []
-
-    candles = []
-    for idx, row in hist.iterrows():
-        price_date = idx.date() if hasattr(idx, "date") else idx
-        candles.append(
+    try:
+        provider = YFinanceProvider()
+        records = provider.fetch_prices(symbol, start, end)
+        return [
             {
-                "date": str(price_date),
-                "open": float(row["Open"]) if row["Open"] is not None else 0,
-                "high": float(row["High"]) if row["High"] is not None else 0,
-                "low": float(row["Low"]) if row["Low"] is not None else 0,
-                "close": float(row["Close"]) if row["Close"] is not None else 0,
-                "volume": int(row["Volume"]) if row["Volume"] is not None else 0,
+                "date": str(r.date),
+                "open": float(r.open) if r.open is not None else 0,
+                "high": float(r.high) if r.high is not None else 0,
+                "low": float(r.low) if r.low is not None else 0,
+                "close": float(r.close) if r.close is not None else 0,
+                "volume": int(r.volume) if r.volume is not None else 0,
             }
-        )
-    return candles
+            for r in records
+        ]
+    except ProviderError as e:
+        logger.warning(f"YFinanceProvider failed for {symbol}: {e}")
+        return []
 
 
 def _fetch_from_database(symbol: str, start: date) -> list[dict[str, Any]]:
@@ -48,19 +51,42 @@ def _fetch_from_database(symbol: str, start: date) -> list[dict[str, Any]]:
         query, {"symbol": symbol.upper(), "start_date": start}
     )
 
-    candles = []
-    for row in rows:
-        row_dict = dict(zip(columns, row))
-        candles.append(
-            {
-                "date": str(row_dict["date"]),
-                "open": float(row_dict["open"]) if row_dict["open"] is not None else 0,
-                "high": float(row_dict["high"]) if row_dict["high"] is not None else 0,
-                "low": float(row_dict["low"]) if row_dict["low"] is not None else 0,
-                "close": float(row_dict["close"]) if row_dict["close"] is not None else 0,
-                "volume": int(row_dict["volume"]) if row_dict["volume"] is not None else 0,
-            }
+    return [
+        {
+            "date": str(row_dict["date"]),
+            "open": float(row_dict["open"]) if row_dict["open"] is not None else 0,
+            "high": float(row_dict["high"]) if row_dict["high"] is not None else 0,
+            "low": float(row_dict["low"]) if row_dict["low"] is not None else 0,
+            "close": float(row_dict["close"]) if row_dict["close"] is not None else 0,
+            "volume": int(row_dict["volume"]) if row_dict["volume"] is not None else 0,
+        }
+        for row_dict in (dict(zip(columns, row)) for row in rows)
+    ]
+
+
+def _get_candles(symbol: str, days: int) -> list[dict[str, Any]]:
+    """Get candles with TTL caching. Tries yfinance first, DB fallback."""
+    cache_key = (symbol.upper(), days)
+    now = time.time()
+
+    if cache_key in _price_cache:
+        cached_candles, cached_at = _price_cache[cache_key]
+        if now - cached_at < _CACHE_TTL:
+            return cached_candles
+
+    start_date = (datetime.now() - timedelta(days=days)).date()
+    end_date = datetime.now().date()
+
+    candles = _fetch_from_yfinance(symbol.upper(), start_date, end_date)
+    if candles:
+        logger.info(
+            f"Fetched {len(candles)} candles from yfinance for {symbol}",
+            extra={"symbol": symbol, "count": len(candles)},
         )
+    else:
+        candles = _fetch_from_database(symbol.upper(), start_date)
+
+    _price_cache[cache_key] = (candles, now)
     return candles
 
 
@@ -71,27 +97,10 @@ def get_price_data(
 ) -> dict[str, Any]:
     """Get OHLCV candle data for a symbol with live yfinance data.
 
-    Fetches directly from yfinance for fresh data. Falls back to the
-    market_prices database if yfinance is unavailable.
+    Fetches directly from yfinance for fresh data (with 5-min TTL cache).
+    Falls back to the market_prices database if yfinance is unavailable.
     """
-    start_date = (datetime.now() - timedelta(days=days)).date()
-    end_date = datetime.now().date()
-
-    # Try yfinance first for live data
-    try:
-        candles = _fetch_from_yfinance(symbol.upper(), start_date, end_date)
-        if candles:
-            logger.info(
-                f"Fetched {len(candles)} candles from yfinance for {symbol}",
-                extra={"symbol": symbol, "count": len(candles)},
-            )
-    except Exception as e:
-        logger.warning(f"yfinance failed for {symbol}, falling back to DB: {e}")
-        candles = []
-
-    # Fall back to database if yfinance returned nothing
-    if not candles:
-        candles = _fetch_from_database(symbol.upper(), start_date)
+    candles = _get_candles(symbol, days)
 
     # Find the candle index closest to the post timestamp
     post_date_index = None
@@ -100,7 +109,6 @@ def get_price_data(
             post_dt = datetime.fromisoformat(post_timestamp.replace("Z", "+00:00"))
             post_date_str = str(post_dt.date())
 
-            # Find exact date match or closest trading day
             for i, candle in enumerate(candles):
                 if candle["date"] == post_date_str:
                     post_date_index = i
@@ -109,7 +117,6 @@ def get_price_data(
                     post_date_index = max(0, i - 1) if i > 0 else 0
                     break
 
-            # If post date is after all candles (data gap), use last candle
             if post_date_index is None and candles:
                 post_date_index = len(candles) - 1
         except (ValueError, TypeError) as e:

@@ -62,8 +62,8 @@ if os.path.isdir(_frontend_dir):
         """Serve static files from dist/, fall back to index.html for SPA routing."""
         # Serve actual files (eagle.svg, favicon, etc.) if they exist
         if full_path:
-            file_path = os.path.join(_frontend_dir, full_path)
-            if os.path.isfile(file_path):
+            file_path = os.path.realpath(os.path.join(_frontend_dir, full_path))
+            if file_path.startswith(os.path.realpath(_frontend_dir)) and os.path.isfile(file_path):
                 return FileResponse(file_path)
         # SPA fallback — serve index.html for client-side routing
         index = os.path.join(_frontend_dir, "index.html")

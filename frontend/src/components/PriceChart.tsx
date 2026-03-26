@@ -7,13 +7,14 @@ import {
   type IChartApi,
 } from "lightweight-charts";
 import { usePriceData } from "../api/hooks";
+import { colors } from "../styles/theme";
 
 const containerStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "12px",
   overflow: "hidden",
-  background: "#FFFFFF",
-  border: "1px solid #CBD5E1",
+  background: "var(--bg-card)",
+  border: "1px solid var(--border)",
   padding: "8px",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
@@ -23,7 +24,7 @@ const loadingStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  color: "#64748B",
+  color: "var(--text-muted)",
   fontSize: "0.85rem",
 };
 
@@ -50,32 +51,32 @@ export function PriceChart({ symbol, days, postTimestamp }: Props) {
       width: containerRef.current.clientWidth,
       height: 300,
       layout: {
-        background: { type: ColorType.Solid, color: "#FFFFFF" },
-        textColor: "#64748B",
+        background: { type: ColorType.Solid, color: colors.bgCard },
+        textColor: colors.textMuted,
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: "#F1F5F9" },
-        horzLines: { color: "#F1F5F9" },
+        vertLines: { color: colors.gridLine },
+        horzLines: { color: colors.gridLine },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
       },
       rightPriceScale: {
-        borderColor: "#E2E8F0",
+        borderColor: colors.borderLight,
       },
       timeScale: {
-        borderColor: "#E2E8F0",
+        borderColor: colors.borderLight,
         timeVisible: false,
       },
     });
 
     const candleSeries = chart.addCandlestickSeries({
-      upColor: "#16A34A",
-      downColor: "#DC2626",
-      wickUpColor: "#16A34A",
-      wickDownColor: "#DC2626",
+      upColor: colors.money,
+      downColor: colors.red,
+      wickUpColor: colors.money,
+      wickDownColor: colors.red,
       borderVisible: false,
     });
 
@@ -104,19 +105,19 @@ export function PriceChart({ symbol, days, postTimestamp }: Props) {
         value: c.volume,
         color:
           c.close >= c.open
-            ? "rgba(22, 163, 74, 0.2)"
-            : "rgba(220, 38, 38, 0.2)",
+            ? `${colors.money}33`
+            : `${colors.red}33`,
       })),
     );
 
-    // Post marker — red arrow
+    // Post marker
     if (data.post_date_index != null && data.candles[data.post_date_index]) {
       const postCandle = data.candles[data.post_date_index];
       candleSeries.setMarkers([
         {
           time: postCandle.date,
           position: "aboveBar",
-          color: "#DC2626",
+          color: colors.red,
           shape: "arrowDown",
           text: "POST",
         },

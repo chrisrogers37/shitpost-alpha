@@ -134,10 +134,10 @@ class MarketDataClient:
         # Check if we already have fresh data (unless force refresh)
         if not force_refresh:
             existing = self._get_existing_prices(symbol, start_date, end_date)
-            if len(existing) > 0:
-                latest_date = max(r.date for r in existing)
-                # Only skip fetch if data is fresh (within 1 trading day)
-                if latest_date >= date.today() - timedelta(days=3):
+            if existing:
+                latest_date = existing[-1].date  # already sorted ASC by query
+                staleness_days = settings.MARKET_DATA_STALENESS_THRESHOLD_HOURS // 24
+                if latest_date >= date.today() - timedelta(days=staleness_days):
                     logger.info(
                         f"Found {len(existing)} fresh prices for {symbol} (latest: {latest_date}), skipping fetch",
                         extra={"symbol": symbol, "count": len(existing), "latest": str(latest_date)},

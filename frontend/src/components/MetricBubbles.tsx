@@ -55,22 +55,22 @@ export function MetricBubbles({ outcome }: Props) {
           const isPending = ret == null;
 
           const bgColor = isPending
-            ? "#F8FAFC"
+            ? "var(--bg-sunken)"
             : isPositive
               ? "rgba(22, 163, 74, 0.08)"
               : "rgba(220, 38, 38, 0.08)";
 
           const borderColor = isPending
-            ? "#E2E8F0"
+            ? "var(--border-light)"
             : isPositive
               ? "rgba(22, 163, 74, 0.3)"
               : "rgba(220, 38, 38, 0.3)";
 
           const textColor = isPending
-            ? "#94A3B8"
+            ? "var(--text-faint)"
             : isPositive
-              ? "#16A34A"
-              : "#DC2626";
+              ? "var(--color-money)"
+              : "var(--color-red)";
 
           const bubbleStyle: CSSProperties = {
             background: bgColor,
@@ -88,7 +88,7 @@ export function MetricBubbles({ outcome }: Props) {
                 style={{
                   fontSize: "0.65rem",
                   fontWeight: 600,
-                  color: "#94A3B8",
+                  color: "var(--text-faint)",
                   letterSpacing: "0.05em",
                   marginBottom: "4px",
                 }}
@@ -121,14 +121,14 @@ export function MetricBubbles({ outcome }: Props) {
                   style={{
                     fontSize: "0.65rem",
                     marginTop: "4px",
-                    color: correct ? "#16A34A" : "#DC2626",
+                    color: correct ? "var(--color-money)" : "var(--color-red)",
                   }}
                 >
                   {correct ? "\u2713 Correct" : "\u2717 Wrong"}
                 </div>
               )}
               {isPending && (
-                <div style={{ fontSize: "0.6rem", marginTop: "4px", color: "#2563EB" }}>
+                <div style={{ fontSize: "0.6rem", marginTop: "4px", color: "var(--color-blue)" }}>
                   Pending
                 </div>
               )}

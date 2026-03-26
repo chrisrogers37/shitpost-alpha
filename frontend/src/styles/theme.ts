@@ -11,7 +11,10 @@ export const colors = {
   textPrimary: "#0F172A",
   textSecondary: "#334155",
   textMuted: "#64748B",
+  textFaint: "#94A3B8",
   border: "#CBD5E1",
+  borderLight: "#E2E8F0",
+  gridLine: "#F1F5F9",
 } as const;
 
 export const fonts = {
