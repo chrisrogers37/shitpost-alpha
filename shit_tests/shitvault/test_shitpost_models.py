@@ -10,11 +10,10 @@ from sqlalchemy import inspect
 from shitvault.shitpost_models import (
     TruthSocialShitpost,
     Prediction,
-    Subscriber,
-    LLMFeedback,
     shitpost_to_dict,
     prediction_to_dict,
 )
+from shitvault.signal_models import Signal  # noqa: F401 — needed for Prediction.signal relationship
 from shit.db.data_models import Base
 
 
@@ -338,160 +337,6 @@ class TestPrediction:
         assert len(shitpost_id_col.foreign_keys) > 0
 
 
-class TestSubscriber:
-    """Test cases for Subscriber model."""
-
-    def test_model_creation(self):
-        """Test creating a Subscriber instance."""
-        subscriber = Subscriber(
-            phone_number="+1234567890",
-            name="John Doe",
-            email="john@example.com"
-        )
-        
-        assert subscriber.phone_number == "+1234567890"
-        assert subscriber.name == "John Doe"
-        assert subscriber.email == "john@example.com"
-
-    def test_model_with_default_settings(self):
-        """Test model with default settings."""
-        subscriber = Subscriber(
-            phone_number="+1234567890",
-            is_active=True,
-            confidence_threshold=0.7,
-            alert_frequency="all",
-            alerts_sent_today=0
-        )
-        
-        # SQLAlchemy defaults don't apply until persisted
-        assert subscriber.phone_number == "+1234567890"
-        assert subscriber.is_active is True
-        assert subscriber.confidence_threshold == 0.7
-        assert subscriber.alert_frequency == "all"
-
-    def test_model_with_preferences(self):
-        """Test model with custom preferences."""
-        subscriber = Subscriber(
-            phone_number="+1234567890",
-            confidence_threshold=0.85,
-            alert_frequency="high_confidence"
-        )
-        
-        assert subscriber.confidence_threshold == 0.85
-        assert subscriber.alert_frequency == "high_confidence"
-
-    def test_model_with_rate_limiting(self):
-        """Test model with rate limiting data."""
-        last_alert = datetime(2024, 1, 15, 12, 0, 0)
-        subscriber = Subscriber(
-            phone_number="+1234567890",
-            last_alert_sent=last_alert,
-            alerts_sent_today=5
-        )
-        
-        assert subscriber.last_alert_sent == last_alert
-        assert subscriber.alerts_sent_today == 5
-
-    def test_model_inactive_subscriber(self):
-        """Test model with inactive subscriber."""
-        subscriber = Subscriber(
-            phone_number="+1234567890",
-            is_active=False
-        )
-        
-        assert subscriber.is_active is False
-
-    def test_model_repr(self):
-        """Test model string representation."""
-        subscriber = Subscriber(
-            phone_number="+1234567890",
-            is_active=True
-        )
-        
-        repr_str = repr(subscriber)
-        assert "Subscriber" in repr_str
-        assert "+1234567890" in repr_str
-
-    def test_table_name(self):
-        """Test correct table name."""
-        assert Subscriber.__tablename__ == "subscribers"
-
-    def test_phone_number_unique_constraint(self):
-        """Test that phone_number has unique constraint."""
-        mapper = inspect(Subscriber)
-        phone_col = mapper.columns['phone_number']
-        assert phone_col.unique is True
-
-
-class TestLLMFeedback:
-    """Test cases for LLMFeedback model."""
-
-    def test_model_creation(self):
-        """Test creating an LLMFeedback instance."""
-        feedback = LLMFeedback(
-            prediction_id=1,
-            feedback_type="accuracy",
-            feedback_score=0.90,
-            feedback_notes="Prediction was highly accurate"
-        )
-        
-        assert feedback.prediction_id == 1
-        assert feedback.feedback_type == "accuracy"
-        assert feedback.feedback_score == 0.90
-        assert feedback.feedback_notes == "Prediction was highly accurate"
-
-    def test_model_with_default_source(self):
-        """Test model with default feedback source."""
-        feedback = LLMFeedback(
-            prediction_id=1,
-            feedback_type="relevance",
-            feedback_score=0.75,
-            feedback_source="system"
-        )
-        
-        # SQLAlchemy defaults don't apply until persisted
-        assert feedback.prediction_id == 1
-        assert feedback.feedback_type == "relevance"
-        assert feedback.feedback_score == 0.75
-        assert feedback.feedback_source == "system"
-
-    def test_model_with_human_feedback(self):
-        """Test model with human feedback source."""
-        feedback = LLMFeedback(
-            prediction_id=1,
-            feedback_type="confidence",
-            feedback_score=0.85,
-            feedback_source="human",
-            feedback_notes="Manual review confirmed accuracy"
-        )
-        
-        assert feedback.feedback_source == "human"
-        assert feedback.feedback_notes == "Manual review confirmed accuracy"
-
-    def test_model_repr(self):
-        """Test model string representation."""
-        feedback = LLMFeedback(
-            prediction_id=1,
-            feedback_type="accuracy",
-            feedback_score=0.90
-        )
-        
-        repr_str = repr(feedback)
-        assert "LLMFeedback" in repr_str
-        assert "accuracy" in repr_str
-
-    def test_table_name(self):
-        """Test correct table name."""
-        assert LLMFeedback.__tablename__ == "llm_feedback"
-
-    def test_foreign_key_constraint(self):
-        """Test that prediction_id has foreign key constraint."""
-        mapper = inspect(LLMFeedback)
-        prediction_id_col = mapper.columns['prediction_id']
-        assert prediction_id_col.foreign_keys is not None
-        assert len(prediction_id_col.foreign_keys) > 0
-
-
 class TestUtilityFunctions:
     """Test cases for utility functions."""
 
@@ -568,19 +413,4 @@ class TestModelInheritance:
         assert 'created_at' in mapper.columns.keys()
         assert 'updated_at' in mapper.columns.keys()
 
-    def test_subscriber_inherits_mixins(self):
-        """Test Subscriber inherits from Base, IDMixin, TimestampMixin."""
-        assert issubclass(Subscriber, Base)
-        mapper = inspect(Subscriber)
-        assert 'id' in mapper.columns.keys()
-        assert 'created_at' in mapper.columns.keys()
-        assert 'updated_at' in mapper.columns.keys()
-
-    def test_llm_feedback_inherits_mixins(self):
-        """Test LLMFeedback inherits from Base, IDMixin, TimestampMixin."""
-        assert issubclass(LLMFeedback, Base)
-        mapper = inspect(LLMFeedback)
-        assert 'id' in mapper.columns.keys()
-        assert 'created_at' in mapper.columns.keys()
-        assert 'updated_at' in mapper.columns.keys()
 

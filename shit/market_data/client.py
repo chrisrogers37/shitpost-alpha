@@ -236,21 +236,35 @@ class MarketDataClient:
         records: List[RawPriceRecord],
         force_refresh: bool = False,
     ) -> List[MarketPrice]:
-        """Convert RawPriceRecord objects to MarketPrice ORM objects and store."""
+        """Convert RawPriceRecord objects to MarketPrice ORM objects and store.
+
+        Uses batch duplicate detection instead of per-record queries to avoid
+        N+1 pattern (was 1 SELECT per record, now 1 SELECT total).
+        """
+        if not records:
+            return []
+
         prices = []
 
-        for record in records:
-            # Check if price already exists
-            existing_price = (
-                self.session.query(MarketPrice)
-                .filter(
-                    and_(
-                        MarketPrice.symbol == record.symbol,
-                        MarketPrice.date == record.date,
-                    )
+        # Batch-fetch all existing prices in one query
+        record_keys = [(r.symbol, r.date) for r in records]
+        symbols = list({k[0] for k in record_keys})
+        dates = list({k[1] for k in record_keys})
+
+        existing_rows = (
+            self.session.query(MarketPrice)
+            .filter(
+                and_(
+                    MarketPrice.symbol.in_(symbols),
+                    MarketPrice.date.in_(dates),
                 )
-                .first()
             )
+            .all()
+        )
+        existing_map = {(p.symbol, p.date): p for p in existing_rows}
+
+        for record in records:
+            existing_price = existing_map.get((record.symbol, record.date))
 
             if existing_price and not force_refresh:
                 prices.append(existing_price)

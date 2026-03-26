@@ -72,7 +72,9 @@ class TestGetExistingPrices:
 
 class TestFetchPriceHistory:
     def test_returns_cached_prices_when_available(self, client, mock_session):
-        existing = [MagicMock(spec=MarketPrice)]
+        existing_price = MagicMock(spec=MarketPrice)
+        existing_price.date = date.today()
+        existing = [existing_price]
         mock_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = existing
 
         result = client.fetch_price_history("AAPL", date(2026, 1, 1))
@@ -95,7 +97,9 @@ class TestFetchPriceHistory:
         mock_chain.fetch_with_fallback.assert_called()
 
     def test_end_date_defaults_to_today(self, client, mock_session):
-        existing = [MagicMock(spec=MarketPrice)]
+        existing_price = MagicMock(spec=MarketPrice)
+        existing_price.date = date.today()
+        existing = [existing_price]
         mock_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = existing
 
         result = client.fetch_price_history("AAPL", date(2026, 1, 1))
@@ -195,7 +199,8 @@ class TestFetchWithRetry:
 
 class TestStoreRawRecords:
     def test_creates_new_price_records(self, client, mock_session):
-        mock_session.query.return_value.filter.return_value.first.return_value = None
+        # Batch query returns no existing records
+        mock_session.query.return_value.filter.return_value.all.return_value = []
 
         records = [
             RawPriceRecord(
@@ -211,7 +216,10 @@ class TestStoreRawRecords:
 
     def test_skips_existing_unless_force(self, client, mock_session):
         existing = MagicMock(spec=MarketPrice)
-        mock_session.query.return_value.filter.return_value.first.return_value = existing
+        existing.symbol = "AAPL"
+        existing.date = date(2026, 1, 15)
+        # Batch query returns the existing record
+        mock_session.query.return_value.filter.return_value.all.return_value = [existing]
 
         records = [
             RawPriceRecord(
@@ -227,7 +235,10 @@ class TestStoreRawRecords:
 
     def test_updates_existing_on_force(self, client, mock_session):
         existing = MagicMock(spec=MarketPrice)
-        mock_session.query.return_value.filter.return_value.first.return_value = existing
+        existing.symbol = "AAPL"
+        existing.date = date(2026, 1, 15)
+        # Batch query returns the existing record
+        mock_session.query.return_value.filter.return_value.all.return_value = [existing]
 
         records = [
             RawPriceRecord(
@@ -293,7 +304,9 @@ class TestGetLatestPrice:
 
 class TestUpdatePricesForSymbols:
     def test_updates_multiple_symbols(self, client, mock_session):
-        existing = [MagicMock(spec=MarketPrice)]
+        existing_price = MagicMock(spec=MarketPrice)
+        existing_price.date = date.today()
+        existing = [existing_price]
         mock_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = existing
 
         result = client.update_prices_for_symbols(["AAPL", "TSLA"])

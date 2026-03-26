@@ -26,7 +26,6 @@ from data.base import (  # noqa: F401
     execute_query,
     ttl_cache,
     logger,
-    SIGNALS_TABLE,
     DATABASE_URL,
 )
 
@@ -144,7 +143,6 @@ __all__ = [
     "execute_query",
     "ttl_cache",
     "logger",
-    "SIGNALS_TABLE",
     "DATABASE_URL",
     "clear_all_caches",
     # Signal queries

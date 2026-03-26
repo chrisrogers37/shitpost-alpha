@@ -6,6 +6,7 @@ SQLAlchemy models for tracking stock prices and prediction outcomes.
 from datetime import datetime, date
 from typing import Optional
 from sqlalchemy import (
+    CheckConstraint,
     Column,
     String,
     Date,
@@ -16,6 +17,7 @@ from sqlalchemy import (
     Integer,
     Boolean,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -65,6 +67,12 @@ class PredictionOutcome(Base, IDMixin, TimestampMixin):
     """Model for tracking actual outcomes of predictions with detailed metrics."""
 
     __tablename__ = "prediction_outcomes"
+    __table_args__ = (
+        UniqueConstraint(
+            "prediction_id", "symbol",
+            name="uq_prediction_outcomes_pred_symbol",
+        ),
+    )
 
     # Link to prediction
     prediction_id = Column(
@@ -206,6 +214,12 @@ class TickerRegistry(Base, IDMixin, TimestampMixin):
     """
 
     __tablename__ = "ticker_registry"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'inactive', 'invalid')",
+            name="ck_ticker_registry_status",
+        ),
+    )
 
     # Ticker identification
     symbol = Column(String(20), unique=True, nullable=False, index=True)
