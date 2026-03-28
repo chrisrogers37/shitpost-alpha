@@ -33,24 +33,93 @@ def _rows_to_dicts(result) -> List[Dict[str, Any]]:
     return [dict(zip(columns, row)) for row in rows]
 
 
+def _extract_scalar(result) -> Any:
+    """Extract a single scalar value from a query result."""
+    row = result.fetchone()
+    if row and row[0]:
+        return row[0]
+    return None
+
+
+def _execute_read(
+    query_str: str,
+    params: Optional[Dict[str, Any]] = None,
+    processor=_rows_to_dicts,
+    default: Any = None,
+    context: str = "",
+) -> Any:
+    """
+    Execute a read query with standard error handling.
+
+    Args:
+        query_str: SQL query string.
+        params: Optional query parameters.
+        processor: Function to process the result (default: _rows_to_dicts).
+                   Use _row_to_dict for single-row queries.
+        default: Value to return on error or empty result.
+        context: Descriptive label for error logging (e.g. "get_subscription").
+
+    Returns:
+        Processed query result, or default on error.
+    """
+    try:
+        with get_session() as session:
+            result = session.execute(text(query_str), params or {})
+            return processor(result)
+    except Exception as e:
+        logger.error(
+            f"Error in {context}: {e}" if context else f"Read query error: {e}"
+        )
+        return default
+
+
+def _execute_write(
+    query_str: str,
+    params: Optional[Dict[str, Any]] = None,
+    context: str = "",
+) -> bool:
+    """
+    Execute a write query with standard error handling.
+
+    Args:
+        query_str: SQL query string.
+        params: Optional query parameters.
+        context: Descriptive label for error logging (e.g. "record_alert_sent").
+
+    Returns:
+        True if successful, False on error.
+    """
+    try:
+        with get_session() as session:
+            session.execute(text(query_str), params or {})
+        return True
+    except Exception as e:
+        logger.error(
+            f"Error in {context}: {e}" if context else f"Write query error: {e}"
+        )
+        return False
+
+
 # Whitelist of columns that can be updated via update_subscription().
 # Prevents SQL injection through dynamic kwargs keys.
-_UPDATABLE_COLUMNS = frozenset({
-    "chat_type",
-    "username",
-    "first_name",
-    "last_name",
-    "title",
-    "is_active",
-    "subscribed_at",
-    "unsubscribed_at",
-    "alert_preferences",
-    "last_alert_at",
-    "alerts_sent_count",
-    "consecutive_errors",
-    "last_error",
-    "last_interaction_at",
-})
+_UPDATABLE_COLUMNS = frozenset(
+    {
+        "chat_type",
+        "username",
+        "first_name",
+        "last_name",
+        "title",
+        "is_active",
+        "subscribed_at",
+        "unsubscribed_at",
+        "alert_preferences",
+        "last_alert_at",
+        "alerts_sent_count",
+        "consecutive_errors",
+        "last_error",
+        "last_interaction_at",
+    }
+)
 
 
 # ============================================================
@@ -68,23 +137,22 @@ def get_subscription(chat_id: str) -> Optional[Dict[str, Any]]:
     Returns:
         Subscription dict or None if not found.
     """
-    try:
-        with get_session() as session:
-            query = text("""
-                SELECT
-                    id, chat_id, chat_type, username, first_name, last_name,
-                    title, is_active, subscribed_at, unsubscribed_at,
-                    alert_preferences, last_alert_at, alerts_sent_count,
-                    last_interaction_at, consecutive_errors, last_error,
-                    created_at, updated_at
-                FROM telegram_subscriptions
-                WHERE chat_id = :chat_id
-            """)
-            result = session.execute(query, {"chat_id": str(chat_id)})
-            return _row_to_dict(result)
-    except Exception as e:
-        logger.error(f"Error getting subscription for chat_id {chat_id}: {e}")
-        return None
+    return _execute_read(
+        """
+        SELECT
+            id, chat_id, chat_type, username, first_name, last_name,
+            title, is_active, subscribed_at, unsubscribed_at,
+            alert_preferences, last_alert_at, alerts_sent_count,
+            last_interaction_at, consecutive_errors, last_error,
+            created_at, updated_at
+        FROM telegram_subscriptions
+        WHERE chat_id = :chat_id
+        """,
+        params={"chat_id": str(chat_id)},
+        processor=_row_to_dict,
+        default=None,
+        context=f"get_subscription(chat_id={chat_id})",
+    )
 
 
 def get_active_subscriptions() -> List[Dict[str, Any]]:
@@ -94,23 +162,20 @@ def get_active_subscriptions() -> List[Dict[str, Any]]:
     Returns:
         List of subscription dicts.
     """
-    try:
-        with get_session() as session:
-            query = text("""
-                SELECT
-                    id, chat_id, chat_type, username, first_name, last_name,
-                    title, is_active, subscribed_at, alert_preferences,
-                    last_alert_at, alerts_sent_count, consecutive_errors
-                FROM telegram_subscriptions
-                WHERE is_active = true
-                    AND consecutive_errors < 5
-                ORDER BY subscribed_at ASC
-            """)
-            result = session.execute(query)
-            return _rows_to_dicts(result)
-    except Exception as e:
-        logger.error(f"Error getting active subscriptions: {e}")
-        return []
+    return _execute_read(
+        """
+        SELECT
+            id, chat_id, chat_type, username, first_name, last_name,
+            title, is_active, subscribed_at, alert_preferences,
+            last_alert_at, alerts_sent_count, consecutive_errors
+        FROM telegram_subscriptions
+        WHERE is_active = true
+            AND consecutive_errors < 5
+        ORDER BY subscribed_at ASC
+        """,
+        default=[],
+        context="get_active_subscriptions",
+    )
 
 
 def create_subscription(
@@ -153,34 +218,34 @@ def create_subscription(
             "quiet_hours_end": "08:00",
         }
 
-        with get_session() as session:
-            query = text("""
-                INSERT INTO telegram_subscriptions (
-                    chat_id, chat_type, username, first_name, last_name, title,
-                    is_active, subscribed_at, alert_preferences,
-                    alerts_sent_count, consecutive_errors,
-                    created_at, updated_at
-                ) VALUES (
-                    :chat_id, :chat_type, :username, :first_name, :last_name, :title,
-                    true, NOW(), :alert_preferences,
-                    0, 0,
-                    NOW(), NOW()
-                )
-            """)
-            session.execute(
-                query,
-                {
-                    "chat_id": str(chat_id),
-                    "chat_type": chat_type,
-                    "username": username,
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "title": title,
-                    "alert_preferences": json.dumps(default_prefs),
-                },
+        success = _execute_write(
+            """
+            INSERT INTO telegram_subscriptions (
+                chat_id, chat_type, username, first_name, last_name, title,
+                is_active, subscribed_at, alert_preferences,
+                alerts_sent_count, consecutive_errors,
+                created_at, updated_at
+            ) VALUES (
+                :chat_id, :chat_type, :username, :first_name, :last_name, :title,
+                true, NOW(), :alert_preferences,
+                0, 0,
+                NOW(), NOW()
             )
-        logger.info(f"Created Telegram subscription for chat_id {chat_id}")
-        return True
+            """,
+            params={
+                "chat_id": str(chat_id),
+                "chat_type": chat_type,
+                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
+                "title": title,
+                "alert_preferences": json.dumps(default_prefs),
+            },
+            context=f"create_subscription(chat_id={chat_id})",
+        )
+        if success:
+            logger.info(f"Created Telegram subscription for chat_id {chat_id}")
+        return success
     except Exception as e:
         logger.error(f"Error creating subscription for chat_id {chat_id}: {e}")
         return False
@@ -237,62 +302,53 @@ def deactivate_subscription(chat_id: str) -> bool:
 
 def record_alert_sent(chat_id: str) -> bool:
     """Record that an alert was sent to this subscription."""
-    try:
-        with get_session() as session:
-            query = text("""
-                UPDATE telegram_subscriptions
-                SET last_alert_at = NOW(),
-                    alerts_sent_count = alerts_sent_count + 1,
-                    consecutive_errors = 0,
-                    updated_at = NOW()
-                WHERE chat_id = :chat_id
-            """)
-            session.execute(query, {"chat_id": str(chat_id)})
-        return True
-    except Exception as e:
-        logger.error(f"Error recording alert sent for chat_id {chat_id}: {e}")
-        return False
+    return _execute_write(
+        """
+        UPDATE telegram_subscriptions
+        SET last_alert_at = NOW(),
+            alerts_sent_count = alerts_sent_count + 1,
+            consecutive_errors = 0,
+            updated_at = NOW()
+        WHERE chat_id = :chat_id
+        """,
+        params={"chat_id": str(chat_id)},
+        context=f"record_alert_sent(chat_id={chat_id})",
+    )
 
 
 def record_error(chat_id: str, error_message: str) -> bool:
     """Record an error for this subscription."""
-    try:
-        with get_session() as session:
-            query = text("""
-                UPDATE telegram_subscriptions
-                SET consecutive_errors = consecutive_errors + 1,
-                    last_error = :error_message,
-                    updated_at = NOW()
-                WHERE chat_id = :chat_id
-            """)
-            session.execute(
-                query, {"chat_id": str(chat_id), "error_message": error_message}
-            )
-        return True
-    except Exception as e:
-        logger.error(f"Error recording error for chat_id {chat_id}: {e}")
-        return False
+    return _execute_write(
+        """
+        UPDATE telegram_subscriptions
+        SET consecutive_errors = consecutive_errors + 1,
+            last_error = :error_message,
+            updated_at = NOW()
+        WHERE chat_id = :chat_id
+        """,
+        params={"chat_id": str(chat_id), "error_message": error_message},
+        context=f"record_error(chat_id={chat_id})",
+    )
 
 
 def get_subscription_stats() -> Dict[str, Any]:
     """Get statistics about Telegram subscriptions."""
-    try:
-        with get_session() as session:
-            query = text("""
-                SELECT
-                    COUNT(*) as total,
-                    COUNT(CASE WHEN is_active = true THEN 1 END) as active,
-                    COUNT(CASE WHEN chat_type = 'private' THEN 1 END) as private_chats,
-                    COUNT(CASE WHEN chat_type IN ('group', 'supergroup') THEN 1 END) as groups,
-                    COUNT(CASE WHEN chat_type = 'channel' THEN 1 END) as channels,
-                    SUM(alerts_sent_count) as total_alerts_sent
-                FROM telegram_subscriptions
-            """)
-            result = session.execute(query)
-            return _row_to_dict(result) or {}
-    except Exception as e:
-        logger.error(f"Error getting subscription stats: {e}")
-        return {}
+    result = _execute_read(
+        """
+        SELECT
+            COUNT(*) as total,
+            COUNT(CASE WHEN is_active = true THEN 1 END) as active,
+            COUNT(CASE WHEN chat_type = 'private' THEN 1 END) as private_chats,
+            COUNT(CASE WHEN chat_type IN ('group', 'supergroup') THEN 1 END) as groups,
+            COUNT(CASE WHEN chat_type = 'channel' THEN 1 END) as channels,
+            SUM(alerts_sent_count) as total_alerts_sent
+        FROM telegram_subscriptions
+        """,
+        processor=_row_to_dict,
+        default=None,
+        context="get_subscription_stats",
+    )
+    return result or {}
 
 
 # ============================================================
@@ -310,44 +366,42 @@ def get_new_predictions_since(since: datetime) -> List[Dict[str, Any]]:
     Returns:
         List of prediction dicts with associated shitpost data.
     """
-    try:
-        with get_session() as session:
-            query = text("""
-                SELECT
-                    tss.timestamp,
-                    tss.text,
-                    tss.shitpost_id,
-                    p.id as prediction_id,
-                    p.assets,
-                    p.market_impact,
-                    p.confidence,
-                    p.thesis,
-                    p.analysis_status,
-                    p.created_at as prediction_created_at
-                FROM predictions p
-                INNER JOIN truth_social_shitposts tss
-                    ON tss.shitpost_id = p.shitpost_id
-                WHERE p.analysis_status = 'completed'
-                    AND p.created_at > :since
-                    AND p.confidence IS NOT NULL
-                    AND p.assets IS NOT NULL
-                    AND p.assets::jsonb <> '[]'::jsonb
-                ORDER BY p.created_at DESC
-                LIMIT 50
-            """)
-            result = session.execute(query, {"since": since})
-            results = _rows_to_dicts(result)
-            for row_dict in results:
-                if isinstance(row_dict.get("timestamp"), datetime):
-                    row_dict["timestamp"] = row_dict["timestamp"].isoformat()
-                if isinstance(row_dict.get("prediction_created_at"), datetime):
-                    row_dict["prediction_created_at"] = row_dict[
-                        "prediction_created_at"
-                    ].isoformat()
-            return results
-    except Exception as e:
-        logger.error(f"Error loading new predictions: {e}")
-        return []
+    results = _execute_read(
+        """
+        SELECT
+            tss.timestamp,
+            tss.text,
+            tss.shitpost_id,
+            p.id as prediction_id,
+            p.assets,
+            p.market_impact,
+            p.confidence,
+            p.thesis,
+            p.analysis_status,
+            p.created_at as prediction_created_at
+        FROM predictions p
+        INNER JOIN truth_social_shitposts tss
+            ON tss.shitpost_id = p.shitpost_id
+        WHERE p.analysis_status = 'completed'
+            AND p.created_at > :since
+            AND p.confidence IS NOT NULL
+            AND p.assets IS NOT NULL
+            AND p.assets::jsonb <> '[]'::jsonb
+        ORDER BY p.created_at DESC
+        LIMIT 50
+        """,
+        params={"since": since},
+        default=[],
+        context="get_new_predictions_since",
+    )
+    for row_dict in results:
+        if isinstance(row_dict.get("timestamp"), datetime):
+            row_dict["timestamp"] = row_dict["timestamp"].isoformat()
+        if isinstance(row_dict.get("prediction_created_at"), datetime):
+            row_dict["prediction_created_at"] = row_dict[
+                "prediction_created_at"
+            ].isoformat()
+    return results
 
 
 def get_prediction_stats() -> Dict[str, Any]:
@@ -357,36 +411,35 @@ def get_prediction_stats() -> Dict[str, Any]:
     Returns:
         Dict with accuracy, win_rate, total_pnl, total_predictions.
     """
-    try:
-        with get_session() as session:
-            query = text("""
-                SELECT
-                    COUNT(*) as total_predictions,
-                    COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct_count,
-                    COUNT(CASE WHEN correct_t7 IS NOT NULL THEN 1 END) as evaluated_count,
-                    COALESCE(SUM(return_t7), 0) as total_return
-                FROM prediction_outcomes
-            """)
-            result = session.execute(query)
-            row = _row_to_dict(result)
-            if row:
-                total = row.get("total_predictions", 0) or 0
-                correct = row.get("correct_count", 0) or 0
-                evaluated = row.get("evaluated_count", 0) or 0
-                total_return = float(row.get("total_return", 0) or 0)
-
-                win_rate = (correct / evaluated * 100) if evaluated > 0 else 0.0
-                return {
-                    "total_predictions": total,
-                    "evaluated": evaluated,
-                    "correct": correct,
-                    "win_rate": round(win_rate, 1),
-                    "total_return_pct": round(total_return * 100, 2),
-                }
-            return {}
-    except Exception as e:
-        logger.error(f"Error getting prediction stats: {e}")
+    row = _execute_read(
+        """
+        SELECT
+            COUNT(*) as total_predictions,
+            COUNT(CASE WHEN correct_t7 = true THEN 1 END) as correct_count,
+            COUNT(CASE WHEN correct_t7 IS NOT NULL THEN 1 END) as evaluated_count,
+            COALESCE(SUM(return_t7), 0) as total_return
+        FROM prediction_outcomes
+        """,
+        processor=_row_to_dict,
+        default=None,
+        context="get_prediction_stats",
+    )
+    if not row:
         return {}
+
+    total = row.get("total_predictions", 0) or 0
+    correct = row.get("correct_count", 0) or 0
+    evaluated = row.get("evaluated_count", 0) or 0
+    total_return = float(row.get("total_return", 0) or 0)
+
+    win_rate = (correct / evaluated * 100) if evaluated > 0 else 0.0
+    return {
+        "total_predictions": total,
+        "evaluated": evaluated,
+        "correct": correct,
+        "win_rate": round(win_rate, 1),
+        "total_return_pct": round(total_return * 100, 2),
+    }
 
 
 def get_latest_predictions(limit: int = 5) -> List[Dict[str, Any]]:
@@ -399,36 +452,34 @@ def get_latest_predictions(limit: int = 5) -> List[Dict[str, Any]]:
     Returns:
         List of prediction dicts with outcome status.
     """
-    try:
-        with get_session() as session:
-            query = text("""
-                SELECT
-                    p.id as prediction_id,
-                    p.assets,
-                    p.confidence,
-                    p.market_impact,
-                    p.thesis,
-                    p.created_at,
-                    po.prediction_sentiment,
-                    po.correct_t7,
-                    po.return_t7,
-                    po.symbol
-                FROM predictions p
-                LEFT JOIN prediction_outcomes po ON po.prediction_id = p.id
-                WHERE p.analysis_status = 'completed'
-                    AND p.confidence IS NOT NULL
-                ORDER BY p.created_at DESC
-                LIMIT :limit
-            """)
-            result = session.execute(query, {"limit": limit})
-            results = _rows_to_dicts(result)
-            for row_dict in results:
-                if isinstance(row_dict.get("created_at"), datetime):
-                    row_dict["created_at"] = row_dict["created_at"].isoformat()
-            return results
-    except Exception as e:
-        logger.error(f"Error getting latest predictions: {e}")
-        return []
+    results = _execute_read(
+        """
+        SELECT
+            p.id as prediction_id,
+            p.assets,
+            p.confidence,
+            p.market_impact,
+            p.thesis,
+            p.created_at,
+            po.prediction_sentiment,
+            po.correct_t7,
+            po.return_t7,
+            po.symbol
+        FROM predictions p
+        LEFT JOIN prediction_outcomes po ON po.prediction_id = p.id
+        WHERE p.analysis_status = 'completed'
+            AND p.confidence IS NOT NULL
+        ORDER BY p.created_at DESC
+        LIMIT :limit
+        """,
+        params={"limit": limit},
+        default=[],
+        context="get_latest_predictions",
+    )
+    for row_dict in results:
+        if isinstance(row_dict.get("created_at"), datetime):
+            row_dict["created_at"] = row_dict["created_at"].isoformat()
+    return results
 
 
 # ============================================================
@@ -440,22 +491,15 @@ def get_last_alert_check() -> Optional[datetime]:
     """
     Get the timestamp of the last alert check from the database.
 
-    Uses a simple key-value approach in a notification_state table,
-    falling back to None if the table doesn't exist yet.
+    Uses the most recent last_alert_at across all active subscriptions as a proxy.
     """
-    try:
-        with get_session() as session:
-            # Use the most recent alert sent across all subscriptions as a proxy
-            query = text("""
-                SELECT MAX(last_alert_at) as last_check
-                FROM telegram_subscriptions
-                WHERE is_active = true
-            """)
-            result = session.execute(query)
-            row = result.fetchone()
-            if row and row[0]:
-                return row[0]
-            return None
-    except Exception as e:
-        logger.error(f"Error getting last alert check: {e}")
-        return None
+    return _execute_read(
+        """
+        SELECT MAX(last_alert_at) as last_check
+        FROM telegram_subscriptions
+        WHERE is_active = true
+        """,
+        processor=_extract_scalar,
+        default=None,
+        context="get_last_alert_check",
+    )

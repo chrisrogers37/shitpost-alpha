@@ -1,5 +1,10 @@
 # Phase 02 — Notifications DB Test Coverage + Query Dedup
 
+**Status:** ✅ COMPLETE
+**Started:** 2026-03-28
+**Completed:** 2026-03-28
+**PR:** #114
+
 | Field | Value |
 |---|---|
 | **PR Title** | `feat: notifications DB test coverage + query dedup` |
@@ -969,7 +974,7 @@ class TestGetLastAlertCheck:
         assert result is None
 ```
 
-**Total test count**: 64 tests (9 existing + 55 new).
+**Total test count**: 62 tests (8 existing + 54 new).
 
 ### Step 2: Run the tests and verify they all pass
 
@@ -978,7 +983,7 @@ Run:
 ./venv/bin/python -m pytest shit_tests/notifications/test_db.py -v
 ```
 
-All 64 tests must pass before proceeding to the refactor step.
+All 62 tests must pass before proceeding to the refactor step.
 
 ### Step 3: Extract query helper functions in `notifications/db.py`
 
@@ -994,6 +999,7 @@ def _execute_read(
     params: Optional[Dict[str, Any]] = None,
     processor=_rows_to_dicts,
     default: Any = None,
+    context: str = "",
 ) -> Any:
     """
     Execute a read query with standard error handling.
@@ -1004,6 +1010,7 @@ def _execute_read(
         processor: Function to process the result (default: _rows_to_dicts).
                    Use _row_to_dict for single-row queries.
         default: Value to return on error or empty result.
+        context: Descriptive label for error logging (e.g. "get_subscription").
 
     Returns:
         Processed query result, or default on error.
@@ -1013,13 +1020,14 @@ def _execute_read(
             result = session.execute(text(query_str), params or {})
             return processor(result)
     except Exception as e:
-        logger.error(f"Read query error: {e}")
+        logger.error(f"Error in {context}: {e}" if context else f"Read query error: {e}")
         return default
 
 
 def _execute_write(
     query_str: str,
     params: Optional[Dict[str, Any]] = None,
+    context: str = "",
 ) -> bool:
     """
     Execute a write query with standard error handling.
@@ -1027,6 +1035,7 @@ def _execute_write(
     Args:
         query_str: SQL query string.
         params: Optional query parameters.
+        context: Descriptive label for error logging (e.g. "record_alert_sent").
 
     Returns:
         True if successful, False on error.
@@ -1036,7 +1045,7 @@ def _execute_write(
             session.execute(text(query_str), params or {})
         return True
     except Exception as e:
-        logger.error(f"Write query error: {e}")
+        logger.error(f"Error in {context}: {e}" if context else f"Write query error: {e}")
         return False
 ```
 
@@ -1105,6 +1114,7 @@ def get_subscription(chat_id: str) -> Optional[Dict[str, Any]]:
         params={"chat_id": str(chat_id)},
         processor=_row_to_dict,
         default=None,
+        context=f"get_subscription(chat_id={chat_id})",
     )
 ```
 
@@ -1161,6 +1171,7 @@ def get_active_subscriptions() -> List[Dict[str, Any]]:
         ORDER BY subscribed_at ASC
         """,
         default=[],
+        context="get_active_subscriptions",
     )
 ```
 
@@ -1266,6 +1277,7 @@ After:
                 "title": title,
                 "alert_preferences": json.dumps(default_prefs),
             },
+            context=f"create_subscription(chat_id={chat_id})",
         )
         if success:
             logger.info(f"Created Telegram subscription for chat_id {chat_id}")
@@ -1320,6 +1332,7 @@ def record_alert_sent(chat_id: str) -> bool:
         WHERE chat_id = :chat_id
         """,
         params={"chat_id": str(chat_id)},
+        context=f"record_alert_sent(chat_id={chat_id})",
     )
 ```
 
@@ -1362,6 +1375,7 @@ def record_error(chat_id: str, error_message: str) -> bool:
         WHERE chat_id = :chat_id
         """,
         params={"chat_id": str(chat_id), "error_message": error_message},
+        context=f"record_error(chat_id={chat_id})",
     )
 ```
 
@@ -1409,6 +1423,7 @@ def get_subscription_stats() -> Dict[str, Any]:
         """,
         processor=_row_to_dict,
         default=None,
+        context="get_subscription_stats",
     )
     return result or {}
 ```
@@ -1509,9 +1524,8 @@ def get_new_predictions_since(since: datetime) -> List[Dict[str, Any]]:
         """,
         params={"since": since},
         default=[],
+        context="get_new_predictions_since",
     )
-    if results is None:
-        return []
     for row_dict in results:
         if isinstance(row_dict.get("timestamp"), datetime):
             row_dict["timestamp"] = row_dict["timestamp"].isoformat()
@@ -1587,6 +1601,7 @@ def get_prediction_stats() -> Dict[str, Any]:
         """,
         processor=_row_to_dict,
         default=None,
+        context="get_prediction_stats",
     )
     if not row:
         return {}
@@ -1688,9 +1703,8 @@ def get_latest_predictions(limit: int = 5) -> List[Dict[str, Any]]:
         """,
         params={"limit": limit},
         default=[],
+        context="get_latest_predictions",
     )
-    if results is None:
-        return []
     for row_dict in results:
         if isinstance(row_dict.get("created_at"), datetime):
             row_dict["created_at"] = row_dict["created_at"].isoformat()
@@ -1754,6 +1768,7 @@ def get_last_alert_check() -> Optional[datetime]:
         """,
         processor=_extract_scalar,
         default=None,
+        context="get_last_alert_check",
     )
 ```
 
@@ -1766,7 +1781,7 @@ Run:
 ./venv/bin/python -m pytest shit_tests/notifications/test_db.py -v
 ```
 
-All 64 tests must still pass. If any fail, the refactor introduced a regression -- fix before proceeding.
+All 62 tests must still pass. If any fail, the refactor introduced a regression -- fix before proceeding.
 
 ### Step 5: Run the full test suite
 
@@ -1839,6 +1854,7 @@ def _execute_read(
     params: Optional[Dict[str, Any]] = None,
     processor=_rows_to_dicts,
     default: Any = None,
+    context: str = "",
 ) -> Any:
     """
     Execute a read query with standard error handling.
@@ -1849,6 +1865,7 @@ def _execute_read(
         processor: Function to process the result (default: _rows_to_dicts).
                    Use _row_to_dict for single-row queries.
         default: Value to return on error or empty result.
+        context: Descriptive label for error logging (e.g. "get_subscription").
 
     Returns:
         Processed query result, or default on error.
@@ -1858,13 +1875,14 @@ def _execute_read(
             result = session.execute(text(query_str), params or {})
             return processor(result)
     except Exception as e:
-        logger.error(f"Read query error: {e}")
+        logger.error(f"Error in {context}: {e}" if context else f"Read query error: {e}")
         return default
 
 
 def _execute_write(
     query_str: str,
     params: Optional[Dict[str, Any]] = None,
+    context: str = "",
 ) -> bool:
     """
     Execute a write query with standard error handling.
@@ -1872,6 +1890,7 @@ def _execute_write(
     Args:
         query_str: SQL query string.
         params: Optional query parameters.
+        context: Descriptive label for error logging (e.g. "record_alert_sent").
 
     Returns:
         True if successful, False on error.
@@ -1881,7 +1900,7 @@ def _execute_write(
             session.execute(text(query_str), params or {})
         return True
     except Exception as e:
-        logger.error(f"Write query error: {e}")
+        logger.error(f"Error in {context}: {e}" if context else f"Write query error: {e}")
         return False
 
 
@@ -1934,6 +1953,7 @@ def get_subscription(chat_id: str) -> Optional[Dict[str, Any]]:
         params={"chat_id": str(chat_id)},
         processor=_row_to_dict,
         default=None,
+        context=f"get_subscription(chat_id={chat_id})",
     )
 
 
@@ -1956,6 +1976,7 @@ def get_active_subscriptions() -> List[Dict[str, Any]]:
         ORDER BY subscribed_at ASC
         """,
         default=[],
+        context="get_active_subscriptions",
     )
 
 
@@ -2022,6 +2043,7 @@ def create_subscription(
                 "title": title,
                 "alert_preferences": json.dumps(default_prefs),
             },
+            context=f"create_subscription(chat_id={chat_id})",
         )
         if success:
             logger.info(f"Created Telegram subscription for chat_id {chat_id}")
@@ -2092,6 +2114,7 @@ def record_alert_sent(chat_id: str) -> bool:
         WHERE chat_id = :chat_id
         """,
         params={"chat_id": str(chat_id)},
+        context=f"record_alert_sent(chat_id={chat_id})",
     )
 
 
@@ -2106,6 +2129,7 @@ def record_error(chat_id: str, error_message: str) -> bool:
         WHERE chat_id = :chat_id
         """,
         params={"chat_id": str(chat_id), "error_message": error_message},
+        context=f"record_error(chat_id={chat_id})",
     )
 
 
@@ -2124,6 +2148,7 @@ def get_subscription_stats() -> Dict[str, Any]:
         """,
         processor=_row_to_dict,
         default=None,
+        context="get_subscription_stats",
     )
     return result or {}
 
@@ -2169,9 +2194,8 @@ def get_new_predictions_since(since: datetime) -> List[Dict[str, Any]]:
         """,
         params={"since": since},
         default=[],
+        context="get_new_predictions_since",
     )
-    if results is None:
-        return []
     for row_dict in results:
         if isinstance(row_dict.get("timestamp"), datetime):
             row_dict["timestamp"] = row_dict["timestamp"].isoformat()
@@ -2200,6 +2224,7 @@ def get_prediction_stats() -> Dict[str, Any]:
         """,
         processor=_row_to_dict,
         default=None,
+        context="get_prediction_stats",
     )
     if not row:
         return {}
@@ -2251,9 +2276,8 @@ def get_latest_predictions(limit: int = 5) -> List[Dict[str, Any]]:
         """,
         params={"limit": limit},
         default=[],
+        context="get_latest_predictions",
     )
-    if results is None:
-        return []
     for row_dict in results:
         if isinstance(row_dict.get("created_at"), datetime):
             row_dict["created_at"] = row_dict["created_at"].isoformat()
@@ -2279,6 +2303,7 @@ def get_last_alert_check() -> Optional[datetime]:
         """,
         processor=_extract_scalar,
         default=None,
+        context="get_last_alert_check",
     )
 ```
 
@@ -2286,7 +2311,7 @@ def get_last_alert_check() -> Optional[datetime]:
 
 ## Test Plan
 
-### New tests added (55 tests across 13 test classes)
+### New tests added (54 tests across 14 test classes)
 
 | Class | Tests | What it verifies |
 |---|---|---|
@@ -2305,12 +2330,12 @@ def get_last_alert_check() -> Optional[datetime]:
 | `TestGetLatestPredictions` | 5 | Results with outcomes, datetime serialization, limit param, default limit, DB error |
 | `TestGetLastAlertCheck` | 4 | datetime returned, NULL → None, no rows → None, DB error |
 
-### Existing tests preserved (9 tests across 2 test classes)
+### Existing tests preserved (8 tests across 2 test classes)
 
 | Class | Tests |
 |---|---|
 | `TestUpdatableColumnsWhitelist` | 3 |
-| `TestUpdateSubscriptionInjectionPrevention` | 6 |
+| `TestUpdateSubscriptionInjectionPrevention` | 5 |
 
 ### Coverage expectations
 
@@ -2374,7 +2399,7 @@ Every function that touches the database is tested with a mock that raises `Exce
 
 ## Verification Checklist
 
-- [ ] All 64 tests pass: `./venv/bin/python -m pytest shit_tests/notifications/test_db.py -v`
+- [ ] All 62 tests pass: `./venv/bin/python -m pytest shit_tests/notifications/test_db.py -v`
 - [ ] Full test suite passes: `./venv/bin/python -m pytest -v`
 - [ ] Linting passes: `./venv/bin/python -m ruff check notifications/db.py shit_tests/notifications/test_db.py`
 - [ ] Formatting passes: `./venv/bin/python -m ruff format --check notifications/db.py shit_tests/notifications/test_db.py`
