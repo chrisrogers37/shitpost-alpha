@@ -1,7 +1,9 @@
 # Phase 05: Resolve TODOs, Add Legacy Documentation
 
-**Status**: `🔧 IN PROGRESS`
+**Status**: `✅ COMPLETE`
 **Started**: 2026-03-28
+**Completed**: 2026-03-28
+**PR**: #117
 
 **PR Title**: `chore: resolve TODOs, add legacy documentation`
 **Risk**: Low (comment-only changes, no behavior changes)
