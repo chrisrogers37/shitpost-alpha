@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Notifications DB test coverage** — 62 tests for all 13 functions in `notifications/db.py`
+  - Subscription CRUD: get, create, update, deactivate, reactivation flows
+  - Alert operations: record_alert_sent, record_error, get_subscription_stats
+  - Prediction queries: get_new_predictions_since, get_prediction_stats, get_latest_predictions
+  - Edge cases: SQL injection prevention, None handling, int-to-string coercion, datetime serialization
+
+### Changed
+- **Notifications query dedup** — Extract `_execute_read`/`_execute_write` helpers in `notifications/db.py`
+  - Eliminates 11 duplicated try/session/except blocks
+  - `context` parameter preserves function-specific error logging
+  - `_extract_scalar` helper for single-value queries (get_last_alert_check)
+
+### Added
 - **API test coverage** — 54 tests for all FastAPI endpoints, query functions, and response schemas
   - Feed router: navigation bounds, JSON parsing, engagement defaults, error cases
   - Price router: yfinance/DB fallback, cache TTL, post_timestamp indexing, validation
