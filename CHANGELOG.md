@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **API test coverage** — 54 tests for all FastAPI endpoints, query functions, and response schemas
+  - Feed router: navigation bounds, JSON parsing, engagement defaults, error cases
+  - Price router: yfinance/DB fallback, cache TTL, post_timestamp indexing, validation
+  - Telegram router: webhook processing, error resilience, health check
+  - Query layer: offset logic, JSON string parsing, empty results
+
+### Security
+- **CORS hardening** — Restrict `allow_origins` to Railway domain in production
+  - Added `ALLOWED_ORIGINS` env var (comma-separated, defaults to Railway URL)
+  - Wildcard `*` only used when `ENVIRONMENT=development`
+
+### Added
 - **Data model remediation** — Full data model audit and remediation based on 30 findings across 10 tables
   - 4 missing indexes on `predictions` table (`shitpost_id`, `signal_id`, `analysis_status`, `created_at`)
   - Denormalized `post_timestamp` on `predictions` to eliminate N+1 lazy loading in OutcomeCalculator
