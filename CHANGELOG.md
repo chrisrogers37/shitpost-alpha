@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **TODO resolution** — Replaced 5 vague TODO comments with concrete decision records
+  - `shitvault/s3_processor.py`: Dual-write stays until signals migration (linked to plan)
+  - `shitposts/twitter_harvester.py`: Twitter skeleton marked as not currently planned
+  - `shit/utils/error_handling.py`: Sentry/metrics deferred until error volume warrants it
+  - `shitty_ui/data/__init__.py`: Added deprecation notice for legacy Dash re-export layer
 - **Outcome Calculator** — Decomposed 245-line `_calculate_single_outcome` into 3 focused helpers: `_resolve_base_price`, `_fill_timeframe_prices`, `_fill_intraday_prices`
 - **Market Data CLI** — Split 754-line CLI into domain submodules: `cli_fetch.py` (5 commands), `cli_outcomes.py` (6 commands), `cli_registry.py` (2 commands); entry point preserved at `cli.py`
 
