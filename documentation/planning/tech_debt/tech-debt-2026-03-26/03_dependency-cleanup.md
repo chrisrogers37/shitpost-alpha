@@ -1,5 +1,10 @@
 # Phase 03: Remove Unused Dependencies, Bump Safe Minors
 
+**Status:** ✅ COMPLETE
+**Started:** 2026-03-28
+**Completed:** 2026-03-28
+**PR:** #115
+
 ## Header
 
 | Field | Value |
@@ -121,7 +126,7 @@ The following changes are applied simultaneously in a single edit:
 9. **Bump `sqlalchemy[asyncio]`**: `>=2.0.47` to `>=2.0.48` (patch bump, no breaking changes).
 10. **Bump `psycopg[binary]`**: `>=3.2.0` to `>=3.3.0` (minor bump within same major, async driver improvements).
 11. **Bump `click`**: `>=8.1.0` to `>=8.3.0` (minor bump, bug fixes only).
-12. **Bump `rich`**: `>=13.0.0` to `>=14.3.0` (minor bump to match installed `14.1.0`; floor should be at or near installed version).
+12. **Bump `rich`**: `>=13.0.0` to `>=14.3.0` (minor bump; installed is 14.1.0, bumping floor to latest 14.x to stay current).
 
 ### Step 3: Write the new file
 
@@ -281,7 +286,7 @@ Add under `## [Unreleased]`:
 
 The bumped version floors (`>=2.0.48`, `>=3.3.0`, `>=8.3.0`, `>=14.3.0`) are all below or equal to the currently installed versions in production (sqlalchemy 2.0.47->2.0.48, psycopg 3.2.10->3.3.0 minimum, click 8.2.1->8.3.0 minimum, rich 14.1.0->14.3.0 minimum). On Railway's next deploy, `pip install` will pull the latest compatible versions, which are the same or newer than what is already running.
 
-**Risk**: psycopg `>=3.3.0` raises the floor above the currently installed `3.2.10`. This means pip will upgrade to `3.3.x` on next install. The psycopg 3.3.x series is backwards compatible with 3.2.x (same major version, non-breaking minor). The SQLAlchemy integration (`postgresql+psycopg://`) is stable across both.
+**Risk**: All four bumps raise floors above currently-installed versions (sqlalchemy 2.0.47→2.0.48, psycopg 3.2.10→3.3.x, click 8.2.1→8.3.x, rich 14.1.0→14.3.x). To mitigate, install the updated requirements locally and run the full test suite before committing. psycopg 3.3.x is backwards compatible with 3.2.x (same major version, non-breaking minor). The SQLAlchemy integration (`postgresql+psycopg://`) is stable across both.
 
 **Risk**: rich `>=14.3.0` raises the floor above the currently installed `14.1.0`. Rich 14.x is backwards compatible within the major version. Our usage is limited to CLI output formatting.
 
@@ -338,3 +343,5 @@ Even though `asyncpg` is not directly imported, it may be pulled in as a transit
 7. **Do NOT add new dependencies**. This PR is strictly about cleanup and minor bumps. Any new packages belong in their own PRs.
 
 8. **Do NOT forget to update CHANGELOG.md**. Every PR in this project requires a changelog entry per CLAUDE.md conventions.
+
+9. **Do NOT add `ruff` to requirements.txt**. The overview plan mentioned bumping ruff, but ruff is a dev-only tool not tracked in requirements.txt. It is excluded from this phase intentionally.

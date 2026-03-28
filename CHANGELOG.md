@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **Unused dependencies** — Removed 4 packages with zero imports: `asyncio-mqtt`, `apscheduler`, `asyncio-throttle`, `structlog`
+- **Stale comments** — Removed "Phase 2" planning comments from `requirements.txt`
+
+### Changed
+- **Dependency version bumps** — Safe minor/patch bumps: `sqlalchemy` 2.0.47→2.0.48, `psycopg` 3.2→3.3, `click` 8.2→8.3, `rich` 14.1→14.3
+- **Dependency annotations** — Added comments for non-obvious deps: `twilio` (lazy import), `psycopg2-binary` (sync driver, remove when Dash retired), `asyncpg` (URL cleanup only)
+
 ### Added
 - **Notifications DB test coverage** — 62 tests for all 13 functions in `notifications/db.py`
   - Subscription CRUD: get, create, update, deactivate, reactivation flows
