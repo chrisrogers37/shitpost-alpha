@@ -1,5 +1,8 @@
 # Phase 04: Decompose outcome_calculator + Split market_data CLI
 
+**Status:** 🔧 IN PROGRESS
+**Started:** 2026-03-28
+
 - **PR Title**: `refactor: decompose outcome_calculator + split market_data CLI`
 - **Risk**: Medium (refactoring actively-used production code, but 725-line test file provides safety net)
 - **Estimated Effort**: Medium
@@ -19,7 +22,7 @@
 2. **Trading-day timeframe filling** (lines 248-311) — iterating T+1/T+3/T+7/T+30 and computing returns/correctness/PnL
 3. **Intraday price filling** (lines 313-381) — same_day and 1h price snapshots
 
-Similarly, `shit/market_data/cli.py` is 754 lines containing 14 Click commands that serve three unrelated domains: price fetching, outcome calculation, and ticker registry management. Finding a specific command requires scrolling through the entire file.
+Similarly, `shit/market_data/cli.py` is 754 lines containing 13 Click commands that serve three unrelated domains: price fetching, outcome calculation, and ticker registry management. Finding a specific command requires scrolling through the entire file.
 
 Both files are actively used in production (Railway cron workers call the outcome calculator; developers use the CLI for ad-hoc operations). The existing 725-line test file (`test_outcome_calculator.py`) and 354-line CLI test file (`test_market_data_cli.py`) provide a comprehensive safety net for this refactoring.
 
@@ -1362,16 +1365,24 @@ CALC_PATCH = "shit.market_data.cli.OutcomeCalculator"  # NEEDS UPDATE — see be
 CALC_PATCH = "shit.market_data.cli_outcomes.OutcomeCalculator"
 ```
 
-**This is the one test file change required.** Edit line 24 of `test_market_data_cli.py`:
+**Two test files require patch path updates.** After the split, `OutcomeCalculator` is imported in `cli_outcomes.py`, not `cli.py`.
 
-**Before** (line 24):
+**File 1: `test_market_data_cli.py`** — Edit line 24:
+
 ```python
+# Before:
 CALC_PATCH = "shit.market_data.cli.OutcomeCalculator"
+# After:
+CALC_PATCH = "shit.market_data.cli_outcomes.OutcomeCalculator"
 ```
 
-**After**:
+**File 2: `test_outcome_maturation.py`** — 4 inline patch strings at lines 337, 360, 381, 402:
+
 ```python
-CALC_PATCH = "shit.market_data.cli_outcomes.OutcomeCalculator"
+# Before (each instance):
+@patch("shit.market_data.cli.OutcomeCalculator")
+# After:
+@patch("shit.market_data.cli_outcomes.OutcomeCalculator")
 ```
 
 No other test changes are needed. The `runner.invoke(cli, ["auto-pipeline"])` calls still work because `cli` is still imported from `shit.market_data.cli` and the `auto_pipeline` command is registered on it.
@@ -1434,14 +1445,15 @@ The outer `_calculate_single_outcome` still commits/logs at the end, and the out
 4. [ ] `__main__.py` unchanged (still imports `cli` from `shit.market_data.cli`)
 5. [ ] `__init__.py` unchanged (does not import CLI symbols)
 6. [ ] `CALC_PATCH` in `test_market_data_cli.py` updated to `"shit.market_data.cli_outcomes.OutcomeCalculator"`
-7. [ ] Run: `./venv/bin/python -m pytest shit_tests/shit/market_data/test_outcome_calculator.py -v` — all pass
-8. [ ] Run: `./venv/bin/python -m pytest shit_tests/shit/market_data/test_market_data_cli.py -v` — all pass
-9. [ ] Run: `./venv/bin/python -m pytest shit_tests/shit/market_data/ -v` — full market_data test suite passes
-10. [ ] Run: `./venv/bin/python -m ruff check shit/market_data/` — no lint errors
-11. [ ] Run: `./venv/bin/python -m ruff format shit/market_data/` — formatting clean
-12. [ ] Verify `python -m shit.market_data --help` still lists all 14 commands (import check)
-13. [ ] Verify command names are unchanged: `fetch-prices`, `update-all-prices`, `calculate-outcomes`, `fix-sentiments`, `mature-outcomes`, `accuracy-report`, `price-stats`, `health-check`, `auto-pipeline`, `auto-backfill`, `backfill-all-missing`, `ticker-registry`, `register-tickers`
-14. [ ] CHANGELOG.md updated
+7. [ ] 4 inline `@patch("shit.market_data.cli.OutcomeCalculator")` in `test_outcome_maturation.py` updated to `cli_outcomes`
+8. [ ] Run: `./venv/bin/python -m pytest shit_tests/shit/market_data/test_outcome_calculator.py -v` — all pass
+9. [ ] Run: `./venv/bin/python -m pytest shit_tests/shit/market_data/test_market_data_cli.py -v` — all pass
+10. [ ] Run: `./venv/bin/python -m pytest shit_tests/shit/market_data/ -v` — full market_data test suite passes
+11. [ ] Run: `./venv/bin/python -m ruff check shit/market_data/` — no lint errors
+12. [ ] Run: `./venv/bin/python -m ruff format shit/market_data/` — formatting clean
+13. [ ] Verify `python -m shit.market_data --help` still lists all 13 commands (import check)
+14. [ ] Verify command names are unchanged: `fetch-prices`, `update-all-prices`, `calculate-outcomes`, `fix-sentiments`, `mature-outcomes`, `accuracy-report`, `price-stats`, `health-check`, `auto-pipeline`, `auto-backfill`, `backfill-all-missing`, `ticker-registry`, `register-tickers`
+15. [ ] CHANGELOG.md updated
 
 ---
 
@@ -1457,7 +1469,7 @@ The outer `_calculate_single_outcome` still commits/logs at the end, and the out
 
 5. **Do NOT add the new CLI submodules to `__init__.py`'s `__all__`.** CLI modules are not part of the public API. They are only used via `python -m shit.market_data`.
 
-6. **Do NOT forget to update `CALC_PATCH` in the test file.** After the split, `OutcomeCalculator` is imported in `cli_outcomes.py`, not `cli.py`. Patching the old path will cause tests to fail because the mock won't intercept the real import.
+6. **Do NOT forget to update `CALC_PATCH` in BOTH test files.** `test_market_data_cli.py` (line 24 constant) and `test_outcome_maturation.py` (4 inline `@patch` strings). After the split, `OutcomeCalculator` is imported in `cli_outcomes.py`, not `cli.py`. Patching the old path will cause tests to fail because the mock won't intercept the real import.
 
 7. **Do NOT change the `price_t0` variable to just use `base_price` float everywhere in `_fill_timeframe_prices`.** The helper receives `base_price` as a float (the closing price), but the timeframe loop calls `outcome.calculate_return(base_price, price_tn.close)`. This is correct — `base_price` is already a float, and `price_tn.close` is also a float. Do NOT try to pass the full `MarketPrice` object.
 

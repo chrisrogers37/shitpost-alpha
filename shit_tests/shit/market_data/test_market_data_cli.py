@@ -21,7 +21,7 @@ from shit.market_data.cli import cli
 BACKFILL_PATCH = "shit.market_data.auto_backfill_service.auto_backfill_recent"
 LOGGER_PATCH = "shit.logging.get_service_logger"
 # OutcomeCalculator is imported at the top of cli.py, so patch on the cli module.
-CALC_PATCH = "shit.market_data.cli.OutcomeCalculator"
+CALC_PATCH = "shit.market_data.cli_outcomes.OutcomeCalculator"
 
 
 def _mock_calculator(outcome_stats):

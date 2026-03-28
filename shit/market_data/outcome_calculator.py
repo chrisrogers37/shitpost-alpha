@@ -213,7 +213,58 @@ class OutcomeCalculator:
             )
         )
 
-        # Get price at prediction time
+        # Step 1: Resolve base price (T+0)
+        base_price = self._resolve_base_price(symbol, prediction_date, prediction_id)
+        if base_price is None:
+            return None
+
+        outcome.price_at_prediction = base_price
+
+        # Step 2: Fill trading-day timeframe prices (T+1, T+3, T+7, T+30)
+        self._fill_timeframe_prices(
+            outcome, symbol, prediction_date, base_price, sentiment
+        )
+
+        # Step 3: Fill intraday prices (same-day close, +1 hour)
+        if post_datetime and base_price:
+            self._fill_intraday_prices(outcome, symbol, post_datetime, sentiment)
+
+        outcome.last_price_update = date.today()
+
+        # Save to database
+        if not existing:
+            self.session.add(outcome)
+
+        self.session.commit()
+
+        logger.info(
+            f"Calculated outcome for {symbol} in prediction {prediction_id}",
+            extra={
+                "prediction_id": prediction_id,
+                "symbol": symbol,
+                "sentiment": sentiment,
+                "return_t7": outcome.return_t7,
+                "correct_t7": outcome.correct_t7,
+            },
+        )
+
+        return outcome
+
+    def _resolve_base_price(
+        self,
+        symbol: str,
+        prediction_date: date,
+        prediction_id: int,
+    ) -> Optional[float]:
+        """Fetch the closing price on the prediction date, with retry.
+
+        Tries the local database first. If no price is found, fetches
+        a 7-day window from the market data provider and retries.
+
+        Returns:
+            The closing price as a float, or None if unavailable
+            (also adds the symbol to ``_failed_symbols`` on failure).
+        """
         price_t0 = self.market_client.get_price_on_date(symbol, prediction_date)
         if not price_t0:
             # Try to fetch it
@@ -243,9 +294,25 @@ class OutcomeCalculator:
             )
             return None
 
-        outcome.price_at_prediction = price_t0.close
+        return price_t0.close
 
-        # Calculate outcomes for trading-day timeframes
+    def _fill_timeframe_prices(
+        self,
+        outcome: PredictionOutcome,
+        symbol: str,
+        prediction_date: date,
+        base_price: float,
+        sentiment: Optional[str],
+    ) -> None:
+        """Fill trading-day timeframe fields (T+1, T+3, T+7, T+30) on an outcome.
+
+        For each timeframe, calculates the target trading day, fetches the
+        closing price, and sets the price/return/correctness/PnL attributes.
+        Sets ``outcome.is_complete = False`` if any target date is in the
+        future or if the price cannot be fetched.
+
+        Mutates ``outcome`` in place; returns nothing.
+        """
         # NOTE: These are TRADING DAYS, not calendar days.
         # T+1 on Friday = Monday. T+1 before a holiday skips the holiday.
         timeframes = [
@@ -295,7 +362,7 @@ class OutcomeCalculator:
                 setattr(outcome, price_attr, price_tn.close)
 
                 # Calculate return
-                return_pct = outcome.calculate_return(price_t0.close, price_tn.close)
+                return_pct = outcome.calculate_return(base_price, price_tn.close)
                 setattr(outcome, return_attr, return_pct)
 
                 # Determine if prediction was correct
@@ -310,96 +377,86 @@ class OutcomeCalculator:
             else:
                 outcome.is_complete = False
 
-        # -- Intraday timeframes (same-day close, +1 hour) --------------------
-        # Only attempt for predictions where we have the full post datetime
-        if post_datetime and price_t0:
-            outcome.post_published_at = post_datetime
+    def _fill_intraday_prices(
+        self,
+        outcome: PredictionOutcome,
+        symbol: str,
+        post_published_at: datetime,
+        sentiment: Optional[str],
+    ) -> None:
+        """Fill intraday price fields (same-day close, +1 hour) on an outcome.
 
-            # Only fetch intraday for outcomes that don't already have it
-            if outcome.price_at_post is None:
-                try:
-                    snapshot = fetch_intraday_snapshot(symbol, post_datetime)
-                    outcome.price_at_post = snapshot.price_at_post
-                    outcome.price_1h_after = snapshot.price_1h_after
-                    # Prefer daily close from MarketPrice over intraday last bar
-                    if outcome.price_at_next_close is None:
-                        # Get the next trading day's close for "same-day close"
-                        next_close_date = self._calendar.nearest_trading_day(
-                            post_datetime.date()
+        Only fetches intraday data when ``outcome.price_at_post`` is still
+        None (avoids redundant API calls on re-evaluation).
+
+        Mutates ``outcome`` in place; returns nothing.
+        """
+        outcome.post_published_at = post_published_at
+
+        # Only fetch intraday for outcomes that don't already have it
+        if outcome.price_at_post is None:
+            try:
+                snapshot = fetch_intraday_snapshot(symbol, post_published_at)
+                outcome.price_at_post = snapshot.price_at_post
+                outcome.price_1h_after = snapshot.price_1h_after
+                # Prefer daily close from MarketPrice over intraday last bar
+                if outcome.price_at_next_close is None:
+                    # Get the next trading day's close for "same-day close"
+                    next_close_date = self._calendar.nearest_trading_day(
+                        post_published_at.date()
+                    )
+                    # If post is after market close, next close is next trading day
+                    if self._calendar.is_trading_day(post_published_at.date()):
+                        close_time = self._calendar.session_close_time(
+                            post_published_at.date()
                         )
-                        # If post is after market close, next close is next trading day
-                        if self._calendar.is_trading_day(post_datetime.date()):
-                            close_time = self._calendar.session_close_time(
-                                post_datetime.date()
+                        if close_time and post_published_at >= close_time:
+                            next_close_date = self._calendar.next_trading_day(
+                                post_published_at.date()
                             )
-                            if close_time and post_datetime >= close_time:
-                                next_close_date = self._calendar.next_trading_day(
-                                    post_datetime.date()
-                                )
-                        next_close_price = self.market_client.get_price_on_date(
-                            symbol, next_close_date
-                        )
-                        if next_close_price:
-                            outcome.price_at_next_close = next_close_price.close
-                        elif snapshot.price_at_next_close:
-                            outcome.price_at_next_close = snapshot.price_at_next_close
-                except Exception as e:
-                    logger.debug(
-                        f"Intraday snapshot failed for {symbol}: {e}",
-                        extra={"symbol": symbol, "error": str(e)},
+                    next_close_price = self.market_client.get_price_on_date(
+                        symbol, next_close_date
                     )
+                    if next_close_price:
+                        outcome.price_at_next_close = next_close_price.close
+                    elif snapshot.price_at_next_close:
+                        outcome.price_at_next_close = snapshot.price_at_next_close
+            except Exception as e:
+                logger.debug(
+                    f"Intraday snapshot failed for {symbol}: {e}",
+                    extra={"symbol": symbol, "error": str(e)},
+                )
 
-            # Calculate intraday returns (from price_at_post, not price_at_prediction)
-            base_price = outcome.price_at_post
-            if base_price and base_price > 0:
-                # Same-day close return
-                if outcome.price_at_next_close is not None:
-                    outcome.return_same_day = outcome.calculate_return(
-                        base_price, outcome.price_at_next_close
-                    )
-                    outcome.correct_same_day = (
-                        outcome.is_correct(sentiment, outcome.return_same_day)
-                        if sentiment
-                        else None
-                    )
-                    outcome.pnl_same_day = outcome.calculate_pnl(
-                        outcome.return_same_day, position_size=1000.0
-                    )
+        # Calculate intraday returns (from price_at_post, not price_at_prediction)
+        intraday_base = outcome.price_at_post
+        if intraday_base and intraday_base > 0:
+            # Same-day close return
+            if outcome.price_at_next_close is not None:
+                outcome.return_same_day = outcome.calculate_return(
+                    intraday_base, outcome.price_at_next_close
+                )
+                outcome.correct_same_day = (
+                    outcome.is_correct(sentiment, outcome.return_same_day)
+                    if sentiment
+                    else None
+                )
+                outcome.pnl_same_day = outcome.calculate_pnl(
+                    outcome.return_same_day, position_size=1000.0
+                )
 
-                # 1-hour return
-                if outcome.price_1h_after is not None:
-                    outcome.return_1h = outcome.calculate_return(
-                        base_price, outcome.price_1h_after
-                    )
-                    outcome.correct_1h = (
-                        outcome.is_correct(sentiment, outcome.return_1h)
-                        if sentiment
-                        else None
-                    )
-                    outcome.pnl_1h = outcome.calculate_pnl(
-                        outcome.return_1h, position_size=1000.0
-                    )
-
-        outcome.last_price_update = date.today()
-
-        # Save to database
-        if not existing:
-            self.session.add(outcome)
-
-        self.session.commit()
-
-        logger.info(
-            f"Calculated outcome for {symbol} in prediction {prediction_id}",
-            extra={
-                "prediction_id": prediction_id,
-                "symbol": symbol,
-                "sentiment": sentiment,
-                "return_t7": outcome.return_t7,
-                "correct_t7": outcome.correct_t7,
-            },
-        )
-
-        return outcome
+            # 1-hour return
+            if outcome.price_1h_after is not None:
+                outcome.return_1h = outcome.calculate_return(
+                    intraday_base, outcome.price_1h_after
+                )
+                outcome.correct_1h = (
+                    outcome.is_correct(sentiment, outcome.return_1h)
+                    if sentiment
+                    else None
+                )
+                outcome.pnl_1h = outcome.calculate_pnl(
+                    outcome.return_1h, position_size=1000.0
+                )
 
     def calculate_outcomes_for_all_predictions(
         self,
@@ -642,7 +699,7 @@ class OutcomeCalculator:
             Timezone-aware datetime (UTC), or None.
         """
         # Prefer denormalized post_timestamp (avoids N+1 lazy loading)
-        if getattr(prediction, 'post_timestamp', None):
+        if getattr(prediction, "post_timestamp", None):
             ts = prediction.post_timestamp
             if ts.tzinfo is None:
                 ts = ts.replace(tzinfo=timezone.utc)
