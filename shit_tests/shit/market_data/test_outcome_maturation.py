@@ -334,7 +334,7 @@ class TestMatureOutcomesCLI:
         result = runner.invoke(cli, ["--help"])
         assert "mature-outcomes" in result.output
 
-    @patch("shit.market_data.cli.OutcomeCalculator")
+    @patch("shit.market_data.cli_outcomes.OutcomeCalculator")
     def test_default_run(self, mock_calc_class, runner):
         from shit.market_data.cli import cli
 
@@ -357,7 +357,7 @@ class TestMatureOutcomesCLI:
         assert "Newly complete: 2" in result.output
         mock_calc.mature_outcomes.assert_called_once_with(limit=None, emit_event=False)
 
-    @patch("shit.market_data.cli.OutcomeCalculator")
+    @patch("shit.market_data.cli_outcomes.OutcomeCalculator")
     def test_with_limit(self, mock_calc_class, runner):
         from shit.market_data.cli import cli
 
@@ -378,7 +378,7 @@ class TestMatureOutcomesCLI:
         assert result.exit_code == 0
         mock_calc.mature_outcomes.assert_called_once_with(limit=10, emit_event=False)
 
-    @patch("shit.market_data.cli.OutcomeCalculator")
+    @patch("shit.market_data.cli_outcomes.OutcomeCalculator")
     def test_with_emit_event_flag(self, mock_calc_class, runner):
         from shit.market_data.cli import cli
 
@@ -399,7 +399,7 @@ class TestMatureOutcomesCLI:
         assert result.exit_code == 0
         mock_calc.mature_outcomes.assert_called_once_with(limit=None, emit_event=True)
 
-    @patch("shit.market_data.cli.OutcomeCalculator")
+    @patch("shit.market_data.cli_outcomes.OutcomeCalculator")
     def test_error_handling(self, mock_calc_class, runner):
         from shit.market_data.cli import cli
 

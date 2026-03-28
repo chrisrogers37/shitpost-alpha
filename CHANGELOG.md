@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Outcome Calculator** — Decomposed 245-line `_calculate_single_outcome` into 3 focused helpers: `_resolve_base_price`, `_fill_timeframe_prices`, `_fill_intraday_prices`
+- **Market Data CLI** — Split 754-line CLI into domain submodules: `cli_fetch.py` (5 commands), `cli_outcomes.py` (6 commands), `cli_registry.py` (2 commands); entry point preserved at `cli.py`
+
 ### Removed
 - **Unused dependencies** — Removed 4 packages with zero imports: `asyncio-mqtt`, `apscheduler`, `asyncio-throttle`, `structlog`
 - **Stale comments** — Removed "Phase 2" planning comments from `requirements.txt`
