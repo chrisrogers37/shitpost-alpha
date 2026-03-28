@@ -27,10 +27,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS for local development (Vite on :5173, API on :8000)
+# CORS — restrict origins in production, allow all in development
+_default_origins = "https://shitpost-alpha-web-production.up.railway.app"
+_allowed_origins_str = os.environ.get("ALLOWED_ORIGINS", _default_origins)
+_environment = os.environ.get("ENVIRONMENT", "production")
+
+if _environment == "development":
+    _allowed_origins = ["*"]
+else:
+    _allowed_origins = [o.strip() for o in _allowed_origins_str.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -63,7 +72,9 @@ if os.path.isdir(_frontend_dir):
         # Serve actual files (eagle.svg, favicon, etc.) if they exist
         if full_path:
             file_path = os.path.realpath(os.path.join(_frontend_dir, full_path))
-            if file_path.startswith(os.path.realpath(_frontend_dir)) and os.path.isfile(file_path):
+            if file_path.startswith(os.path.realpath(_frontend_dir)) and os.path.isfile(
+                file_path
+            ):
                 return FileResponse(file_path)
         # SPA fallback — serve index.html for client-side routing
         index = os.path.join(_frontend_dir, "index.html")
