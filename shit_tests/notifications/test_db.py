@@ -4,8 +4,6 @@ import json
 from datetime import datetime
 from unittest.mock import MagicMock
 
-import pytest
-
 from notifications.db import (
     _row_to_dict,
     _rows_to_dicts,
@@ -41,7 +39,11 @@ class TestRowToDict:
 
         result = _row_to_dict(mock_result)
 
-        assert result == {"chat_id": "chat_123", "chat_type": "private", "is_active": True}
+        assert result == {
+            "chat_id": "chat_123",
+            "chat_type": "private",
+            "is_active": True,
+        }
 
     def test_returns_first_row_when_multiple_rows(self):
         """When multiple rows exist, only the first row is returned."""
@@ -54,7 +56,11 @@ class TestRowToDict:
 
         result = _row_to_dict(mock_result)
 
-        assert result == {"chat_id": "chat_1", "chat_type": "private", "is_active": True}
+        assert result == {
+            "chat_id": "chat_1",
+            "chat_type": "private",
+            "is_active": True,
+        }
 
     def test_returns_none_for_empty_result(self):
         """An empty result set returns None."""
@@ -128,15 +134,46 @@ class TestGetSubscription:
         """Returns a dict when a matching subscription exists."""
         mock_result = MagicMock()
         mock_result.fetchall.return_value = [
-            (1, "12345", "private", "testuser", "Test", "User",
-             None, True, None, None, "{}", None, 5, None, 0, None, None, None)
+            (
+                1,
+                "12345",
+                "private",
+                "testuser",
+                "Test",
+                "User",
+                None,
+                True,
+                None,
+                None,
+                "{}",
+                None,
+                5,
+                None,
+                0,
+                None,
+                None,
+                None,
+            )
         ]
         mock_result.keys.return_value = [
-            "id", "chat_id", "chat_type", "username", "first_name", "last_name",
-            "title", "is_active", "subscribed_at", "unsubscribed_at",
-            "alert_preferences", "last_alert_at", "alerts_sent_count",
-            "last_interaction_at", "consecutive_errors", "last_error",
-            "created_at", "updated_at",
+            "id",
+            "chat_id",
+            "chat_type",
+            "username",
+            "first_name",
+            "last_name",
+            "title",
+            "is_active",
+            "subscribed_at",
+            "unsubscribed_at",
+            "alert_preferences",
+            "last_alert_at",
+            "alerts_sent_count",
+            "last_interaction_at",
+            "consecutive_errors",
+            "last_error",
+            "created_at",
+            "updated_at",
         ]
         mock_sync_session.execute.return_value = mock_result
 
@@ -191,13 +228,51 @@ class TestGetActiveSubscriptions:
         """Returns a list of dicts for active subscriptions."""
         mock_result = MagicMock()
         mock_result.fetchall.return_value = [
-            (1, "chat_1", "private", "user1", "Alice", None, None, True, None, "{}", None, 3, 0),
-            (2, "chat_2", "group", None, None, None, "My Group", True, None, "{}", None, 7, 1),
+            (
+                1,
+                "chat_1",
+                "private",
+                "user1",
+                "Alice",
+                None,
+                None,
+                True,
+                None,
+                "{}",
+                None,
+                3,
+                0,
+            ),
+            (
+                2,
+                "chat_2",
+                "group",
+                None,
+                None,
+                None,
+                "My Group",
+                True,
+                None,
+                "{}",
+                None,
+                7,
+                1,
+            ),
         ]
         mock_result.keys.return_value = [
-            "id", "chat_id", "chat_type", "username", "first_name", "last_name",
-            "title", "is_active", "subscribed_at", "alert_preferences",
-            "last_alert_at", "alerts_sent_count", "consecutive_errors",
+            "id",
+            "chat_id",
+            "chat_type",
+            "username",
+            "first_name",
+            "last_name",
+            "title",
+            "is_active",
+            "subscribed_at",
+            "alert_preferences",
+            "last_alert_at",
+            "alerts_sent_count",
+            "consecutive_errors",
         ]
         mock_sync_session.execute.return_value = mock_result
 
@@ -212,9 +287,19 @@ class TestGetActiveSubscriptions:
         mock_result = MagicMock()
         mock_result.fetchall.return_value = []
         mock_result.keys.return_value = [
-            "id", "chat_id", "chat_type", "username", "first_name", "last_name",
-            "title", "is_active", "subscribed_at", "alert_preferences",
-            "last_alert_at", "alerts_sent_count", "consecutive_errors",
+            "id",
+            "chat_id",
+            "chat_type",
+            "username",
+            "first_name",
+            "last_name",
+            "title",
+            "is_active",
+            "subscribed_at",
+            "alert_preferences",
+            "last_alert_at",
+            "alerts_sent_count",
+            "consecutive_errors",
         ]
         mock_sync_session.execute.return_value = mock_result
 
@@ -250,7 +335,9 @@ class TestCreateSubscription:
 
         mock_sync_session.execute.side_effect = [mock_result_select, mock_result_insert]
 
-        result = create_subscription("99999", "private", username="newuser", first_name="New")
+        result = create_subscription(
+            "99999", "private", username="newuser", first_name="New"
+        )
 
         assert result is True
         # Verify INSERT was called (second execute call)
@@ -270,15 +357,46 @@ class TestCreateSubscription:
         # get_subscription returns an inactive sub
         mock_result_select = MagicMock()
         mock_result_select.fetchall.return_value = [
-            (1, "12345", "private", "user", "Test", None,
-             None, False, None, None, "{}", None, 0, None, 0, None, None, None)
+            (
+                1,
+                "12345",
+                "private",
+                "user",
+                "Test",
+                None,
+                None,
+                False,
+                None,
+                None,
+                "{}",
+                None,
+                0,
+                None,
+                0,
+                None,
+                None,
+                None,
+            )
         ]
         mock_result_select.keys.return_value = [
-            "id", "chat_id", "chat_type", "username", "first_name", "last_name",
-            "title", "is_active", "subscribed_at", "unsubscribed_at",
-            "alert_preferences", "last_alert_at", "alerts_sent_count",
-            "last_interaction_at", "consecutive_errors", "last_error",
-            "created_at", "updated_at",
+            "id",
+            "chat_id",
+            "chat_type",
+            "username",
+            "first_name",
+            "last_name",
+            "title",
+            "is_active",
+            "subscribed_at",
+            "unsubscribed_at",
+            "alert_preferences",
+            "last_alert_at",
+            "alerts_sent_count",
+            "last_interaction_at",
+            "consecutive_errors",
+            "last_error",
+            "created_at",
+            "updated_at",
         ]
 
         # update_subscription (called internally for reactivation)
@@ -294,15 +412,46 @@ class TestCreateSubscription:
         """Returns True immediately if subscription already exists and is active."""
         mock_result_select = MagicMock()
         mock_result_select.fetchall.return_value = [
-            (1, "12345", "private", "user", "Test", None,
-             None, True, None, None, "{}", None, 5, None, 0, None, None, None)
+            (
+                1,
+                "12345",
+                "private",
+                "user",
+                "Test",
+                None,
+                None,
+                True,
+                None,
+                None,
+                "{}",
+                None,
+                5,
+                None,
+                0,
+                None,
+                None,
+                None,
+            )
         ]
         mock_result_select.keys.return_value = [
-            "id", "chat_id", "chat_type", "username", "first_name", "last_name",
-            "title", "is_active", "subscribed_at", "unsubscribed_at",
-            "alert_preferences", "last_alert_at", "alerts_sent_count",
-            "last_interaction_at", "consecutive_errors", "last_error",
-            "created_at", "updated_at",
+            "id",
+            "chat_id",
+            "chat_type",
+            "username",
+            "first_name",
+            "last_name",
+            "title",
+            "is_active",
+            "subscribed_at",
+            "unsubscribed_at",
+            "alert_preferences",
+            "last_alert_at",
+            "alerts_sent_count",
+            "last_interaction_at",
+            "consecutive_errors",
+            "last_error",
+            "created_at",
+            "updated_at",
         ]
         mock_sync_session.execute.return_value = mock_result_select
 
@@ -561,7 +710,12 @@ class TestGetSubscriptionStats:
         mock_result = MagicMock()
         mock_result.fetchall.return_value = [(10, 8, 6, 2, 2, 150)]
         mock_result.keys.return_value = [
-            "total", "active", "private_chats", "groups", "channels", "total_alerts_sent"
+            "total",
+            "active",
+            "private_chats",
+            "groups",
+            "channels",
+            "total_alerts_sent",
         ]
         mock_sync_session.execute.return_value = mock_result
 
@@ -609,20 +763,27 @@ class TestGetNewPredictionsSince:
         mock_result.fetchall.return_value = [
             (
                 datetime(2026, 3, 15, 10, 0, 0),  # timestamp
-                "Big news about tariffs!",         # text
-                "post_123",                        # shitpost_id
-                42,                                # prediction_id
-                '["SPY", "DIA"]',                  # assets
-                '{"SPY": "bearish"}',              # market_impact
-                0.85,                              # confidence
-                "Tariffs likely to impact...",      # thesis
-                "completed",                       # analysis_status
+                "Big news about tariffs!",  # text
+                "post_123",  # shitpost_id
+                42,  # prediction_id
+                '["SPY", "DIA"]',  # assets
+                '{"SPY": "bearish"}',  # market_impact
+                0.85,  # confidence
+                "Tariffs likely to impact...",  # thesis
+                "completed",  # analysis_status
                 datetime(2026, 3, 15, 10, 5, 0),  # prediction_created_at
             ),
         ]
         mock_result.keys.return_value = [
-            "timestamp", "text", "shitpost_id", "prediction_id", "assets",
-            "market_impact", "confidence", "thesis", "analysis_status",
+            "timestamp",
+            "text",
+            "shitpost_id",
+            "prediction_id",
+            "assets",
+            "market_impact",
+            "confidence",
+            "thesis",
+            "analysis_status",
             "prediction_created_at",
         ]
         mock_sync_session.execute.return_value = mock_result
@@ -643,8 +804,15 @@ class TestGetNewPredictionsSince:
             (ts, "text", "post_1", 1, "[]", "{}", 0.9, "thesis", "completed", created),
         ]
         mock_result.keys.return_value = [
-            "timestamp", "text", "shitpost_id", "prediction_id", "assets",
-            "market_impact", "confidence", "thesis", "analysis_status",
+            "timestamp",
+            "text",
+            "shitpost_id",
+            "prediction_id",
+            "assets",
+            "market_impact",
+            "confidence",
+            "thesis",
+            "analysis_status",
             "prediction_created_at",
         ]
         mock_sync_session.execute.return_value = mock_result
@@ -659,11 +827,29 @@ class TestGetNewPredictionsSince:
         since = datetime(2026, 1, 1)
         mock_result = MagicMock()
         mock_result.fetchall.return_value = [
-            ("2026-03-15T10:00:00", "text", "post_1", 1, "[]", "{}", 0.9, "thesis", "completed", "2026-03-15T10:05:00"),
+            (
+                "2026-03-15T10:00:00",
+                "text",
+                "post_1",
+                1,
+                "[]",
+                "{}",
+                0.9,
+                "thesis",
+                "completed",
+                "2026-03-15T10:05:00",
+            ),
         ]
         mock_result.keys.return_value = [
-            "timestamp", "text", "shitpost_id", "prediction_id", "assets",
-            "market_impact", "confidence", "thesis", "analysis_status",
+            "timestamp",
+            "text",
+            "shitpost_id",
+            "prediction_id",
+            "assets",
+            "market_impact",
+            "confidence",
+            "thesis",
+            "analysis_status",
             "prediction_created_at",
         ]
         mock_sync_session.execute.return_value = mock_result
@@ -678,8 +864,15 @@ class TestGetNewPredictionsSince:
         mock_result = MagicMock()
         mock_result.fetchall.return_value = []
         mock_result.keys.return_value = [
-            "timestamp", "text", "shitpost_id", "prediction_id", "assets",
-            "market_impact", "confidence", "thesis", "analysis_status",
+            "timestamp",
+            "text",
+            "shitpost_id",
+            "prediction_id",
+            "assets",
+            "market_impact",
+            "confidence",
+            "thesis",
+            "analysis_status",
             "prediction_created_at",
         ]
         mock_sync_session.execute.return_value = mock_result
@@ -710,7 +903,10 @@ class TestGetPredictionStats:
         mock_result = MagicMock()
         mock_result.fetchall.return_value = [(100, 60, 80, 0.15)]
         mock_result.keys.return_value = [
-            "total_predictions", "correct_count", "evaluated_count", "total_return",
+            "total_predictions",
+            "correct_count",
+            "evaluated_count",
+            "total_return",
         ]
         mock_sync_session.execute.return_value = mock_result
 
@@ -727,7 +923,10 @@ class TestGetPredictionStats:
         mock_result = MagicMock()
         mock_result.fetchall.return_value = [(5, 0, 0, 0)]
         mock_result.keys.return_value = [
-            "total_predictions", "correct_count", "evaluated_count", "total_return",
+            "total_predictions",
+            "correct_count",
+            "evaluated_count",
+            "total_return",
         ]
         mock_sync_session.execute.return_value = mock_result
 
@@ -741,7 +940,10 @@ class TestGetPredictionStats:
         mock_result = MagicMock()
         mock_result.fetchall.return_value = [(None, None, None, None)]
         mock_result.keys.return_value = [
-            "total_predictions", "correct_count", "evaluated_count", "total_return",
+            "total_predictions",
+            "correct_count",
+            "evaluated_count",
+            "total_return",
         ]
         mock_sync_session.execute.return_value = mock_result
 
@@ -782,12 +984,30 @@ class TestGetLatestPredictions:
         """Returns prediction dicts with LEFT JOINed outcome data."""
         mock_result = MagicMock()
         mock_result.fetchall.return_value = [
-            (1, '["AAPL"]', 0.9, '{"AAPL": "bullish"}', "Strong buy",
-             datetime(2026, 3, 15), "bullish", True, 0.05, "AAPL"),
+            (
+                1,
+                '["AAPL"]',
+                0.9,
+                '{"AAPL": "bullish"}',
+                "Strong buy",
+                datetime(2026, 3, 15),
+                "bullish",
+                True,
+                0.05,
+                "AAPL",
+            ),
         ]
         mock_result.keys.return_value = [
-            "prediction_id", "assets", "confidence", "market_impact", "thesis",
-            "created_at", "prediction_sentiment", "correct_t7", "return_t7", "symbol",
+            "prediction_id",
+            "assets",
+            "confidence",
+            "market_impact",
+            "thesis",
+            "created_at",
+            "prediction_sentiment",
+            "correct_t7",
+            "return_t7",
+            "symbol",
         ]
         mock_sync_session.execute.return_value = mock_result
 
@@ -807,8 +1027,16 @@ class TestGetLatestPredictions:
             (1, "[]", 0.8, "{}", "thesis", dt, None, None, None, None),
         ]
         mock_result.keys.return_value = [
-            "prediction_id", "assets", "confidence", "market_impact", "thesis",
-            "created_at", "prediction_sentiment", "correct_t7", "return_t7", "symbol",
+            "prediction_id",
+            "assets",
+            "confidence",
+            "market_impact",
+            "thesis",
+            "created_at",
+            "prediction_sentiment",
+            "correct_t7",
+            "return_t7",
+            "symbol",
         ]
         mock_sync_session.execute.return_value = mock_result
 
@@ -821,8 +1049,16 @@ class TestGetLatestPredictions:
         mock_result = MagicMock()
         mock_result.fetchall.return_value = []
         mock_result.keys.return_value = [
-            "prediction_id", "assets", "confidence", "market_impact", "thesis",
-            "created_at", "prediction_sentiment", "correct_t7", "return_t7", "symbol",
+            "prediction_id",
+            "assets",
+            "confidence",
+            "market_impact",
+            "thesis",
+            "created_at",
+            "prediction_sentiment",
+            "correct_t7",
+            "return_t7",
+            "symbol",
         ]
         mock_sync_session.execute.return_value = mock_result
 
@@ -837,8 +1073,16 @@ class TestGetLatestPredictions:
         mock_result = MagicMock()
         mock_result.fetchall.return_value = []
         mock_result.keys.return_value = [
-            "prediction_id", "assets", "confidence", "market_impact", "thesis",
-            "created_at", "prediction_sentiment", "correct_t7", "return_t7", "symbol",
+            "prediction_id",
+            "assets",
+            "confidence",
+            "market_impact",
+            "thesis",
+            "created_at",
+            "prediction_sentiment",
+            "correct_t7",
+            "return_t7",
+            "symbol",
         ]
         mock_sync_session.execute.return_value = mock_result
 
