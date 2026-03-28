@@ -23,8 +23,9 @@ async def handle_exceptions(error: Exception, context: str = "Unknown") -> None:
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(f"Full traceback: {traceback.format_exc()}")
     
-    # TODO: Add error reporting to external services (Sentry, etc.)
-    # TODO: Add metrics collection for error rates
+    # Deferred: Error reporting (Sentry) and metrics collection.
+    # Currently tracked via Railway service logs and the orchestrator
+    # log files. Re-evaluate when error volume warrants external tooling.
 
 
 def async_retry(

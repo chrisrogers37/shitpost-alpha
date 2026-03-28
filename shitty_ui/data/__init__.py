@@ -13,6 +13,11 @@ Internal structure:
     data/timeframe.py         -- Timeframe column mapping helper
 """
 
+# DEPRECATED: This module re-exports query functions for the legacy Dash
+# dashboard (shitty_ui/). The Dash dashboard is being retired in favor of
+# the React frontend (api/ + frontend/). Do not add new functions here.
+# New query work should go in api/queries/.
+
 # --- Timeframe helpers ---
 from data.timeframe import (  # noqa: F401
     get_tf_columns,

@@ -1,5 +1,8 @@
 # Phase 05: Resolve TODOs, Add Legacy Documentation
 
+**Status**: `🔧 IN PROGRESS`
+**Started**: 2026-03-28
+
 **PR Title**: `chore: resolve TODOs, add legacy documentation`
 **Risk**: Low (comment-only changes, no behavior changes)
 **Estimated Effort**: Low (~30 minutes)
@@ -76,8 +79,8 @@ Resolving these TODOs replaces vague future intent with concrete decision record
     async def _test_connection(self) -> None:
         """Test Twitter API v2 connection.
 
-        NOTE: Skeleton -- implement when Twitter/X API access is obtained.
-        Not currently planned.
+        Skeleton — no implementation planned. Revisit if Twitter/X API
+        access is obtained.
         """
 ```
 
@@ -99,8 +102,8 @@ Resolving these TODOs replaces vague future intent with concrete decision record
     ) -> tuple[List[Dict], Optional[str]]:
         """Fetch a batch of tweets.
 
-        NOTE: Skeleton -- implement when Twitter/X API access is obtained.
-        Not currently planned.
+        Skeleton — no implementation planned. Revisit if Twitter/X API
+        access is obtained.
         """
 ```
 

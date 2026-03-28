@@ -63,7 +63,8 @@ class TwitterHarvester(SignalHarvester):
     async def _test_connection(self) -> None:
         """Test Twitter API v2 connection.
 
-        TODO: Implement with real Twitter API call.
+        Skeleton — no implementation planned. Revisit if Twitter/X API
+        access is obtained.
         """
         if not self.bearer_token:
             raise ValueError(
@@ -89,7 +90,8 @@ class TwitterHarvester(SignalHarvester):
     ) -> tuple[List[Dict], Optional[str]]:
         """Fetch a batch of tweets.
 
-        TODO: Implement with Twitter API v2 search or user timeline.
+        Skeleton — no implementation planned. Revisit if Twitter/X API
+        access is obtained.
         """
         raise NotImplementedError(
             "TwitterHarvester is a skeleton. "
