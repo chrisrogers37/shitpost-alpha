@@ -1,7 +1,7 @@
 import { useState, useCallback, CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { useFeedPost, usePrefetchAdjacentPosts } from "../api/hooks";
+import { useFeedPost, usePrefetchAdjacentPosts, usePriceData } from "../api/hooks";
 import { useKeyboardNav } from "../hooks/useKeyboardNav";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
@@ -9,6 +9,7 @@ import { ShitpostCard } from "../components/ShitpostCard";
 import { PredictionPanel } from "../components/PredictionPanel";
 import { TickerSelector } from "../components/TickerSelector";
 import { MetricBubbles } from "../components/MetricBubbles";
+import { PriceKPIs } from "../components/PriceKPIs";
 import { TimeframeToggle, timeframeToDays, type Timeframe } from "../components/TimeframeToggle";
 import { PriceChart } from "../components/PriceChart";
 import { NavigationArrows } from "../components/NavigationArrows";
@@ -122,6 +123,16 @@ export function FeedPage() {
   const activeTicker = selectedTicker || data.prediction.assets[0] || "";
   const activeOutcome = data.outcomes.find((o) => o.symbol === activeTicker);
 
+  // Price data for chart and KPIs (shared hook)
+  const priceQuery = usePriceData(
+    activeTicker || undefined,
+    timeframeToDays[timeframe],
+    data.post.timestamp,
+  );
+  const currentPrice = priceQuery.data?.candles?.length
+    ? priceQuery.data.candles[priceQuery.data.candles.length - 1].close
+    : null;
+
   return (
     <>
       <Header />
@@ -155,6 +166,11 @@ export function FeedPage() {
                   onSelect={setSelectedTicker}
                 />
 
+                <PriceKPIs
+                  priceAtPost={activeOutcome?.price_at_post ?? null}
+                  currentPrice={currentPrice}
+                />
+
                 <MetricBubbles outcome={activeOutcome} />
 
                 <TimeframeToggle selected={timeframe} onSelect={setTimeframe} />
@@ -162,8 +178,8 @@ export function FeedPage() {
                 {activeTicker && (
                   <PriceChart
                     symbol={activeTicker}
-                    days={timeframeToDays[timeframe]}
-                    postTimestamp={data.post.timestamp}
+                    data={priceQuery.data}
+                    isLoading={priceQuery.isLoading}
                   />
                 )}
               </>
