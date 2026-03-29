@@ -6,7 +6,7 @@ import {
   CrosshairMode,
   type IChartApi,
 } from "lightweight-charts";
-import { usePriceData } from "../api/hooks";
+import type { PriceResponse } from "../types/api";
 import { colors } from "../styles/theme";
 
 const containerStyle: CSSProperties = {
@@ -30,14 +30,13 @@ const loadingStyle: CSSProperties = {
 
 interface Props {
   symbol: string;
-  days: number;
-  postTimestamp: string;
+  data: PriceResponse | undefined;
+  isLoading: boolean;
 }
 
-export function PriceChart({ symbol, days, postTimestamp }: Props) {
+export function PriceChart({ symbol, data, isLoading }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const { data, isLoading } = usePriceData(symbol, days, postTimestamp);
 
   useEffect(() => {
     if (!containerRef.current || !data || data.candles.length === 0) return;
