@@ -9,7 +9,7 @@ Covers:
 - GET /api/health
 """
 
-from datetime import datetime
+from conftest import make_outcome_rows, make_post_row
 
 
 # ---------------------------------------------------------------------------
@@ -17,15 +17,55 @@ from datetime import datetime
 # ---------------------------------------------------------------------------
 
 
-def test_get_latest_post_happy_path(
-    client,
-    mock_execute_query,
-    sample_post_row,
-    sample_outcomes_rows,
-):
+def test_get_latest_post_happy_path(client, mock_execute_query):
     """GET /api/feed/latest returns a complete FeedResponse with post, prediction, outcomes."""
-    post_rows, post_cols = sample_post_row
-    outcome_rows, outcome_cols = sample_outcomes_rows
+    post_rows, post_cols = make_post_row()
+    outcome_rows, outcome_cols = make_outcome_rows(
+        {
+            "symbol": "AAPL",
+            "prediction_sentiment": "bearish",
+        },
+        {
+            "symbol": "TSLA",
+            "prediction_sentiment": "bullish",
+            "price_at_prediction": 245.00,
+            "price_at_post": 244.80,
+            "price_at_next_close": 246.50,
+            "price_1h_after": 245.50,
+            "price_t1": 248.00,
+            "price_t3": 252.00,
+            "price_t7": 260.00,
+            "price_t30": 240.00,
+            "return_t1": 1.22,
+            "return_t3": 2.86,
+            "return_t7": 6.12,
+            "return_t30": -2.04,
+            "return_same_day": 0.69,
+            "return_1h": 0.20,
+            "correct_t1": True,
+            "correct_t3": True,
+            "correct_t7": True,
+            "correct_t30": False,
+            "correct_same_day": True,
+            "correct_1h": True,
+            "pnl_t1": 12.20,
+            "pnl_t3": 28.60,
+            "pnl_t7": 61.20,
+            "pnl_t30": -20.40,
+            "pnl_same_day": 6.90,
+            "pnl_1h": 2.00,
+            "company_name": "Tesla Inc.",
+            "asset_type": "stock",
+            "exchange": "NASDAQ",
+            "sector": "Automotive",
+            "industry": "Auto Manufacturers",
+            "market_cap": 812000000000,
+            "pe_ratio": 68.4,
+            "forward_pe": 42.1,
+            "beta": 2.05,
+            "dividend_yield": None,
+        },
+    )
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
@@ -81,15 +121,12 @@ def test_get_latest_post_empty_database(client, mock_execute_query):
 # ---------------------------------------------------------------------------
 
 
-def test_get_post_at_offset_zero(
-    client,
-    mock_execute_query,
-    sample_post_row,
-    sample_outcomes_rows,
-):
+def test_get_post_at_offset_zero(client, mock_execute_query):
     """GET /api/feed/at?offset=0 behaves identically to /api/feed/latest."""
-    post_rows, post_cols = sample_post_row
-    outcome_rows, outcome_cols = sample_outcomes_rows
+    post_rows, post_cols = make_post_row()
+    outcome_rows, outcome_cols = make_outcome_rows(
+        {"symbol": "AAPL"}, {"symbol": "TSLA"}
+    )
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
@@ -108,15 +145,12 @@ def test_get_post_at_offset_zero(
 # ---------------------------------------------------------------------------
 
 
-def test_get_post_at_offset_five(
-    client,
-    mock_execute_query,
-    sample_post_row,
-    sample_outcomes_rows,
-):
+def test_get_post_at_offset_five(client, mock_execute_query):
     """GET /api/feed/at?offset=5 returns the 5th most recent analyzed post."""
-    post_rows, post_cols = sample_post_row
-    outcome_rows, outcome_cols = sample_outcomes_rows
+    post_rows, post_cols = make_post_row()
+    outcome_rows, outcome_cols = make_outcome_rows(
+        {"symbol": "AAPL"}, {"symbol": "TSLA"}
+    )
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
@@ -163,12 +197,12 @@ def test_get_post_at_negative_offset(client, mock_execute_query):
 # ---------------------------------------------------------------------------
 
 
-def test_navigation_has_newer_false_at_offset_zero(
-    client, mock_execute_query, sample_post_row, sample_outcomes_rows
-):
+def test_navigation_has_newer_false_at_offset_zero(client, mock_execute_query):
     """At offset=0, has_newer must be False (already at the newest post)."""
-    post_rows, post_cols = sample_post_row
-    outcome_rows, outcome_cols = sample_outcomes_rows
+    post_rows, post_cols = make_post_row()
+    outcome_rows, outcome_cols = make_outcome_rows(
+        {"symbol": "AAPL"}, {"symbol": "TSLA"}
+    )
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
@@ -187,12 +221,12 @@ def test_navigation_has_newer_false_at_offset_zero(
 # ---------------------------------------------------------------------------
 
 
-def test_navigation_has_older_false_at_last_post(
-    client, mock_execute_query, sample_post_row, sample_outcomes_rows
-):
+def test_navigation_has_older_false_at_last_post(client, mock_execute_query):
     """At offset = total - 1, has_older must be False (already at the oldest post)."""
-    post_rows, post_cols = sample_post_row
-    outcome_rows, outcome_cols = sample_outcomes_rows
+    post_rows, post_cols = make_post_row()
+    outcome_rows, outcome_cols = make_outcome_rows(
+        {"symbol": "AAPL"}, {"symbol": "TSLA"}
+    )
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
@@ -200,7 +234,7 @@ def test_navigation_has_older_false_at_last_post(
         ([], []),  # snapshots
     ]
 
-    # total_count is 42 in sample_post_row, so offset=41 is the last post
+    # total_count is 42 in make_post_row defaults, so offset=41 is the last post
     response = client.get("/api/feed/at?offset=41")
     assert response.status_code == 200
 
@@ -215,12 +249,12 @@ def test_navigation_has_older_false_at_last_post(
 # ---------------------------------------------------------------------------
 
 
-def test_navigation_mid_range_has_both_directions(
-    client, mock_execute_query, sample_post_row, sample_outcomes_rows
-):
+def test_navigation_mid_range_has_both_directions(client, mock_execute_query):
     """At a mid-range offset, both has_newer and has_older must be True."""
-    post_rows, post_cols = sample_post_row
-    outcome_rows, outcome_cols = sample_outcomes_rows
+    post_rows, post_cols = make_post_row()
+    outcome_rows, outcome_cols = make_outcome_rows(
+        {"symbol": "AAPL"}, {"symbol": "TSLA"}
+    )
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
@@ -241,11 +275,12 @@ def test_navigation_mid_range_has_both_directions(
 # ---------------------------------------------------------------------------
 
 
-def test_assets_json_string_parsed_to_list(
-    client, mock_execute_query, sample_post_row_json_strings
-):
+def test_assets_json_string_parsed_to_list(client, mock_execute_query):
     """When assets comes back as a JSON string from the DB, it gets parsed to a list."""
-    post_rows, post_cols = sample_post_row_json_strings
+    post_rows, post_cols = make_post_row(
+        assets='["SPY", "DIA"]',
+        market_impact='{"SPY": "bullish", "DIA": "bullish"}',
+    )
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
@@ -266,11 +301,12 @@ def test_assets_json_string_parsed_to_list(
 # ---------------------------------------------------------------------------
 
 
-def test_market_impact_json_string_parsed_to_dict(
-    client, mock_execute_query, sample_post_row_json_strings
-):
+def test_market_impact_json_string_parsed_to_dict(client, mock_execute_query):
     """When market_impact comes back as a JSON string, it gets parsed to a dict."""
-    post_rows, post_cols = sample_post_row_json_strings
+    post_rows, post_cols = make_post_row(
+        assets='["SPY", "DIA"]',
+        market_impact='{"SPY": "bullish", "DIA": "bullish"}',
+    )
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
@@ -291,42 +327,12 @@ def test_market_impact_json_string_parsed_to_dict(
 # ---------------------------------------------------------------------------
 
 
-def _make_minimal_post_row(overrides: dict) -> tuple[list[tuple], list[str]]:
-    """Build a post row with defaults, applying overrides."""
-    defaults = {
-        "shitpost_id": "post_test",
-        "text": "Test",
-        "content_html": None,
-        "timestamp": datetime(2026, 3, 25, 12, 0, 0),
-        "username": "realDonaldTrump",
-        "url": None,
-        "replies_count": 0, "reblogs_count": 0, "favourites_count": 0,
-        "upvotes_count": 0, "downvotes_count": 0,
-        "account_verified": False, "account_followers_count": None,
-        "card": None, "media_attachments": None,
-        "in_reply_to_id": None, "in_reply_to": None, "reblog": None,
-        "prediction_id": 999,
-        "assets": ["SPY"], "market_impact": {"SPY": "bullish"},
-        "confidence": 0.5, "thesis": "Thesis",
-        "analysis_status": "completed",
-        "engagement_score": None, "viral_score": None,
-        "sentiment_score": None, "urgency_score": None,
-        "total_count": 1,
-    }
-    defaults.update(overrides)
-    columns = list(defaults.keys())
-    row = tuple(defaults.values())
-    return ([row], columns)
-
-
-def test_post_with_none_text_defaults_to_empty_string(
-    client, mock_execute_query
-):
+def test_post_with_none_text_defaults_to_empty_string(client, mock_execute_query):
     """When text is None in the DB row, the response should use an empty string."""
-    post_rows, post_cols = _make_minimal_post_row({
-        "shitpost_id": "post_null_text",
-        "text": None,
-    })
+    post_rows, post_cols = make_post_row(
+        shitpost_id="post_null_text",
+        text=None,
+    )
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
@@ -344,17 +350,17 @@ def test_post_with_none_text_defaults_to_empty_string(
 # ---------------------------------------------------------------------------
 
 
-def test_post_with_none_engagement_defaults_to_zero(
-    client, mock_execute_query
-):
+def test_post_with_none_engagement_defaults_to_zero(client, mock_execute_query):
     """When engagement counts are None, the response should default them to 0."""
-    post_rows, post_cols = _make_minimal_post_row({
-        "shitpost_id": "post_none_eng",
-        "text": "Test post",
-        "replies_count": None, "reblogs_count": None,
-        "favourites_count": None, "upvotes_count": None,
-        "downvotes_count": None,
-    })
+    post_rows, post_cols = make_post_row(
+        shitpost_id="post_none_eng",
+        text="Test post",
+        replies_count=None,
+        reblogs_count=None,
+        favourites_count=None,
+        upvotes_count=None,
+        downvotes_count=None,
+    )
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
@@ -378,11 +384,9 @@ def test_post_with_none_engagement_defaults_to_zero(
 # ---------------------------------------------------------------------------
 
 
-def test_feed_response_with_no_outcomes(
-    client, mock_execute_query, sample_post_row
-):
+def test_feed_response_with_no_outcomes(client, mock_execute_query):
     """When there are no outcomes for a prediction, outcomes list is empty."""
-    post_rows, post_cols = sample_post_row
+    post_rows, post_cols = make_post_row()
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
@@ -402,14 +406,20 @@ def test_feed_response_with_no_outcomes(
 
 def test_scores_with_none_values(client, mock_execute_query):
     """When score fields are None, they serialize as null in the JSON response."""
-    post_rows, post_cols = _make_minimal_post_row({
-        "shitpost_id": "post_no_scores",
-        "replies_count": 5, "reblogs_count": 10,
-        "favourites_count": 20, "upvotes_count": 15,
-        "downvotes_count": 1,
-        "prediction_id": 505,
-        "confidence": 0.7,
-    })
+    post_rows, post_cols = make_post_row(
+        shitpost_id="post_no_scores",
+        replies_count=5,
+        reblogs_count=10,
+        favourites_count=20,
+        upvotes_count=15,
+        downvotes_count=1,
+        prediction_id=505,
+        confidence=0.7,
+        engagement_score=None,
+        viral_score=None,
+        sentiment_score=None,
+        urgency_score=None,
+    )
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
@@ -432,15 +442,12 @@ def test_scores_with_none_values(client, mock_execute_query):
 # ---------------------------------------------------------------------------
 
 
-def test_at_endpoint_default_offset_is_zero(
-    client,
-    mock_execute_query,
-    sample_post_row,
-    sample_outcomes_rows,
-):
+def test_at_endpoint_default_offset_is_zero(client, mock_execute_query):
     """GET /api/feed/at without offset param defaults to offset=0."""
-    post_rows, post_cols = sample_post_row
-    outcome_rows, outcome_cols = sample_outcomes_rows
+    post_rows, post_cols = make_post_row()
+    outcome_rows, outcome_cols = make_outcome_rows(
+        {"symbol": "AAPL"}, {"symbol": "TSLA"}
+    )
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
@@ -458,11 +465,9 @@ def test_at_endpoint_default_offset_is_zero(
 # ---------------------------------------------------------------------------
 
 
-def test_timestamp_serialized_as_iso_string(
-    client, mock_execute_query, sample_post_row
-):
+def test_timestamp_serialized_as_iso_string(client, mock_execute_query):
     """The post timestamp should be an ISO-format string in the response."""
-    post_rows, post_cols = sample_post_row
+    post_rows, post_cols = make_post_row()
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
