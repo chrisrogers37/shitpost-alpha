@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Feed API service extraction** — Extracted `_build_feed_response()` monolith into `FeedService` class (`api/services/feed_service.py`) with static builder methods; router shrinks from 226 to 30 lines (#120)
+- **Test fixture factory** — Replaced 4 duplicate post-row and 2 outcome-row construction patterns with `make_post_row()`, `make_outcome_row()`, `make_outcome_rows()` factory functions; future column additions require updating 1 place instead of 8 (#122)
+
 ### Added
 - **Post card enrichment** — Author profile (verified badge, follower count), market timing badges (PRE-MKT/OPEN/AFTER-HRS/WEEKEND with relative timing), link preview cards, reply/quote context, media thumbnails
 - **Fundamentals strip** — Company name, exchange, sector, market cap, P/E, forward P/E, beta, dividend yield below ticker pills (JOIN on `ticker_registry`)
