@@ -101,20 +101,26 @@ class TestMarketDataWorker:
 
         mock_snapshot_svc = MagicMock()
         mock_snapshot_svc.capture_for_prediction.return_value = [
-            MagicMock(), MagicMock(), MagicMock()
+            MagicMock(),
+            MagicMock(),
+            MagicMock(),
         ]
 
         mock_session = MagicMock()
 
-        with patch(
-            "shit.market_data.auto_backfill_service.AutoBackfillService",
-            return_value=mock_backfill,
-        ), patch(
-            "shit.market_data.snapshot_service.PriceSnapshotService",
-            return_value=mock_snapshot_svc,
-        ), patch(
-            "shit.db.sync_session.SessionLocal",
-            return_value=mock_session,
+        with (
+            patch(
+                "shit.market_data.auto_backfill_service.AutoBackfillService",
+                return_value=mock_backfill,
+            ),
+            patch(
+                "shit.market_data.snapshot_service.PriceSnapshotService",
+                return_value=mock_snapshot_svc,
+            ),
+            patch(
+                "shit.db.sync_session.SessionLocal",
+                return_value=mock_session,
+            ),
         ):
             worker = MarketDataWorker.__new__(MarketDataWorker)
             result = worker.process_event(
@@ -137,3 +143,56 @@ class TestMarketDataWorker:
                 "assets_backfilled": 3,
                 "outcomes_calculated": 2,
             }
+
+    def test_logs_warning_when_zero_snapshots_captured(self):
+        """Verify a warning is logged when snapshot capture returns 0 despite having assets.
+
+        What it verifies: When PriceSnapshotService.capture_for_prediction raises
+        an exception, snapshots_captured stays 0 and a warning is logged.
+        Mocking:
+          - PriceSnapshotService.capture_for_prediction raises RuntimeError
+          - AutoBackfillService.process_single_prediction returns (0, 0)
+          - SessionLocal context manager
+        Assertions:
+          - Warning log contains "No snapshots captured"
+          - Result has snapshots_captured=0
+        """
+        mock_backfill = MagicMock()
+        mock_backfill.process_single_prediction.return_value = (0, 0)
+
+        mock_snapshot_svc = MagicMock()
+        mock_snapshot_svc.capture_for_prediction.side_effect = RuntimeError(
+            "yfinance down"
+        )
+
+        mock_session = MagicMock()
+
+        with (
+            patch(
+                "shit.market_data.auto_backfill_service.AutoBackfillService",
+                return_value=mock_backfill,
+            ),
+            patch(
+                "shit.market_data.snapshot_service.PriceSnapshotService",
+                return_value=mock_snapshot_svc,
+            ),
+            patch(
+                "shit.db.sync_session.SessionLocal",
+                return_value=mock_session,
+            ),
+            patch("shit.market_data.event_consumer.logger") as mock_logger,
+        ):
+            worker = MarketDataWorker.__new__(MarketDataWorker)
+            result = worker.process_event(
+                "prediction_created",
+                {
+                    "prediction_id": 99,
+                    "assets": ["AAPL", "TSLA"],
+                    "analysis_status": "completed",
+                },
+            )
+
+            assert result["snapshots_captured"] == 0
+            # Should have warning about capture failure + warning about 0 snapshots
+            warning_calls = [str(c) for c in mock_logger.warning.call_args_list]
+            assert any("No snapshots captured" in w for w in warning_calls)

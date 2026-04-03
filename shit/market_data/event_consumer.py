@@ -60,9 +60,7 @@ class MarketDataWorker(EventWorker):
         post_published_at = None
         if payload.get("post_published_at"):
             try:
-                post_published_at = datetime.fromisoformat(
-                    payload["post_published_at"]
-                )
+                post_published_at = datetime.fromisoformat(payload["post_published_at"])
             except (ValueError, TypeError):
                 pass
 
@@ -79,8 +77,13 @@ class MarketDataWorker(EventWorker):
                 session.commit()
         except Exception as e:
             logger.warning(
-                f"Snapshot capture failed for prediction "
-                f"{prediction_id}: {e}"
+                f"Snapshot capture failed for prediction {prediction_id}: {e}"
+            )
+
+        if snapshots_captured == 0 and assets:
+            logger.warning(
+                f"No snapshots captured for prediction {prediction_id} "
+                f"despite having {len(assets)} assets: {assets}"
             )
 
         # Backfill price history + calculate outcomes
