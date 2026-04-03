@@ -1,45 +1,88 @@
 """Feed API router — single-post-at-a-time endpoint."""
 
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException, Query
 
 from api.queries.feed_queries import (
     get_analyzed_post_at_offset,
     get_outcomes_for_prediction,
-    get_total_analyzed_posts,
+    get_snapshots_for_prediction,
 )
 from api.schemas.feed import (
     Correct,
     Engagement,
     FeedResponse,
+    Fundamentals,
+    LinkPreview,
     Navigation,
     Outcome,
     Pnl,
     Post,
     Prediction,
+    PriceSnapshotSchema,
+    ReplyContext,
     Returns,
     Scores,
+)
+from shit.market_data.market_timing import (
+    compute_market_timing,
+    compute_marker_dates,
 )
 
 router = APIRouter()
 
 
+def _build_link_preview(card_data: dict | None) -> LinkPreview | None:
+    """Extract link preview from Truth Social card JSON."""
+    if not card_data or not isinstance(card_data, dict):
+        return None
+    title = card_data.get("title")
+    if not title:
+        return None
+    return LinkPreview(
+        title=title,
+        description=card_data.get("description"),
+        image=card_data.get("image"),
+        url=card_data.get("url"),
+        provider_name=card_data.get("provider_name"),
+    )
+
+
+def _build_reply_context(in_reply_to: dict | None) -> ReplyContext | None:
+    """Extract reply context from the in_reply_to JSON."""
+    if not in_reply_to or not isinstance(in_reply_to, dict):
+        return None
+    account = in_reply_to.get("account", {})
+    username = account.get("username") or account.get("acct")
+    # Use plain text content, falling back to stripping HTML
+    text = in_reply_to.get("text") or in_reply_to.get("content", "")
+    if not username and not text:
+        return None
+    return ReplyContext(username=username, text=text[:200] if text else None)
+
+
 def _build_feed_response(offset: int) -> FeedResponse:
     """Build a complete feed response for a given offset."""
-    row = get_analyzed_post_at_offset(offset)
-    if row is None:
+    result = get_analyzed_post_at_offset(offset)
+    if result is None:
         raise HTTPException(status_code=404, detail="No post found at this offset")
 
-    total = get_total_analyzed_posts()
+    row, total = result
     outcomes_raw = get_outcomes_for_prediction(row["prediction_id"])
+
+    # Compute market timing from post timestamp
+    ts = row["timestamp"]
+    if isinstance(ts, str):
+        ts = datetime.fromisoformat(ts)
+    market_timing, minutes_to_market = compute_market_timing(ts)
 
     # Build post
     post = Post(
         shitpost_id=row["shitpost_id"],
         text=row["text"] or "",
         content_html=row.get("content_html"),
-        timestamp=row["timestamp"].isoformat()
-        if hasattr(row["timestamp"], "isoformat")
-        else str(row["timestamp"]),
+        timestamp=ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
         username=row["username"] or "",
         url=row.get("url"),
         engagement=Engagement(
@@ -49,6 +92,14 @@ def _build_feed_response(offset: int) -> FeedResponse:
             upvotes=row.get("upvotes_count") or 0,
             downvotes=row.get("downvotes_count") or 0,
         ),
+        verified=bool(row.get("account_verified")),
+        followers_count=row.get("account_followers_count"),
+        card=_build_link_preview(row.get("card")),
+        media_attachments=row.get("media_attachments") or [],
+        reply_context=_build_reply_context(row.get("in_reply_to")),
+        is_repost=row.get("reblog") is not None,
+        market_timing=market_timing,
+        minutes_to_market=minutes_to_market,
     )
 
     # Build prediction
@@ -69,9 +120,45 @@ def _build_feed_response(offset: int) -> FeedResponse:
         ),
     )
 
+    # Fetch price snapshots for this prediction
+    snapshots_by_symbol = get_snapshots_for_prediction(
+        row["prediction_id"]
+    )
+
     # Build outcomes
     outcomes = []
     for o in outcomes_raw:
+        # Build fundamentals from ticker_registry JOIN
+        has_fundamentals = o.get("company_name") is not None
+        fundamentals = Fundamentals(
+            company_name=o.get("company_name"),
+            asset_type=o.get("asset_type"),
+            exchange=o.get("exchange"),
+            sector=o.get("sector"),
+            industry=o.get("industry"),
+            market_cap=o.get("market_cap"),
+            pe_ratio=o.get("pe_ratio"),
+            forward_pe=o.get("forward_pe"),
+            beta=o.get("beta"),
+            dividend_yield=o.get("dividend_yield"),
+        ) if has_fundamentals else None
+
+        # Build price snapshot from captured data
+        snap_data = snapshots_by_symbol.get(o["symbol"])
+        price_snapshot = PriceSnapshotSchema(
+            **snap_data
+        ) if snap_data else None
+
+        # Compute T+N marker dates for chart annotations
+        pred_date = o.get("prediction_date")
+        marker_dates = compute_marker_dates(pred_date, o)
+        if hasattr(pred_date, "isoformat"):
+            pred_date_str = pred_date.isoformat()
+        elif pred_date:
+            pred_date_str = str(pred_date)
+        else:
+            pred_date_str = None
+
         outcomes.append(
             Outcome(
                 symbol=o["symbol"],
@@ -104,6 +191,10 @@ def _build_feed_response(offset: int) -> FeedResponse:
                     t30=o.get("pnl_t30"),
                 ),
                 is_complete=o.get("is_complete", False) or False,
+                fundamentals=fundamentals,
+                price_snapshot=price_snapshot,
+                prediction_date=pred_date_str,
+                marker_dates=marker_dates,
             )
         )
 

@@ -201,6 +201,51 @@ class PredictionOutcome(Base, IDMixin, TimestampMixin):
             return None
 
 
+class PriceSnapshot(Base, IDMixin, TimestampMixin):
+    """Point-in-time price capture for tickers at prediction creation.
+
+    Captures the live market price for each ticker immediately when
+    a prediction is created, providing the most precise price reference
+    tied to the moment the system becomes aware of relevant assets.
+    """
+
+    __tablename__ = "price_snapshots"
+    __table_args__ = (
+        UniqueConstraint(
+            "prediction_id", "symbol",
+            name="uq_price_snapshot_pred_symbol",
+        ),
+        CheckConstraint("price > 0", name="ck_price_snapshot_positive"),
+    )
+
+    # Linkage
+    prediction_id = Column(
+        Integer, ForeignKey("predictions.id"), nullable=False, index=True
+    )
+    symbol = Column(String(20), nullable=False)
+
+    # Captured price data
+    price = Column(Float, nullable=False)
+    captured_at = Column(DateTime, nullable=False)
+    post_published_at = Column(DateTime, nullable=True)
+
+    # Source and context
+    source = Column(String(50), default="yfinance_fast_info")
+    market_status = Column(String(20), nullable=True)
+
+    # Additional market data at capture time
+    previous_close = Column(Float, nullable=True)
+    day_high = Column(Float, nullable=True)
+    day_low = Column(Float, nullable=True)
+    volume = Column(BigInteger, nullable=True)
+
+    def __repr__(self):
+        return (
+            f"<PriceSnapshot(symbol='{self.symbol}', "
+            f"price=${self.price}, captured={self.captured_at})>"
+        )
+
+
 class TickerRegistry(Base, IDMixin, TimestampMixin):
     """Registry of all ticker symbols the system tracks.
 
@@ -277,3 +322,8 @@ Index("idx_prediction_outcome_prediction_id", PredictionOutcome.prediction_id)
 Index("idx_ticker_registry_symbol", TickerRegistry.symbol, unique=True)
 Index("idx_ticker_registry_status", TickerRegistry.status)
 Index("idx_ticker_registry_sector", TickerRegistry.sector)
+Index(
+    "idx_price_snapshot_symbol_captured",
+    PriceSnapshot.symbol,
+    PriceSnapshot.captured_at,
+)

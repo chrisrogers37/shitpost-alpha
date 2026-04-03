@@ -3,8 +3,9 @@ yfinance Price Provider
 Wraps the yfinance library behind the PriceProvider interface.
 """
 
-from datetime import date, timedelta
-from typing import List
+from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta, timezone
+from typing import List, Optional
 
 import yfinance as yf
 
@@ -153,3 +154,79 @@ class YFinanceProvider(PriceProvider):
                 extra={"symbol": symbol, "date": str(target_date), "error": str(e)},
             )
             return []
+
+
+@dataclass
+class LiveQuote:
+    """Point-in-time price quote from yfinance fast_info."""
+
+    symbol: str
+    price: float
+    previous_close: Optional[float] = None
+    day_high: Optional[float] = None
+    day_low: Optional[float] = None
+    volume: Optional[int] = None
+    captured_at: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    source: str = "yfinance_fast_info"
+
+
+def fetch_live_quote(symbol: str) -> Optional[LiveQuote]:
+    """Fetch the current live price for a symbol via yfinance.
+
+    Uses fast_info for a lightweight single HTTP call. Returns None
+    on any failure — never raises.
+
+    Args:
+        symbol: Ticker symbol (e.g., "AAPL", "TSLA").
+
+    Returns:
+        LiveQuote with current price data, or None on failure.
+    """
+    try:
+        ticker = yf.Ticker(symbol)
+        fi = ticker.fast_info
+        price = fi.last_price
+
+        if price is None or price <= 0:
+            logger.warning(
+                f"Invalid price from fast_info for {symbol}: {price}"
+            )
+            return None
+
+        return LiveQuote(
+            symbol=symbol,
+            price=float(price),
+            previous_close=_safe_float(fi.previous_close),
+            day_high=_safe_float(fi.day_high),
+            day_low=_safe_float(fi.day_low),
+            volume=_safe_int(fi.last_volume),
+        )
+    except Exception as e:
+        logger.warning(
+            f"Failed to fetch live quote for {symbol}: {e}",
+            extra={"symbol": symbol, "error": str(e)},
+        )
+        return None
+
+
+def _safe_float(value) -> Optional[float]:
+    """Safely convert to float, returning None on failure."""
+    try:
+        if value is None:
+            return None
+        f = float(value)
+        return f if f > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_int(value) -> Optional[int]:
+    """Safely convert to int, returning None on failure."""
+    try:
+        if value is None:
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None

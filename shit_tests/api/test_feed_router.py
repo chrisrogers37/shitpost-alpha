@@ -22,17 +22,15 @@ def test_get_latest_post_happy_path(
     mock_execute_query,
     sample_post_row,
     sample_outcomes_rows,
-    sample_total_count_row,
 ):
     """GET /api/feed/latest returns a complete FeedResponse with post, prediction, outcomes."""
     post_rows, post_cols = sample_post_row
     outcome_rows, outcome_cols = sample_outcomes_rows
-    count_rows, count_cols = sample_total_count_row
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
-        (count_rows, count_cols),
         (outcome_rows, outcome_cols),
+        ([], []),  # snapshots
     ]
 
     response = client.get("/api/feed/latest")
@@ -88,17 +86,15 @@ def test_get_post_at_offset_zero(
     mock_execute_query,
     sample_post_row,
     sample_outcomes_rows,
-    sample_total_count_row,
 ):
     """GET /api/feed/at?offset=0 behaves identically to /api/feed/latest."""
     post_rows, post_cols = sample_post_row
     outcome_rows, outcome_cols = sample_outcomes_rows
-    count_rows, count_cols = sample_total_count_row
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
-        (count_rows, count_cols),
         (outcome_rows, outcome_cols),
+        ([], []),  # snapshots
     ]
 
     response = client.get("/api/feed/at?offset=0")
@@ -117,17 +113,15 @@ def test_get_post_at_offset_five(
     mock_execute_query,
     sample_post_row,
     sample_outcomes_rows,
-    sample_total_count_row,
 ):
     """GET /api/feed/at?offset=5 returns the 5th most recent analyzed post."""
     post_rows, post_cols = sample_post_row
     outcome_rows, outcome_cols = sample_outcomes_rows
-    count_rows, count_cols = sample_total_count_row
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
-        (count_rows, count_cols),
         (outcome_rows, outcome_cols),
+        ([], []),  # snapshots
     ]
 
     response = client.get("/api/feed/at?offset=5")
@@ -178,8 +172,8 @@ def test_navigation_has_newer_false_at_offset_zero(
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
-        ([(10,)], ["total"]),
         (outcome_rows, outcome_cols),
+        ([], []),  # snapshots
     ]
 
     response = client.get("/api/feed/at?offset=0")
@@ -202,17 +196,18 @@ def test_navigation_has_older_false_at_last_post(
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
-        ([(10,)], ["total"]),
         (outcome_rows, outcome_cols),
+        ([], []),  # snapshots
     ]
 
-    response = client.get("/api/feed/at?offset=9")
+    # total_count is 42 in sample_post_row, so offset=41 is the last post
+    response = client.get("/api/feed/at?offset=41")
     assert response.status_code == 200
 
     nav = response.json()["navigation"]
     assert nav["has_older"] is False
     assert nav["has_newer"] is True
-    assert nav["total_posts"] == 10
+    assert nav["total_posts"] == 42
 
 
 # ---------------------------------------------------------------------------
@@ -229,8 +224,8 @@ def test_navigation_mid_range_has_both_directions(
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
-        ([(10,)], ["total"]),
         (outcome_rows, outcome_cols),
+        ([], []),  # snapshots
     ]
 
     response = client.get("/api/feed/at?offset=5")
@@ -247,16 +242,15 @@ def test_navigation_mid_range_has_both_directions(
 
 
 def test_assets_json_string_parsed_to_list(
-    client, mock_execute_query, sample_post_row_json_strings, sample_total_count_row
+    client, mock_execute_query, sample_post_row_json_strings
 ):
     """When assets comes back as a JSON string from the DB, it gets parsed to a list."""
     post_rows, post_cols = sample_post_row_json_strings
-    count_rows, count_cols = sample_total_count_row
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
-        (count_rows, count_cols),
-        ([], []),
+        ([], []),  # outcomes
+        ([], []),  # snapshots
     ]
 
     response = client.get("/api/feed/latest")
@@ -273,16 +267,15 @@ def test_assets_json_string_parsed_to_list(
 
 
 def test_market_impact_json_string_parsed_to_dict(
-    client, mock_execute_query, sample_post_row_json_strings, sample_total_count_row
+    client, mock_execute_query, sample_post_row_json_strings
 ):
     """When market_impact comes back as a JSON string, it gets parsed to a dict."""
     post_rows, post_cols = sample_post_row_json_strings
-    count_rows, count_cols = sample_total_count_row
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
-        (count_rows, count_cols),
-        ([], []),
+        ([], []),  # outcomes
+        ([], []),  # snapshots
     ]
 
     response = client.get("/api/feed/latest")
@@ -298,62 +291,47 @@ def test_market_impact_json_string_parsed_to_dict(
 # ---------------------------------------------------------------------------
 
 
+def _make_minimal_post_row(overrides: dict) -> tuple[list[tuple], list[str]]:
+    """Build a post row with defaults, applying overrides."""
+    defaults = {
+        "shitpost_id": "post_test",
+        "text": "Test",
+        "content_html": None,
+        "timestamp": datetime(2026, 3, 25, 12, 0, 0),
+        "username": "realDonaldTrump",
+        "url": None,
+        "replies_count": 0, "reblogs_count": 0, "favourites_count": 0,
+        "upvotes_count": 0, "downvotes_count": 0,
+        "account_verified": False, "account_followers_count": None,
+        "card": None, "media_attachments": None,
+        "in_reply_to_id": None, "in_reply_to": None, "reblog": None,
+        "prediction_id": 999,
+        "assets": ["SPY"], "market_impact": {"SPY": "bullish"},
+        "confidence": 0.5, "thesis": "Thesis",
+        "analysis_status": "completed",
+        "engagement_score": None, "viral_score": None,
+        "sentiment_score": None, "urgency_score": None,
+        "total_count": 1,
+    }
+    defaults.update(overrides)
+    columns = list(defaults.keys())
+    row = tuple(defaults.values())
+    return ([row], columns)
+
+
 def test_post_with_none_text_defaults_to_empty_string(
-    client, mock_execute_query, sample_total_count_row
+    client, mock_execute_query
 ):
     """When text is None in the DB row, the response should use an empty string."""
-    columns = [
-        "shitpost_id",
-        "text",
-        "content_html",
-        "timestamp",
-        "username",
-        "url",
-        "replies_count",
-        "reblogs_count",
-        "favourites_count",
-        "upvotes_count",
-        "downvotes_count",
-        "prediction_id",
-        "assets",
-        "market_impact",
-        "confidence",
-        "thesis",
-        "analysis_status",
-        "engagement_score",
-        "viral_score",
-        "sentiment_score",
-        "urgency_score",
-    ]
-    row = (
-        "post_null_text",
-        None,
-        None,
-        datetime(2026, 3, 25, 12, 0, 0),
-        "realDonaldTrump",
-        None,
-        0,
-        0,
-        0,
-        0,
-        0,
-        303,
-        ["SPY"],
-        {"SPY": "bullish"},
-        0.6,
-        "Some thesis",
-        "completed",
-        None,
-        None,
-        None,
-        None,
-    )
-    count_rows, count_cols = sample_total_count_row
+    post_rows, post_cols = _make_minimal_post_row({
+        "shitpost_id": "post_null_text",
+        "text": None,
+    })
 
     mock_execute_query.side_effect = [
-        ([row], columns),
-        (count_rows, count_cols),
-        ([], []),
+        (post_rows, post_cols),
+        ([], []),  # outcomes
+        ([], []),  # snapshots
     ]
 
     response = client.get("/api/feed/latest")
@@ -367,61 +345,21 @@ def test_post_with_none_text_defaults_to_empty_string(
 
 
 def test_post_with_none_engagement_defaults_to_zero(
-    client, mock_execute_query, sample_total_count_row
+    client, mock_execute_query
 ):
     """When engagement counts are None, the response should default them to 0."""
-    columns = [
-        "shitpost_id",
-        "text",
-        "content_html",
-        "timestamp",
-        "username",
-        "url",
-        "replies_count",
-        "reblogs_count",
-        "favourites_count",
-        "upvotes_count",
-        "downvotes_count",
-        "prediction_id",
-        "assets",
-        "market_impact",
-        "confidence",
-        "thesis",
-        "analysis_status",
-        "engagement_score",
-        "viral_score",
-        "sentiment_score",
-        "urgency_score",
-    ]
-    row = (
-        "post_none_eng",
-        "Test post",
-        None,
-        datetime(2026, 3, 25, 12, 0, 0),
-        "realDonaldTrump",
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        404,
-        ["AAPL"],
-        {"AAPL": "bullish"},
-        0.5,
-        "Thesis",
-        "completed",
-        None,
-        None,
-        None,
-        None,
-    )
-    count_rows, count_cols = sample_total_count_row
+    post_rows, post_cols = _make_minimal_post_row({
+        "shitpost_id": "post_none_eng",
+        "text": "Test post",
+        "replies_count": None, "reblogs_count": None,
+        "favourites_count": None, "upvotes_count": None,
+        "downvotes_count": None,
+    })
 
     mock_execute_query.side_effect = [
-        ([row], columns),
-        (count_rows, count_cols),
-        ([], []),
+        (post_rows, post_cols),
+        ([], []),  # outcomes
+        ([], []),  # snapshots
     ]
 
     response = client.get("/api/feed/latest")
@@ -441,16 +379,15 @@ def test_post_with_none_engagement_defaults_to_zero(
 
 
 def test_feed_response_with_no_outcomes(
-    client, mock_execute_query, sample_post_row, sample_total_count_row
+    client, mock_execute_query, sample_post_row
 ):
     """When there are no outcomes for a prediction, outcomes list is empty."""
     post_rows, post_cols = sample_post_row
-    count_rows, count_cols = sample_total_count_row
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
-        (count_rows, count_cols),
-        ([], []),
+        ([], []),  # outcomes
+        ([], []),  # snapshots
     ]
 
     response = client.get("/api/feed/latest")
@@ -463,60 +400,21 @@ def test_feed_response_with_no_outcomes(
 # ---------------------------------------------------------------------------
 
 
-def test_scores_with_none_values(client, mock_execute_query, sample_total_count_row):
+def test_scores_with_none_values(client, mock_execute_query):
     """When score fields are None, they serialize as null in the JSON response."""
-    columns = [
-        "shitpost_id",
-        "text",
-        "content_html",
-        "timestamp",
-        "username",
-        "url",
-        "replies_count",
-        "reblogs_count",
-        "favourites_count",
-        "upvotes_count",
-        "downvotes_count",
-        "prediction_id",
-        "assets",
-        "market_impact",
-        "confidence",
-        "thesis",
-        "analysis_status",
-        "engagement_score",
-        "viral_score",
-        "sentiment_score",
-        "urgency_score",
-    ]
-    row = (
-        "post_no_scores",
-        "Test",
-        None,
-        datetime(2026, 3, 25, 12, 0, 0),
-        "realDonaldTrump",
-        None,
-        5,
-        10,
-        20,
-        15,
-        1,
-        505,
-        ["AAPL"],
-        {"AAPL": "bullish"},
-        0.7,
-        "Thesis",
-        "completed",
-        None,
-        None,
-        None,
-        None,
-    )
-    count_rows, count_cols = sample_total_count_row
+    post_rows, post_cols = _make_minimal_post_row({
+        "shitpost_id": "post_no_scores",
+        "replies_count": 5, "reblogs_count": 10,
+        "favourites_count": 20, "upvotes_count": 15,
+        "downvotes_count": 1,
+        "prediction_id": 505,
+        "confidence": 0.7,
+    })
 
     mock_execute_query.side_effect = [
-        ([row], columns),
-        (count_rows, count_cols),
-        ([], []),
+        (post_rows, post_cols),
+        ([], []),  # outcomes
+        ([], []),  # snapshots
     ]
 
     response = client.get("/api/feed/latest")
@@ -539,17 +437,15 @@ def test_at_endpoint_default_offset_is_zero(
     mock_execute_query,
     sample_post_row,
     sample_outcomes_rows,
-    sample_total_count_row,
 ):
     """GET /api/feed/at without offset param defaults to offset=0."""
     post_rows, post_cols = sample_post_row
     outcome_rows, outcome_cols = sample_outcomes_rows
-    count_rows, count_cols = sample_total_count_row
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
-        (count_rows, count_cols),
         (outcome_rows, outcome_cols),
+        ([], []),  # snapshots
     ]
 
     response = client.get("/api/feed/at")
@@ -563,16 +459,15 @@ def test_at_endpoint_default_offset_is_zero(
 
 
 def test_timestamp_serialized_as_iso_string(
-    client, mock_execute_query, sample_post_row, sample_total_count_row
+    client, mock_execute_query, sample_post_row
 ):
     """The post timestamp should be an ISO-format string in the response."""
     post_rows, post_cols = sample_post_row
-    count_rows, count_cols = sample_total_count_row
 
     mock_execute_query.side_effect = [
         (post_rows, post_cols),
-        (count_rows, count_cols),
-        ([], []),
+        ([], []),  # outcomes
+        ([], []),  # snapshots
     ]
 
     response = client.get("/api/feed/latest")

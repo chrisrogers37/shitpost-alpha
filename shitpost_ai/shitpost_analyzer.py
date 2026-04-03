@@ -400,6 +400,12 @@ class ShitpostAnalyzer:
                         from shit.events.producer import emit_event
                         from shit.events.event_types import EventType
 
+                        post_ts = shitpost.get("timestamp")
+                        post_published = (
+                            post_ts.isoformat()
+                            if hasattr(post_ts, "isoformat")
+                            else str(post_ts) if post_ts else None
+                        )
                         emit_event(
                             event_type=EventType.PREDICTION_CREATED,
                             payload={
@@ -409,6 +415,7 @@ class ShitpostAnalyzer:
                                 "assets": assets,
                                 "confidence": confidence,
                                 "analysis_status": analysis_status,
+                                "post_published_at": post_published,
                             },
                             source_service="analyzer",
                         )

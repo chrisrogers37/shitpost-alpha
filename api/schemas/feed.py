@@ -12,6 +12,19 @@ class Engagement(BaseModel):
     downvotes: int = 0
 
 
+class LinkPreview(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    image: Optional[str] = None
+    url: Optional[str] = None
+    provider_name: Optional[str] = None
+
+
+class ReplyContext(BaseModel):
+    username: Optional[str] = None
+    text: Optional[str] = None
+
+
 class Post(BaseModel):
     shitpost_id: str
     text: str
@@ -20,6 +33,14 @@ class Post(BaseModel):
     username: str
     url: Optional[str] = None
     engagement: Engagement
+    verified: bool = False
+    followers_count: Optional[int] = None
+    card: Optional[LinkPreview] = None
+    media_attachments: list[dict] = []
+    reply_context: Optional[ReplyContext] = None
+    is_repost: bool = False
+    market_timing: Optional[str] = None
+    minutes_to_market: Optional[str] = None
 
 
 class Scores(BaseModel):
@@ -65,6 +86,28 @@ class Pnl(BaseModel):
     t30: Optional[float] = None
 
 
+class PriceSnapshotSchema(BaseModel):
+    price: float
+    captured_at: str
+    market_status: Optional[str] = None
+    previous_close: Optional[float] = None
+    day_high: Optional[float] = None
+    day_low: Optional[float] = None
+
+
+class Fundamentals(BaseModel):
+    company_name: Optional[str] = None
+    asset_type: Optional[str] = None
+    exchange: Optional[str] = None
+    sector: Optional[str] = None
+    industry: Optional[str] = None
+    market_cap: Optional[float] = None
+    pe_ratio: Optional[float] = None
+    forward_pe: Optional[float] = None
+    beta: Optional[float] = None
+    dividend_yield: Optional[float] = None
+
+
 class Outcome(BaseModel):
     symbol: str
     sentiment: Optional[str] = None
@@ -76,6 +119,10 @@ class Outcome(BaseModel):
     correct: Correct
     pnl: Pnl
     is_complete: bool = False
+    fundamentals: Optional[Fundamentals] = None
+    price_snapshot: Optional[PriceSnapshotSchema] = None
+    prediction_date: Optional[str] = None
+    marker_dates: dict[str, str] = {}
 
 
 class Navigation(BaseModel):

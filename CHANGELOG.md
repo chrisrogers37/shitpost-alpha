@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Post card enrichment** — Author profile (verified badge, follower count), market timing badges (PRE-MKT/OPEN/AFTER-HRS/WEEKEND with relative timing), link preview cards, reply/quote context, media thumbnails
+- **Fundamentals strip** — Company name, exchange, sector, market cap, P/E, forward P/E, beta, dividend yield below ticker pills (JOIN on `ticker_registry`)
+- **Intraday outcome bubbles** — 1H and Same-Day timeframes added to metric bubbles (6 total, up from 4)
+- **Returns/P&L toggle** — Swappable display mode on metric bubbles (Returns % vs P&L $)
+- **Chart outcome markers** — T+1, T+3, T+7, T+30 markers with return % labels on price chart, color-coded green/red
+- **Chart type toggle** — Candle/Line chart switcher in toolbar
+- **90D timeframe** — New chart timeframe option (180 calendar days of data)
+- **Brainstorm guide** — `documentation/planning/BRAINSTORM_GUIDE.md` with 10 future enhancement ideas
+
+### Removed
+- **Old Dash UI** — Deleted `shitty_ui/` (88 source files) and `shit_tests/shitty_ui/` (23 test files), removed `dash`, `plotly`, `dash-bootstrap-components` from requirements.txt
+- **Stale branches** — Pruned 12 local branches, 104 merged remote branches, 4 orphaned worktrees, 1 stale stash
+
 ### Changed
 - **TODO resolution** — Replaced 5 vague TODO comments with concrete decision records
   - `shitvault/s3_processor.py`: Dual-write stays until signals migration (linked to plan)

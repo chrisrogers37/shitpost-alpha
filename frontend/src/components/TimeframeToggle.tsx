@@ -12,18 +12,20 @@ const containerStyle: CSSProperties = {
   margin: "16px auto 0",
 };
 
-export type Timeframe = "1d" | "7d" | "30d";
+export type Timeframe = "1d" | "7d" | "30d" | "90d";
 
 const options: { label: string; value: Timeframe }[] = [
   { label: "1D", value: "1d" },
   { label: "7D", value: "7d" },
   { label: "30D", value: "30d" },
+  { label: "90D", value: "90d" },
 ];
 
 export const timeframeToDays: Record<Timeframe, number> = {
   "1d": 7,
   "7d": 30,
   "30d": 90,
+  "90d": 180,
 };
 
 interface Props {

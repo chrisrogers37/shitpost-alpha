@@ -8,6 +8,19 @@ export interface Engagement {
   downvotes: number;
 }
 
+export interface LinkPreview {
+  title: string | null;
+  description: string | null;
+  image: string | null;
+  url: string | null;
+  provider_name: string | null;
+}
+
+export interface ReplyContext {
+  username: string | null;
+  text: string | null;
+}
+
 export interface Post {
   shitpost_id: string;
   text: string;
@@ -16,6 +29,14 @@ export interface Post {
   username: string;
   url: string | null;
   engagement: Engagement;
+  verified: boolean;
+  followers_count: number | null;
+  card: LinkPreview | null;
+  media_attachments: Record<string, unknown>[];
+  reply_context: ReplyContext | null;
+  is_repost: boolean;
+  market_timing: string | null;
+  minutes_to_market: string | null;
 }
 
 export interface Scores {
@@ -61,6 +82,28 @@ export interface Pnl {
   t30: number | null;
 }
 
+export interface PriceSnapshot {
+  price: number;
+  captured_at: string;
+  market_status: string | null;
+  previous_close: number | null;
+  day_high: number | null;
+  day_low: number | null;
+}
+
+export interface Fundamentals {
+  company_name: string | null;
+  asset_type: string | null;
+  exchange: string | null;
+  sector: string | null;
+  industry: string | null;
+  market_cap: number | null;
+  pe_ratio: number | null;
+  forward_pe: number | null;
+  beta: number | null;
+  dividend_yield: number | null;
+}
+
 export interface Outcome {
   symbol: string;
   sentiment: string | null;
@@ -72,6 +115,10 @@ export interface Outcome {
   correct: Correct;
   pnl: Pnl;
   is_complete: boolean;
+  fundamentals: Fundamentals | null;
+  price_snapshot: PriceSnapshot | null;
+  prediction_date: string | null;
+  marker_dates: Record<string, string>;
 }
 
 export interface Navigation {
