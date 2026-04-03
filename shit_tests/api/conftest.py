@@ -1,11 +1,11 @@
 """
 Conftest for API tests.
-Provides TestClient, mock execute_query, and sample data fixtures.
+Provides TestClient, mock execute_query, and row factory functions.
 """
 
 import os
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -17,6 +17,143 @@ if project_root not in sys.path:
 
 # Set DATABASE_URL env var so sync_session module can import
 os.environ.setdefault("DATABASE_URL", "sqlite:///test.db")
+
+
+# ---------------------------------------------------------------------------
+# Row factory functions
+# ---------------------------------------------------------------------------
+
+
+def make_post_row(**overrides) -> tuple[list[tuple], list[str]]:
+    """Build a post row as returned by get_analyzed_post_at_offset's SQL.
+
+    Column order matches the SQL query in api/queries/feed_queries.py.
+    Returns (rows, columns) matching execute_query() return format.
+
+    Usage:
+        rows, cols = make_post_row()                          # all defaults
+        rows, cols = make_post_row(text=None)                 # override one field
+        rows, cols = make_post_row(assets='["SPY"]')          # JSON string variant
+    """
+    defaults = {
+        "shitpost_id": "post_abc123",
+        "text": "Big tariff announcement coming!",
+        "content_html": "<p>Big tariff announcement coming!</p>",
+        "timestamp": datetime(2026, 3, 25, 14, 30, 0),
+        "username": "realDonaldTrump",
+        "url": "https://truthsocial.com/@realDonaldTrump/post_abc123",
+        "replies_count": 42,
+        "reblogs_count": 150,
+        "favourites_count": 500,
+        "upvotes_count": 300,
+        "downvotes_count": 10,
+        "account_verified": True,
+        "account_followers_count": 8200000,
+        "card": None,
+        "media_attachments": [],
+        "in_reply_to_id": None,
+        "in_reply_to": None,
+        "reblog": None,
+        "prediction_id": 101,
+        "assets": ["AAPL", "TSLA"],
+        "market_impact": {"AAPL": "bearish", "TSLA": "bullish"},
+        "confidence": 0.85,
+        "thesis": "Tariffs on China will hurt Apple supply chain but benefit Tesla domestic production.",
+        "analysis_status": "completed",
+        "engagement_score": 0.7,
+        "viral_score": 0.8,
+        "sentiment_score": -0.3,
+        "urgency_score": 0.9,
+        "total_count": 42,
+    }
+    defaults.update(overrides)
+    columns = list(defaults.keys())
+    row = tuple(defaults.values())
+    return ([row], columns)
+
+
+def make_outcome_row(**overrides) -> tuple[list[tuple], list[str]]:
+    """Build an outcome row as returned by get_outcomes_for_prediction's SQL.
+
+    Column order matches the SQL query in api/queries/feed_queries.py.
+    Returns (rows, columns) matching execute_query() return format.
+
+    Usage:
+        rows, cols = make_outcome_row()                              # AAPL defaults
+        rows, cols = make_outcome_row(symbol="TSLA", prediction_sentiment="bullish")
+    """
+    defaults = {
+        "symbol": "AAPL",
+        "prediction_sentiment": "bearish",
+        "prediction_confidence": 0.85,
+        "prediction_date": date(2026, 3, 25),
+        "price_at_prediction": 178.50,
+        "price_at_post": 178.20,
+        "price_at_next_close": 177.80,
+        "price_1h_after": 178.00,
+        "price_t1": 176.50,
+        "price_t3": 175.00,
+        "price_t7": 174.00,
+        "price_t30": 180.00,
+        "return_t1": -1.12,
+        "return_t3": -1.96,
+        "return_t7": -2.52,
+        "return_t30": 0.84,
+        "return_same_day": -0.39,
+        "return_1h": -0.11,
+        "correct_t1": True,
+        "correct_t3": True,
+        "correct_t7": True,
+        "correct_t30": False,
+        "correct_same_day": True,
+        "correct_1h": True,
+        "pnl_t1": 11.20,
+        "pnl_t3": 19.60,
+        "pnl_t7": 25.20,
+        "pnl_t30": -8.40,
+        "pnl_same_day": 3.90,
+        "pnl_1h": 1.10,
+        "is_complete": True,
+        "company_name": "Apple Inc.",
+        "asset_type": "stock",
+        "exchange": "NASDAQ",
+        "sector": "Technology",
+        "industry": "Consumer Electronics",
+        "market_cap": 2800000000000,
+        "pe_ratio": 28.5,
+        "forward_pe": 26.1,
+        "beta": 1.2,
+        "dividend_yield": 0.005,
+    }
+    defaults.update(overrides)
+    columns = list(defaults.keys())
+    row = tuple(defaults.values())
+    return ([row], columns)
+
+
+def make_outcome_rows(*rows_overrides: dict) -> tuple[list[tuple], list[str]]:
+    """Build multiple outcome rows sharing the same column list.
+
+    Usage:
+        rows, cols = make_outcome_rows(
+            {"symbol": "AAPL"},
+            {"symbol": "TSLA", "prediction_sentiment": "bullish"},
+        )
+    """
+    if not rows_overrides:
+        return make_outcome_row()
+
+    first_rows, columns = make_outcome_row(**rows_overrides[0])
+    all_rows = list(first_rows)
+    for ov in rows_overrides[1:]:
+        more_rows, _ = make_outcome_row(**ov)
+        all_rows.extend(more_rows)
+    return (all_rows, columns)
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -56,286 +193,6 @@ def client(mock_execute_query):
 
 
 @pytest.fixture
-def sample_post_row() -> tuple[list[tuple], list[str]]:
-    """A single analyzed post row as returned by execute_query.
-
-    Returns (rows, columns) matching get_analyzed_post_at_offset's SQL.
-    Includes total_count from COUNT(*) OVER().
-    """
-    columns = [
-        "shitpost_id",
-        "text",
-        "content_html",
-        "timestamp",
-        "username",
-        "url",
-        "replies_count",
-        "reblogs_count",
-        "favourites_count",
-        "upvotes_count",
-        "downvotes_count",
-        "account_verified",
-        "account_followers_count",
-        "card",
-        "media_attachments",
-        "in_reply_to_id",
-        "in_reply_to",
-        "reblog",
-        "prediction_id",
-        "assets",
-        "market_impact",
-        "confidence",
-        "thesis",
-        "analysis_status",
-        "engagement_score",
-        "viral_score",
-        "sentiment_score",
-        "urgency_score",
-        "total_count",
-    ]
-    row = (
-        "post_abc123",
-        "Big tariff announcement coming!",
-        "<p>Big tariff announcement coming!</p>",
-        datetime(2026, 3, 25, 14, 30, 0),
-        "realDonaldTrump",
-        "https://truthsocial.com/@realDonaldTrump/post_abc123",
-        42,
-        150,
-        500,
-        300,
-        10,
-        True,
-        8200000,
-        None,
-        [],
-        None,
-        None,
-        None,
-        101,
-        ["AAPL", "TSLA"],
-        {"AAPL": "bearish", "TSLA": "bullish"},
-        0.85,
-        "Tariffs on China will hurt Apple supply chain but benefit Tesla domestic production.",
-        "completed",
-        0.7,
-        0.8,
-        -0.3,
-        0.9,
-        42,
-    )
-    return ([row], columns)
-
-
-@pytest.fixture
-def sample_post_row_json_strings() -> tuple[list[tuple], list[str]]:
-    """A post row where assets and market_impact are JSON strings (not parsed).
-
-    This simulates what some database drivers return.
-    """
-    columns = [
-        "shitpost_id",
-        "text",
-        "content_html",
-        "timestamp",
-        "username",
-        "url",
-        "replies_count",
-        "reblogs_count",
-        "favourites_count",
-        "upvotes_count",
-        "downvotes_count",
-        "account_verified",
-        "account_followers_count",
-        "card",
-        "media_attachments",
-        "in_reply_to_id",
-        "in_reply_to",
-        "reblog",
-        "prediction_id",
-        "assets",
-        "market_impact",
-        "confidence",
-        "thesis",
-        "analysis_status",
-        "engagement_score",
-        "viral_score",
-        "sentiment_score",
-        "urgency_score",
-        "total_count",
-    ]
-    row = (
-        "post_json456",
-        "Trade deal signed!",
-        "<p>Trade deal signed!</p>",
-        datetime(2026, 3, 24, 10, 0, 0),
-        "realDonaldTrump",
-        None,
-        10,
-        50,
-        200,
-        100,
-        5,
-        False,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        202,
-        '["SPY", "DIA"]',
-        '{"SPY": "bullish", "DIA": "bullish"}',
-        0.72,
-        "Trade deal boosts market indices.",
-        "completed",
-        0.5,
-        0.6,
-        0.4,
-        0.3,
-        42,
-    )
-    return ([row], columns)
-
-
-@pytest.fixture
-def sample_outcomes_rows() -> tuple[list[tuple], list[str]]:
-    """Outcome rows as returned by get_outcomes_for_prediction's SQL."""
-    from datetime import date
-
-    columns = [
-        "symbol",
-        "prediction_sentiment",
-        "prediction_confidence",
-        "prediction_date",
-        "price_at_prediction",
-        "price_at_post",
-        "price_at_next_close",
-        "price_1h_after",
-        "price_t1",
-        "price_t3",
-        "price_t7",
-        "price_t30",
-        "return_t1",
-        "return_t3",
-        "return_t7",
-        "return_t30",
-        "return_same_day",
-        "return_1h",
-        "correct_t1",
-        "correct_t3",
-        "correct_t7",
-        "correct_t30",
-        "correct_same_day",
-        "correct_1h",
-        "pnl_t1",
-        "pnl_t3",
-        "pnl_t7",
-        "pnl_t30",
-        "pnl_same_day",
-        "pnl_1h",
-        "is_complete",
-        "company_name",
-        "asset_type",
-        "exchange",
-        "sector",
-        "industry",
-        "market_cap",
-        "pe_ratio",
-        "forward_pe",
-        "beta",
-        "dividend_yield",
-    ]
-    row_aapl = (
-        "AAPL",
-        "bearish",
-        0.85,
-        date(2026, 3, 25),
-        178.50,
-        178.20,
-        177.80,
-        178.00,
-        176.50,
-        175.00,
-        174.00,
-        180.00,
-        -1.12,
-        -1.96,
-        -2.52,
-        0.84,
-        -0.39,
-        -0.11,
-        True,
-        True,
-        True,
-        False,
-        True,
-        True,
-        11.20,
-        19.60,
-        25.20,
-        -8.40,
-        3.90,
-        1.10,
-        True,
-        "Apple Inc.",
-        "stock",
-        "NASDAQ",
-        "Technology",
-        "Consumer Electronics",
-        2800000000000,
-        28.5,
-        26.1,
-        1.2,
-        0.005,
-    )
-    row_tsla = (
-        "TSLA",
-        "bullish",
-        0.85,
-        date(2026, 3, 25),
-        245.00,
-        244.80,
-        246.50,
-        245.50,
-        248.00,
-        252.00,
-        260.00,
-        240.00,
-        1.22,
-        2.86,
-        6.12,
-        -2.04,
-        0.69,
-        0.20,
-        True,
-        True,
-        True,
-        False,
-        True,
-        True,
-        12.20,
-        28.60,
-        61.20,
-        -20.40,
-        6.90,
-        2.00,
-        True,
-        "Tesla Inc.",
-        "stock",
-        "NASDAQ",
-        "Automotive",
-        "Auto Manufacturers",
-        812000000000,
-        68.4,
-        42.1,
-        2.05,
-        None,
-    )
-    return ([row_aapl, row_tsla], columns)
-
-
-@pytest.fixture
 def sample_snapshot_rows() -> tuple[list[tuple], list[str]]:
     """Empty snapshot rows (no snapshots captured yet)."""
     return ([], [])
@@ -344,8 +201,6 @@ def sample_snapshot_rows() -> tuple[list[tuple], list[str]]:
 @pytest.fixture
 def sample_candle_rows() -> tuple[list[tuple], list[str]]:
     """Price candle rows as returned from the database fallback query."""
-    from datetime import date
-
     columns = ["date", "open", "high", "low", "close", "volume"]
     rows = [
         (date(2026, 3, 20), 175.0, 178.0, 174.5, 177.0, 50000000),
