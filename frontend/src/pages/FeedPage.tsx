@@ -8,6 +8,7 @@ import { Footer } from "../components/Footer";
 import { ShitpostCard } from "../components/ShitpostCard";
 import { PredictionPanel } from "../components/PredictionPanel";
 import { TickerSelector } from "../components/TickerSelector";
+import { FundamentalsStrip } from "../components/FundamentalsStrip";
 import { MetricBubbles } from "../components/MetricBubbles";
 import { PriceKPIs } from "../components/PriceKPIs";
 import { TimeframeToggle, timeframeToDays, type Timeframe } from "../components/TimeframeToggle";
@@ -95,6 +96,20 @@ export function FeedPage() {
     data?.navigation.has_older ?? false,
   );
 
+  // Default to first ticker (safe when data is null)
+  const activeTicker = selectedTicker || data?.prediction.assets[0] || "";
+  const activeOutcome = data?.outcomes.find((o) => o.symbol === activeTicker);
+
+  // All hooks must be called before any early returns (React hooks rule)
+  const priceQuery = usePriceData(
+    activeTicker || undefined,
+    timeframeToDays[timeframe],
+    data?.post.timestamp,
+  );
+  const currentPrice = priceQuery.data?.candles?.length
+    ? priceQuery.data.candles[priceQuery.data.candles.length - 1].close
+    : null;
+
   if (isLoading) {
     return (
       <>
@@ -118,20 +133,6 @@ export function FeedPage() {
       </>
     );
   }
-
-  // Default to first ticker
-  const activeTicker = selectedTicker || data.prediction.assets[0] || "";
-  const activeOutcome = data.outcomes.find((o) => o.symbol === activeTicker);
-
-  // Price data for chart and KPIs (shared hook)
-  const priceQuery = usePriceData(
-    activeTicker || undefined,
-    timeframeToDays[timeframe],
-    data.post.timestamp,
-  );
-  const currentPrice = priceQuery.data?.candles?.length
-    ? priceQuery.data.candles[priceQuery.data.candles.length - 1].close
-    : null;
 
   return (
     <>
@@ -166,8 +167,16 @@ export function FeedPage() {
                   onSelect={setSelectedTicker}
                 />
 
+                <FundamentalsStrip
+                  fundamentals={activeOutcome?.fundamentals ?? null}
+                />
+
                 <PriceKPIs
-                  priceAtPost={activeOutcome?.price_at_post ?? null}
+                  priceAtPost={
+                    activeOutcome?.price_snapshot?.price
+                    ?? activeOutcome?.price_at_post
+                    ?? null
+                  }
                   currentPrice={currentPrice}
                 />
 
@@ -180,6 +189,7 @@ export function FeedPage() {
                     symbol={activeTicker}
                     data={priceQuery.data}
                     isLoading={priceQuery.isLoading}
+                    outcome={activeOutcome}
                   />
                 )}
               </>

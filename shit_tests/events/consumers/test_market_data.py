@@ -86,19 +86,35 @@ class TestMarketDataWorker:
 
         What it verifies: For a valid prediction_created event (completed status,
         non-empty assets), the worker creates an AutoBackfillService and calls
-        process_single_prediction with the correct arguments.
+        process_single_prediction with the correct arguments. Also verifies
+        PriceSnapshotService is invoked for live price capture.
         Mocking:
           - AutoBackfillService.process_single_prediction returns (3, 2)
+          - PriceSnapshotService.capture_for_prediction returns 3 snapshots
+          - SessionLocal context manager
         Assertions:
           - process_single_prediction called with prediction_id=42, calculate_outcome=True
-          - Return dict has prediction_id=42, assets_backfilled=3, outcomes_calculated=2
+          - Return dict has prediction_id, snapshots_captured, assets_backfilled, outcomes_calculated
         """
-        mock_service = MagicMock()
-        mock_service.process_single_prediction.return_value = (3, 2)
+        mock_backfill = MagicMock()
+        mock_backfill.process_single_prediction.return_value = (3, 2)
+
+        mock_snapshot_svc = MagicMock()
+        mock_snapshot_svc.capture_for_prediction.return_value = [
+            MagicMock(), MagicMock(), MagicMock()
+        ]
+
+        mock_session = MagicMock()
 
         with patch(
             "shit.market_data.auto_backfill_service.AutoBackfillService",
-            return_value=mock_service,
+            return_value=mock_backfill,
+        ), patch(
+            "shit.market_data.snapshot_service.PriceSnapshotService",
+            return_value=mock_snapshot_svc,
+        ), patch(
+            "shit.db.sync_session.SessionLocal",
+            return_value=mock_session,
         ):
             worker = MarketDataWorker.__new__(MarketDataWorker)
             result = worker.process_event(
@@ -111,12 +127,13 @@ class TestMarketDataWorker:
                 },
             )
 
-            mock_service.process_single_prediction.assert_called_once_with(
+            mock_backfill.process_single_prediction.assert_called_once_with(
                 prediction_id=42,
                 calculate_outcome=True,
             )
             assert result == {
                 "prediction_id": 42,
+                "snapshots_captured": 3,
                 "assets_backfilled": 3,
                 "outcomes_calculated": 2,
             }

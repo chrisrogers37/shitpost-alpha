@@ -21,7 +21,6 @@ def execute_query(
 ) -> tuple[list, list]:
     """Execute a raw SQL query and return (rows, column_names).
 
-    Mirrors the pattern from shitty_ui/data/base.py.
     """
     try:
         with SessionLocal() as session:

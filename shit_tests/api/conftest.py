@@ -60,6 +60,7 @@ def sample_post_row() -> tuple[list[tuple], list[str]]:
     """A single analyzed post row as returned by execute_query.
 
     Returns (rows, columns) matching get_analyzed_post_at_offset's SQL.
+    Includes total_count from COUNT(*) OVER().
     """
     columns = [
         "shitpost_id",
@@ -73,6 +74,13 @@ def sample_post_row() -> tuple[list[tuple], list[str]]:
         "favourites_count",
         "upvotes_count",
         "downvotes_count",
+        "account_verified",
+        "account_followers_count",
+        "card",
+        "media_attachments",
+        "in_reply_to_id",
+        "in_reply_to",
+        "reblog",
         "prediction_id",
         "assets",
         "market_impact",
@@ -83,6 +91,7 @@ def sample_post_row() -> tuple[list[tuple], list[str]]:
         "viral_score",
         "sentiment_score",
         "urgency_score",
+        "total_count",
     ]
     row = (
         "post_abc123",
@@ -96,6 +105,13 @@ def sample_post_row() -> tuple[list[tuple], list[str]]:
         500,
         300,
         10,
+        True,
+        8200000,
+        None,
+        [],
+        None,
+        None,
+        None,
         101,
         ["AAPL", "TSLA"],
         {"AAPL": "bearish", "TSLA": "bullish"},
@@ -106,6 +122,7 @@ def sample_post_row() -> tuple[list[tuple], list[str]]:
         0.8,
         -0.3,
         0.9,
+        42,
     )
     return ([row], columns)
 
@@ -128,6 +145,13 @@ def sample_post_row_json_strings() -> tuple[list[tuple], list[str]]:
         "favourites_count",
         "upvotes_count",
         "downvotes_count",
+        "account_verified",
+        "account_followers_count",
+        "card",
+        "media_attachments",
+        "in_reply_to_id",
+        "in_reply_to",
+        "reblog",
         "prediction_id",
         "assets",
         "market_impact",
@@ -138,6 +162,7 @@ def sample_post_row_json_strings() -> tuple[list[tuple], list[str]]:
         "viral_score",
         "sentiment_score",
         "urgency_score",
+        "total_count",
     ]
     row = (
         "post_json456",
@@ -151,6 +176,13 @@ def sample_post_row_json_strings() -> tuple[list[tuple], list[str]]:
         200,
         100,
         5,
+        False,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
         202,
         '["SPY", "DIA"]',
         '{"SPY": "bullish", "DIA": "bullish"}',
@@ -161,6 +193,7 @@ def sample_post_row_json_strings() -> tuple[list[tuple], list[str]]:
         0.6,
         0.4,
         0.3,
+        42,
     )
     return ([row], columns)
 
@@ -168,10 +201,13 @@ def sample_post_row_json_strings() -> tuple[list[tuple], list[str]]:
 @pytest.fixture
 def sample_outcomes_rows() -> tuple[list[tuple], list[str]]:
     """Outcome rows as returned by get_outcomes_for_prediction's SQL."""
+    from datetime import date
+
     columns = [
         "symbol",
         "prediction_sentiment",
         "prediction_confidence",
+        "prediction_date",
         "price_at_prediction",
         "price_at_post",
         "price_at_next_close",
@@ -199,11 +235,22 @@ def sample_outcomes_rows() -> tuple[list[tuple], list[str]]:
         "pnl_same_day",
         "pnl_1h",
         "is_complete",
+        "company_name",
+        "asset_type",
+        "exchange",
+        "sector",
+        "industry",
+        "market_cap",
+        "pe_ratio",
+        "forward_pe",
+        "beta",
+        "dividend_yield",
     ]
     row_aapl = (
         "AAPL",
         "bearish",
         0.85,
+        date(2026, 3, 25),
         178.50,
         178.20,
         177.80,
@@ -231,11 +278,22 @@ def sample_outcomes_rows() -> tuple[list[tuple], list[str]]:
         3.90,
         1.10,
         True,
+        "Apple Inc.",
+        "stock",
+        "NASDAQ",
+        "Technology",
+        "Consumer Electronics",
+        2800000000000,
+        28.5,
+        26.1,
+        1.2,
+        0.005,
     )
     row_tsla = (
         "TSLA",
         "bullish",
         0.85,
+        date(2026, 3, 25),
         245.00,
         244.80,
         246.50,
@@ -263,14 +321,24 @@ def sample_outcomes_rows() -> tuple[list[tuple], list[str]]:
         6.90,
         2.00,
         True,
+        "Tesla Inc.",
+        "stock",
+        "NASDAQ",
+        "Automotive",
+        "Auto Manufacturers",
+        812000000000,
+        68.4,
+        42.1,
+        2.05,
+        None,
     )
     return ([row_aapl, row_tsla], columns)
 
 
 @pytest.fixture
-def sample_total_count_row() -> tuple[list[tuple], list[str]]:
-    """Total count row as returned by get_total_analyzed_posts."""
-    return ([(42,)], ["total"])
+def sample_snapshot_rows() -> tuple[list[tuple], list[str]]:
+    """Empty snapshot rows (no snapshots captured yet)."""
+    return ([], [])
 
 
 @pytest.fixture

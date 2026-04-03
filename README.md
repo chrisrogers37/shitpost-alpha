@@ -80,7 +80,8 @@ The project uses a delightfully themed directory structure that's both logical, 
 - **`shitvault/`** - Secure data storage and S3 processing
 - **`shitposts/`** - Content harvesting and monitoring
 - **`shitpost_ai/`** - AI analysis and LLM integration
-- **`shitty_ui/`** - Dashboard for prediction performance visualization
+- **`frontend/`** - React + TypeScript web dashboard
+- **`api/`** - FastAPI backend serving the React frontend
 
 ```
 shitpost_alpha/
@@ -114,23 +115,19 @@ shitpost_alpha/
 │   ├── shitpost_analyzer.py # Analysis orchestrator
 │   ├── compare_cli.py      # Multi-provider comparison CLI
 │   └── cli.py              # Analysis CLI utilities
-├── shitty_ui/              # Prediction performance dashboard
-│   ├── app.py              # Dash application & Flask endpoints
-│   ├── layout.py           # App factory, router & callback registration
-│   ├── data.py             # Database query functions (2000+ lines)
-│   ├── constants.py        # Colors, typography, spacing tokens
-│   ├── pages/              # Page modules
-│   │   ├── dashboard.py    # Main dashboard (tabbed analytics)
-│   │   ├── signals.py      # Signal feed with filtering
-│   │   ├── trends.py       # Signal-over-trend charts
-│   │   └── assets.py       # Asset deep dive page
-│   ├── components/         # Reusable UI components
-│   │   ├── cards.py        # Signal, prediction & metric cards
-│   │   ├── charts.py       # Candlestick & overlay charts
-│   │   ├── controls.py     # Filter & period controls
-│   │   └── header.py       # Navigation header
-│   └── callbacks/          # Callback groups
-│       └── alerts.py       # Alert configuration panel
+├── api/                    # FastAPI backend
+│   ├── main.py             # App entry point, CORS, static files
+│   ├── routers/            # Endpoint routers (feed, prices, telegram)
+│   ├── queries/            # Database query layer
+│   ├── schemas/            # Pydantic response models
+│   └── dependencies.py     # Shared DB session helpers
+├── frontend/               # React 19 + TypeScript + Vite
+│   ├── src/
+│   │   ├── pages/          # FeedPage (single-post-at-a-time)
+│   │   ├── components/     # ShitpostCard, PriceChart, MetricBubbles, etc.
+│   │   ├── api/            # TanStack Query hooks & client
+│   │   └── styles/         # Theme configuration
+│   └── dist/               # Built production assets
 ├── notifications/          # Alert dispatch & Telegram bot
 │   ├── alert_engine.py     # Alert check-and-dispatch loop
 │   ├── dispatcher.py       # Multi-channel delivery
@@ -144,7 +141,6 @@ shitpost_alpha/
     ├── shitposts/           # Harvesting module tests
     ├── shitvault/           # Database module tests
     ├── shitpost_ai/         # AI analysis tests
-    ├── shitty_ui/           # Dashboard tests
     ├── notifications/       # Alert system tests
     ├── integration/         # End-to-end pipeline tests
     └── fixtures/            # Test data & mock responses
@@ -188,10 +184,10 @@ For comprehensive information about each component, see the detailed README file
 - Enhanced context analysis
 - Bypass functionality for unanalyzable content
 
-### 📊 [Performance Dashboard](shitty_ui/README.md)
-- Multi-page Dash app (Dashboard, Signals, Trends, Assets)
-- Signal-over-trend candlestick charts with prediction overlays
-- Performance KPIs and analytics
+### 📊 Performance Dashboard
+- React 19 + TypeScript single-post feed with prediction outcomes
+- TradingView Lightweight Charts with post markers
+- Price KPIs, outcome bubbles (T+1/3/7/30), ticker selection
 
 ### 🔔 [Notifications](documentation/TELEGRAM_SETUP_GUIDE.md)
 - Telegram bot with subscriber management
@@ -230,13 +226,12 @@ For detailed version history and recent improvements, see [CHANGELOG.md](CHANGEL
 - [x] **Automated Updates** - Railway cron every 15 minutes for price fetching and outcome calculation
 
 ### Phase 3: Dashboard & Visualization ✅ **COMPLETED**
-- [x] **Multi-page Dash App** - `shitty_ui/` with Plotly + Bootstrap (Dashboard, Signals, Trends, Assets)
-- [x] **Performance Metrics** - Accuracy, P&L, average return KPIs
-- [x] **Tabbed Analytics** - Accuracy by confidence, performance by asset, accuracy over time
-- [x] **Signal Feed** - Filterable signal cards with sentiment colors and confidence badges
-- [x] **Signal-Over-Trend Charts** - Candlestick price charts with prediction marker overlays
-- [x] **Asset Deep Dive** - Historical predictions on dedicated `/assets/<ticker>` page
-- [x] **Dark Theme** - Professional trading platform design with typography scale
+- [x] **React + FastAPI Frontend** - Single-post feed with prediction outcomes and price charts
+- [x] **TradingView Charts** - Candlestick/volume charts with post timestamp markers
+- [x] **Outcome Tracking** - T+1/3/7/30 return bubbles with P&L and correctness
+- [x] **Ticker Selection** - Multi-asset navigation with sentiment-colored pills
+- [x] **Price KPIs** - Price at post vs current price with delta
+- [x] **Light Theme** - Red-white-blue American palette with Oswald typography
 - [x] **Smart Empty States** - Compact informative messages when data is missing
 
 ### Phase 4: Real-Time Alerting ✅ **COMPLETED**

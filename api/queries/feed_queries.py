@@ -1,6 +1,5 @@
 """Feed queries for the single-post-at-a-time API.
 
-Adapted from shitty_ui/data/signal_queries.py patterns.
 Only returns posts with completed LLM analysis and non-empty assets.
 """
 
@@ -10,14 +9,19 @@ from typing import Any, Optional
 from api.dependencies import execute_query
 
 
-def get_analyzed_post_at_offset(offset: int = 0) -> Optional[dict[str, Any]]:
-    """Get the Nth most recent post with a completed LLM analysis.
+def get_analyzed_post_at_offset(
+    offset: int = 0,
+) -> Optional[tuple[dict[str, Any], int]]:
+    """Get the Nth most recent analyzed post and the total count.
+
+    Uses COUNT(*) OVER() to get both in a single query, avoiding
+    a separate round trip for the total count.
 
     Args:
         offset: 0 = latest, 1 = one older, etc.
 
     Returns:
-        Dict with post + prediction data, or None if offset is out of range.
+        Tuple of (post+prediction dict, total_count), or None if out of range.
     """
     query = """
         SELECT
@@ -32,6 +36,13 @@ def get_analyzed_post_at_offset(offset: int = 0) -> Optional[dict[str, Any]]:
             tss.favourites_count,
             tss.upvotes_count,
             tss.downvotes_count,
+            tss.account_verified,
+            tss.account_followers_count,
+            tss.card,
+            tss.media_attachments,
+            tss.in_reply_to_id,
+            tss.in_reply_to,
+            tss.reblog,
             p.id AS prediction_id,
             p.assets,
             p.market_impact,
@@ -41,7 +52,8 @@ def get_analyzed_post_at_offset(offset: int = 0) -> Optional[dict[str, Any]]:
             p.engagement_score,
             p.viral_score,
             p.sentiment_score,
-            p.urgency_score
+            p.urgency_score,
+            COUNT(*) OVER() AS total_count
         FROM truth_social_shitposts tss
         INNER JOIN predictions p ON tss.shitpost_id = p.shitpost_id
         WHERE p.analysis_status = 'completed'
@@ -59,14 +71,18 @@ def get_analyzed_post_at_offset(offset: int = 0) -> Optional[dict[str, Any]]:
         return None
 
     row = dict(zip(columns, rows[0]))
+    total = row.pop("total_count", 0)
 
     # Parse JSON fields
-    if isinstance(row.get("assets"), str):
-        row["assets"] = json.loads(row["assets"])
-    if isinstance(row.get("market_impact"), str):
-        row["market_impact"] = json.loads(row["market_impact"])
+    json_keys = (
+        "assets", "market_impact", "card",
+        "media_attachments", "in_reply_to", "reblog",
+    )
+    for key in json_keys:
+        if isinstance(row.get(key), str):
+            row[key] = json.loads(row[key])
 
-    return row
+    return row, int(total)
 
 
 def get_outcomes_for_prediction(prediction_id: int) -> list[dict[str, Any]]:
@@ -83,6 +99,7 @@ def get_outcomes_for_prediction(prediction_id: int) -> list[dict[str, Any]]:
             po.symbol,
             po.prediction_sentiment,
             po.prediction_confidence,
+            po.prediction_date,
             po.price_at_prediction,
             po.price_at_post,
             po.price_at_next_close,
@@ -109,8 +126,19 @@ def get_outcomes_for_prediction(prediction_id: int) -> list[dict[str, Any]]:
             po.pnl_t30,
             po.pnl_same_day,
             po.pnl_1h,
-            po.is_complete
+            po.is_complete,
+            tr.company_name,
+            tr.asset_type,
+            tr.exchange,
+            tr.sector,
+            tr.industry,
+            tr.market_cap,
+            tr.pe_ratio,
+            tr.forward_pe,
+            tr.beta,
+            tr.dividend_yield
         FROM prediction_outcomes po
+        LEFT JOIN ticker_registry tr ON po.symbol = tr.symbol
         WHERE po.prediction_id = :prediction_id
         ORDER BY po.symbol
     """
@@ -119,18 +147,33 @@ def get_outcomes_for_prediction(prediction_id: int) -> list[dict[str, Any]]:
     return [dict(zip(columns, row)) for row in rows]
 
 
-def get_total_analyzed_posts() -> int:
-    """Get total count of analyzed posts (for navigation bounds)."""
-    query = """
-        SELECT COUNT(*) AS total
-        FROM truth_social_shitposts tss
-        INNER JOIN predictions p ON tss.shitpost_id = p.shitpost_id
-        WHERE p.analysis_status = 'completed'
-            AND p.confidence IS NOT NULL
-            AND p.assets IS NOT NULL
-            AND p.assets::text <> '[]'
-            AND p.assets::text <> 'null'
-    """
+def get_snapshots_for_prediction(
+    prediction_id: int,
+) -> dict[str, dict[str, Any]]:
+    """Get price snapshots for a prediction, keyed by symbol.
 
-    rows, _ = execute_query(query)
-    return rows[0][0] if rows else 0
+    Returns:
+        Dict mapping symbol → snapshot data dict.
+    """
+    query = """
+        SELECT
+            symbol, price, captured_at,
+            market_status, previous_close,
+            day_high, day_low
+        FROM price_snapshots
+        WHERE prediction_id = :prediction_id
+        ORDER BY symbol
+    """
+    rows, columns = execute_query(
+        query, {"prediction_id": prediction_id}
+    )
+    result = {}
+    for row in rows:
+        d = dict(zip(columns, row))
+        sym = d.pop("symbol")
+        if hasattr(d.get("captured_at"), "isoformat"):
+            d["captured_at"] = d["captured_at"].isoformat()
+        result[sym] = d
+    return result
+
+

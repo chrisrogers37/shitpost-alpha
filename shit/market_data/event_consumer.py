@@ -33,7 +33,11 @@ class MarketDataWorker(EventWorker):
         Returns:
             Backfill statistics dict.
         """
+        from datetime import datetime
+
+        from shit.db.sync_session import SessionLocal
         from shit.market_data.auto_backfill_service import AutoBackfillService
+        from shit.market_data.snapshot_service import PriceSnapshotService
 
         prediction_id = payload.get("prediction_id")
         assets = payload.get("assets", [])
@@ -51,6 +55,35 @@ class MarketDataWorker(EventWorker):
             )
             return {"skipped": True, "reason": "not applicable"}
 
+        # Capture live price snapshots immediately
+        snapshots_captured = 0
+        post_published_at = None
+        if payload.get("post_published_at"):
+            try:
+                post_published_at = datetime.fromisoformat(
+                    payload["post_published_at"]
+                )
+            except (ValueError, TypeError):
+                pass
+
+        try:
+            with SessionLocal() as session:
+                snapshot_svc = PriceSnapshotService()
+                snapshots = snapshot_svc.capture_for_prediction(
+                    session=session,
+                    prediction_id=prediction_id,
+                    assets=assets,
+                    post_published_at=post_published_at,
+                )
+                snapshots_captured = len(snapshots)
+                session.commit()
+        except Exception as e:
+            logger.warning(
+                f"Snapshot capture failed for prediction "
+                f"{prediction_id}: {e}"
+            )
+
+        # Backfill price history + calculate outcomes
         service = AutoBackfillService()
         backfilled, outcomes = service.process_single_prediction(
             prediction_id=prediction_id,
@@ -59,6 +92,7 @@ class MarketDataWorker(EventWorker):
 
         return {
             "prediction_id": prediction_id,
+            "snapshots_captured": snapshots_captured,
             "assets_backfilled": backfilled,
             "outcomes_calculated": outcomes,
         }

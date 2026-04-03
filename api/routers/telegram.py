@@ -1,4 +1,4 @@
-"""Telegram webhook router — ported from shitty_ui/app.py."""
+"""Telegram webhook router."""
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse

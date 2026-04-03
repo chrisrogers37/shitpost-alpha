@@ -214,8 +214,8 @@ class S3Processor:
                 result = await self.signal_ops.store_signal(signal_data)
 
                 # Dual-write to legacy truth_social_shitposts table.
-                # This stays until api/queries/feed_queries.py and shitty_ui/data/
-                # migrate their reads to the signals table. Tracked in:
+                # This stays until api/queries/feed_queries.py migrates reads
+                # to the signals table. Tracked in:
                 # documentation/planning/SIGNALS_MIGRATION.md
                 legacy_data = DatabaseUtils.transform_s3_data_to_shitpost(s3_data)
                 await self.shitpost_ops.store_shitpost(legacy_data)

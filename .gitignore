@@ -246,6 +246,9 @@ config/secrets.json
 .claude/worktrees/
 .claude/plans/
 
+# Superpowers brainstorm sessions
+.superpowers/
+
 # Frontend build artifacts
 node_modules/
 frontend/dist/

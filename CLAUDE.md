@@ -87,31 +87,20 @@ shitpost_alpha/
 ├── shitpost_ai/            # AI analysis engine
 │   ├── shitpost_analyzer.py  # Analysis orchestrator
 │   └── cli.py              # Analysis CLI utilities
-├── shitty_ui/              # Prediction performance dashboard
-│   ├── app.py              # Dash application entry point
-│   ├── layout.py           # App factory, router & callback registration
-│   ├── data/               # Database query layer (split by domain)
-│   │   ├── __init__.py     # Re-exports all functions (backward compat)
-│   │   ├── base.py         # execute_query, ttl_cache, logger
-│   │   ├── signal_queries.py    # Signal loading, feed, filtering
-│   │   ├── performance_queries.py  # KPIs, accuracy, P&L, streaks
-│   │   ├── asset_queries.py     # Screener, sparklines, asset stats
-│   │   └── insight_queries.py   # Dynamic insight cards
-│   ├── pages/              # Page modules (dashboard, assets)
-│   │   ├── dashboard.py        # Dashboard layout + callback orchestrator
-│   │   ├── dashboard_callbacks/ # Dashboard callback sub-modules
-│   │   │   ├── period.py       # Period selection + countdown
-│   │   │   ├── content.py      # KPI, screener, insights, post feed
-│   │   │   └── table.py        # Data table, row clicks, thesis expand
-│   │   └── assets.py           # Asset detail page layout + callbacks
-│   ├── components/         # Reusable UI components
-│   └── callbacks/          # Callback groups (alerts, navigation, clientside)
-│       ├── alerts.py           # Alert system orchestrator + panel components
-│       ├── alert_components.py # Alert config panel UI builders
-│       ├── alert_models.py     # AlertPreferences Pydantic model
-│       ├── alert_preferences.py # Preference management callbacks
-│       ├── alert_history.py    # History rendering callbacks
-│       └── alert_notifications.py # Browser notification callbacks
+├── api/                    # FastAPI backend (React frontend API)
+│   ├── main.py             # App entry point, CORS, static file serving
+│   ├── routers/            # Endpoint routers (feed, prices, telegram)
+│   ├── queries/            # Database query layer
+│   ├── schemas/            # Pydantic response models
+│   └── dependencies.py     # Shared DB session helpers
+├── frontend/               # React 19 + TypeScript + Vite web dashboard
+│   ├── src/
+│   │   ├── pages/          # FeedPage (single-post-at-a-time view)
+│   │   ├── components/     # ShitpostCard, PriceChart, MetricBubbles, etc.
+│   │   ├── api/            # TanStack Query hooks & API client
+│   │   ├── styles/         # Theme configuration
+│   │   └── types/          # TypeScript interfaces
+│   └── dist/               # Built production assets
 ├── notifications/          # Alert dispatch & Telegram bot
 │   ├── alert_engine.py     # Core alert dispatch logic
 │   ├── dispatcher.py       # Multi-channel delivery (Telegram, Email, SMS)
@@ -125,7 +114,6 @@ shitpost_alpha/
     ├── shitposts/           # Harvesting tests
     ├── shitvault/           # Database tests
     ├── shitpost_ai/         # AI analysis tests
-    ├── shitty_ui/           # Dashboard tests
     ├── integration/         # End-to-end tests
     └── fixtures/            # Test data & mock responses
 ```
@@ -446,7 +434,6 @@ shit_tests/
 ├── shitposts/                     # Harvesting tests (79 tests)
 ├── shitpost_ai/                   # AI analysis tests (102 tests)
 ├── shitvault/                     # Database tests (153 tests)
-├── shitty_ui/                     # Dashboard tests (49 tests)
 ├── content/                       # Bypass service tests
 ├── integration/                   # End-to-end tests (16 tests)
 └── fixtures/                      # Test data & mock responses

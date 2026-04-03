@@ -18,7 +18,7 @@ anthropic>=0.83.0
 
 # Database
 psycopg[binary]>=3.3.0  # Async PostgreSQL driver (used by shit/db/database_client.py)
-psycopg2-binary>=2.9.0  # Sync PostgreSQL driver for shit/db/sync_session.py — remove when Dash UI retired
+psycopg2-binary>=2.9.0  # Sync PostgreSQL driver for shit/db/sync_session.py (CLIs, notifications)
 asyncpg>=0.29.0  # Legacy: only referenced in URL cleanup (sync_session.py:22), not directly imported
 
 # Testing
@@ -44,11 +44,6 @@ numpy>=1.24.0
 yfinance>=0.2.48
 exchange_calendars>=4.5.0
 
-# Dashboard dependencies
-dash>=4.0.0,<5.0.0
-plotly>=5.15.0
-dash-bootstrap-components>=2.0.0,<3.0.0
-
-# FastAPI web server (new React frontend API)
+# FastAPI web server (React frontend API)
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
