@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Live price quotes** — New `/api/prices/{symbol}/live` endpoint using yfinance fast_info (~300ms); `useLiveQuote()` TanStack Query hook polls every 15 seconds; PriceKPIs shows pulsing green dot when live data is active
+- **Inline snapshot capture** — Price snapshots now captured within seconds of LLM analysis (in analyzer's `_trigger_reactive_backfill`), down from 5-15 minutes via the market-data-worker cron hop; worker stays as idempotent safety net
+
 ### Fixed
 - **Price snapshot observability** — Added warning log when market-data-worker captures 0 snapshots despite having assets, preventing silent pipeline failures (#121)
 - **Price snapshot backfill** — Backfilled 706 price snapshots for 361 existing predictions that were processed before snapshot capture was deployed

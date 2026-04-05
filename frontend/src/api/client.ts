@@ -1,6 +1,6 @@
 /** API client — fetch wrapper with base URL handling. */
 
-import type { FeedResponse, PriceResponse } from "../types/api";
+import type { FeedResponse, LiveQuote, PriceResponse } from "../types/api";
 
 const BASE_URL = "";
 
@@ -24,4 +24,8 @@ export function fetchPriceData(
   const params = new URLSearchParams({ days: String(days) });
   if (postTimestamp) params.set("post_timestamp", postTimestamp);
   return fetchJson<PriceResponse>(`/api/prices/${symbol}?${params}`);
+}
+
+export function fetchLiveQuote(symbol: string): Promise<LiveQuote> {
+  return fetchJson<LiveQuote>(`/api/prices/${symbol}/live`);
 }

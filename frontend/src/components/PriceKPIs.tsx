@@ -40,12 +40,23 @@ const changeRowStyle: CSSProperties = {
   borderTop: "1px solid var(--border-light)",
 };
 
+const liveDotStyle: CSSProperties = {
+  display: "inline-block",
+  width: "6px",
+  height: "6px",
+  borderRadius: "50%",
+  backgroundColor: "var(--color-money)",
+  marginRight: "5px",
+  animation: "livePulse 2s ease-in-out infinite",
+};
+
 interface Props {
   priceAtPost: number | null;
   currentPrice: number | null;
+  isLive?: boolean;
 }
 
-export function PriceKPIs({ priceAtPost, currentPrice }: Props) {
+export function PriceKPIs({ priceAtPost, currentPrice, isLive }: Props) {
   if (priceAtPost == null && currentPrice == null) return null;
 
   const hasChange = priceAtPost != null && currentPrice != null && priceAtPost !== 0;
@@ -63,13 +74,17 @@ export function PriceKPIs({ priceAtPost, currentPrice }: Props) {
 
   return (
     <div style={cardStyle}>
+      <style>{`@keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }`}</style>
       <div style={rowStyle}>
         <div>
           <div style={labelStyle}>Price at Post</div>
           <div style={priceStyle}>{formatPrice(priceAtPost)}</div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={labelStyle}>Price Now</div>
+          <div style={labelStyle}>
+            {isLive && <span style={liveDotStyle} />}
+            Price Now
+          </div>
           <div style={priceStyle}>{formatPrice(currentPrice)}</div>
         </div>
       </div>

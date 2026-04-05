@@ -135,6 +135,16 @@ export interface FeedResponse {
   navigation: Navigation;
 }
 
+export interface LiveQuote {
+  symbol: string;
+  price: number;
+  previous_close: number | null;
+  day_high: number | null;
+  day_low: number | null;
+  volume: number | null;
+  captured_at: string;
+}
+
 export interface Candle {
   date: string;
   open: number;
