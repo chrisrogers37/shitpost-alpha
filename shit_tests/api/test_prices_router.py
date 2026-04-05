@@ -293,3 +293,61 @@ def test_post_timestamp_between_dates_picks_earlier(client, mock_execute_query):
 
     assert response.status_code == 200
     assert response.json()["post_date_index"] == 0
+
+
+# ---------------------------------------------------------------------------
+# GET /api/prices/{symbol}/live — live quote
+# ---------------------------------------------------------------------------
+
+
+def test_get_live_quote_happy_path(client, mock_execute_query):
+    """GET /api/prices/AAPL/live returns a live quote from yfinance."""
+    from datetime import datetime, timezone
+
+    mock_quote = type(
+        "LiveQuote",
+        (),
+        {
+            "symbol": "AAPL",
+            "price": 182.50,
+            "previous_close": 180.00,
+            "day_high": 183.00,
+            "day_low": 179.50,
+            "volume": 45000000,
+            "captured_at": datetime(2026, 4, 5, 14, 30, 0, tzinfo=timezone.utc),
+        },
+    )()
+
+    with patch(
+        "shit.market_data.yfinance_provider.fetch_live_quote", return_value=mock_quote
+    ):
+        response = client.get("/api/prices/AAPL/live")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["symbol"] == "AAPL"
+    assert data["price"] == 182.50
+    assert data["previous_close"] == 180.00
+    assert data["day_high"] == 183.00
+    assert data["volume"] == 45000000
+    assert "captured_at" in data
+
+
+def test_get_live_quote_symbol_uppercased(client, mock_execute_query):
+    """GET /api/prices/aapl/live uppercases the symbol before fetching."""
+    with patch(
+        "shit.market_data.yfinance_provider.fetch_live_quote", return_value=None
+    ) as mock_fq:
+        client.get("/api/prices/aapl/live")
+    mock_fq.assert_called_once_with("AAPL")
+
+
+def test_get_live_quote_not_found(client, mock_execute_query):
+    """GET /api/prices/INVALID/live returns 404 when yfinance fails."""
+    with patch(
+        "shit.market_data.yfinance_provider.fetch_live_quote", return_value=None
+    ):
+        response = client.get("/api/prices/INVALID/live")
+
+    assert response.status_code == 404
+    assert "No quote available" in response.json()["detail"]

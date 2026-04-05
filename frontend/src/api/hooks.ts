@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { fetchFeedPost, fetchPriceData } from "./client";
+import { fetchFeedPost, fetchLiveQuote, fetchPriceData } from "./client";
 
 export function useFeedPost(offset: number) {
   return useQuery({
@@ -23,6 +23,16 @@ export function usePriceData(
     queryFn: () => fetchPriceData(symbol!, days, postTimestamp),
     staleTime: 5 * 60_000,
     enabled: !!symbol,
+  });
+}
+
+export function useLiveQuote(symbol: string | undefined) {
+  return useQuery({
+    queryKey: ["liveQuote", symbol],
+    queryFn: () => fetchLiveQuote(symbol!),
+    enabled: !!symbol,
+    staleTime: 10_000,
+    refetchInterval: 15_000,
   });
 }
 

@@ -148,6 +148,16 @@ class Candle(BaseModel):
     volume: int
 
 
+class LiveQuoteResponse(BaseModel):
+    symbol: str
+    price: float
+    previous_close: Optional[float] = None
+    day_high: Optional[float] = None
+    day_low: Optional[float] = None
+    volume: Optional[int] = None
+    captured_at: str
+
+
 class PriceResponse(BaseModel):
     symbol: str
     post_timestamp: Optional[str] = None

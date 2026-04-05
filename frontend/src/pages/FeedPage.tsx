@@ -1,7 +1,7 @@
 import { useState, useCallback, CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { useFeedPost, usePrefetchAdjacentPosts, usePriceData } from "../api/hooks";
+import { useFeedPost, useLiveQuote, usePrefetchAdjacentPosts, usePriceData } from "../api/hooks";
 import { useKeyboardNav } from "../hooks/useKeyboardNav";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
@@ -106,9 +106,11 @@ export function FeedPage() {
     timeframeToDays[timeframe],
     data?.post.timestamp,
   );
-  const currentPrice = priceQuery.data?.candles?.length
-    ? priceQuery.data.candles[priceQuery.data.candles.length - 1].close
-    : null;
+  const liveQuote = useLiveQuote(activeTicker || undefined);
+  const currentPrice = liveQuote.data?.price
+    ?? (priceQuery.data?.candles?.length
+      ? priceQuery.data.candles[priceQuery.data.candles.length - 1].close
+      : null);
 
   if (isLoading) {
     return (
@@ -178,6 +180,7 @@ export function FeedPage() {
                     ?? null
                   }
                   currentPrice={currentPrice}
+                  isLive={liveQuote.data != null}
                 />
 
                 <MetricBubbles outcome={activeOutcome} />
