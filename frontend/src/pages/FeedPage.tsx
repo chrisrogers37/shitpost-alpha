@@ -10,6 +10,7 @@ import { PredictionPanel } from "../components/PredictionPanel";
 import { TickerSelector } from "../components/TickerSelector";
 import { FundamentalsStrip } from "../components/FundamentalsStrip";
 import { MetricBubbles } from "../components/MetricBubbles";
+import { SkeletonFeed } from "../components/SkeletonFeed";
 import { PriceKPIs } from "../components/PriceKPIs";
 import { TimeframeToggle, timeframeToDays, type Timeframe } from "../components/TimeframeToggle";
 import { PriceChart } from "../components/PriceChart";
@@ -116,10 +117,7 @@ export function FeedPage() {
     return (
       <>
         <Header />
-        <div style={loadingStyle}>
-          <div className="pulse" style={{ fontSize: "2rem" }}>&#x1F1FA;&#x1F1F8;</div>
-          <span>Retrieving intelligence...</span>
-        </div>
+        <SkeletonFeed />
       </>
     );
   }
@@ -146,7 +144,7 @@ export function FeedPage() {
         onOlder={navigateOlder}
       />
 
-      <main style={mainStyle}>
+      <main className="feed-main" style={mainStyle}>
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={data.post.shitpost_id}
@@ -181,6 +179,7 @@ export function FeedPage() {
                   }
                   currentPrice={currentPrice}
                   isLive={liveQuote.data != null}
+                  capturedAt={liveQuote.data?.captured_at}
                 />
 
                 <MetricBubbles outcome={activeOutcome} />

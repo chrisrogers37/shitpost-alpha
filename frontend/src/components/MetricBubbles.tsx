@@ -53,16 +53,18 @@ export function MetricBubbles({ outcome }: Props) {
           FREEDOM METRICS
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "12px" }}>
-          <div style={toggleGroupStyle}>
+          <div style={toggleGroupStyle} role="group" aria-label="Display mode">
             <button
               style={mode === "returns" ? toggleBtnActive : toggleBtnBase}
               onClick={() => setMode("returns")}
+              aria-pressed={mode === "returns"}
             >
               Returns %
             </button>
             <button
               style={mode === "pnl" ? toggleBtnActive : toggleBtnBase}
               onClick={() => setMode("pnl")}
+              aria-pressed={mode === "pnl"}
             >
               P&L $
             </button>

@@ -30,15 +30,15 @@ const subtitleStyle: CSSProperties = {
 
 export function Header() {
   return (
-    <header style={headerStyle}>
-      <span style={{ fontSize: "1.6rem" }}>🦅</span>
+    <header className="header-wrap" style={headerStyle}>
+      <span className="header-emoji" style={{ fontSize: "1.6rem" }}>🦅</span>
       <div>
-        <h1 style={titleStyle}>SHITPOST ALPHA</h1>
-        <p style={subtitleStyle}>
+        <h1 className="header-title" style={titleStyle}>SHITPOST ALPHA</h1>
+        <p className="header-subtitle" style={subtitleStyle}>
           Weaponizing Shitposts for American Profit Since 2025
         </p>
       </div>
-      <span style={{ fontSize: "1.6rem" }}>🇺🇸</span>
+      <span className="header-emoji" style={{ fontSize: "1.6rem" }}>🇺🇸</span>
     </header>
   );
 }

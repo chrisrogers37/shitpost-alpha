@@ -1,6 +1,7 @@
 import { CSSProperties } from "react";
 import type { Post } from "../types/api";
-import { relativeTime, formatTimestamp } from "../utils/time";
+import { formatTimestamp } from "../utils/time";
+import { useRelativeTime } from "../hooks/useRelativeTime";
 import { formatNumber } from "../utils/format";
 
 const cardStyle: CSSProperties = {
@@ -127,6 +128,7 @@ export function ShitpostCard({ post }: Props) {
   const timingKey = post.market_timing || "";
   const timingStyle = TIMING_STYLES[timingKey];
   const timingLabel = TIMING_LABELS[timingKey];
+  const timeAgo = useRelativeTime(post.timestamp);
 
   return (
     <div style={cardStyle}>
@@ -298,7 +300,7 @@ export function ShitpostCard({ post }: Props) {
       {/* Timestamp with market timing context */}
       <div style={timestampRowStyle}>
         <time title={formatTimestamp(post.timestamp)}>
-          {relativeTime(post.timestamp)}
+          {timeAgo}
         </time>
         {post.minutes_to_market && (
           <>
