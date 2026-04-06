@@ -1,0 +1,96 @@
+/* Responsive breakpoints for Shitpost Alpha */
+
+/* Tablet: 768px and below */
+@media (max-width: 768px) {
+  .header-title {
+    font-size: 1.6rem !important;
+  }
+  .header-emoji {
+    font-size: 1.2rem !important;
+  }
+  .nav-arrow {
+    width: 36px !important;
+    height: 36px !important;
+  }
+  .price-chart-container {
+    height: 260px !important;
+  }
+}
+
+/* Mobile: 480px and below */
+@media (max-width: 480px) {
+  .header-title {
+    font-size: 1.3rem !important;
+  }
+  .header-subtitle {
+    font-size: 0.55rem !important;
+  }
+  .header-emoji {
+    display: none !important;
+  }
+  .header-wrap {
+    padding: 16px 12px 10px !important;
+    gap: 0 !important;
+  }
+  .nav-arrow {
+    position: static !important;
+    transform: none !important;
+  }
+  .nav-arrow-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 16px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-light);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .feed-main {
+    padding-bottom: 72px !important;
+  }
+  .price-chart-container {
+    height: 220px !important;
+  }
+  .metric-bubbles-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+  .kpi-price {
+    font-size: 1.1rem !important;
+  }
+  .fundamentals-metrics {
+    gap: 10px !important;
+  }
+  .post-text {
+    font-size: 0.95rem !important;
+  }
+}
+
+/* Interactive feedback */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 2px;
+}
+
+.nav-arrow:hover:not(:disabled) {
+  transform: translateY(-50%) scale(1.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.nav-arrow:active:not(:disabled) {
+  transform: translateY(-50%) scale(0.95);
+}
+
+@media (max-width: 480px) {
+  .nav-arrow:hover:not(:disabled),
+  .nav-arrow:active:not(:disabled) {
+    transform: none;
+  }
+}

@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Live price quotes** — New `/api/prices/{symbol}/live` endpoint using yfinance fast_info (~300ms); `useLiveQuote()` TanStack Query hook polls every 15 seconds; PriceKPIs shows pulsing green dot when live data is active
 - **Inline snapshot capture** — Price snapshots now captured within seconds of LLM analysis (in analyzer's `_trigger_reactive_backfill`), down from 5-15 minutes via the market-data-worker cron hop; worker stays as idempotent safety net
+- **Animated price transitions** — "Price Now" flashes green/red on updates with color transitions; "updated Xs ago" ticking counter shows data freshness
+- **Skeleton loading** — Shimmer skeleton cards replace flag emoji loading state for professional first impression
+- **Mobile responsive** — 3 breakpoints (480px, 768px, 1024px): header scales down, nav arrows become bottom bar on mobile, chart/fonts/bubbles adapt
+- **Ticking timestamps** — Post age ("2m ago") updates every 30s instead of being static from initial render
+- **Accessibility baseline** — Focus-visible outlines on all interactive elements, `role="tablist"` on timeframe toggle, `aria-pressed` on metric toggle, `aria-selected` on tabs
 
 ### Fixed
 - **Price snapshot observability** — Added warning log when market-data-worker captures 0 snapshots despite having assets, preventing silent pipeline failures (#121)

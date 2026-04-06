@@ -35,8 +35,9 @@ interface Props {
 
 export function NavigationArrows({ hasNewer, hasOlder, onNewer, onOlder }: Props) {
   return (
-    <>
+    <div className="nav-arrow-bar">
       <button
+        className="nav-arrow"
         style={{
           ...arrowBase,
           left: "12px",
@@ -52,6 +53,7 @@ export function NavigationArrows({ hasNewer, hasOlder, onNewer, onOlder }: Props
         </svg>
       </button>
       <button
+        className="nav-arrow"
         style={{
           ...arrowBase,
           right: "12px",
@@ -66,6 +68,6 @@ export function NavigationArrows({ hasNewer, hasOlder, onNewer, onOlder }: Props
           <polyline points="9 18 15 12 9 6" />
         </svg>
       </button>
-    </>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import { CSSProperties } from "react";
+import { CSSProperties, useEffect, useRef, useState } from "react";
 import { formatPrice, formatDollar, formatPercent } from "../utils/format";
 
 const cardStyle: CSSProperties = {
@@ -31,6 +31,7 @@ const priceStyle: CSSProperties = {
   fontSize: "1.3rem",
   fontWeight: 700,
   color: "var(--text-primary)",
+  transition: "color 0.3s ease",
 };
 
 const changeRowStyle: CSSProperties = {
@@ -50,14 +51,66 @@ const liveDotStyle: CSSProperties = {
   animation: "livePulse 2s ease-in-out infinite",
 };
 
+const updatedAgoStyle: CSSProperties = {
+  fontFamily: "var(--font-mono)",
+  fontSize: "0.6rem",
+  color: "var(--text-faint)",
+  marginTop: "2px",
+};
+
+function useFlashColor(price: number | null): string | undefined {
+  const prevPrice = useRef(price);
+  const [flash, setFlash] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (price == null || prevPrice.current == null || price === prevPrice.current) {
+      prevPrice.current = price;
+      return;
+    }
+    const color = price > prevPrice.current ? "var(--color-money)" : "var(--color-red)";
+    setFlash(color);
+    prevPrice.current = price;
+    const timer = setTimeout(() => setFlash(undefined), 800);
+    return () => clearTimeout(timer);
+  }, [price]);
+
+  return flash;
+}
+
+function useUpdatedAgo(isLive: boolean, capturedAt: string | undefined): string {
+  const [ago, setAgo] = useState("");
+
+  useEffect(() => {
+    if (!isLive || !capturedAt) {
+      setAgo("");
+      return;
+    }
+    const update = () => {
+      const seconds = Math.floor((Date.now() - new Date(capturedAt).getTime()) / 1000);
+      if (seconds < 5) setAgo("just now");
+      else if (seconds < 60) setAgo(`${seconds}s ago`);
+      else setAgo(`${Math.floor(seconds / 60)}m ago`);
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [isLive, capturedAt]);
+
+  return ago;
+}
+
 interface Props {
   priceAtPost: number | null;
   currentPrice: number | null;
   isLive?: boolean;
+  capturedAt?: string;
 }
 
-export function PriceKPIs({ priceAtPost, currentPrice, isLive }: Props) {
+export function PriceKPIs({ priceAtPost, currentPrice, isLive, capturedAt }: Props) {
   if (priceAtPost == null && currentPrice == null) return null;
+
+  const flashColor = useFlashColor(currentPrice);
+  const updatedAgo = useUpdatedAgo(isLive ?? false, capturedAt);
 
   const hasChange = priceAtPost != null && currentPrice != null && priceAtPost !== 0;
   const dollarChange = hasChange ? currentPrice - priceAtPost : null;
@@ -74,7 +127,9 @@ export function PriceKPIs({ priceAtPost, currentPrice, isLive }: Props) {
 
   return (
     <div style={cardStyle}>
-      <style>{`@keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }`}</style>
+      <style>{`
+        @keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+      `}</style>
       <div style={rowStyle}>
         <div>
           <div style={labelStyle}>Price at Post</div>
@@ -85,7 +140,10 @@ export function PriceKPIs({ priceAtPost, currentPrice, isLive }: Props) {
             {isLive && <span style={liveDotStyle} />}
             Price Now
           </div>
-          <div style={priceStyle}>{formatPrice(currentPrice)}</div>
+          <div style={{ ...priceStyle, color: flashColor ?? priceStyle.color }}>
+            {formatPrice(currentPrice)}
+          </div>
+          {updatedAgo && <div style={updatedAgoStyle}>{updatedAgo}</div>}
         </div>
       </div>
       {hasChange && (

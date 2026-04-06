@@ -35,7 +35,7 @@ interface Props {
 
 export function TimeframeToggle({ selected, onSelect }: Props) {
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle} role="tablist" aria-label="Chart timeframe">
       {options.map(({ label, value }) => {
         const isActive = value === selected;
         const btnStyle: CSSProperties = {
@@ -52,7 +52,7 @@ export function TimeframeToggle({ selected, onSelect }: Props) {
         };
 
         return (
-          <button key={value} style={btnStyle} onClick={() => onSelect(value)}>
+          <button key={value} style={btnStyle} onClick={() => onSelect(value)} role="tab" aria-selected={isActive}>
             {label}
           </button>
         );
