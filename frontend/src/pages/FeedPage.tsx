@@ -180,6 +180,7 @@ export function FeedPage() {
                   currentPrice={currentPrice}
                   isLive={liveQuote.data != null}
                   capturedAt={liveQuote.data?.captured_at}
+                  snapshotCapturedAt={activeOutcome?.price_snapshot?.captured_at}
                 />
 
                 <MetricBubbles outcome={activeOutcome} />

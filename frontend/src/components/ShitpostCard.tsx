@@ -299,8 +299,8 @@ export function ShitpostCard({ post }: Props) {
 
       {/* Timestamp with market timing context */}
       <div style={timestampRowStyle}>
-        <time title={formatTimestamp(post.timestamp)}>
-          {timeAgo}
+        <time dateTime={post.timestamp}>
+          {timeAgo} · {formatTimestamp(post.timestamp)}
         </time>
         {post.minutes_to_market && (
           <>
