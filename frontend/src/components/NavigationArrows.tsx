@@ -40,7 +40,7 @@ export function NavigationArrows({ hasNewer, hasOlder, onNewer, onOlder }: Props
         className="nav-arrow"
         style={{
           ...arrowBase,
-          left: "12px",
+          left: "calc(50% - 368px)",
           ...(hasNewer ? {} : disabledStyle),
         }}
         onClick={onNewer}
@@ -56,7 +56,7 @@ export function NavigationArrows({ hasNewer, hasOlder, onNewer, onOlder }: Props
         className="nav-arrow"
         style={{
           ...arrowBase,
-          right: "12px",
+          right: "calc(50% - 368px)",
           ...(hasOlder ? {} : disabledStyle),
         }}
         onClick={onOlder}

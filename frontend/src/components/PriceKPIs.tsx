@@ -1,5 +1,6 @@
-import { CSSProperties, useEffect, useRef, useState } from "react";
+import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { formatPrice, formatDollar, formatPercent } from "../utils/format";
+import { formatTimestamp } from "../utils/time";
 
 const cardStyle: CSSProperties = {
   background: "var(--bg-card)",
@@ -104,13 +105,23 @@ interface Props {
   currentPrice: number | null;
   isLive?: boolean;
   capturedAt?: string;
+  snapshotCapturedAt?: string;
 }
 
-export function PriceKPIs({ priceAtPost, currentPrice, isLive, capturedAt }: Props) {
+export function PriceKPIs({ priceAtPost, currentPrice, isLive, capturedAt, snapshotCapturedAt }: Props) {
   if (priceAtPost == null && currentPrice == null) return null;
 
   const flashColor = useFlashColor(currentPrice);
   const updatedAgo = useUpdatedAgo(isLive ?? false, capturedAt);
+
+  const postPriceTooltip = useMemo(
+    () => snapshotCapturedAt ? `Captured: ${formatTimestamp(snapshotCapturedAt)}` : undefined,
+    [snapshotCapturedAt],
+  );
+  const livePriceTooltip = useMemo(
+    () => capturedAt ? `Captured: ${formatTimestamp(capturedAt)}` : undefined,
+    [capturedAt],
+  );
 
   const hasChange = priceAtPost != null && currentPrice != null && priceAtPost !== 0;
   const dollarChange = hasChange ? currentPrice - priceAtPost : null;
@@ -127,15 +138,12 @@ export function PriceKPIs({ priceAtPost, currentPrice, isLive, capturedAt }: Pro
 
   return (
     <div style={cardStyle}>
-      <style>{`
-        @keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-      `}</style>
       <div style={rowStyle}>
-        <div>
+        <div title={postPriceTooltip}>
           <div style={labelStyle}>Price at Post</div>
           <div style={priceStyle}>{formatPrice(priceAtPost)}</div>
         </div>
-        <div style={{ textAlign: "right" }}>
+        <div style={{ textAlign: "right" }} title={livePriceTooltip}>
           <div style={labelStyle}>
             {isLive && <span style={liveDotStyle} />}
             Price Now
