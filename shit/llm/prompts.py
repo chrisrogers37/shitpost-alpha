@@ -15,7 +15,7 @@ SYSTEM_MESSAGES = {
 }
 
 # Prompt versions for consistency
-PROMPT_VERSION = "1.0"
+PROMPT_VERSION = "1.1"
 
 
 def get_analysis_prompt(content: str, context: Optional[Dict] = None) -> str:
@@ -69,7 +69,13 @@ ANALYSIS GUIDELINES:
 - Consider political influence on market sentiment
 - Be conservative with confidence scores
 - If no financial implications detected, return empty arrays
-- Use standard ticker symbols (e.g., TSLA, AAPL, BTC, GLD)
+- Use CURRENT, actively-traded US ticker symbols only:
+  - Good: TSLA, AAPL, BTC-USD, GLD, XLE, SPY
+  - Do NOT use delisted or renamed symbols (RTN → use RTX, FB → use META, TWTR → Twitter is private)
+  - Do NOT use concepts as tickers (DEFENSE, CRYPTO, ECONOMY are not ticker symbols)
+  - Do NOT use foreign exchange tickers (use ADRs instead: e.g., BABA not 9988.HK)
+- For ETFs, prefer the most liquid US-listed version (SPY not ^GSPC, QQQ not ^IXIC)
+- If a company is mentioned but you're unsure of the current ticker, omit it rather than guess
 - Consider both direct mentions and implied references
 
 EXAMPLES:
@@ -149,6 +155,15 @@ OUTPUT FORMAT:
     "risks": ["List of potential confounding factors"],
     "confidence": 0.85
 }}
+
+TICKER GUIDELINES:
+- Use CURRENT, actively-traded US ticker symbols only:
+  - Good: TSLA, AAPL, BTC-USD, GLD, XLE, SPY
+  - Do NOT use delisted or renamed symbols (RTN → use RTX, FB → use META, TWTR → Twitter is private)
+  - Do NOT use concepts as tickers (DEFENSE, CRYPTO, ECONOMY are not ticker symbols)
+  - Do NOT use foreign exchange tickers (use ADRs instead: e.g., BABA not 9988.HK)
+- For ETFs, prefer the most liquid US-listed version (SPY not ^GSPC, QQQ not ^IXIC)
+- If a company is mentioned but you're unsure of the current ticker, omit it rather than guess
 
 Now provide your detailed analysis:
 """

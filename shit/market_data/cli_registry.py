@@ -1,13 +1,15 @@
 """
 Market Data CLI — Ticker Registry Commands
 
-Commands for managing the ticker registry.
+Commands for managing the ticker registry, including retroactive
+cleanup of historical predictions (remap aliases, remove concepts).
 """
 
 import click
 from rich.console import Console
 from rich.table import Table
 from rich import print as rprint
+from sqlalchemy import text
 
 from shit.logging import print_success, print_error, print_info
 from shit.db.sync_session import get_session
@@ -91,4 +93,170 @@ def register_tickers_cmd(symbols: tuple):
 
     except Exception as e:
         print_error(f"Error registering tickers: {e}")
+        raise click.Abort()
+
+
+@click.command(name="remap-tickers")
+@click.option("--dry-run", is_flag=True, help="Show what would change without modifying data")
+def remap_tickers_cmd(dry_run: bool):
+    """Remap historical predictions with delisted/renamed tickers using ALIASES.
+
+    Updates predictions.assets and predictions.market_impact for tickers
+    that have a known replacement (e.g., RTN→RTX, FB→META).
+    """
+    from shit.market_data.ticker_validator import TickerValidator
+
+    aliases_with_replacement = {
+        old: new for old, new in TickerValidator.ALIASES.items() if new is not None
+    }
+
+    if not aliases_with_replacement:
+        print_info("No aliases with replacements configured")
+        return
+
+    try:
+        total_remapped = 0
+        with get_session() as session:
+            for old_symbol, new_symbol in aliases_with_replacement.items():
+                # Count affected predictions
+                result = session.execute(
+                    text(
+                        "SELECT COUNT(*) FROM predictions "
+                        "WHERE assets::text LIKE :pattern"
+                    ),
+                    {"pattern": f'%"{old_symbol}"%'},
+                )
+                count = result.scalar()
+
+                if count == 0:
+                    continue
+
+                if dry_run:
+                    rprint(
+                        f"  [yellow]Would remap[/yellow] {old_symbol} → {new_symbol}: "
+                        f"[bold]{count}[/bold] predictions"
+                    )
+                else:
+                    # Update assets array
+                    session.execute(
+                        text("""
+                            UPDATE predictions
+                            SET assets = (
+                                SELECT jsonb_agg(
+                                    CASE WHEN elem = :old THEN :new ELSE elem END
+                                )
+                                FROM jsonb_array_elements_text(assets::jsonb) AS elem
+                            )::json
+                            WHERE assets::text LIKE :pattern
+                        """),
+                        {"old": old_symbol, "new": new_symbol, "pattern": f'%"{old_symbol}"%'},
+                    )
+                    # Update market_impact keys
+                    session.execute(
+                        text("""
+                            UPDATE predictions
+                            SET market_impact = (
+                                market_impact::jsonb - :old
+                                || jsonb_build_object(:new, market_impact::jsonb -> :old)
+                            )::json
+                            WHERE market_impact::text LIKE :pattern
+                        """),
+                        {"old": old_symbol, "new": new_symbol, "pattern": f'%"{old_symbol}"%'},
+                    )
+                    rprint(
+                        f"  [green]Remapped[/green] {old_symbol} → {new_symbol}: "
+                        f"[bold]{count}[/bold] predictions"
+                    )
+                total_remapped += count
+
+            if not dry_run:
+                session.commit()
+
+        if total_remapped == 0:
+            print_info("No predictions to remap")
+        elif dry_run:
+            rprint(f"\n[yellow]Dry run:[/yellow] {total_remapped} predictions would be remapped")
+        else:
+            print_success(f"Remapped {total_remapped} predictions")
+
+    except Exception as e:
+        print_error(f"Error remapping tickers: {e}")
+        raise click.Abort()
+
+
+@click.command(name="clean-concept-tickers")
+@click.option("--dry-run", is_flag=True, help="Show what would change without modifying data")
+def clean_concept_tickers_cmd(dry_run: bool):
+    """Remove non-ticker concepts (DEFENSE, CRYPTO, etc.) from historical predictions.
+
+    Removes concept strings from predictions.assets arrays and
+    predictions.market_impact dicts.
+    """
+    from shit.market_data.ticker_validator import TickerValidator
+
+    concepts = sorted(TickerValidator.BLOCKLIST)
+
+    try:
+        total_cleaned = 0
+        with get_session() as session:
+            for concept in concepts:
+                # Count affected predictions
+                result = session.execute(
+                    text(
+                        "SELECT COUNT(*) FROM predictions "
+                        "WHERE assets::text LIKE :pattern"
+                    ),
+                    {"pattern": f'%"{concept}"%'},
+                )
+                count = result.scalar()
+
+                if count == 0:
+                    continue
+
+                if dry_run:
+                    rprint(
+                        f"  [yellow]Would remove[/yellow] {concept}: "
+                        f"[bold]{count}[/bold] predictions"
+                    )
+                else:
+                    # Remove from assets array
+                    session.execute(
+                        text("""
+                            UPDATE predictions
+                            SET assets = (
+                                SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+                                FROM jsonb_array_elements_text(assets::jsonb) AS elem
+                                WHERE elem != :concept
+                            )::json
+                            WHERE assets::text LIKE :pattern
+                        """),
+                        {"concept": concept, "pattern": f'%"{concept}"%'},
+                    )
+                    # Remove from market_impact
+                    session.execute(
+                        text("""
+                            UPDATE predictions
+                            SET market_impact = (market_impact::jsonb - :concept)::json
+                            WHERE market_impact::text LIKE :pattern
+                        """),
+                        {"concept": concept, "pattern": f'%"{concept}"%'},
+                    )
+                    rprint(
+                        f"  [green]Removed[/green] {concept}: "
+                        f"[bold]{count}[/bold] predictions"
+                    )
+                total_cleaned += count
+
+            if not dry_run:
+                session.commit()
+
+        if total_cleaned == 0:
+            print_info("No concept tickers found in predictions")
+        elif dry_run:
+            rprint(f"\n[yellow]Dry run:[/yellow] {total_cleaned} predictions would be cleaned")
+        else:
+            print_success(f"Cleaned {total_cleaned} predictions")
+
+    except Exception as e:
+        print_error(f"Error cleaning concept tickers: {e}")
         raise click.Abort()

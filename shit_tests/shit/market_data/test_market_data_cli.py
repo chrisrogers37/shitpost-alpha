@@ -349,6 +349,118 @@ class TestCliGroupRegistration:
             "backfill-all-missing",
             "accuracy-report",
             "price-stats",
+            "remap-tickers",
+            "clean-concept-tickers",
         ]
         for cmd in expected_commands:
             assert cmd in result.output, f"Command '{cmd}' not found in CLI help"
+
+
+class TestRemapTickersCommand:
+    """Test remap-tickers CLI command."""
+
+    @pytest.fixture
+    def runner(self):
+        return CliRunner()
+
+    def test_help_shows_description(self, runner):
+        result = runner.invoke(cli, ["remap-tickers", "--help"])
+        assert result.exit_code == 0
+        assert "--dry-run" in result.output
+
+    def test_dry_run_shows_counts(self, runner):
+        """Dry run should show affected prediction counts without modifying data."""
+        mock_session = MagicMock()
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_session)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+
+        # Simulate RTN having 3 affected predictions
+        def mock_execute(query, params=None):
+            result = MagicMock()
+            if params and "RTN" in str(params.get("pattern", "")):
+                result.scalar.return_value = 3
+            else:
+                result.scalar.return_value = 0
+            return result
+
+        mock_session.execute.side_effect = mock_execute
+
+        with patch("shit.market_data.cli_registry.get_session", return_value=mock_ctx):
+            result = runner.invoke(cli, ["remap-tickers", "--dry-run"])
+
+        assert result.exit_code == 0
+        assert "Would remap" in result.output
+        # Should NOT commit in dry-run
+        mock_session.commit.assert_not_called()
+
+    def test_no_affected_predictions(self, runner):
+        """When no predictions need remapping, show info message."""
+        mock_session = MagicMock()
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_session)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+
+        result_mock = MagicMock()
+        result_mock.scalar.return_value = 0
+        mock_session.execute.return_value = result_mock
+
+        with patch("shit.market_data.cli_registry.get_session", return_value=mock_ctx):
+            result = runner.invoke(cli, ["remap-tickers", "--dry-run"])
+
+        assert result.exit_code == 0
+        assert "No predictions to remap" in result.output
+
+
+class TestCleanConceptTickersCommand:
+    """Test clean-concept-tickers CLI command."""
+
+    @pytest.fixture
+    def runner(self):
+        return CliRunner()
+
+    def test_help_shows_description(self, runner):
+        result = runner.invoke(cli, ["clean-concept-tickers", "--help"])
+        assert result.exit_code == 0
+        assert "--dry-run" in result.output
+
+    def test_dry_run_shows_counts(self, runner):
+        """Dry run should show affected prediction counts without modifying data."""
+        mock_session = MagicMock()
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_session)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+
+        def mock_execute(query, params=None):
+            result = MagicMock()
+            if params and "DEFENSE" in str(params.get("pattern", "")):
+                result.scalar.return_value = 5
+            else:
+                result.scalar.return_value = 0
+            return result
+
+        mock_session.execute.side_effect = mock_execute
+
+        with patch("shit.market_data.cli_registry.get_session", return_value=mock_ctx):
+            result = runner.invoke(cli, ["clean-concept-tickers", "--dry-run"])
+
+        assert result.exit_code == 0
+        assert "Would remove" in result.output
+        mock_session.commit.assert_not_called()
+
+    def test_no_concepts_found(self, runner):
+        """When no concept tickers exist, show info message."""
+        mock_session = MagicMock()
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_session)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+
+        result_mock = MagicMock()
+        result_mock.scalar.return_value = 0
+        mock_session.execute.return_value = result_mock
+
+        with patch("shit.market_data.cli_registry.get_session", return_value=mock_ctx):
+            result = runner.invoke(cli, ["clean-concept-tickers", "--dry-run"])
+
+        assert result.exit_code == 0
+        assert "No concept tickers found" in result.output

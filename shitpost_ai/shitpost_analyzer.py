@@ -463,6 +463,24 @@ class ShitpostAnalyzer:
                 analysis, shitpost
             )
 
+            # Validate and normalize extracted ticker symbols
+            raw_assets = enhanced_analysis.get("assets", [])
+            if raw_assets:
+                from shit.market_data.ticker_validator import TickerValidator
+                validator = TickerValidator()
+                validated_assets = validator.validate_symbols(raw_assets)
+                if validated_assets != raw_assets:
+                    logger.info(
+                        f"Ticker validation: {raw_assets} → {validated_assets}"
+                    )
+                enhanced_analysis["assets"] = validated_assets
+                # Filter market_impact to match validated assets
+                enhanced_analysis["market_impact"] = {
+                    k: v
+                    for k, v in enhanced_analysis.get("market_impact", {}).items()
+                    if k in validated_assets
+                }
+
             if not dry_run:
                 # Store analysis in database
                 analysis_id = await self.prediction_ops.store_analysis(

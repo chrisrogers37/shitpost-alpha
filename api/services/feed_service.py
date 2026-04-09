@@ -59,6 +59,16 @@ class FeedService:
             snap_data = self._extract_snapshot(o)
             outcomes.append(self.build_outcome(o, snap_data))
 
+        # Filter prediction.assets to exclude invalid tickers (no outcome = filtered by SQL)
+        valid_symbols = {o.symbol for o in outcomes}
+        if valid_symbols and prediction.assets:
+            prediction.assets = [a for a in prediction.assets if a in valid_symbols]
+            prediction.market_impact = {
+                k: v
+                for k, v in prediction.market_impact.items()
+                if k in valid_symbols
+            }
+
         navigation = self.build_navigation(offset, total)
 
         return FeedResponse(

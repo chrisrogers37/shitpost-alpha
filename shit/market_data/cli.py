@@ -29,6 +29,8 @@ from shit.market_data.cli_outcomes import (
 from shit.market_data.cli_registry import (
     ticker_registry_cmd,
     register_tickers_cmd,
+    remap_tickers_cmd,
+    clean_concept_tickers_cmd,
 )
 
 
@@ -56,6 +58,8 @@ cli.add_command(auto_pipeline)
 # Registry commands
 cli.add_command(ticker_registry_cmd)
 cli.add_command(register_tickers_cmd)
+cli.add_command(remap_tickers_cmd)
+cli.add_command(clean_concept_tickers_cmd)
 
 
 if __name__ == "__main__":

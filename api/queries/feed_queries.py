@@ -152,6 +152,7 @@ def get_outcomes_for_prediction(prediction_id: int) -> list[dict[str, Any]]:
             ON po.prediction_id = ps.prediction_id
             AND po.symbol = ps.symbol
         WHERE po.prediction_id = :prediction_id
+            AND (tr.status IS NULL OR tr.status != 'invalid')
         ORDER BY po.symbol
     """
 

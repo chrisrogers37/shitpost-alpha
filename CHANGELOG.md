@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Ticker validation service** — New `TickerValidator` class (`shit/market_data/ticker_validator.py`) with three-layer defense: static blocklist (DEFENSE, CRYPTO, etc.), alias remapping (RTN→RTX, FB→META, etc.), and yfinance spot-check for novel symbols
+- **Registry-first optimization** — Validator skips yfinance for symbols already active in ticker_registry (0ms cached lookup vs 300ms per yfinance call)
+- **Feed API invalid ticker filtering** — Outcomes query excludes tickers with `status='invalid'`; prediction assets filtered in API response to match
+- **Ticker cleanup CLI commands** — `python -m shit.market_data remap-tickers --dry-run` remaps delisted symbols in historical predictions; `python -m shit.market_data clean-concept-tickers --dry-run` removes non-ticker concepts
+- **29 TickerValidator tests** — Blocklist, aliases, registry-first, yfinance spot-check, fail-open, dedup, end-to-end scenarios
+
 ### Changed
+- **LLM prompt ticker guidance** — Updated `get_analysis_prompt()` and `get_detailed_analysis_prompt()` with explicit rules: use current US tickers only, no delisted/renamed/concept symbols, no foreign exchanges, omit uncertain tickers. PROMPT_VERSION bumped to 1.1
+- **Analyzer validates tickers before storage** — Extracted assets filtered through `TickerValidator` before reaching `prediction.assets`, preventing bad tickers at the source
 - **Provider-aware predictions** — `check_prediction_exists()` and `get_unprocessed_*()` queries accept `llm_provider`/`llm_model` params, enabling multiple LLM predictions per post without code changes to callers
 - **Slim analyzer dict** — `get_unprocessed_shitposts()` returns 18 fields actually consumed by the analyzer instead of 53 (all data preserved in `raw_api_data`)
 - **Batch price lookups** — `get_price_on_date()` replaced 7-query backward walk with single bounded SQL query; outcome calculator and ticker registry batch-check existence before per-asset loops

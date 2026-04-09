@@ -371,3 +371,102 @@ class TestGetFeedResponse:
         assert result.prediction.assets == ["SPY"]
         assert result.outcomes == []
         assert result.navigation.total_posts == 10
+
+    def test_filters_invalid_tickers_from_assets(self):
+        """Assets in prediction that have no outcome (filtered by SQL) should be removed."""
+        row = {
+            "shitpost_id": "post_2",
+            "text": "Defense and stocks",
+            "content_html": None,
+            "timestamp": datetime(2026, 3, 25, 14, 30, 0),
+            "username": "user",
+            "url": None,
+            "replies_count": 0,
+            "reblogs_count": 0,
+            "favourites_count": 0,
+            "upvotes_count": 0,
+            "downvotes_count": 0,
+            "account_verified": False,
+            "account_followers_count": None,
+            "card": None,
+            "media_attachments": None,
+            "in_reply_to": None,
+            "reblog": None,
+            "prediction_id": 2,
+            "assets": ["RTX", "RTN", "DEFENSE"],
+            "market_impact": {"RTX": "bullish", "RTN": "bullish", "DEFENSE": "bullish"},
+            "confidence": 0.7,
+            "thesis": "Defense spending",
+            "analysis_status": "completed",
+            "engagement_score": None,
+            "viral_score": None,
+            "sentiment_score": None,
+            "urgency_score": None,
+        }
+
+        # Only RTX has an outcome (RTN and DEFENSE filtered by SQL)
+        outcomes_raw = [
+            {
+                "symbol": "RTX",
+                "prediction_sentiment": "bullish",
+                "prediction_confidence": 0.7,
+                "prediction_date": date(2026, 3, 25),
+                "price_at_prediction": 120.0,
+                "price_at_post": None,
+                "return_same_day": None,
+                "return_1h": None,
+                "return_t1": 1.5,
+                "return_t3": None,
+                "return_t7": None,
+                "return_t30": None,
+                "correct_same_day": None,
+                "correct_1h": None,
+                "correct_t1": True,
+                "correct_t3": None,
+                "correct_t7": None,
+                "correct_t30": None,
+                "pnl_same_day": None,
+                "pnl_1h": None,
+                "pnl_t1": 15.0,
+                "pnl_t3": None,
+                "pnl_t7": None,
+                "pnl_t30": None,
+                "is_complete": False,
+                "company_name": "RTX Corporation",
+                "asset_type": "stock",
+                "exchange": "NYSE",
+                "sector": "Industrials",
+                "industry": "Aerospace & Defense",
+                "market_cap": 150000000000,
+                "pe_ratio": 22.0,
+                "forward_pe": 20.0,
+                "beta": 0.9,
+                "dividend_yield": 0.02,
+                "snapshot_price": None,
+                "snapshot_captured_at": None,
+                "snapshot_market_status": None,
+                "snapshot_previous_close": None,
+                "snapshot_day_high": None,
+                "snapshot_day_low": None,
+            }
+        ]
+
+        with (
+            patch(
+                "api.services.feed_service.get_analyzed_post_at_offset",
+                return_value=(row, 5),
+            ),
+            patch(
+                "api.services.feed_service.get_outcomes_for_prediction",
+                return_value=outcomes_raw,
+            ),
+        ):
+            service = FeedService()
+            result = service.get_feed_response(0)
+
+        assert result is not None
+        # Only RTX should remain in assets (RTN and DEFENSE filtered)
+        assert result.prediction.assets == ["RTX"]
+        assert result.prediction.market_impact == {"RTX": "bullish"}
+        assert len(result.outcomes) == 1
+        assert result.outcomes[0].symbol == "RTX"
