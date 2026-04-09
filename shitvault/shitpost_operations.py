@@ -134,39 +134,54 @@ class ShitpostOperations:
             logger.error(f"Error storing shitpost {shitpost_data.get('shitpost_id')}: {e}")
             raise
     
-    async def get_unprocessed_shitposts(self, launch_date: str, limit: int = 10) -> List[Dict]:
+    async def get_unprocessed_shitposts(
+        self,
+        launch_date: str,
+        limit: int = 10,
+        llm_provider: Optional[str] = None,
+        llm_model: Optional[str] = None,
+    ) -> List[Dict]:
         """
         Get shitposts that need LLM analysis.
-        
+
+        Provider-aware: when llm_provider/llm_model are given, returns posts
+        that haven't been analyzed by that specific provider+model, even if
+        other providers have already analyzed them.
+
         Criteria:
         1. Shitpost timestamp is after system launch date
-        2. Shitpost has no existing prediction
+        2. Shitpost has no existing prediction (for the given provider/model)
         3. Shitpost has sufficient content for analysis
         """
         try:
             # Parse launch date
             launch_datetime = datetime.fromisoformat(launch_date.replace('Z', '+00:00'))
-            
-            # Subquery to check if prediction exists
-            prediction_exists = select(Prediction.id).where(Prediction.shitpost_id == TruthSocialShitpost.shitpost_id)
-            
+
+            # Subquery to check if prediction exists (provider-aware)
+            pred_conditions = [Prediction.shitpost_id == TruthSocialShitpost.shitpost_id]
+            if llm_provider is not None:
+                pred_conditions.append(Prediction.llm_provider == llm_provider)
+            if llm_model is not None:
+                pred_conditions.append(Prediction.llm_model == llm_model)
+
+            prediction_exists = select(Prediction.id).where(and_(*pred_conditions))
+
             # Main query - Get posts that need analysis
             # Include ALL posts (even those with no text) so they can be bypassed
             stmt = select(TruthSocialShitpost).where(
                 and_(
                     TruthSocialShitpost.timestamp >= launch_datetime,
                     not_(exists(prediction_exists))
-                    # Removed text filters so posts with no text can be processed and bypassed
                 )
             ).order_by(TruthSocialShitpost.timestamp.desc()).limit(limit)
-            
+
             result = await self.db_ops.session.execute(stmt)
             shitposts = result.scalars().all()
-            
-            # Convert to dict format
+
+            # Convert to dict — only fields consumed by the analyzer pipeline
             shitpost_dicts = []
             for shitpost in shitposts:
-                shitpost_dict = {
+                shitpost_dicts.append({
                     'id': shitpost.id,
                     'shitpost_id': shitpost.shitpost_id,
                     'content': shitpost.content,
@@ -174,58 +189,22 @@ class ShitpostOperations:
                     'timestamp': shitpost.timestamp,
                     'username': shitpost.username,
                     'platform': shitpost.platform,
-                    'language': shitpost.language,
-                    'visibility': shitpost.visibility,
-                    'sensitive': shitpost.sensitive,
-                    'uri': shitpost.uri,
-                    'url': shitpost.url,
                     'replies_count': shitpost.replies_count,
                     'reblogs_count': shitpost.reblogs_count,
                     'favourites_count': shitpost.favourites_count,
                     'upvotes_count': shitpost.upvotes_count,
-                    'downvotes_count': shitpost.downvotes_count,
-                    'account_id': shitpost.account_id,
-                    'account_display_name': shitpost.account_display_name,
-                    'account_followers_count': shitpost.account_followers_count,
-                    'account_following_count': shitpost.account_following_count,
-                    'account_statuses_count': shitpost.account_statuses_count,
                     'account_verified': shitpost.account_verified,
-                    'account_website': shitpost.account_website,
+                    'account_followers_count': shitpost.account_followers_count,
                     'has_media': shitpost.has_media,
-                    'media_attachments': shitpost.media_attachments,
                     'mentions': shitpost.mentions,
                     'tags': shitpost.tags,
-                    'in_reply_to_id': shitpost.in_reply_to_id,
-                    'quote_id': shitpost.quote_id,
-                    'in_reply_to_account_id': shitpost.in_reply_to_account_id,
-                    'card': shitpost.card,
-                    'group': shitpost.group,
-                    'quote': shitpost.quote,
-                    'in_reply_to': shitpost.in_reply_to,
                     'reblog': shitpost.reblog,
-                    'sponsored': shitpost.sponsored,
-                    'reaction': shitpost.reaction,
-                    'favourited': shitpost.favourited,
-                    'reblogged': shitpost.reblogged,
-                    'muted': shitpost.muted,
-                    'pinned': shitpost.pinned,
-                    'bookmarked': shitpost.bookmarked,
-                    'poll': shitpost.poll,
-                    'emojis': shitpost.emojis,
-                    'votable': shitpost.votable,
-                    'edited_at': shitpost.edited_at,
-                    'version': shitpost.version,
-                    'editable': shitpost.editable,
-                    'title': shitpost.title,
-                    'raw_api_data': shitpost.raw_api_data,
-                    'created_at': shitpost.created_at,
-                    'updated_at': shitpost.updated_at
-                }
-                shitpost_dicts.append(shitpost_dict)
-            
+                    'is_repost': shitpost.reblog is not None,
+                })
+
             logger.info(f"Retrieved {len(shitpost_dicts)} unprocessed shitposts")
             return shitpost_dicts
-            
+
         except Exception as e:
             logger.error(f"Error retrieving unprocessed shitposts: {e}")
             raise

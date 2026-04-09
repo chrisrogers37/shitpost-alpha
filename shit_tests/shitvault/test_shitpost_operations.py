@@ -392,5 +392,5 @@ class TestShitpostOperations:
         assert 'id' in result[0]
         assert 'shitpost_id' in result[0]
         assert 'content' in result[0]
-        assert 'created_at' in result[0]
-        assert 'updated_at' in result[0]
+        assert 'has_media' in result[0]
+        assert 'is_repost' in result[0]

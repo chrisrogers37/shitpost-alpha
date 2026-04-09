@@ -72,6 +72,10 @@ class PredictionOutcome(Base, IDMixin, TimestampMixin):
             "prediction_id", "symbol",
             name="uq_prediction_outcomes_pred_symbol",
         ),
+        CheckConstraint(
+            "prediction_sentiment IN ('bullish', 'bearish', 'neutral') OR prediction_sentiment IS NULL",
+            name="ck_prediction_outcomes_sentiment",
+        ),
     )
 
     # Link to prediction
