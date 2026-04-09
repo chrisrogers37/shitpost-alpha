@@ -362,10 +362,6 @@ class TestGetFeedResponse:
             patch(
                 "api.services.feed_service.get_outcomes_for_prediction", return_value=[]
             ),
-            patch(
-                "api.services.feed_service.get_snapshots_for_prediction",
-                return_value={},
-            ),
         ):
             service = FeedService()
             result = service.get_feed_response(0)
