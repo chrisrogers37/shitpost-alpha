@@ -7,7 +7,7 @@ Extracted from ShitpostDatabase for modularity.
 
 from typing import Dict, Optional, Any
 from datetime import datetime
-from sqlalchemy import select
+from sqlalchemy import and_, select
 
 from shit.db.database_operations import DatabaseOperations
 from shit.db.database_utils import DatabaseUtils
@@ -186,18 +186,38 @@ class PredictionOperations:
             return None
     
     
-    async def check_prediction_exists(self, content_id: str, *, use_signal: bool = False) -> bool:
+    async def check_prediction_exists(
+        self,
+        content_id: str,
+        *,
+        use_signal: bool = False,
+        llm_provider: Optional[str] = None,
+        llm_model: Optional[str] = None,
+    ) -> bool:
         """Check if a prediction already exists for content.
+
+        Provider-aware: when llm_provider/llm_model are given, checks for
+        a prediction from that specific provider+model combination, allowing
+        multiple LLM predictions per post.
 
         Args:
             content_id: Signal ID or shitpost ID to check.
             use_signal: If True, check signal_id; otherwise check shitpost_id.
+            llm_provider: If set, only match predictions from this provider.
+            llm_model: If set, only match predictions from this model.
         """
         try:
             if use_signal:
-                stmt = select(Prediction.id).where(Prediction.signal_id == content_id)
+                conditions = [Prediction.signal_id == content_id]
             else:
-                stmt = select(Prediction.id).where(Prediction.shitpost_id == content_id)
+                conditions = [Prediction.shitpost_id == content_id]
+
+            if llm_provider is not None:
+                conditions.append(Prediction.llm_provider == llm_provider)
+            if llm_model is not None:
+                conditions.append(Prediction.llm_model == llm_model)
+
+            stmt = select(Prediction.id).where(and_(*conditions))
             result = await self.db_ops.session.execute(stmt)
             return result.scalar_one_or_none() is not None
 

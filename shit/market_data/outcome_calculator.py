@@ -118,6 +118,14 @@ class OutcomeCalculator:
 
         outcomes = []
 
+        # Batch-query existing outcomes for this prediction (avoids N+1)
+        existing_outcomes = {
+            row.symbol: row
+            for row in self.session.query(PredictionOutcome)
+            .filter(PredictionOutcome.prediction_id == prediction_id)
+            .all()
+        }
+
         # Calculate outcome for each asset
         for asset in prediction.assets:
             try:
@@ -136,6 +144,7 @@ class OutcomeCalculator:
                     confidence=prediction.confidence,
                     force_refresh=force_refresh,
                     post_datetime=post_datetime,
+                    existing_outcome=existing_outcomes.get(asset),
                 )
                 if outcome:
                     outcomes.append(outcome)
@@ -164,6 +173,7 @@ class OutcomeCalculator:
         confidence: Optional[float],
         force_refresh: bool = False,
         post_datetime: Optional[datetime] = None,
+        existing_outcome: Optional[PredictionOutcome] = None,
     ) -> Optional[PredictionOutcome]:
         """Calculate outcome for a single asset prediction."""
 
@@ -175,17 +185,19 @@ class OutcomeCalculator:
             )
             return None
 
-        # Check if outcome already exists
-        existing = (
-            self.session.query(PredictionOutcome)
-            .filter(
-                and_(
-                    PredictionOutcome.prediction_id == prediction_id,
-                    PredictionOutcome.symbol == symbol,
+        # Use pre-fetched outcome from batch query, or query if not provided
+        existing = existing_outcome
+        if existing is None:
+            existing = (
+                self.session.query(PredictionOutcome)
+                .filter(
+                    and_(
+                        PredictionOutcome.prediction_id == prediction_id,
+                        PredictionOutcome.symbol == symbol,
+                    )
                 )
+                .first()
             )
-            .first()
-        )
 
         if existing and not force_refresh:
             if existing.is_complete:
@@ -210,6 +222,7 @@ class OutcomeCalculator:
                 prediction_date=prediction_date,
                 prediction_sentiment=sentiment,
                 prediction_confidence=confidence,
+                sector=self._lookup_sector(symbol),
             )
         )
 
@@ -249,6 +262,17 @@ class OutcomeCalculator:
         )
 
         return outcome
+
+    def _lookup_sector(self, symbol: str) -> Optional[str]:
+        """Look up the sector for a symbol from the ticker registry."""
+        from shit.market_data.models import TickerRegistry
+
+        row = (
+            self.session.query(TickerRegistry.sector)
+            .filter(TickerRegistry.symbol == symbol)
+            .first()
+        )
+        return row.sector if row else None
 
     def _resolve_base_price(
         self,

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Provider-aware predictions** — `check_prediction_exists()` and `get_unprocessed_*()` queries accept `llm_provider`/`llm_model` params, enabling multiple LLM predictions per post without code changes to callers
+- **Slim analyzer dict** — `get_unprocessed_shitposts()` returns 18 fields actually consumed by the analyzer instead of 53 (all data preserved in `raw_api_data`)
+- **Batch price lookups** — `get_price_on_date()` replaced 7-query backward walk with single bounded SQL query; outcome calculator and ticker registry batch-check existence before per-asset loops
+- **Feed query consolidation** — Merged outcomes + snapshots into single SQL JOIN, eliminating Python-side merge and 1 DB round trip per feed request (3 queries → 2)
+- **Statistics consolidation** — `get_database_stats()` reduced from 8 separate queries to 2 using CASE WHEN aggregation
+- **Notifications decoupled from legacy table** — `get_new_predictions_since()` uses `predictions.post_timestamp` instead of JOIN to `truth_social_shitposts`, now picks up signal-based predictions
+- **TelegramSubscription model moved** — From `shitvault/shitpost_models.py` to `notifications/models.py` (proper separation of concerns, re-exported for compatibility)
+
+### Added
+- **Sentiment CHECK constraint** — `prediction_outcomes.prediction_sentiment` enforced to `bullish`/`bearish`/`neutral`/NULL at DB level
+- **Symbol FK constraints** — `prediction_outcomes.symbol` and `price_snapshots.symbol` now reference `ticker_registry.symbol`
+- **Sector snapshot on outcomes** — `prediction_outcomes.sector` populated from `ticker_registry` at outcome creation for backtesting analytics
+- **Migration script 008** — Adds sentiment CHECK, symbol FKs, drops dead `market_volatility` and `notes` columns
+
 ### Added
 - **Live price quotes** — New `/api/prices/{symbol}/live` endpoint using yfinance fast_info (~300ms); `useLiveQuote()` TanStack Query hook polls every 15 seconds; PriceKPIs shows pulsing green dot when live data is active
 - **Inline snapshot capture** — Price snapshots now captured within seconds of LLM analysis (in analyzer's `_trigger_reactive_backfill`), down from 5-15 minutes via the market-data-worker cron hop; worker stays as idempotent safety net

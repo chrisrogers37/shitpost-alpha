@@ -86,13 +86,16 @@ def get_analyzed_post_at_offset(
 
 
 def get_outcomes_for_prediction(prediction_id: int) -> list[dict[str, Any]]:
-    """Get all prediction_outcomes for a given prediction.
+    """Get all prediction_outcomes with ticker fundamentals and price snapshots.
+
+    Single query joins outcomes, ticker_registry, and price_snapshots,
+    eliminating the separate snapshot query and Python-side merge.
 
     Args:
         prediction_id: The prediction.id to look up.
 
     Returns:
-        List of outcome dicts, one per ticker symbol.
+        List of outcome dicts (one per ticker), each including snapshot fields.
     """
     query = """
         SELECT
@@ -136,44 +139,23 @@ def get_outcomes_for_prediction(prediction_id: int) -> list[dict[str, Any]]:
             tr.pe_ratio,
             tr.forward_pe,
             tr.beta,
-            tr.dividend_yield
+            tr.dividend_yield,
+            ps.price     AS snapshot_price,
+            ps.captured_at AS snapshot_captured_at,
+            ps.market_status AS snapshot_market_status,
+            ps.previous_close AS snapshot_previous_close,
+            ps.day_high  AS snapshot_day_high,
+            ps.day_low   AS snapshot_day_low
         FROM prediction_outcomes po
         LEFT JOIN ticker_registry tr ON po.symbol = tr.symbol
+        LEFT JOIN price_snapshots ps
+            ON po.prediction_id = ps.prediction_id
+            AND po.symbol = ps.symbol
         WHERE po.prediction_id = :prediction_id
         ORDER BY po.symbol
     """
 
     rows, columns = execute_query(query, {"prediction_id": prediction_id})
     return [dict(zip(columns, row)) for row in rows]
-
-
-def get_snapshots_for_prediction(
-    prediction_id: int,
-) -> dict[str, dict[str, Any]]:
-    """Get price snapshots for a prediction, keyed by symbol.
-
-    Returns:
-        Dict mapping symbol → snapshot data dict.
-    """
-    query = """
-        SELECT
-            symbol, price, captured_at,
-            market_status, previous_close,
-            day_high, day_low
-        FROM price_snapshots
-        WHERE prediction_id = :prediction_id
-        ORDER BY symbol
-    """
-    rows, columns = execute_query(
-        query, {"prediction_id": prediction_id}
-    )
-    result = {}
-    for row in rows:
-        d = dict(zip(columns, row))
-        sym = d.pop("symbol")
-        if hasattr(d.get("captured_at"), "isoformat"):
-            d["captured_at"] = d["captured_at"].isoformat()
-        result[sym] = d
-    return result
 
 

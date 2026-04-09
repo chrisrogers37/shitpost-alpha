@@ -298,52 +298,32 @@ class MarketDataClient:
     ) -> Optional[MarketPrice]:
         """Get price for a specific date, with fallback for non-trading days.
 
-        Uses the market calendar to walk backward through actual trading days
-        rather than calendar days. If target_date is a weekend or holiday,
-        this returns the most recent trading day's close.
+        Uses a single bounded query to find the most recent price on or before
+        the target date within the lookback window. If target_date is a weekend
+        or holiday, this returns the most recent trading day's close.
         """
-        from shit.market_data.market_calendar import MarketCalendar
-
+        # Single query: find most recent price on or before target within lookback window
+        lookback_date = target_date - timedelta(days=lookback_days * 2)  # Calendar days > trading days
         price = (
             self.session.query(MarketPrice)
-            .filter(and_(MarketPrice.symbol == symbol, MarketPrice.date == target_date))
+            .filter(
+                and_(
+                    MarketPrice.symbol == symbol,
+                    MarketPrice.date <= target_date,
+                    MarketPrice.date >= lookback_date,
+                )
+            )
+            .order_by(MarketPrice.date.desc())
             .first()
         )
 
         if price:
-            return price
-
-        logger.debug(
-            f"No price found for {symbol} on {target_date}, checking previous trading days",
-            extra={"symbol": symbol, "target_date": str(target_date)},
-        )
-
-        # Use market calendar to find the most recent trading day
-        calendar = MarketCalendar()
-        check_date = target_date
-        for _ in range(lookback_days):
-            try:
-                check_date = calendar.previous_trading_day(check_date)
-            except Exception:
-                # Fallback to naive walk if calendar fails
-                check_date = check_date - timedelta(days=1)
-                while check_date.weekday() >= 5:
-                    check_date -= timedelta(days=1)
-
-            price = (
-                self.session.query(MarketPrice)
-                .filter(
-                    and_(MarketPrice.symbol == symbol, MarketPrice.date == check_date)
-                )
-                .first()
-            )
-
-            if price:
+            if price.date != target_date:
                 logger.debug(
-                    f"Found price for {symbol} on {check_date} (nearest trading day before {target_date})",
-                    extra={"symbol": symbol, "price_date": str(check_date)},
+                    f"Found price for {symbol} on {price.date} (nearest trading day before {target_date})",
+                    extra={"symbol": symbol, "price_date": str(price.date)},
                 )
-                return price
+            return price
 
         logger.warning(
             f"No price found for {symbol} within {lookback_days} trading days of {target_date}",

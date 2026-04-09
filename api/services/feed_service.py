@@ -6,7 +6,6 @@ from typing import Any
 from api.queries.feed_queries import (
     get_analyzed_post_at_offset,
     get_outcomes_for_prediction,
-    get_snapshots_for_prediction,
 )
 from api.schemas.feed import (
     Correct,
@@ -54,13 +53,10 @@ class FeedService:
         post = self.build_post(row, market_timing, minutes_to_market)
         prediction = self.build_prediction(row)
 
-        # Fetch price snapshots for this prediction
-        snapshots_by_symbol = get_snapshots_for_prediction(row["prediction_id"])
-
-        # Build outcomes
+        # Build outcomes — snapshot data is now in the same query result
         outcomes = []
         for o in outcomes_raw:
-            snap_data = snapshots_by_symbol.get(o["symbol"])
+            snap_data = self._extract_snapshot(o)
             outcomes.append(self.build_outcome(o, snap_data))
 
         navigation = self.build_navigation(offset, total)
@@ -193,6 +189,35 @@ class FeedService:
             prediction_date=pred_date_str,
             marker_dates=marker_dates,
         )
+
+    @staticmethod
+    def _extract_snapshot(o: dict[str, Any]) -> dict[str, Any] | None:
+        """Extract snapshot fields from a merged outcome+snapshot query row.
+
+        Pops the snapshot_ prefixed keys from the outcome dict and returns
+        them as a standalone snapshot dict, or None if no snapshot exists.
+        """
+        price = o.pop("snapshot_price", None)
+        captured_at = o.pop("snapshot_captured_at", None)
+        market_status = o.pop("snapshot_market_status", None)
+        previous_close = o.pop("snapshot_previous_close", None)
+        day_high = o.pop("snapshot_day_high", None)
+        day_low = o.pop("snapshot_day_low", None)
+
+        if price is None:
+            return None
+
+        if hasattr(captured_at, "isoformat"):
+            captured_at = captured_at.isoformat()
+
+        return {
+            "price": price,
+            "captured_at": captured_at,
+            "market_status": market_status,
+            "previous_close": previous_close,
+            "day_high": day_high,
+            "day_low": day_low,
+        }
 
     @staticmethod
     def build_navigation(offset: int, total: int) -> Navigation:

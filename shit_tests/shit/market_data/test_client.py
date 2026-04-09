@@ -258,33 +258,35 @@ class TestStoreRawRecords:
 class TestGetPriceOnDate:
     def test_returns_exact_date_match(self, client, mock_session):
         mock_price = MagicMock(spec=MarketPrice)
-        mock_session.query.return_value.filter.return_value.first.return_value = mock_price
+        mock_price.date = date(2026, 1, 15)
+        mock_session.query.return_value.filter.return_value.order_by.return_value.first.return_value = mock_price
 
         result = client.get_price_on_date("AAPL", date(2026, 1, 15))
         assert result is mock_price
 
     def test_returns_none_when_not_found(self, client, mock_session):
-        mock_session.query.return_value.filter.return_value.first.return_value = None
+        mock_session.query.return_value.filter.return_value.order_by.return_value.first.return_value = None
 
         result = client.get_price_on_date("AAPL", date(2026, 1, 15))
         assert result is None
 
-    def test_looks_back_when_market_closed(self, client, mock_session):
+    def test_returns_nearest_trading_day(self, client, mock_session):
+        """Single bounded query returns the nearest trading day before target."""
         mock_price = MagicMock(spec=MarketPrice)
-        mock_session.query.return_value.filter.return_value.first.side_effect = [
-            None,  # exact date
-            mock_price,  # 1 day back
-        ]
+        mock_price.date = date(2026, 1, 13)  # Monday before target Wednesday
+        mock_session.query.return_value.filter.return_value.order_by.return_value.first.return_value = mock_price
 
         result = client.get_price_on_date("AAPL", date(2026, 1, 15))
         assert result is mock_price
 
-    def test_respects_lookback_limit(self, client, mock_session):
-        mock_session.query.return_value.filter.return_value.first.return_value = None
+    def test_single_query_instead_of_loop(self, client, mock_session):
+        """Verify only 1 query is issued regardless of lookback window."""
+        mock_session.query.return_value.filter.return_value.order_by.return_value.first.return_value = None
 
-        result = client.get_price_on_date("AAPL", date(2026, 1, 15), lookback_days=3)
+        result = client.get_price_on_date("AAPL", date(2026, 1, 15), lookback_days=7)
         assert result is None
-        assert mock_session.query.return_value.filter.return_value.first.call_count == 4
+        # Single query, not N queries walking backward
+        assert mock_session.query.call_count == 1
 
 
 class TestGetLatestPrice:

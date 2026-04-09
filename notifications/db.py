@@ -369,9 +369,9 @@ def get_new_predictions_since(since: datetime) -> List[Dict[str, Any]]:
     results = _execute_read(
         """
         SELECT
-            tss.timestamp,
-            tss.text,
-            tss.shitpost_id,
+            p.post_timestamp AS timestamp,
+            p.shitpost_id,
+            p.signal_id,
             p.id as prediction_id,
             p.assets,
             p.market_impact,
@@ -380,8 +380,6 @@ def get_new_predictions_since(since: datetime) -> List[Dict[str, Any]]:
             p.analysis_status,
             p.created_at as prediction_created_at
         FROM predictions p
-        INNER JOIN truth_social_shitposts tss
-            ON tss.shitpost_id = p.shitpost_id
         WHERE p.analysis_status = 'completed'
             AND p.created_at > :since
             AND p.confidence IS NOT NULL

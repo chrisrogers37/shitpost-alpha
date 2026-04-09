@@ -45,25 +45,30 @@ class TickerRegistryService:
         already_known = []
 
         with get_session() as session:
+            # Validate and normalize symbols
+            valid_symbols = []
             for symbol in symbols:
                 symbol = symbol.strip().upper()
-
-                # Validate symbol format
                 if not symbol or len(symbol) > 20 or " " in symbol:
                     logger.warning(f"Skipping invalid symbol format: '{symbol}'")
                     continue
+                valid_symbols.append(symbol)
 
-                # Check if already registered
-                existing = (
-                    session.query(TickerRegistry)
-                    .filter(TickerRegistry.symbol == symbol)
-                    .first()
+            # Batch-query existing tickers (avoids N+1)
+            existing_set = set()
+            if valid_symbols:
+                existing_rows = (
+                    session.query(TickerRegistry.symbol)
+                    .filter(TickerRegistry.symbol.in_(valid_symbols))
+                    .all()
                 )
+                existing_set = {row.symbol for row in existing_rows}
 
-                if existing:
+            for symbol in valid_symbols:
+                if symbol in existing_set:
                     already_known.append(symbol)
                     logger.debug(
-                        f"Ticker {symbol} already registered (status={existing.status})"
+                        f"Ticker {symbol} already registered"
                     )
                     continue
 

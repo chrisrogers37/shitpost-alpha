@@ -65,20 +65,31 @@ class SignalOperations:
             raise
 
     async def get_unprocessed_signals(
-        self, launch_date: str, limit: int = 10, source: Optional[str] = None
+        self,
+        launch_date: str,
+        limit: int = 10,
+        source: Optional[str] = None,
+        llm_provider: Optional[str] = None,
+        llm_model: Optional[str] = None,
     ) -> List[Dict]:
         """
         Get signals that need LLM analysis.
 
+        Provider-aware: when llm_provider/llm_model are given, returns signals
+        that haven't been analyzed by that specific provider+model, even if
+        other providers have already analyzed them.
+
         Criteria:
         1. Signal published_at is after launch date
-        2. No existing prediction for this signal
+        2. No existing prediction for this signal (for the given provider/model)
         3. Optionally filtered by source
 
         Args:
             launch_date: ISO date string for minimum timestamp
             limit: Maximum signals to return
             source: Optional source filter
+            llm_provider: If set, only match predictions from this provider.
+            llm_model: If set, only match predictions from this model.
 
         Returns:
             List of signal dictionaries (includes backward-compatible aliases)
@@ -88,8 +99,14 @@ class SignalOperations:
                 launch_date.replace("Z", "+00:00")
             )
 
+            pred_conditions = [Prediction.signal_id == Signal.signal_id]
+            if llm_provider is not None:
+                pred_conditions.append(Prediction.llm_provider == llm_provider)
+            if llm_model is not None:
+                pred_conditions.append(Prediction.llm_model == llm_model)
+
             prediction_exists = select(Prediction.id).where(
-                Prediction.signal_id == Signal.signal_id
+                and_(*pred_conditions)
             )
 
             conditions = [

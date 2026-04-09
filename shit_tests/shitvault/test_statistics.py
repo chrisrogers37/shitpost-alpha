@@ -112,54 +112,38 @@ class TestStatistics:
 
     @pytest.mark.asyncio
     async def test_get_database_stats_success(self, statistics, mock_db_ops):
-        """Test successful database stats retrieval."""
-        # Mock shitpost count
-        mock_shitpost_result = MagicMock()
-        mock_shitpost_result.scalar.return_value = 100
-        
-        # Mock analysis count
-        mock_analysis_result = MagicMock()
-        mock_analysis_result.scalar.return_value = 75
-        
-        # Mock status counts
-        mock_completed = MagicMock()
-        mock_completed.scalar.return_value = 60
-        mock_bypassed = MagicMock()
-        mock_bypassed.scalar.return_value = 10
-        mock_error = MagicMock()
-        mock_error.scalar.return_value = 3
-        mock_pending = MagicMock()
-        mock_pending.scalar.return_value = 2
-        
-        # Mock average confidence
-        mock_confidence_result = MagicMock()
-        mock_confidence_result.scalar.return_value = 0.85
-        
-        # Mock date ranges
+        """Test successful database stats retrieval (2 consolidated queries)."""
         min_date = datetime(2024, 1, 1, 12, 0, 0)
         max_date = datetime(2024, 1, 31, 18, 0, 0)
-        
-        mock_min_date = MagicMock()
-        mock_min_date.scalar.return_value = min_date
-        mock_max_date = MagicMock()
-        mock_max_date.scalar.return_value = max_date
-        
+
+        # Query 1: shitpost aggregates
+        shitpost_row = MagicMock()
+        shitpost_row.shitpost_count = 100
+        shitpost_row.min_date = min_date
+        shitpost_row.max_date = max_date
+        mock_shitpost_result = MagicMock()
+        mock_shitpost_result.one.return_value = shitpost_row
+
+        # Query 2: prediction aggregates
+        pred_row = MagicMock()
+        pred_row.total = 75
+        pred_row.avg_confidence = 0.85
+        pred_row.completed_count = 60
+        pred_row.bypassed_count = 10
+        pred_row.error_count = 3
+        pred_row.pending_count = 2
+        pred_row.min_analysis_date = min_date
+        pred_row.max_analysis_date = max_date
+        mock_pred_result = MagicMock()
+        mock_pred_result.one.return_value = pred_row
+
         mock_db_ops.session.execute.side_effect = [
-            mock_shitpost_result,  # shitpost count
-            mock_analysis_result,  # analysis count
-            mock_completed,        # completed count
-            mock_bypassed,         # bypassed count
-            mock_error,            # error count
-            mock_pending,          # pending count
-            mock_confidence_result, # avg confidence
-            mock_min_date,         # min date
-            mock_max_date,         # max date
-            mock_min_date,         # min analysis date
-            mock_max_date,         # max analysis date
+            mock_shitpost_result,
+            mock_pred_result,
         ]
-        
+
         result = await statistics.get_database_stats()
-        
+
         assert result['total_shitposts'] == 100
         assert result['total_analyses'] == 75
         assert result['average_confidence'] == 0.85
@@ -172,35 +156,38 @@ class TestStatistics:
         assert result['latest_post'] == max_date.isoformat()
         assert result['earliest_analyzed_post'] == min_date.isoformat()
         assert result['latest_analyzed_post'] == max_date.isoformat()
+        # Only 2 queries now instead of 8+
+        assert mock_db_ops.session.execute.call_count == 2
 
     @pytest.mark.asyncio
     async def test_get_database_stats_no_dates(self, statistics, mock_db_ops):
         """Test database stats with no dates (empty database)."""
-        mock_count = MagicMock()
-        mock_count.scalar.return_value = 0
-        
-        mock_confidence = MagicMock()
-        mock_confidence.scalar.return_value = 0.0
-        
-        mock_no_date = MagicMock()
-        mock_no_date.scalar.return_value = None
-        
+        shitpost_row = MagicMock()
+        shitpost_row.shitpost_count = 0
+        shitpost_row.min_date = None
+        shitpost_row.max_date = None
+        mock_shitpost_result = MagicMock()
+        mock_shitpost_result.one.return_value = shitpost_row
+
+        pred_row = MagicMock()
+        pred_row.total = 0
+        pred_row.avg_confidence = None
+        pred_row.completed_count = 0
+        pred_row.bypassed_count = 0
+        pred_row.error_count = 0
+        pred_row.pending_count = 0
+        pred_row.min_analysis_date = None
+        pred_row.max_analysis_date = None
+        mock_pred_result = MagicMock()
+        mock_pred_result.one.return_value = pred_row
+
         mock_db_ops.session.execute.side_effect = [
-            mock_count,     # shitpost count
-            mock_count,     # analysis count
-            mock_count,     # completed count
-            mock_count,     # bypassed count
-            mock_count,     # error count
-            mock_count,     # pending count
-            mock_confidence, # avg confidence
-            mock_no_date,   # min date
-            mock_no_date,   # max date
-            mock_no_date,   # min analysis date
-            mock_no_date,   # max analysis date
+            mock_shitpost_result,
+            mock_pred_result,
         ]
-        
+
         result = await statistics.get_database_stats()
-        
+
         assert result['earliest_post'] is None
         assert result['latest_post'] is None
         assert result['earliest_analyzed_post'] is None
@@ -210,10 +197,9 @@ class TestStatistics:
     async def test_get_database_stats_error_handling(self, statistics, mock_db_ops):
         """Test error handling in get_database_stats."""
         mock_db_ops.session.execute.side_effect = Exception("Database error")
-        
+
         result = await statistics.get_database_stats()
-        
-        # Should return default values on error
+
         assert result['total_shitposts'] == 0
         assert result['total_analyses'] == 0
         assert result['average_confidence'] == 0.0
@@ -230,78 +216,65 @@ class TestStatistics:
     @pytest.mark.asyncio
     async def test_get_database_stats_partial_analysis(self, statistics, mock_db_ops):
         """Test database stats with partial analysis."""
-        # More shitposts than analyses
+        now = datetime.now()
+        shitpost_row = MagicMock()
+        shitpost_row.shitpost_count = 200
+        shitpost_row.min_date = now
+        shitpost_row.max_date = now
         mock_shitpost_result = MagicMock()
-        mock_shitpost_result.scalar.return_value = 200
-        
-        mock_analysis_result = MagicMock()
-        mock_analysis_result.scalar.return_value = 100
-        
-        mock_status_count = MagicMock()
-        mock_status_count.scalar.return_value = 25
-        
-        mock_confidence_result = MagicMock()
-        mock_confidence_result.scalar.return_value = 0.75
-        
-        mock_date = MagicMock()
-        mock_date.scalar.return_value = datetime.now()
-        
+        mock_shitpost_result.one.return_value = shitpost_row
+
+        pred_row = MagicMock()
+        pred_row.total = 100
+        pred_row.avg_confidence = 0.75
+        pred_row.completed_count = 25
+        pred_row.bypassed_count = 25
+        pred_row.error_count = 25
+        pred_row.pending_count = 25
+        pred_row.min_analysis_date = now
+        pred_row.max_analysis_date = now
+        mock_pred_result = MagicMock()
+        mock_pred_result.one.return_value = pred_row
+
         mock_db_ops.session.execute.side_effect = [
-            mock_shitpost_result,  # shitpost count
-            mock_analysis_result,  # analysis count
-            mock_status_count,     # completed
-            mock_status_count,     # bypassed
-            mock_status_count,     # error
-            mock_status_count,     # pending
-            mock_confidence_result, # avg confidence
-            mock_date,             # min date
-            mock_date,             # max date
-            mock_date,             # min analysis date
-            mock_date,             # max analysis date
+            mock_shitpost_result,
+            mock_pred_result,
         ]
-        
+
         result = await statistics.get_database_stats()
-        
+
         assert result['analysis_rate'] == 0.5  # 100/200
 
     @pytest.mark.asyncio
     async def test_get_database_stats_all_statuses(self, statistics, mock_db_ops):
         """Test that all analysis statuses are counted."""
-        mock_count = MagicMock()
-        mock_count.scalar.return_value = 10
-        
-        mock_completed = MagicMock()
-        mock_completed.scalar.return_value = 5
-        mock_bypassed = MagicMock()
-        mock_bypassed.scalar.return_value = 3
-        mock_error = MagicMock()
-        mock_error.scalar.return_value = 1
-        mock_pending = MagicMock()
-        mock_pending.scalar.return_value = 1
-        
-        mock_confidence = MagicMock()
-        mock_confidence.scalar.return_value = 0.8
-        
-        mock_date = MagicMock()
-        mock_date.scalar.return_value = datetime.now()
-        
+        now = datetime.now()
+        shitpost_row = MagicMock()
+        shitpost_row.shitpost_count = 10
+        shitpost_row.min_date = now
+        shitpost_row.max_date = now
+        mock_shitpost_result = MagicMock()
+        mock_shitpost_result.one.return_value = shitpost_row
+
+        pred_row = MagicMock()
+        pred_row.total = 10
+        pred_row.avg_confidence = 0.8
+        pred_row.completed_count = 5
+        pred_row.bypassed_count = 3
+        pred_row.error_count = 1
+        pred_row.pending_count = 1
+        pred_row.min_analysis_date = now
+        pred_row.max_analysis_date = now
+        mock_pred_result = MagicMock()
+        mock_pred_result.one.return_value = pred_row
+
         mock_db_ops.session.execute.side_effect = [
-            mock_count,     # shitpost count
-            mock_count,     # analysis count
-            mock_completed, # completed count
-            mock_bypassed,  # bypassed count
-            mock_error,     # error count
-            mock_pending,   # pending count
-            mock_confidence, # avg confidence
-            mock_date,      # min date
-            mock_date,      # max date
-            mock_date,      # min analysis date
-            mock_date,      # max analysis date
+            mock_shitpost_result,
+            mock_pred_result,
         ]
-        
+
         result = await statistics.get_database_stats()
-        
-        # Verify all status counts
+
         assert result['completed_count'] == 5
         assert result['bypassed_count'] == 3
         assert result['error_count'] == 1
@@ -312,60 +285,54 @@ class TestStatistics:
         """Test that confidence and analysis rate are properly rounded."""
         mock_shitpost_result = MagicMock()
         mock_shitpost_result.scalar.return_value = 7
-        
+
         mock_analysis_result = MagicMock()
         mock_analysis_result.scalar.return_value = 5
-        
+
         mock_confidence_result = MagicMock()
         mock_confidence_result.scalar.return_value = 0.876543
-        
+
         mock_db_ops.session.execute.side_effect = [
             mock_shitpost_result,
             mock_analysis_result,
             mock_confidence_result
         ]
-        
+
         result = await statistics.get_analysis_stats()
-        
-        # Should be rounded to 3 decimal places
+
         assert result['average_confidence'] == 0.877
         assert result['analysis_rate'] == 0.714  # 5/7 = 0.714...
 
     @pytest.mark.asyncio
     async def test_get_database_stats_rounding(self, statistics, mock_db_ops):
         """Test that database stats values are properly rounded."""
+        now = datetime.now()
+        shitpost_row = MagicMock()
+        shitpost_row.shitpost_count = 7
+        shitpost_row.min_date = now
+        shitpost_row.max_date = now
         mock_shitpost_result = MagicMock()
-        mock_shitpost_result.scalar.return_value = 7
-        
-        mock_analysis_result = MagicMock()
-        mock_analysis_result.scalar.return_value = 5
-        
-        mock_status_count = MagicMock()
-        mock_status_count.scalar.return_value = 1
-        
-        mock_confidence_result = MagicMock()
-        mock_confidence_result.scalar.return_value = 0.876543
-        
-        mock_date = MagicMock()
-        mock_date.scalar.return_value = datetime.now()
-        
+        mock_shitpost_result.one.return_value = shitpost_row
+
+        pred_row = MagicMock()
+        pred_row.total = 5
+        pred_row.avg_confidence = 0.876543
+        pred_row.completed_count = 1
+        pred_row.bypassed_count = 1
+        pred_row.error_count = 1
+        pred_row.pending_count = 1
+        pred_row.min_analysis_date = now
+        pred_row.max_analysis_date = now
+        mock_pred_result = MagicMock()
+        mock_pred_result.one.return_value = pred_row
+
         mock_db_ops.session.execute.side_effect = [
             mock_shitpost_result,
-            mock_analysis_result,
-            mock_status_count,
-            mock_status_count,
-            mock_status_count,
-            mock_status_count,
-            mock_confidence_result,
-            mock_date,
-            mock_date,
-            mock_date,
-            mock_date,
+            mock_pred_result,
         ]
-        
+
         result = await statistics.get_database_stats()
-        
-        # Should be rounded to 3 decimal places
+
         assert result['average_confidence'] == 0.877
         assert result['analysis_rate'] == 0.714
 

@@ -32,7 +32,8 @@ class TestRegisterTickers:
 
     def test_registers_new_ticker_successfully(self):
         ctx, session = _mock_session()
-        session.query.return_value.filter.return_value.first.return_value = None
+        # Batch query returns no existing symbols
+        session.query.return_value.filter.return_value.all.return_value = []
 
         with patch(SESSION_PATCH, return_value=ctx):
             service = TickerRegistryService()
@@ -44,8 +45,10 @@ class TestRegisterTickers:
 
     def test_skips_already_registered_ticker(self):
         ctx, session = _mock_session()
-        existing = MagicMock(status="active")
-        session.query.return_value.filter.return_value.first.return_value = existing
+        # Batch query returns AAPL as existing
+        existing_row = MagicMock()
+        existing_row.symbol = "AAPL"
+        session.query.return_value.filter.return_value.all.return_value = [existing_row]
 
         with patch(SESSION_PATCH, return_value=ctx):
             service = TickerRegistryService()
@@ -57,12 +60,10 @@ class TestRegisterTickers:
 
     def test_returns_newly_registered_and_already_known_lists(self):
         ctx, session = _mock_session()
-        existing = MagicMock(status="active")
-        # First call returns None (new), second returns existing
-        session.query.return_value.filter.return_value.first.side_effect = [
-            None,
-            existing,
-        ]
+        # Batch query returns AAPL as existing, NVDA not present
+        existing_row = MagicMock()
+        existing_row.symbol = "AAPL"
+        session.query.return_value.filter.return_value.all.return_value = [existing_row]
 
         with patch(SESSION_PATCH, return_value=ctx):
             service = TickerRegistryService()
@@ -110,7 +111,7 @@ class TestRegisterTickers:
 
     def test_uppercases_symbols(self):
         ctx, session = _mock_session()
-        session.query.return_value.filter.return_value.first.return_value = None
+        session.query.return_value.filter.return_value.all.return_value = []
 
         with patch(SESSION_PATCH, return_value=ctx):
             service = TickerRegistryService()
@@ -120,7 +121,7 @@ class TestRegisterTickers:
 
     def test_sets_source_prediction_id(self):
         ctx, session = _mock_session()
-        session.query.return_value.filter.return_value.first.return_value = None
+        session.query.return_value.filter.return_value.all.return_value = []
 
         with patch(SESSION_PATCH, return_value=ctx):
             service = TickerRegistryService()
@@ -131,7 +132,7 @@ class TestRegisterTickers:
 
     def test_sets_first_seen_date_to_today(self):
         ctx, session = _mock_session()
-        session.query.return_value.filter.return_value.first.return_value = None
+        session.query.return_value.filter.return_value.all.return_value = []
 
         with patch(SESSION_PATCH, return_value=ctx):
             service = TickerRegistryService()
@@ -142,7 +143,7 @@ class TestRegisterTickers:
 
     def test_default_status_is_active(self):
         ctx, session = _mock_session()
-        session.query.return_value.filter.return_value.first.return_value = None
+        session.query.return_value.filter.return_value.all.return_value = []
 
         with patch(SESSION_PATCH, return_value=ctx):
             service = TickerRegistryService()
@@ -155,7 +156,7 @@ class TestRegisterTickers:
         from sqlalchemy.exc import IntegrityError
 
         ctx, session = _mock_session()
-        session.query.return_value.filter.return_value.first.return_value = None
+        session.query.return_value.filter.return_value.all.return_value = []
         session.commit.side_effect = IntegrityError("dup", {}, None)
 
         with patch(SESSION_PATCH, return_value=ctx):
@@ -437,8 +438,9 @@ class TestRegisterTickersFundamentals:
 
     def test_does_not_fetch_fundamentals_when_no_new_tickers(self):
         ctx, session = _mock_session()
-        existing = MagicMock(status="active")
-        session.query.return_value.filter.return_value.first.return_value = existing
+        existing_row = MagicMock()
+        existing_row.symbol = "AAPL"
+        session.query.return_value.filter.return_value.all.return_value = [existing_row]
 
         with (
             patch(SESSION_PATCH, return_value=ctx),
