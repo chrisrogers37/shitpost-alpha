@@ -222,6 +222,7 @@ class OutcomeCalculator:
                 prediction_date=prediction_date,
                 prediction_sentiment=sentiment,
                 prediction_confidence=confidence,
+                sector=self._lookup_sector(symbol),
             )
         )
 
@@ -261,6 +262,17 @@ class OutcomeCalculator:
         )
 
         return outcome
+
+    def _lookup_sector(self, symbol: str) -> Optional[str]:
+        """Look up the sector for a symbol from the ticker registry."""
+        from shit.market_data.models import TickerRegistry
+
+        row = (
+            self.session.query(TickerRegistry.sector)
+            .filter(TickerRegistry.symbol == symbol)
+            .first()
+        )
+        return row.sector if row else None
 
     def _resolve_base_price(
         self,

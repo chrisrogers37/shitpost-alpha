@@ -84,7 +84,9 @@ class PredictionOutcome(Base, IDMixin, TimestampMixin):
     )
 
     # Asset being tracked
-    symbol = Column(String(20), nullable=False, index=True)  # Ticker symbol
+    symbol = Column(
+        String(20), ForeignKey("ticker_registry.symbol"), nullable=False, index=True
+    )  # Ticker symbol
 
     # Prediction details (denormalized for easier querying)
     prediction_date = Column(
@@ -226,7 +228,7 @@ class PriceSnapshot(Base, IDMixin, TimestampMixin):
     prediction_id = Column(
         Integer, ForeignKey("predictions.id"), nullable=False, index=True
     )
-    symbol = Column(String(20), nullable=False)
+    symbol = Column(String(20), ForeignKey("ticker_registry.symbol"), nullable=False)
 
     # Captured price data
     price = Column(Float, nullable=False)
