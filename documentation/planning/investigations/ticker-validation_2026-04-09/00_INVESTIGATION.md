@@ -1,7 +1,8 @@
 # Investigation: Missing Price Data for Tickers (RTN et al.)
 
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 **Started:** 2026-04-09
+**PR:** #132
 **Date:** 2026-04-09
 **Trigger:** RTN (Raytheon) shows "No price data available" on dispatch 1 of 383
 **Root Cause:** LLM extracts delisted/renamed/conceptual symbols with no validation before registration
