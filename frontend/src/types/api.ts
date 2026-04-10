@@ -49,10 +49,28 @@ export interface Scores {
 export interface Prediction {
   prediction_id: number;
   confidence: number | null;
+  calibrated_confidence: number | null;
   thesis: string | null;
   assets: string[];
   market_impact: Record<string, string>;
   scores: Scores;
+}
+
+export interface BinStat {
+  bin_label: string;
+  bin_center: number;
+  n_total: number;
+  n_correct: number;
+  accuracy: number | null;
+}
+
+export interface CalibrationCurveData {
+  fitted_at: string;
+  timeframe: string;
+  n_predictions: number;
+  n_bins: number;
+  bin_stats: BinStat[];
+  lookup_table: Record<string, number | null>;
 }
 
 export interface Returns {

@@ -1,6 +1,6 @@
 /** API client — fetch wrapper with base URL handling. */
 
-import type { FeedResponse, LiveQuote, PriceResponse } from "../types/api";
+import type { CalibrationCurveData, FeedResponse, LiveQuote, PriceResponse } from "../types/api";
 
 const BASE_URL = "";
 
@@ -28,4 +28,12 @@ export function fetchPriceData(
 
 export function fetchLiveQuote(symbol: string): Promise<LiveQuote> {
   return fetchJson<LiveQuote>(`/api/prices/${symbol}/live`);
+}
+
+export function fetchCalibrationCurve(
+  timeframe: string = "t7",
+): Promise<CalibrationCurveData> {
+  return fetchJson<CalibrationCurveData>(
+    `/api/calibration/curve?timeframe=${timeframe}`,
+  );
 }

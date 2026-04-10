@@ -59,6 +59,18 @@ export function PredictionPanel({ prediction }: Props) {
         <span style={labelStyle}>AI Intelligence Report</span>
         <span style={{ ...convictionStyle, color: confidenceColor }}>
           {formatConfidence(prediction.confidence)} CONVICTION
+          {prediction.calibrated_confidence != null && (
+            <span
+              style={{
+                fontSize: "0.7rem",
+                fontWeight: 400,
+                color: "var(--text-muted)",
+                marginLeft: "6px",
+              }}
+            >
+              ({Math.round(prediction.calibrated_confidence * 100)}% cal)
+            </span>
+          )}
         </span>
       </div>
 

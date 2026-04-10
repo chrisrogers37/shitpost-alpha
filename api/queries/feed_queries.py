@@ -47,6 +47,7 @@ def get_analyzed_post_at_offset(
             p.assets,
             p.market_impact,
             p.confidence,
+            p.calibrated_confidence,
             p.thesis,
             p.analysis_status,
             p.engagement_score,

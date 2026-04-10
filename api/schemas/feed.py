@@ -53,6 +53,7 @@ class Scores(BaseModel):
 class Prediction(BaseModel):
     prediction_id: int
     confidence: Optional[float] = None
+    calibrated_confidence: Optional[float] = None
     thesis: Optional[str] = None
     assets: list[str] = []
     market_impact: dict[str, str] = {}

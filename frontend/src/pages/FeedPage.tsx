@@ -14,6 +14,7 @@ import { SkeletonFeed } from "../components/SkeletonFeed";
 import { PriceKPIs } from "../components/PriceKPIs";
 import { TimeframeToggle, timeframeToDays, type Timeframe } from "../components/TimeframeToggle";
 import { PriceChart } from "../components/PriceChart";
+import CalibrationChart from "../components/CalibrationChart";
 import { NavigationArrows } from "../components/NavigationArrows";
 
 const mainStyle: CSSProperties = {
@@ -195,6 +196,8 @@ export function FeedPage() {
                     outcome={activeOutcome}
                   />
                 )}
+
+                <CalibrationChart />
               </>
             )}
           </motion.div>
