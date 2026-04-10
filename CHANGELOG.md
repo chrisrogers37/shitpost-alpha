@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Historical Echoes** — Semantic similarity search over past posts to surface actual market outcomes alongside new predictions
+  - `EchoService` in `shit/echoes/` — embed, search (pgvector cosine similarity), and aggregate historical outcomes (returns, win rate, P&L)
+  - `EmbeddingClient` in `shit/llm/embeddings.py` — OpenAI `text-embedding-3-small` (1536 dimensions) with batch support
+  - `PostEmbedding` model with pgvector column for `post_embeddings` table
+  - Analyzer integration: embeds post text after prediction storage via `asyncio.to_thread`
+  - Telegram alert enrichment: echo section with avg return, win rate, P&L from similar past posts
+  - API endpoint `GET /api/echoes/for-prediction/{id}` with configurable timeframe
+  - Backfill CLI `python -m shit.echoes.backfill` (also serves as retry for failed embeddings)
+  - 31 new tests across 6 test files
 - **Fundamentals-enriched LLM prompts** — Pre-extracts tickers from post text (via $TICKER regex, company name matching, and active-set lookup), looks up fundamentals from `ticker_registry` (sector, market cap, P/E, beta, dividend yield), and injects an ASSET CONTEXT block into the LLM prompt so the model can calibrate confidence based on company size and volatility
   - `TickerValidator._load_registry()` builds `_company_names` dict alongside `_known_active` in a single DB query
   - `get_analysis_prompt()` gains `has_fundamentals` param with conditional `FUNDAMENTALS_GUIDANCE` rules
