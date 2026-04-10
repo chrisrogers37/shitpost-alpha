@@ -16,6 +16,7 @@ from shit.utils.error_handling import handle_exceptions
 from shit.content import BypassService
 from shit.logging import get_service_logger
 from shit.market_data.auto_backfill_service import auto_backfill_prediction
+from shit.market_data.ticker_validator import TickerValidator
 
 logger = get_service_logger("analyzer")
 
@@ -50,6 +51,7 @@ class ShitpostAnalyzer:
 
         self.llm_client = LLMClient()
         self.bypass_service = BypassService()
+        self.ticker_validator = TickerValidator()
         self.launch_date = settings.SYSTEM_LAUNCH_DATE
 
         # Analysis mode configuration
@@ -466,19 +468,17 @@ class ShitpostAnalyzer:
             # Validate and normalize extracted ticker symbols
             raw_assets = enhanced_analysis.get("assets", [])
             if raw_assets:
-                from shit.market_data.ticker_validator import TickerValidator
-                validator = TickerValidator()
-                validated_assets = validator.validate_symbols(raw_assets)
+                validated_assets = self.ticker_validator.validate_symbols(raw_assets)
                 if validated_assets != raw_assets:
                     logger.info(
                         f"Ticker validation: {raw_assets} → {validated_assets}"
                     )
                 enhanced_analysis["assets"] = validated_assets
-                # Filter market_impact to match validated assets
+                valid_set = set(validated_assets)
                 enhanced_analysis["market_impact"] = {
                     k: v
                     for k, v in enhanced_analysis.get("market_impact", {}).items()
-                    if k in validated_assets
+                    if k in valid_set
                 }
 
             if not dry_run:

@@ -15,9 +15,6 @@ skip the yfinance check entirely (0ms cached lookup).
 import logging
 from typing import Optional
 
-import yfinance as yf
-from sqlalchemy.orm import Session
-
 logger = logging.getLogger(__name__)
 
 
@@ -45,15 +42,10 @@ class TickerValidator:
         "OIL": None,         # iPath Oil ETN delisted (Apr 2021)
     }
 
-    def __init__(self, session: Optional[Session] = None):
-        """Initialize with optional DB session for registry-first optimization.
-
-        Args:
-            session: SQLAlchemy session for querying ticker_registry.
-                     If None, yfinance check runs for all unknown symbols.
-        """
-        self._session = session
+    def __init__(self):
+        """Initialize validator. Registry and yfinance caches are lazy-loaded."""
         self._known_active: Optional[set[str]] = None
+        self._tradeable_cache: dict[str, bool] = {}
 
     def validate_symbols(self, symbols: list[str]) -> list[str]:
         """Validate and normalize a list of ticker symbols.
@@ -113,36 +105,48 @@ class TickerValidator:
     def _is_known_active(self, symbol: str) -> bool:
         """Check if symbol is already active in ticker_registry.
 
-        Caches the full active set on first call (single query).
-        Returns False if no session provided.
+        Opens its own sync session on first call, caches the full active set.
         """
-        if self._session is None:
-            return False
         if self._known_active is None:
-            from shit.market_data.models import TickerRegistry
-            rows = self._session.query(TickerRegistry.symbol).filter(
-                TickerRegistry.status == "active"
-            ).all()
-            self._known_active = {r.symbol for r in rows}
+            try:
+                from shit.db.sync_session import get_session
+                from shit.market_data.models import TickerRegistry
+                with get_session() as session:
+                    rows = session.query(TickerRegistry.symbol).filter(
+                        TickerRegistry.status == "active"
+                    ).all()
+                    self._known_active = {r.symbol for r in rows}
+            except Exception:
+                # DB unavailable — skip optimization, fall through to yfinance
+                self._known_active = set()
         return symbol in self._known_active
 
     def _is_tradeable(self, symbol: str) -> bool:
         """Quick yfinance check if this is a tradeable symbol.
 
-        Fails open on network errors — don't block analysis because
-        yfinance is slow. The backfill service will catch it later.
+        Caches results to avoid repeated calls for the same symbol.
+        Fails open on network errors — the backfill service will catch it later.
         """
+        if symbol in self._tradeable_cache:
+            return self._tradeable_cache[symbol]
+
+        result = self._check_yfinance(symbol)
+        self._tradeable_cache[symbol] = result
+        return result
+
+    @staticmethod
+    def _check_yfinance(symbol: str) -> bool:
+        """Raw yfinance lookup. Separated for testability."""
         try:
+            import yfinance as yf
             ticker = yf.Ticker(symbol)
             info = ticker.info or {}
-            # Must have a quoteType that indicates it's a real security
             quote_type = info.get("quoteType", "")
             if quote_type in (
                 "EQUITY", "ETF", "MUTUALFUND", "CRYPTOCURRENCY",
                 "FUTURE", "INDEX",
             ):
                 return True
-            # Fallback: check if fast_info has a price
             fast = ticker.fast_info
             if hasattr(fast, "last_price") and fast.last_price is not None:
                 return True

@@ -17,6 +17,16 @@ SYSTEM_MESSAGES = {
 # Prompt versions for consistency
 PROMPT_VERSION = "1.1"
 
+# Shared ticker guidance — single source of truth for both prompt functions
+_TICKER_GUIDELINES = """\
+- Use CURRENT, actively-traded US ticker symbols only:
+  - Good: TSLA, AAPL, BTC-USD, GLD, XLE, SPY
+  - Do NOT use delisted or renamed symbols (RTN → use RTX, FB → use META, TWTR → Twitter is private)
+  - Do NOT use concepts as tickers (DEFENSE, CRYPTO, ECONOMY are not ticker symbols)
+  - Do NOT use foreign exchange tickers (use ADRs instead: e.g., BABA not 9988.HK)
+- For ETFs, prefer the most liquid US-listed version (SPY not ^GSPC, QQQ not ^IXIC)
+- If a company is mentioned but you're unsure of the current ticker, omit it rather than guess"""
+
 
 def get_analysis_prompt(content: str, context: Optional[Dict] = None) -> str:
     """Get the main analysis prompt for financial content.
@@ -69,13 +79,7 @@ ANALYSIS GUIDELINES:
 - Consider political influence on market sentiment
 - Be conservative with confidence scores
 - If no financial implications detected, return empty arrays
-- Use CURRENT, actively-traded US ticker symbols only:
-  - Good: TSLA, AAPL, BTC-USD, GLD, XLE, SPY
-  - Do NOT use delisted or renamed symbols (RTN → use RTX, FB → use META, TWTR → Twitter is private)
-  - Do NOT use concepts as tickers (DEFENSE, CRYPTO, ECONOMY are not ticker symbols)
-  - Do NOT use foreign exchange tickers (use ADRs instead: e.g., BABA not 9988.HK)
-- For ETFs, prefer the most liquid US-listed version (SPY not ^GSPC, QQQ not ^IXIC)
-- If a company is mentioned but you're unsure of the current ticker, omit it rather than guess
+{_TICKER_GUIDELINES}
 - Consider both direct mentions and implied references
 
 EXAMPLES:
@@ -157,13 +161,7 @@ OUTPUT FORMAT:
 }}
 
 TICKER GUIDELINES:
-- Use CURRENT, actively-traded US ticker symbols only:
-  - Good: TSLA, AAPL, BTC-USD, GLD, XLE, SPY
-  - Do NOT use delisted or renamed symbols (RTN → use RTX, FB → use META, TWTR → Twitter is private)
-  - Do NOT use concepts as tickers (DEFENSE, CRYPTO, ECONOMY are not ticker symbols)
-  - Do NOT use foreign exchange tickers (use ADRs instead: e.g., BABA not 9988.HK)
-- For ETFs, prefer the most liquid US-listed version (SPY not ^GSPC, QQQ not ^IXIC)
-- If a company is mentioned but you're unsure of the current ticker, omit it rather than guess
+{_TICKER_GUIDELINES}
 
 Now provide your detailed analysis:
 """
