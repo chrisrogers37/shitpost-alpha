@@ -2,9 +2,26 @@
 
 **Feature**: Build a calibration curve from 1000+ historical predictions to map raw LLM confidence to actual accuracy rates.
 
-**Status**: Design  
+**Status**: COMPLETE  
+**Started**: 2026-04-10  
+**Completed**: 2026-04-10  
+**PR**: #135  
 **Priority**: High  
 **Estimated Effort**: 2-3 sessions  
+
+---
+
+## Challenge Round Resolutions
+
+1. **Calibration method: Lookup table only (no sklearn).** Isotonic regression adds a ~50MB dependency for marginal smoothing between bins. With 10 bins and 100+ samples/bin, lookup table accuracy is sufficient. No pickle, no BYTEA, no sklearn versioning. Add isotonic later if data volume justifies it.
+
+2. **Scope: Global only for v1 (no per-provider/per-asset).** System uses one LLM provider. Feature 05 (ensemble) isn't built. Adding scope later = add column + WHERE clause (~30 min). No `scope` column in table.
+
+3. **Entry point: `python -m shit.market_data.calibration --refit` (not root-level `calibration_cron.py`).** Follows existing CLI patterns (`shit/echoes/backfill.py`, `shit/market_data/cli.py`).
+
+4. **Table simplified.** No `scope` column, no `model_bytes` BYTEA column. Just JSONB for bin_stats and lookup_table.
+
+5. **Staleness guard added.** `max_age_days=30` on curve loading. Returns None if curve is older than threshold — falls back to raw confidence gracefully.
 
 ---
 
@@ -60,56 +77,29 @@ T+7 (7 trading days, ~1.5 calendar weeks) is the sweet spot:
 
 Calibration curves for other timeframes (T+1, T+3, T+30) can be computed too, but T+7 is the default.
 
-### Fitting Method: Isotonic Regression
+### Fitting Method: Bin-Based Lookup Table
 
-**Why isotonic regression over Platt scaling:**
+**Why lookup table over isotonic regression (Challenge Round Resolution #1):**
 
-- Platt scaling (logistic sigmoid fit) assumes a specific functional form. Our confidence-to-accuracy relationship may not be sigmoidal.
-- Isotonic regression is non-parametric -- it produces a monotonically non-decreasing mapping with no functional form assumption.
-- With 1000+ data points across 10 bins, we have enough data for non-parametric fitting.
-- `sklearn.isotonic.IsotonicRegression` is battle-tested and available.
-
-```python
-from sklearn.isotonic import IsotonicRegression
-
-def fit_calibration_curve(
-    raw_confidences: list[float],
-    correct_flags: list[bool],
-) -> IsotonicRegression:
-    """Fit isotonic regression calibration curve.
-
-    Args:
-        raw_confidences: LLM confidence scores for each prediction.
-        correct_flags: Whether each prediction was correct (True/False).
-
-    Returns:
-        Fitted IsotonicRegression model.
-    """
-    import numpy as np
-
-    X = np.array(raw_confidences)
-    y = np.array(correct_flags, dtype=float)
-
-    ir = IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip")
-    ir.fit(X, y)
-    return ir
-```
-
-### Alternative: Simple Lookup Table
-
-For environments where sklearn is undesirable, a simple bin-based lookup table works:
+- No new dependency (sklearn ~50MB+ with scipy). Zero new packages.
+- With 10 bins and 100+ samples per bin, accuracy estimates are already stable.
+- JSON-native — debuggable, inspectable, no pickle versioning issues.
+- Isotonic regression on 10 bins converges to ~10 breakpoints — same resolution as lookup table.
+- If data volume grows to 10,000+ predictions, isotonic regression can be added in one PR.
 
 ```python
 def build_lookup_table(
     raw_confidences: list[float],
     correct_flags: list[bool],
     n_bins: int = 10,
-) -> dict[str, float]:
+    min_per_bin: int = 5,
+) -> dict[str, float | None]:
     """Build bin-based calibration lookup table.
 
     Returns:
         Dict mapping bin label to empirical accuracy.
         Example: {"0.7-0.8": 0.62, "0.8-0.9": 0.71, ...}
+        Bins with fewer than min_per_bin samples return None.
     """
     bins = {}
     for conf, correct in zip(raw_confidences, correct_flags):
@@ -122,12 +112,11 @@ def build_lookup_table(
             bins[bin_label]["correct"] += 1
 
     return {
-        label: data["correct"] / data["total"] if data["total"] > 0 else None
+        label: round(data["correct"] / data["total"], 4)
+        if data["total"] >= min_per_bin else None
         for label, data in sorted(bins.items())
     }
 ```
-
-**Recommendation**: Implement both. Use isotonic regression as the primary calibration method, with the lookup table as a human-readable diagnostic.
 
 ---
 
@@ -163,286 +152,12 @@ CALIBRATION_MIN_PER_BIN: int = 5    # Minimum per bin
 
 ### New Module: `shit/market_data/calibration.py`
 
-```python
-"""
-Confidence Calibration Service
+> **Challenge Round**: Simplified — no sklearn, no pickle, no scope, no BYTEA. Lookup table only. Staleness guard added.
 
-Fits calibration curves from historical prediction outcomes and applies
-calibrated confidence to new predictions.
-"""
-
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Optional
-import json
-import pickle
-
-from sqlalchemy import text
-from shit.db.sync_session import get_session
-from shit.logging import get_service_logger
-
-logger = get_service_logger("calibration")
-
-
-@dataclass
-class CalibrationCurve:
-    """Fitted calibration curve with metadata."""
-    fitted_at: datetime
-    timeframe: str                    # "t7" (primary), "t1", "t3", "t30"
-    window_start: datetime
-    window_end: datetime
-    n_predictions: int
-    n_bins: int
-    bin_stats: list[dict]             # Per-bin: {bin_label, n_total, n_correct, accuracy}
-    model_bytes: Optional[bytes]      # Pickled IsotonicRegression
-    lookup_table: dict[str, float]    # Bin label -> empirical accuracy
-    scope: str                        # "global", "provider:openai", "asset:TSLA"
-
-
-class CalibrationService:
-    """Fits and applies confidence calibration curves."""
-
-    def __init__(
-        self,
-        timeframe: str = "t7",
-        window_days: int = 180,
-        min_samples: int = 100,
-        min_per_bin: int = 5,
-        n_bins: int = 10,
-    ):
-        self.timeframe = timeframe
-        self.window_days = window_days
-        self.min_samples = min_samples
-        self.min_per_bin = min_per_bin
-        self.n_bins = n_bins
-
-    def fit(self, scope: str = "global") -> Optional[CalibrationCurve]:
-        """Fit a calibration curve from historical data.
-
-        Args:
-            scope: "global", "provider:{id}", or "asset:{symbol}"
-
-        Returns:
-            CalibrationCurve if enough data, None otherwise.
-        """
-        # Query historical predictions with outcomes
-        data = self._query_calibration_data(scope)
-        if len(data) < self.min_samples:
-            logger.warning(
-                f"Insufficient data for calibration: {len(data)} < {self.min_samples}"
-            )
-            return None
-
-        raw_confidences = [d["confidence"] for d in data]
-        correct_flags = [d["correct"] for d in data]
-
-        # Build lookup table
-        lookup = self._build_lookup_table(raw_confidences, correct_flags)
-
-        # Fit isotonic regression
-        model_bytes = self._fit_isotonic(raw_confidences, correct_flags)
-
-        # Build per-bin statistics
-        bin_stats = self._compute_bin_stats(raw_confidences, correct_flags)
-
-        window_end = datetime.utcnow()
-        window_start = window_end - timedelta(days=self.window_days)
-
-        curve = CalibrationCurve(
-            fitted_at=datetime.utcnow(),
-            timeframe=self.timeframe,
-            window_start=window_start,
-            window_end=window_end,
-            n_predictions=len(data),
-            n_bins=self.n_bins,
-            bin_stats=bin_stats,
-            model_bytes=model_bytes,
-            lookup_table=lookup,
-            scope=scope,
-        )
-
-        # Persist to database
-        self._store_curve(curve)
-        logger.info(
-            f"Calibration curve fitted: {scope}, {len(data)} predictions, "
-            f"timeframe={self.timeframe}"
-        )
-        return curve
-
-    def calibrate(self, raw_confidence: float) -> Optional[float]:
-        """Apply calibration to a raw confidence score.
-
-        Args:
-            raw_confidence: LLM-reported confidence (0.0-1.0).
-
-        Returns:
-            Calibrated confidence, or None if no calibration curve available.
-        """
-        curve = self._load_latest_curve()
-        if not curve or not curve.model_bytes:
-            return None
-
-        try:
-            import numpy as np
-            model = pickle.loads(curve.model_bytes)
-            calibrated = float(model.predict([raw_confidence])[0])
-            return max(0.0, min(1.0, calibrated))
-        except Exception as e:
-            logger.error(f"Calibration prediction failed: {e}")
-            return None
-
-    def _query_calibration_data(self, scope: str) -> list[dict]:
-        """Query predictions with outcomes for calibration fitting."""
-        correct_col = f"correct_{self.timeframe}"
-        window_start = datetime.utcnow() - timedelta(days=self.window_days)
-
-        base_query = f"""
-            SELECT
-                p.confidence,
-                po.{correct_col} as correct,
-                p.llm_provider,
-                po.symbol
-            FROM predictions p
-            JOIN prediction_outcomes po ON po.prediction_id = p.id
-            WHERE p.analysis_status = 'completed'
-                AND p.confidence IS NOT NULL
-                AND po.{correct_col} IS NOT NULL
-                AND p.created_at >= :window_start
-        """
-
-        params = {"window_start": window_start}
-
-        # Add scope filter
-        if scope.startswith("provider:"):
-            provider = scope.split(":")[1]
-            base_query += " AND p.llm_provider = :provider"
-            params["provider"] = provider
-        elif scope.startswith("asset:"):
-            symbol = scope.split(":")[1]
-            base_query += " AND po.symbol = :symbol"
-            params["symbol"] = symbol
-
-        with get_session() as session:
-            result = session.execute(text(base_query), params)
-            rows = result.fetchall()
-            columns = result.keys()
-            return [dict(zip(columns, row)) for row in rows]
-
-    def _fit_isotonic(self, confidences: list[float], correct: list[bool]) -> Optional[bytes]:
-        """Fit isotonic regression and return pickled model bytes."""
-        try:
-            import numpy as np
-            from sklearn.isotonic import IsotonicRegression
-
-            X = np.array(confidences)
-            y = np.array(correct, dtype=float)
-            ir = IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip")
-            ir.fit(X, y)
-            return pickle.dumps(ir)
-        except ImportError:
-            logger.warning("sklearn not available, skipping isotonic regression")
-            return None
-
-    def _build_lookup_table(self, confidences: list[float], correct: list[bool]) -> dict:
-        """Build bin-based lookup table."""
-        bins = {}
-        for conf, c in zip(confidences, correct):
-            bin_idx = min(int(conf * self.n_bins), self.n_bins - 1)
-            label = f"{bin_idx / self.n_bins:.1f}-{(bin_idx + 1) / self.n_bins:.1f}"
-            if label not in bins:
-                bins[label] = {"total": 0, "correct": 0}
-            bins[label]["total"] += 1
-            if c:
-                bins[label]["correct"] += 1
-
-        return {
-            label: round(data["correct"] / data["total"], 4) if data["total"] >= self.min_per_bin else None
-            for label, data in sorted(bins.items())
-        }
-
-    def _compute_bin_stats(self, confidences: list[float], correct: list[bool]) -> list[dict]:
-        """Compute detailed per-bin statistics."""
-        bins = {}
-        for conf, c in zip(confidences, correct):
-            bin_idx = min(int(conf * self.n_bins), self.n_bins - 1)
-            if bin_idx not in bins:
-                bins[bin_idx] = {"total": 0, "correct": 0}
-            bins[bin_idx]["total"] += 1
-            if c:
-                bins[bin_idx]["correct"] += 1
-
-        stats = []
-        for i in range(self.n_bins):
-            data = bins.get(i, {"total": 0, "correct": 0})
-            accuracy = data["correct"] / data["total"] if data["total"] > 0 else None
-            stats.append({
-                "bin_label": f"{i / self.n_bins:.1f}-{(i + 1) / self.n_bins:.1f}",
-                "bin_center": (i + 0.5) / self.n_bins,
-                "n_total": data["total"],
-                "n_correct": data["correct"],
-                "accuracy": accuracy,
-            })
-        return stats
-
-    def _store_curve(self, curve: CalibrationCurve) -> None:
-        """Persist calibration curve to database."""
-        with get_session() as session:
-            session.execute(
-                text("""
-                    INSERT INTO calibration_curves (
-                        fitted_at, timeframe, window_start, window_end,
-                        n_predictions, n_bins, bin_stats, model_bytes,
-                        lookup_table, scope
-                    ) VALUES (
-                        :fitted_at, :timeframe, :window_start, :window_end,
-                        :n_predictions, :n_bins, :bin_stats, :model_bytes,
-                        :lookup_table, :scope
-                    )
-                """),
-                {
-                    "fitted_at": curve.fitted_at,
-                    "timeframe": curve.timeframe,
-                    "window_start": curve.window_start,
-                    "window_end": curve.window_end,
-                    "n_predictions": curve.n_predictions,
-                    "n_bins": curve.n_bins,
-                    "bin_stats": json.dumps(curve.bin_stats),
-                    "model_bytes": curve.model_bytes,
-                    "lookup_table": json.dumps(curve.lookup_table),
-                    "scope": curve.scope,
-                },
-            )
-
-    def _load_latest_curve(self, scope: str = "global") -> Optional[CalibrationCurve]:
-        """Load the most recently fitted calibration curve."""
-        with get_session() as session:
-            result = session.execute(
-                text("""
-                    SELECT * FROM calibration_curves
-                    WHERE scope = :scope AND timeframe = :timeframe
-                    ORDER BY fitted_at DESC
-                    LIMIT 1
-                """),
-                {"scope": scope, "timeframe": self.timeframe},
-            )
-            row = result.fetchone()
-            if not row:
-                return None
-            columns = result.keys()
-            data = dict(zip(columns, row))
-            return CalibrationCurve(
-                fitted_at=data["fitted_at"],
-                timeframe=data["timeframe"],
-                window_start=data["window_start"],
-                window_end=data["window_end"],
-                n_predictions=data["n_predictions"],
-                n_bins=data["n_bins"],
-                bin_stats=json.loads(data["bin_stats"]) if isinstance(data["bin_stats"], str) else data["bin_stats"],
-                model_bytes=data["model_bytes"],
-                lookup_table=json.loads(data["lookup_table"]) if isinstance(data["lookup_table"], str) else data["lookup_table"],
-                scope=data["scope"],
-            )
-```
+See implementation for final code. Key design:
+- `CalibrationCurve` dataclass: fitted_at, timeframe, window dates, n_predictions, n_bins, bin_stats (list[dict]), lookup_table (dict)
+- `CalibrationService`: fit() queries data + builds lookup, calibrate() does bin lookup, _load_latest_curve() has max_age_days=30 staleness guard
+- CLI entry: `python -m shit.market_data.calibration --refit [--timeframe t7]`
 
 ---
 
@@ -457,36 +172,9 @@ calibrated_confidence = Column(Float, nullable=True)  # Calibrated confidence 0.
 
 ### New Table: `calibration_curves`
 
-```sql
-CREATE TABLE calibration_curves (
-    id SERIAL PRIMARY KEY,
-    fitted_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    timeframe VARCHAR(10) NOT NULL,          -- 't1', 't3', 't7', 't30'
-    window_start TIMESTAMP NOT NULL,
-    window_end TIMESTAMP NOT NULL,
-    n_predictions INTEGER NOT NULL,
-    n_bins INTEGER NOT NULL DEFAULT 10,
-    bin_stats JSONB NOT NULL,                -- Per-bin statistics
-    model_bytes BYTEA,                       -- Pickled sklearn model
-    lookup_table JSONB NOT NULL,             -- Bin -> accuracy mapping
-    scope VARCHAR(100) NOT NULL DEFAULT 'global',  -- 'global', 'provider:openai', 'asset:TSLA'
-    created_at TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_calibration_curves_scope_timeframe
-    ON calibration_curves (scope, timeframe, fitted_at DESC);
-
-COMMENT ON TABLE calibration_curves IS 'Historical calibration curves mapping raw LLM confidence to empirical accuracy';
-```
-
-### Migration SQL
+> **Challenge Round**: Simplified — no `scope` column, no `model_bytes` BYTEA column.
 
 ```sql
--- Add calibrated_confidence to predictions
-ALTER TABLE predictions ADD COLUMN calibrated_confidence FLOAT;
-COMMENT ON COLUMN predictions.calibrated_confidence IS 'Empirically calibrated confidence from calibration curve (null if uncalibrated)';
-
--- Create calibration_curves table
 CREATE TABLE calibration_curves (
     id SERIAL PRIMARY KEY,
     fitted_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -496,14 +184,34 @@ CREATE TABLE calibration_curves (
     n_predictions INTEGER NOT NULL,
     n_bins INTEGER NOT NULL DEFAULT 10,
     bin_stats JSONB NOT NULL,
-    model_bytes BYTEA,
     lookup_table JSONB NOT NULL,
-    scope VARCHAR(100) NOT NULL DEFAULT 'global',
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_calibration_curves_scope_timeframe
-    ON calibration_curves (scope, timeframe, fitted_at DESC);
+CREATE INDEX idx_calibration_curves_timeframe
+    ON calibration_curves (timeframe, fitted_at DESC);
+```
+
+### Migration SQL
+
+```sql
+ALTER TABLE predictions ADD COLUMN calibrated_confidence FLOAT;
+
+CREATE TABLE calibration_curves (
+    id SERIAL PRIMARY KEY,
+    fitted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    timeframe VARCHAR(10) NOT NULL,
+    window_start TIMESTAMP NOT NULL,
+    window_end TIMESTAMP NOT NULL,
+    n_predictions INTEGER NOT NULL,
+    n_bins INTEGER NOT NULL DEFAULT 10,
+    bin_stats JSONB NOT NULL,
+    lookup_table JSONB NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_calibration_curves_timeframe
+    ON calibration_curves (timeframe, fitted_at DESC);
 ```
 
 ---
@@ -512,88 +220,36 @@ CREATE INDEX idx_calibration_curves_scope_timeframe
 
 ### Weekly Refit Cron
 
-A Railway cron job runs every Sunday at 02:00 UTC:
-
-```python
-# calibration_cron.py (new entry point)
-"""Weekly calibration curve refit."""
-
-from shit.market_data.calibration import CalibrationService
-from shit.logging import setup_cli_logging
-
-def main():
-    setup_cli_logging(verbose=True)
-
-    for timeframe in ["t1", "t3", "t7", "t30"]:
-        svc = CalibrationService(timeframe=timeframe)
-
-        # Global calibration
-        curve = svc.fit(scope="global")
-        if curve:
-            print(f"Global {timeframe}: {curve.n_predictions} predictions, "
-                  f"lookup={curve.lookup_table}")
-
-        # Per-provider calibration (if ensemble is active)
-        for provider in ["openai", "anthropic", "grok"]:
-            curve = svc.fit(scope=f"provider:{provider}")
-            if curve:
-                print(f"Provider {provider} {timeframe}: {curve.n_predictions} predictions")
-
-if __name__ == "__main__":
-    main()
-```
+> **Challenge Round**: Entry point moved from root-level `calibration_cron.py` to `python -m shit.market_data.calibration --refit`. Per-provider loop removed (global only).
 
 **Railway Service**: `calibration-refit`, cron schedule `0 2 * * 0` (Sunday 2 AM UTC).
+**Command**: `python -m shit.market_data.calibration --refit`
 
 ### On-Demand Refit
 
-The calibration service can also be triggered manually:
-
 ```bash
-python -m shit.market_data.calibration --refit --timeframe t7 --scope global
+python -m shit.market_data.calibration --refit                    # All timeframes
+python -m shit.market_data.calibration --refit --timeframe t7     # Single timeframe
 ```
 
 ---
 
-## Per-Asset vs. Global Calibration
+## Scope: Global Only (v1)
 
-### Tradeoffs
-
-| Approach | Pros | Cons |
-|----------|------|------|
-| **Global** | Most data per bin, stable estimates | Ignores asset-specific LLM bias |
-| **Per-provider** | Captures model-specific calibration | 3x less data per curve |
-| **Per-asset** | Most accurate per ticker | Very sparse (most tickers have < 20 predictions) |
-| **Per-sector** | Good balance of specificity and data | Requires sector tagging |
-
-### Recommendation
-
-1. **Primary**: Global calibration (enough data, most stable).
-2. **Secondary**: Per-provider calibration (useful when ensemble is active; each provider may have different confidence distributions).
-3. **Future**: Per-sector calibration when enough data accumulates (group assets by `ticker_registry.sector`).
-4. **Not recommended now**: Per-asset calibration (insufficient data for most tickers).
+> **Challenge Round**: Per-provider and per-asset scoping deferred until Feature 05 (Multi-LLM Ensemble) lands. Global calibration is sufficient with one provider.
 
 ### Applying Calibration at Prediction Time
 
-In `shitvault/prediction_operations.py`, when storing a prediction:
+In `shitvault/prediction_operations.py`, apply calibration via deferred import + `asyncio.to_thread`:
 
 ```python
-async def store_analysis(self, shitpost_id: str, analysis: dict, shitpost: dict) -> Optional[int]:
-    # ... existing logic ...
-
-    # Apply calibration
-    raw_confidence = analysis.get("confidence")
-    calibrated = None
-    if raw_confidence is not None:
-        from shit.market_data.calibration import CalibrationService
-        cal_svc = CalibrationService(timeframe="t7")
-        calibrated = cal_svc.calibrate(raw_confidence)
-
-    prediction = Prediction(
-        confidence=raw_confidence,
-        calibrated_confidence=calibrated,
-        # ... other fields ...
-    )
+# After creating prediction, apply calibration
+raw_confidence = analysis_data.get("confidence")
+if raw_confidence is not None:
+    from shit.market_data.calibration import CalibrationService
+    cal_svc = CalibrationService(timeframe="t7")
+    calibrated = cal_svc.calibrate(raw_confidence)
+    # Store on prediction object
 ```
 
 ---
@@ -721,15 +377,16 @@ When the system first deploys or after a major model change, there may not be en
 
 | File | Change |
 |------|--------|
-| `shit/market_data/calibration.py` | **NEW** - `CalibrationService`, `CalibrationCurve` |
+| `shit/market_data/calibration.py` | **NEW** - `CalibrationService`, `CalibrationCurve` (with CLI `__main__` block) |
 | `shitvault/shitpost_models.py` | Add `calibrated_confidence` column to Prediction |
 | `shitvault/prediction_operations.py` | Apply calibration when storing predictions |
 | `notifications/telegram_sender.py` | Show calibrated confidence in alerts |
 | `notifications/alert_engine.py` | Filter on calibrated confidence |
+| `notifications/event_consumer.py` | Pass `calibrated_confidence` in alert dict |
 | `api/routers/calibration.py` | **NEW** - Calibration curve API endpoint |
 | `api/schemas/feed.py` | Add `calibrated_confidence` to PredictionResponse |
+| `api/schemas/calibration.py` | **NEW** - Calibration API response models |
 | `frontend/src/components/CalibrationChart.tsx` | **NEW** - Reliability diagram |
-| `calibration_cron.py` | **NEW** - Weekly refit entry point |
 | `shit_tests/shit/market_data/test_calibration.py` | **NEW** - Unit tests |
 
 ---
@@ -792,15 +449,7 @@ def synthetic_calibration_data():
 
 ## Dependencies
 
-### New Python Package
-
-```
-scikit-learn>=1.4.0  # For IsotonicRegression
-```
-
-Add to `requirements.txt`. This is a well-maintained, BSD-licensed package already commonly used in ML applications. The only function we need is `IsotonicRegression`.
-
-If adding sklearn is undesirable (large dependency), the lookup table approach works standalone. The isotonic regression is an enhancement, not a requirement.
+> **Challenge Round**: No new Python packages. sklearn removed — lookup table uses only stdlib + existing numpy/sqlalchemy.
 
 ---
 

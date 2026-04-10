@@ -117,6 +117,7 @@ class FeedService:
         return Prediction(
             prediction_id=row["prediction_id"],
             confidence=row.get("confidence"),
+            calibrated_confidence=row.get("calibrated_confidence"),
             thesis=row.get("thesis"),
             assets=assets if isinstance(assets, list) else [],
             market_impact=market_impact if isinstance(market_impact, dict) else {},

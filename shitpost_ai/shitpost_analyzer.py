@@ -533,6 +533,15 @@ class ShitpostAnalyzer:
                             if post_ts
                             else None
                         )
+
+                        # Include calibrated confidence in event payload
+                        calibrated = None
+                        try:
+                            from shit.market_data.calibration import CalibrationService
+                            calibrated = CalibrationService(timeframe="t7").calibrate(confidence)
+                        except Exception:
+                            pass
+
                         emit_event(
                             event_type=EventType.PREDICTION_CREATED,
                             payload={
@@ -541,6 +550,7 @@ class ShitpostAnalyzer:
                                 "signal_id": None,
                                 "assets": assets,
                                 "confidence": confidence,
+                                "calibrated_confidence": calibrated,
                                 "analysis_status": analysis_status,
                                 "post_published_at": post_published,
                             },

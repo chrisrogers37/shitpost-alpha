@@ -57,6 +57,7 @@ class NotificationsWorker(EventWorker):
             "prediction_id": prediction_id,
             "shitpost_id": payload.get("shitpost_id"),
             "confidence": payload.get("confidence"),
+            "calibrated_confidence": payload.get("calibrated_confidence"),
             "assets": payload.get("assets", []),
             "sentiment": "neutral",  # Will be enriched if market_impact available
             "thesis": "",
