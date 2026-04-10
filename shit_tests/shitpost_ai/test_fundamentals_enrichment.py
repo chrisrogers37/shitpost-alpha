@@ -14,7 +14,7 @@ import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 
 from shitpost_ai.shitpost_analyzer import ShitpostAnalyzer, _format_market_cap
-from shit.llm.prompts import get_analysis_prompt, _FUNDAMENTALS_GUIDANCE
+from shit.llm.prompts import get_analysis_prompt
 
 
 # ---------------------------------------------------------------------------

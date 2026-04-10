@@ -9,7 +9,6 @@ import os
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
-import pytest
 from unittest.mock import patch, MagicMock
 
 from shit.market_data.ticker_validator import TickerValidator
@@ -139,10 +138,6 @@ class TestRegistryFirstOptimization:
         """
         company_names = company_names or {}
         mock_session = MagicMock()
-        mock_rows = [
-            MagicMock(symbol=s, company_name=company_names.get(s))
-            for s in symbols
-        ]
         # Support iteration (for _load_registry's for loop)
         mock_rows_iter = [(s, company_names.get(s)) for s in symbols]
         query_mock = MagicMock()
