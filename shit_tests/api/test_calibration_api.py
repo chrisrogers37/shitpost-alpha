@@ -1,7 +1,6 @@
 """Tests for the calibration API endpoint."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
