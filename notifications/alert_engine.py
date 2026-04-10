@@ -138,8 +138,8 @@ def filter_predictions_by_preferences(
 
     matched = []
     for pred in predictions:
-        # Check confidence threshold
-        confidence = pred.get("confidence")
+        # Check confidence threshold (prefer calibrated when available)
+        confidence = pred.get("calibrated_confidence") or pred.get("confidence")
         if confidence is None or confidence < min_confidence:
             continue
 

@@ -125,7 +125,15 @@ def format_telegram_alert(alert: Dict[str, Any]) -> str:
     """
     sentiment = alert.get("sentiment", "neutral").upper()
     confidence = alert.get("confidence", 0)
-    confidence_pct = escape_markdown(f"{confidence:.0%}") if confidence else "N/A"
+    calibrated = alert.get("calibrated_confidence")
+    if calibrated is not None and confidence:
+        confidence_pct = escape_markdown(
+            f"{confidence:.0%} raw / {calibrated:.0%} calibrated"
+        )
+    elif confidence:
+        confidence_pct = escape_markdown(f"{confidence:.0%}")
+    else:
+        confidence_pct = "N/A"
     assets = alert.get("assets", [])
     assets_str = escape_markdown(", ".join(assets[:5])) if assets else "None specified"
     text = alert.get("text", "")[:300]

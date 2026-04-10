@@ -287,3 +287,49 @@ class TestCheckAndDispatch:
         result = check_and_dispatch()
         assert result["predictions_found"] == 1
         assert result["alerts_sent"] == 0
+
+
+class TestCalibratedConfidenceFiltering:
+    """Test that filtering prefers calibrated_confidence when available."""
+
+    def _make_alert(self, confidence=0.8, calibrated=None, assets=None):
+        return {
+            "prediction_id": 1,
+            "text": "Test",
+            "confidence": confidence,
+            "calibrated_confidence": calibrated,
+            "assets": assets or ["AAPL"],
+            "sentiment": "bullish",
+        }
+
+    def _prefs(self, min_confidence=0.7):
+        return {
+            "min_confidence": min_confidence,
+            "assets_of_interest": [],
+            "sentiment_filter": "all",
+        }
+
+    def test_uses_calibrated_when_available(self):
+        """Calibrated confidence takes precedence over raw."""
+        # Raw 0.85 passes 0.7 threshold, but calibrated 0.55 does not
+        alerts = [self._make_alert(confidence=0.85, calibrated=0.55)]
+        result = filter_predictions_by_preferences(alerts, self._prefs(0.7))
+        assert len(result) == 0
+
+    def test_calibrated_passes_threshold(self):
+        """Alert passes when calibrated confidence meets threshold."""
+        alerts = [self._make_alert(confidence=0.85, calibrated=0.75)]
+        result = filter_predictions_by_preferences(alerts, self._prefs(0.7))
+        assert len(result) == 1
+
+    def test_falls_back_to_raw_when_calibrated_is_none(self):
+        """Raw confidence used when calibrated is None (no curve)."""
+        alerts = [self._make_alert(confidence=0.85, calibrated=None)]
+        result = filter_predictions_by_preferences(alerts, self._prefs(0.7))
+        assert len(result) == 1
+
+    def test_falls_back_to_raw_when_calibrated_missing(self):
+        """Raw confidence used when calibrated_confidence key is absent."""
+        alert = {"prediction_id": 1, "confidence": 0.85, "assets": ["AAPL"], "sentiment": "bullish"}
+        result = filter_predictions_by_preferences([alert], self._prefs(0.7))
+        assert len(result) == 1

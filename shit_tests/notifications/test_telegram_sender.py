@@ -222,6 +222,37 @@ class TestFormatAlertMarkdownV2:
         assert "BTC\\-USD" in message
 
 
+class TestCalibratedConfidenceDisplay:
+    """Test calibrated confidence rendering in Telegram alerts."""
+
+    def _make_alert(self, confidence=0.85, calibrated=None):
+        return {
+            "sentiment": "bullish",
+            "confidence": confidence,
+            "calibrated_confidence": calibrated,
+            "assets": ["TSLA"],
+            "text": "Test post.",
+            "thesis": "Test thesis.",
+        }
+
+    def test_shows_both_when_calibrated_available(self):
+        """Shows 'raw / calibrated' format when calibrated confidence exists."""
+        message = format_telegram_alert(self._make_alert(confidence=0.85, calibrated=0.62))
+        assert "85% raw" in message or "85\\% raw" in message
+        assert "62% calibrated" in message or "62\\% calibrated" in message
+
+    def test_shows_only_raw_when_no_calibration(self):
+        """Shows only raw confidence when calibrated is None."""
+        message = format_telegram_alert(self._make_alert(confidence=0.85, calibrated=None))
+        assert "85%" in message
+        assert "calibrated" not in message
+
+    def test_shows_na_when_no_confidence(self):
+        """Shows N/A when confidence is 0 or None."""
+        message = format_telegram_alert(self._make_alert(confidence=None))
+        assert "N/A" in message
+
+
 class TestEscapeMarkdown:
     """Test Markdown escaping."""
 
