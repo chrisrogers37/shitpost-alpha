@@ -2,8 +2,10 @@
 
 **Feature**: Build a calibration curve from 1000+ historical predictions to map raw LLM confidence to actual accuracy rates.
 
-**Status**: IN PROGRESS  
+**Status**: COMPLETE  
 **Started**: 2026-04-10  
+**Completed**: 2026-04-10  
+**PR**: #135  
 **Priority**: High  
 **Estimated Effort**: 2-3 sessions  
 

@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Confidence Calibration** — Maps raw LLM confidence to empirical accuracy using historical prediction outcomes
+  - `CalibrationService` in `shit/market_data/calibration.py` — bin-based lookup table (10 bins), rolling 6-month window, staleness guard (30-day max age)
+  - `CalibrationCurve` model in `shit/market_data/models.py` — JSONB bin_stats and lookup_table, indexed by (timeframe, fitted_at)
+  - `calibrated_confidence` column on `predictions` table — populated at storage time, nullable for uncalibrated
+  - Prediction storage: applies calibration via deferred import in `PredictionOperations._calibrate()`
+  - Event payload: includes `calibrated_confidence` for downstream consumers
+  - Telegram alerts: shows "85% raw / 62% calibrated" format when calibration available
+  - Alert filtering: prefers calibrated confidence over raw, with graceful fallback
+  - API endpoint `GET /api/calibration/curve?timeframe=t7` — returns bin stats and lookup table
+  - Frontend: SVG reliability diagram component, calibrated badge in PredictionPanel
+  - CLI: `python -m shit.market_data.calibration --refit [--timeframe t7]`
+  - 40 new tests across 4 test files
 - **Historical Echoes** — Semantic similarity search over past posts to surface actual market outcomes alongside new predictions
   - `EchoService` in `shit/echoes/` — embed, search (pgvector cosine similarity), and aggregate historical outcomes (returns, win rate, P&L)
   - `EmbeddingClient` in `shit/llm/embeddings.py` — OpenAI `text-embedding-3-small` (1536 dimensions) with batch support
