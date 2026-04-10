@@ -2,7 +2,18 @@
 
 **Feature**: When a new post is analyzed, find the 3-5 most semantically similar past posts and attach their actual market outcomes.
 
-**Status**: Planning
+**Status**: COMPLETE
+**Started**: 2026-04-09
+**Completed**: 2026-04-09
+**PR**: #134
+
+### Challenge Round Resolutions (2026-04-09)
+
+1. **No IVFFlat index in initial schema.** Exact cosine search is ~10-50ms for <10k rows. IVFFlat requires `10*lists` minimum rows to build. Ship without vector index; document HNSW as future optimization at 10k+.
+2. **`shit/echoes/` is correct location.** Shared service consumed by analyzer, notifications, and API. Follows pattern of `shit/events/`, `shit/market_data/`, `shit/content/`. Keeps dependency arrows inward.
+3. **Event consumer only for v1.** Monolith retired; event-driven is production path. `alert_engine.py` is dead code. EchoService is shared — alert engine can call it later if resurrected.
+4. **Separate API endpoint, not inline in feed.** Separation of concerns: `/api/echoes/for-prediction/{id}` lets frontend lazy-load, keeps feed fast, can be cached independently. Removed feed_service.py modification.
+5. **No retry mechanism. Backfill CLI doubles as retry.** The backfill query finds predictions without embeddings — naturally picks up failures. Alerts fire without echoes (fail-open).
 **Date**: 2026-04-09
 **Estimated Effort**: Large (3-4 sessions)
 
@@ -265,12 +276,10 @@ CREATE TABLE post_embeddings (
     CONSTRAINT uq_post_embeddings_prediction UNIQUE (prediction_id)
 );
 
--- Index for cosine similarity search
-CREATE INDEX idx_post_embeddings_cosine ON post_embeddings
-    USING ivfflat (embedding vector_cosine_ops)
-    WITH (lists = 10);
--- Note: IVFFlat requires at least 10*lists rows to build. For <100 rows,
--- use exact search (no index needed). Add HNSW index at 10,000+ rows.
+-- No vector index needed for <10k rows (exact cosine is ~10-50ms).
+-- At 10,000+ rows, add HNSW index:
+-- CREATE INDEX idx_post_embeddings_hnsw ON post_embeddings
+--     USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 
 -- Index for joining
 CREATE INDEX idx_post_embeddings_prediction_id ON post_embeddings(prediction_id);
@@ -565,9 +574,9 @@ if analysis_id and not dry_run:
         logger.warning(f"Failed to generate embedding: {e}")
 ```
 
-### 2. Alert Formatting (Telegram)
+### 2. Alert Formatting (Telegram — event consumer path only)
 
-Modify the alert engine to include echo data when available:
+Modify `format_telegram_alert()` to render echoes when present in the alert dict. The event consumer (production path) enriches alerts with echo data before formatting. `alert_engine.py` (retired cron path) is NOT modified.
 
 **File**: `notifications/telegram_sender.py`, in `format_telegram_alert()`:
 
@@ -591,9 +600,11 @@ def format_telegram_alert(alert: dict) -> str:
     return msg
 ```
 
-### 3. Frontend API
+### 3. Frontend API (separate endpoint, not inline in feed)
 
-**New endpoint**: `GET /api/posts/{prediction_id}/echoes`
+Echoes are a separate concern from the feed. A dedicated endpoint lets the frontend lazy-load echoes on demand, keeps the feed response fast, and can be cached independently.
+
+**New endpoint**: `GET /api/echoes/for-prediction/{prediction_id}`
 
 ```python
 # File: api/routers/echoes.py
@@ -603,7 +614,7 @@ from api.schemas.echoes import EchoResponse
 
 router = APIRouter()
 
-@router.get("/posts/{prediction_id}/echoes", response_model=EchoResponse)
+@router.get("/for-prediction/{prediction_id}", response_model=EchoResponse)
 def get_echoes(prediction_id: int):
     """Get historical echo matches for a prediction."""
     from shit.echoes.echo_service import EchoService
@@ -656,35 +667,7 @@ class EchoResponse(BaseModel):
     matches: list[EchoMatch]
 ```
 
-### 4. Feed Response Enhancement
-
-Add echoes to the existing `FeedResponse` so the frontend can display them inline:
-
-```python
-# In api/services/feed_service.py, add echo lookup to get_feed_response():
-def get_feed_response(self, offset: int) -> Optional[dict]:
-    # ... existing code ...
-
-    # Fetch echoes for this prediction
-    try:
-        from shit.echoes.echo_service import EchoService
-        service = EchoService()
-        embedding = service.get_embedding(prediction_id)
-        if embedding:
-            matches = service.find_similar_posts(
-                embedding, limit=3, exclude_prediction_id=prediction_id,
-            )
-            echoes = service.aggregate_echoes(matches)
-        else:
-            echoes = None
-    except Exception:
-        echoes = None
-
-    response["echoes"] = echoes
-    return response
-```
-
-### 5. LLM Prompt Enrichment (Future, Not in v1)
+### 4. LLM Prompt Enrichment (Future, Not in v1)
 
 In a future iteration, echo outcomes could be injected into the analysis prompt (similar to fundamentals enrichment in Doc 02):
 
@@ -1028,13 +1011,12 @@ shit/llm/
 | `api/main.py` | Modify | Register echoes router |
 | `shitpost_ai/shitpost_analyzer.py` | Modify | Call embed_and_store after prediction creation |
 | `notifications/telegram_sender.py` | Modify | Include echo summary in alert format |
-| `notifications/event_consumer.py` | Modify | Look up echoes when dispatching alerts |
-| `api/services/feed_service.py` | Modify | Include echoes in feed response |
+| `notifications/event_consumer.py` | Modify | Look up echoes when dispatching alerts (production path) |
 | `requirements.txt` | Modify | Add `pgvector>=0.3.0` |
 | `shit_tests/echoes/test_echo_service.py` | Create | Unit tests for echo service |
 | `shit_tests/echoes/test_similarity.py` | Create | Unit tests for similarity search |
 | `shit_tests/echoes/test_aggregation.py` | Create | Unit tests for aggregation |
-| `shit_tests/llm/test_embeddings.py` | Create | Unit tests for embedding client |
+| `shit_tests/shit/llm/test_embeddings.py` | Create | Unit tests for embedding client |
 
 ---
 

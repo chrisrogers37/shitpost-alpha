@@ -549,6 +549,21 @@ class ShitpostAnalyzer:
                     except Exception as e:
                         logger.warning(f"Failed to emit prediction_created event: {e}")
 
+                    # Generate embedding for Historical Echoes similarity search
+                    try:
+                        post_text = shitpost.get("text", "")
+                        if post_text:
+                            await asyncio.to_thread(
+                                self._embed_prediction,
+                                int(analysis_id),
+                                post_text,
+                                shitpost_id,
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to generate embedding for prediction {analysis_id}: {e}"
+                        )
+
                     # Reactively capture price snapshots + backfill for new tickers
                     if assets:
                         try:
@@ -785,6 +800,20 @@ class ShitpostAnalyzer:
         }
 
         return enhanced_analysis
+
+    @staticmethod
+    def _embed_prediction(
+        prediction_id: int, text: str, shitpost_id: str | None = None
+    ) -> None:
+        """Generate and store embedding for a prediction (sync, for asyncio.to_thread)."""
+        from shit.echoes.echo_service import EchoService
+
+        service = EchoService()
+        service.embed_and_store(
+            prediction_id=prediction_id,
+            text=text,
+            shitpost_id=shitpost_id,
+        )
 
     async def _trigger_reactive_backfill(
         self, prediction_id: int, assets: list, post_published_at=None

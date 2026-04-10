@@ -150,9 +150,45 @@ _{escape_markdown(text)}_
 \U0001f4a1 *Thesis:*
 {escape_markdown(thesis)}
 
-\u26a0\ufe0f _This is NOT financial advice\\. For entertainment only\\._
+{_format_echo_section(alert)}\u26a0\ufe0f _This is NOT financial advice\\. For entertainment only\\._
 """
     return message.strip()
+
+
+def _format_echo_section(alert: Dict[str, Any]) -> str:
+    """Format the Historical Echoes section for a Telegram alert.
+
+    Returns an empty string if no echoes are available.
+    """
+    echoes = alert.get("echoes")
+    if not echoes or echoes.get("count", 0) == 0:
+        return ""
+
+    lines = [f"\U0001f4ca *Historical Echoes* \\({echoes['count']} similar posts\\):"]
+
+    if echoes.get("avg_return") is not None:
+        val = escape_markdown(f"{echoes['avg_return']:+.1f}%")
+        lines.append(f"\u2022 Avg T\\+7 return: {val}")
+
+    if echoes.get("win_rate") is not None:
+        wr = echoes["win_rate"] * 100
+        c, ic = echoes.get("correct", 0), echoes.get("incorrect", 0)
+        lines.append(
+            f"\u2022 Win rate: {c}/{c + ic} \\({escape_markdown(f'{wr:.0f}%')}\\)"
+        )
+
+    if echoes.get("avg_pnl") is not None:
+        val = escape_markdown(f"${echoes['avg_pnl']:+.0f}")
+        lines.append(f"\u2022 Avg P&L \\($1k\\): {val}")
+
+    pending = echoes.get("pending", 0)
+    if pending > 0 and echoes.get("correct", 0) + echoes.get("incorrect", 0) == 0:
+        lines = [
+            lines[0],
+            f"\u2022 Outcomes: {pending} pending \\(too recent to evaluate\\)",
+        ]
+
+    return "\n".join(lines) + "\n\n"
 
 
 def escape_markdown(text: str) -> str:
