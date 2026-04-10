@@ -446,3 +446,85 @@ class TestPredictionOperationsIntegration:
         assert hasattr(pred_ops, 'handle_no_text_prediction')
         assert hasattr(pred_ops, 'check_prediction_exists')
 
+
+class TestCalibrationIntegration:
+    """Tests for calibrated_confidence integration in prediction storage."""
+
+    @pytest.fixture(autouse=True)
+    def _register_models(self):
+        """Ensure Signal model is registered for Prediction relationship."""
+        from shitvault.signal_models import Signal  # noqa: F401
+
+    @pytest.fixture
+    def prediction_ops(self):
+        mock_ops = MagicMock(spec=DatabaseOperations)
+        mock_ops.session = AsyncMock()
+        mock_ops.session.add = MagicMock()
+        mock_ops.session.commit = AsyncMock()
+        mock_ops.session.refresh = AsyncMock()
+        return PredictionOperations(mock_ops)
+
+    @pytest.mark.asyncio
+    async def test_stores_calibrated_confidence(self, prediction_ops):
+        """When calibration curve exists, stores calibrated value."""
+        captured = None
+
+        def capture(pred):
+            nonlocal captured
+            captured = pred
+            pred.id = 1
+
+        prediction_ops.db_ops.session.add.side_effect = capture
+
+        with patch.object(
+            PredictionOperations,
+            "_calibrate",
+            return_value=0.62,
+        ):
+            await prediction_ops.store_analysis(
+                content_id="test_123",
+                analysis_data={"confidence": 0.85, "assets": ["TSLA"]},
+            )
+
+        assert captured.confidence == 0.85
+        assert captured.calibrated_confidence == 0.62
+
+    @pytest.mark.asyncio
+    async def test_stores_none_when_no_curve(self, prediction_ops):
+        """When no calibration curve exists, calibrated_confidence is None."""
+        captured = None
+
+        def capture(pred):
+            nonlocal captured
+            captured = pred
+            pred.id = 1
+
+        prediction_ops.db_ops.session.add.side_effect = capture
+
+        with patch.object(
+            PredictionOperations,
+            "_calibrate",
+            return_value=None,
+        ):
+            await prediction_ops.store_analysis(
+                content_id="test_123",
+                analysis_data={"confidence": 0.85, "assets": ["TSLA"]},
+            )
+
+        assert captured.confidence == 0.85
+        assert captured.calibrated_confidence is None
+
+    def test_calibrate_returns_none_on_exception(self):
+        """_calibrate catches all exceptions and returns None."""
+        with patch(
+            "shit.market_data.calibration.CalibrationService",
+            side_effect=Exception("DB error"),
+        ):
+            result = PredictionOperations._calibrate(0.85)
+            assert result is None
+
+    def test_calibrate_returns_none_for_none_input(self):
+        """_calibrate short-circuits on None confidence."""
+        result = PredictionOperations._calibrate(None)
+        assert result is None
+

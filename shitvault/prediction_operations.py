@@ -27,6 +27,17 @@ class PredictionOperations:
     def __init__(self, db_ops: DatabaseOperations):
         self.db_ops = db_ops
         self.bypass_service = BypassService()
+
+    @staticmethod
+    def _calibrate(raw_confidence: Optional[float]) -> Optional[float]:
+        """Apply calibration curve to raw confidence. Returns None if unavailable."""
+        if raw_confidence is None:
+            return None
+        try:
+            from shit.market_data.calibration import CalibrationService
+            return CalibrationService(timeframe="t7").calibrate(raw_confidence)
+        except Exception:
+            return None
     
     async def store_analysis(self, content_id: str, analysis_data: Dict[str, Any], content_data: Dict[str, Any] = None, *, use_signal: bool = False) -> Optional[str]:
         """Store LLM analysis results in the database with enhanced content data.
@@ -71,6 +82,7 @@ class PredictionOperations:
                 assets=analysis_data.get('assets', []),
                 market_impact=analysis_data.get('market_impact', {}),
                 confidence=analysis_data.get('confidence', 0.0),
+                calibrated_confidence=self._calibrate(analysis_data.get('confidence')),
                 thesis=analysis_data.get('thesis', ''),
 
                 # Set analysis status for successful analyses
