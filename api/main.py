@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from api.routers import feed, prices, telegram
+from api.routers import echoes, feed, prices, telegram
 
 
 @asynccontextmanager
@@ -46,6 +46,7 @@ app.add_middleware(
 )
 
 # API routers
+app.include_router(echoes.router, prefix="/api/echoes", tags=["echoes"])
 app.include_router(feed.router, prefix="/api/feed", tags=["feed"])
 app.include_router(prices.router, prefix="/api/prices", tags=["prices"])
 app.include_router(telegram.router, tags=["telegram"])
