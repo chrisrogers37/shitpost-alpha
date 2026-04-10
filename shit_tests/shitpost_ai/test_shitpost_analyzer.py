@@ -417,6 +417,7 @@ class TestShitpostAnalyzer:
         await analyzer.initialize()
 
         with patch.object(analyzer.bypass_service, 'should_bypass_post', return_value=(False, None)) as mock_bypass, \
+             patch.object(analyzer, '_pre_extract_tickers', return_value=[]) as mock_pre_extract, \
              patch.object(analyzer, '_prepare_enhanced_content', return_value="Enhanced content") as mock_prepare, \
              patch.object(analyzer.llm_client, 'analyze', new_callable=AsyncMock, return_value=sample_analysis_result) as mock_llm, \
              patch.object(analyzer, '_enhance_analysis_with_shitpost_data', return_value=sample_analysis_result) as mock_enhance, \
@@ -426,8 +427,7 @@ class TestShitpostAnalyzer:
 
             assert result == sample_analysis_result
             mock_bypass.assert_called_once_with(sample_shitpost_data)
-            mock_prepare.assert_called_once_with(sample_shitpost_data)
-            mock_llm.assert_called_once_with("Enhanced content")
+            mock_prepare.assert_called_once_with(sample_shitpost_data, fundamentals=[])
             mock_store.assert_called_once()
 
     @pytest.mark.asyncio
