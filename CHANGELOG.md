@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Fundamentals-enriched LLM prompts** — Pre-extracts tickers from post text (via $TICKER regex, company name matching, and active-set lookup), looks up fundamentals from `ticker_registry` (sector, market cap, P/E, beta, dividend yield), and injects an ASSET CONTEXT block into the LLM prompt so the model can calibrate confidence based on company size and volatility
+  - `TickerValidator._load_registry()` builds `_company_names` dict alongside `_known_active` in a single DB query
+  - `get_analysis_prompt()` gains `has_fundamentals` param with conditional `FUNDAMENTALS_GUIDANCE` rules
+  - 38 new tests covering pre-extraction, fundamentals lookup, enhanced content, prompt guidance, and end-to-end flow
 - **Ticker validation service** — New `TickerValidator` class (`shit/market_data/ticker_validator.py`) with three-layer defense: static blocklist (DEFENSE, CRYPTO, etc.), alias remapping (RTN→RTX, FB→META, etc.), and yfinance spot-check for novel symbols
 - **Registry-first optimization** — Validator skips yfinance for symbols already active in ticker_registry (0ms cached lookup vs 300ms per yfinance call)
 - **Feed API invalid ticker filtering** — Outcomes query excludes tickers with `status='invalid'`; prediction assets filtered in API response to match

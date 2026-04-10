@@ -4,6 +4,7 @@ Business logic orchestrator for analyzing shitposts with enhanced context.
 """
 
 import asyncio
+import re
 from typing import Dict, List, Optional
 from datetime import datetime
 
@@ -19,6 +20,18 @@ from shit.market_data.auto_backfill_service import auto_backfill_prediction
 from shit.market_data.ticker_validator import TickerValidator
 
 logger = get_service_logger("analyzer")
+
+
+def _format_market_cap(value: float) -> str:
+    """Format market cap for human readability."""
+    if value >= 1_000_000_000_000:
+        return f"${value / 1_000_000_000_000:.1f}T"
+    elif value >= 1_000_000_000:
+        return f"${value / 1_000_000_000:.1f}B"
+    elif value >= 1_000_000:
+        return f"${value / 1_000_000:.0f}M"
+    else:
+        return f"${value:,.0f}"
 
 
 class ShitpostAnalyzer:
@@ -450,11 +463,25 @@ class ShitpostAnalyzer:
                     "analysis_comment": str(bypass_reason),
                 }
 
+            # Pre-extract tickers and look up fundamentals for richer LLM context
+            likely_tickers = self._pre_extract_tickers(shitpost.get("text", ""))
+            fundamentals = (
+                await asyncio.to_thread(self._lookup_fundamentals, likely_tickers)
+                if likely_tickers
+                else []
+            )
+
             # Prepare enhanced content for LLM analysis
-            enhanced_content = self._prepare_enhanced_content(shitpost)
+            enhanced_content = self._prepare_enhanced_content(
+                shitpost, fundamentals=fundamentals
+            )
 
             # Analyze with LLM
-            analysis = await self.llm_client.analyze(enhanced_content)
+            analysis = await self.llm_client.analyze(
+                enhanced_content,
+                prompt_func=get_analysis_prompt,
+                has_fundamentals=bool(fundamentals),
+            )
 
             if not analysis:
                 logger.warning(f"LLM analysis failed for shitpost {shitpost_id}")
@@ -470,9 +497,7 @@ class ShitpostAnalyzer:
             if raw_assets:
                 validated_assets = self.ticker_validator.validate_symbols(raw_assets)
                 if validated_assets != raw_assets:
-                    logger.info(
-                        f"Ticker validation: {raw_assets} → {validated_assets}"
-                    )
+                    logger.info(f"Ticker validation: {raw_assets} → {validated_assets}")
                 enhanced_analysis["assets"] = validated_assets
                 valid_set = set(validated_assets)
                 enhanced_analysis["market_impact"] = {
@@ -551,7 +576,9 @@ class ShitpostAnalyzer:
             )
             return None
 
-    def _prepare_enhanced_content(self, signal_data: Dict) -> str:
+    def _prepare_enhanced_content(
+        self, signal_data: Dict, fundamentals: list[dict] | None = None
+    ) -> str:
         """Prepare enhanced content for LLM analysis.
 
         Uses generic field names with fallback to legacy names for
@@ -559,6 +586,7 @@ class ShitpostAnalyzer:
 
         Args:
             signal_data: Signal or shitpost dictionary
+            fundamentals: Optional list of ticker fundamental dicts
 
         Returns:
             Enhanced content string
@@ -600,7 +628,124 @@ class ShitpostAnalyzer:
         )
         enhanced_content += f"Media: {'Yes' if has_media else 'No'}, Mentions: {mentions_count}, Tags: {tags_count}"
 
+        # Inject fundamentals context if available
+        if fundamentals:
+            enhanced_content += "\n\nASSET CONTEXT (from market data):\n"
+            for f in fundamentals:
+                line = f"- {f['symbol']}"
+                if f.get("company_name"):
+                    line += f" ({f['company_name']})"
+                parts = []
+                if f.get("sector"):
+                    sector_str = f["sector"]
+                    if f.get("industry"):
+                        sector_str += f" / {f['industry']}"
+                    parts.append(sector_str)
+                if f.get("market_cap"):
+                    parts.append(f"Mkt Cap: {_format_market_cap(f['market_cap'])}")
+                if f.get("pe_ratio"):
+                    parts.append(f"P/E: {f['pe_ratio']:.1f}")
+                if f.get("beta"):
+                    parts.append(f"Beta: {f['beta']:.2f}")
+                if f.get("dividend_yield") is not None and f["dividend_yield"]:
+                    parts.append(f"Div: {f['dividend_yield']:.1%}")
+                if f.get("asset_type"):
+                    parts.append(f"Type: {f['asset_type']}")
+                if parts:
+                    line += " | " + " | ".join(parts)
+                enhanced_content += line + "\n"
+
         return enhanced_content
+
+    def _pre_extract_tickers(self, text: str) -> list[str]:
+        """Extract likely ticker symbols from post text using simple heuristics.
+
+        Lightweight pre-pass to look up fundamentals before the LLM runs.
+        False positives are harmless (extra context).
+        False negatives are harmless (no context, same as today).
+        """
+        if not text:
+            return []
+
+        text_upper = text.upper()
+
+        # Strategy 1: $TICKER mentions
+        dollar_tickers = re.findall(r"\$([A-Z]{1,5})", text_upper)
+
+        # Strategy 2: Known company name -> ticker mapping
+        name_matches = self._match_company_names(text)
+
+        # Strategy 3: Uppercase words that match known active tickers
+        # Ensure registry is loaded
+        self.ticker_validator._is_known_active("")
+        known_active = self.ticker_validator._known_active or set()
+        words = set(re.findall(r"\b[A-Z]{2,5}\b", text))
+        word_matches = [w for w in words if w in known_active]
+
+        # Combine and deduplicate (preserving order)
+        all_tickers = list(dict.fromkeys(dollar_tickers + name_matches + word_matches))
+        return all_tickers[:10]
+
+    def _match_company_names(self, text: str) -> list[str]:
+        """Match company names in text against ticker_registry company names."""
+        # Ensure registry is loaded
+        self.ticker_validator._is_known_active("")
+        company_names = self.ticker_validator._company_names or {}
+        if not company_names:
+            return []
+
+        text_lower = text.lower()
+        matches = []
+        for name, symbol in company_names.items():
+            if name in text_lower and symbol not in matches:
+                matches.append(symbol)
+        return matches
+
+    @staticmethod
+    def _lookup_fundamentals(symbols: list[str]) -> list[dict]:
+        """Look up fundamentals for ticker symbols from ticker_registry.
+
+        Args:
+            symbols: List of ticker symbols to look up.
+
+        Returns:
+            List of dicts with fundamental data for symbols that have data.
+        """
+        if not symbols:
+            return []
+
+        from shit.db.sync_session import get_session
+        from shit.market_data.models import TickerRegistry
+
+        fundamentals = []
+        with get_session() as session:
+            rows = (
+                session.query(TickerRegistry)
+                .filter(
+                    TickerRegistry.symbol.in_(symbols),
+                    TickerRegistry.status == "active",
+                )
+                .all()
+            )
+
+            for row in rows:
+                fundamentals.append(
+                    {
+                        "symbol": row.symbol,
+                        "company_name": row.company_name,
+                        "sector": row.sector,
+                        "industry": row.industry,
+                        "market_cap": row.market_cap,
+                        "pe_ratio": row.pe_ratio,
+                        "forward_pe": row.forward_pe,
+                        "beta": row.beta,
+                        "dividend_yield": row.dividend_yield,
+                        "asset_type": row.asset_type,
+                        "exchange": row.exchange,
+                    }
+                )
+
+        return fundamentals
 
     def _enhance_analysis_with_shitpost_data(
         self, analysis: Dict, shitpost: Dict

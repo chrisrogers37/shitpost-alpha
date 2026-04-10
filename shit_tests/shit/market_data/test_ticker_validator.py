@@ -9,7 +9,6 @@ import os
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
-import pytest
 from unittest.mock import patch, MagicMock
 
 from shit.market_data.ticker_validator import TickerValidator
@@ -129,11 +128,21 @@ class TestDeduplication:
 class TestRegistryFirstOptimization:
     """Tests for skipping yfinance when ticker is already active in registry."""
 
-    def _mock_get_session(self, symbols):
-        """Create a mock get_session that returns active symbols."""
+    def _mock_get_session(self, symbols, company_names=None):
+        """Create a mock get_session that returns active symbols.
+
+        Args:
+            symbols: List of active ticker symbols.
+            company_names: Optional dict of symbol -> company_name.
+                           Defaults to None for all symbols.
+        """
+        company_names = company_names or {}
         mock_session = MagicMock()
-        mock_rows = [MagicMock(symbol=s) for s in symbols]
-        mock_session.query.return_value.filter.return_value.all.return_value = mock_rows
+        # Support iteration (for _load_registry's for loop)
+        mock_rows_iter = [(s, company_names.get(s)) for s in symbols]
+        query_mock = MagicMock()
+        query_mock.filter.return_value.all.return_value = mock_rows_iter
+        mock_session.query.return_value = query_mock
         mock_ctx = MagicMock()
         mock_ctx.__enter__ = MagicMock(return_value=mock_session)
         mock_ctx.__exit__ = MagicMock(return_value=False)
@@ -279,3 +288,58 @@ class TestEndToEnd:
         with _no_registry(), patch.object(validator, "_is_tradeable", side_effect=lambda s: s != "NOTREAL"):
             result = validator.validate_symbols(["AAPL", "NOTREAL", "TSLA"])
         assert result == ["AAPL", "TSLA"]
+
+
+class TestCompanyNames:
+    """Tests for _company_names dict populated by _load_registry."""
+
+    def test_company_names_populated_on_first_access(self):
+        """_company_names should be populated alongside _known_active."""
+        mock_rows = [
+            ("AAPL", "Apple Inc."),
+            ("TSLA", "Tesla, Inc."),
+            ("SPY", None),  # ETF with no company name
+        ]
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter.return_value.all.return_value = mock_rows
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_session)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+
+        validator = TickerValidator()
+        with patch(_REGISTRY_PATCH, return_value=mock_ctx):
+            validator._is_known_active("AAPL")
+
+        assert validator._known_active == {"AAPL", "TSLA", "SPY"}
+        assert validator._company_names["apple inc."] == "AAPL"
+        assert validator._company_names["apple"] == "AAPL"
+        assert validator._company_names["tesla, inc."] == "TSLA"
+        assert validator._company_names["tesla"] == "TSLA"
+        # SPY has no company name — should not appear
+        assert "spy" not in validator._company_names
+
+    def test_short_first_words_excluded(self):
+        """First words <= 3 chars (e.g., 'The') should not be added."""
+        mock_rows = [("XYZ", "The XYZ Corp")]
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter.return_value.all.return_value = mock_rows
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_session)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+
+        validator = TickerValidator()
+        with patch(_REGISTRY_PATCH, return_value=mock_ctx):
+            validator._is_known_active("XYZ")
+
+        # "the" is 3 chars, should be excluded
+        assert "the" not in validator._company_names
+        # Full name still present
+        assert validator._company_names["the xyz corp"] == "XYZ"
+
+    def test_db_failure_gives_empty_company_names(self):
+        """If DB is unavailable, _company_names should be empty dict."""
+        validator = TickerValidator()
+        with patch(_REGISTRY_PATCH, side_effect=Exception("DB down")):
+            validator._is_known_active("AAPL")
+
+        assert validator._company_names == {}

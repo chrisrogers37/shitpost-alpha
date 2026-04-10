@@ -22,29 +22,42 @@ class TickerValidator:
     """Validates ticker symbols against blocklist, aliases, and yfinance."""
 
     # Known non-ticker strings the LLM commonly extracts
-    BLOCKLIST: frozenset[str] = frozenset({
-        "DEFENSE", "CRYPTO", "ECONOMY", "NEWSMAX", "TARIFF",
-        "GDP", "CPI", "FED", "NATO", "CEO", "IPO", "ESG",
-    })
+    BLOCKLIST: frozenset[str] = frozenset(
+        {
+            "DEFENSE",
+            "CRYPTO",
+            "ECONOMY",
+            "NEWSMAX",
+            "TARIFF",
+            "GDP",
+            "CPI",
+            "FED",
+            "NATO",
+            "CEO",
+            "IPO",
+            "ESG",
+        }
+    )
 
     # Known delisted → current mappings (None = no replacement, filter out)
     ALIASES: dict[str, Optional[str]] = {
         "RTN": "RTX",
         "FB": "META",
-        "TWTR": None,       # Twitter taken private (Oct 2022)
+        "TWTR": None,  # Twitter taken private (Oct 2022)
         "RDS.A": "SHEL",
         "RDS.B": "SHEL",
         "CBS": "PARA",
-        "PTR": None,         # PetroChina delisted from NYSE (Sep 2022)
-        "SNP": None,         # China Petroleum delisted from NYSE (Sep 2022)
+        "PTR": None,  # PetroChina delisted from NYSE (Sep 2022)
+        "SNP": None,  # China Petroleum delisted from NYSE (Sep 2022)
         "AKS": "CLF",
-        "KOL": None,         # VanEck Coal ETF closed (Dec 2020)
-        "OIL": None,         # iPath Oil ETN delisted (Apr 2021)
+        "KOL": None,  # VanEck Coal ETF closed (Dec 2020)
+        "OIL": None,  # iPath Oil ETN delisted (Apr 2021)
     }
 
     def __init__(self):
         """Initialize validator. Registry and yfinance caches are lazy-loaded."""
         self._known_active: Optional[set[str]] = None
+        self._company_names: Optional[dict[str, str]] = None
         self._tradeable_cache: dict[str, bool] = {}
 
     def validate_symbols(self, symbols: list[str]) -> list[str]:
@@ -102,23 +115,44 @@ class TickerValidator:
 
         return validated
 
+    def _load_registry(self) -> None:
+        """Load active symbols and company names from ticker_registry.
+
+        Populates both _known_active and _company_names in a single query.
+        Called lazily on first access.
+        """
+        try:
+            from shit.db.sync_session import get_session
+            from shit.market_data.models import TickerRegistry
+
+            with get_session() as session:
+                rows = (
+                    session.query(TickerRegistry.symbol, TickerRegistry.company_name)
+                    .filter(TickerRegistry.status == "active")
+                    .all()
+                )
+                self._known_active = set()
+                self._company_names = {}
+                for symbol, company_name in rows:
+                    self._known_active.add(symbol)
+                    if company_name:
+                        name_lower = company_name.lower()
+                        self._company_names[name_lower] = symbol
+                        first_word = name_lower.split()[0].rstrip(".,;:")
+                        if len(first_word) > 3:
+                            self._company_names[first_word] = symbol
+        except Exception:
+            # DB unavailable — skip optimization, fall through to yfinance
+            self._known_active = set()
+            self._company_names = {}
+
     def _is_known_active(self, symbol: str) -> bool:
         """Check if symbol is already active in ticker_registry.
 
         Opens its own sync session on first call, caches the full active set.
         """
         if self._known_active is None:
-            try:
-                from shit.db.sync_session import get_session
-                from shit.market_data.models import TickerRegistry
-                with get_session() as session:
-                    rows = session.query(TickerRegistry.symbol).filter(
-                        TickerRegistry.status == "active"
-                    ).all()
-                    self._known_active = {r.symbol for r in rows}
-            except Exception:
-                # DB unavailable — skip optimization, fall through to yfinance
-                self._known_active = set()
+            self._load_registry()
         return symbol in self._known_active
 
     def _is_tradeable(self, symbol: str) -> bool:
@@ -139,12 +173,17 @@ class TickerValidator:
         """Raw yfinance lookup. Separated for testability."""
         try:
             import yfinance as yf
+
             ticker = yf.Ticker(symbol)
             info = ticker.info or {}
             quote_type = info.get("quoteType", "")
             if quote_type in (
-                "EQUITY", "ETF", "MUTUALFUND", "CRYPTOCURRENCY",
-                "FUTURE", "INDEX",
+                "EQUITY",
+                "ETF",
+                "MUTUALFUND",
+                "CRYPTOCURRENCY",
+                "FUTURE",
+                "INDEX",
             ):
                 return True
             fast = ticker.fast_info
