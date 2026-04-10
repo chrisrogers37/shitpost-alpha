@@ -14,10 +14,13 @@ from sqlalchemy import (
     Float,
     BigInteger,
     ForeignKey,
+    Index,
     Integer,
     Boolean,
+    JSON,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import relationship
 
@@ -314,10 +317,34 @@ class TickerRegistry(Base, IDMixin, TimestampMixin):
         return f"<TickerRegistry(symbol='{self.symbol}'{name_part}, status='{self.status}')>"
 
 
-# Indexes for efficient querying
-from sqlalchemy import Index
+class CalibrationCurve(Base):
+    """Fitted calibration curve mapping raw LLM confidence to empirical accuracy.
 
-# Create composite indexes for common queries
+    Each row is an immutable snapshot: one timeframe, one fit.
+    The latest row per timeframe is the active curve.
+    """
+
+    __tablename__ = "calibration_curves"
+
+    id = Column(Integer, primary_key=True)
+    fitted_at = Column(DateTime, nullable=False)
+    timeframe = Column(String(10), nullable=False)
+    window_start = Column(DateTime, nullable=False)
+    window_end = Column(DateTime, nullable=False)
+    n_predictions = Column(Integer, nullable=False)
+    n_bins = Column(Integer, nullable=False, default=10)
+    bin_stats = Column(JSON, nullable=False)
+    lookup_table = Column(JSON, nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+    def __repr__(self):
+        return (
+            f"<CalibrationCurve(timeframe='{self.timeframe}', "
+            f"n={self.n_predictions}, fitted={self.fitted_at})>"
+        )
+
+
+# Composite indexes for common queries
 Index("idx_market_price_symbol_date", MarketPrice.symbol, MarketPrice.date, unique=True)
 Index(
     "idx_prediction_outcome_symbol_date",
@@ -332,4 +359,9 @@ Index(
     "idx_price_snapshot_symbol_captured",
     PriceSnapshot.symbol,
     PriceSnapshot.captured_at,
+)
+Index(
+    "idx_calibration_curves_timeframe",
+    CalibrationCurve.timeframe,
+    CalibrationCurve.fitted_at.desc(),
 )

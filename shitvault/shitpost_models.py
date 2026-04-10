@@ -140,6 +140,9 @@ class Prediction(Base, IDMixin, TimestampMixin):
     confidence = Column(
         Float, nullable=True
     )  # Confidence score 0.0-1.0 (nullable for bypassed posts)
+    calibrated_confidence = Column(
+        Float, nullable=True
+    )  # Empirically calibrated confidence from calibration curve
     thesis = Column(Text, nullable=True)  # Investment thesis
 
     # Analysis metadata

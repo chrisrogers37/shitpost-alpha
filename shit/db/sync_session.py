@@ -74,7 +74,7 @@ def create_tables():
         Prediction,
         TelegramSubscription,
     )
-    from shit.market_data.models import MarketPrice, PredictionOutcome, TickerRegistry
+    from shit.market_data.models import MarketPrice, PredictionOutcome, TickerRegistry, CalibrationCurve  # noqa: F401
     from shitvault.signal_models import Signal
     from shit.events.models import Event  # noqa: F401
     from shit.echoes.models import PostEmbedding  # noqa: F401
