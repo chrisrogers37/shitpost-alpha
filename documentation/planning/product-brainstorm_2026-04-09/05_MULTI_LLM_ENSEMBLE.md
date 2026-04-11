@@ -2,9 +2,17 @@
 
 **Feature**: Run each post through GPT-4, Claude, and Grok in parallel. Compare outputs, surface consensus and disagreements, use consensus for higher confidence.
 
-**Status**: Design  
+**Status**: IN PROGRESS  
+**Started**: 2026-04-11  
 **Priority**: High  
-**Estimated Effort**: 3-4 sessions  
+**Estimated Effort**: 3-4 sessions
+
+### Challenge Round Decisions (2026-04-11)
+
+1. **Extend ProviderComparator** — Add `ConsensusBuilder` to `compare_providers.py` rather than creating a new `EnsembleAnalyzer` class. One parallel-execution path.
+2. **Full scope** — Backend + alerts + frontend display (all 4 phases).
+3. **Raw mean confidence** — No agreement bonus/penalty. Store raw mean of provider confidences. Agreement metrics in `ensemble_metadata` for display only. Calibration (Feature 06) refits naturally.
+4. **Both alert paths** — `alert_engine.py` and `event_consumer.py` both pass `ensemble_metadata` to `format_telegram_alert()`.  
 
 ---
 
