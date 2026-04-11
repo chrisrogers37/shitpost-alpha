@@ -107,6 +107,22 @@ def check_and_dispatch() -> Dict[str, Any]:
             if success:
                 record_alert_sent(chat_id)
                 results["alerts_sent"] += 1
+
+                # Create follow-up tracking (fail-open)
+                prediction_id = alert.get("prediction_id")
+                if prediction_id:
+                    try:
+                        from notifications.followups import create_followup_tracking
+
+                        create_followup_tracking(
+                            prediction_id=prediction_id,
+                            chat_id=chat_id,
+                            alert_sent_at=datetime.utcnow(),
+                        )
+                    except Exception:
+                        logger.debug(
+                            f"Follow-up tracking failed for prediction {prediction_id}"
+                        )
             else:
                 record_error(chat_id, error or "Unknown error")
                 results["alerts_failed"] += 1

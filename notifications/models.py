@@ -4,7 +4,17 @@ SQLAlchemy models for the notifications subsystem.
 """
 
 from datetime import datetime
-from sqlalchemy import Boolean, Column, DateTime, Integer, JSON, String, Text
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    JSON,
+    String,
+    Text,
+    UniqueConstraint,
+)
 
 from shit.db.data_models import Base, TimestampMixin, IDMixin
 
@@ -75,3 +85,40 @@ class TelegramSubscription(Base, IDMixin, TimestampMixin):
                 return f"@{self.username}"
             return self.first_name or f"User {self.chat_id}"
         return self.title or f"Chat {self.chat_id}"
+
+
+class AlertFollowup(Base, IDMixin, TimestampMixin):
+    """Tracks follow-up messages for sent alerts at T+1h, T+1d, T+7d.
+
+    Each row tracks one (prediction, subscriber) pair. The follow-up
+    checker runs every 5 minutes and processes rows where next_check_at <= now.
+    """
+
+    __tablename__ = "alert_followups"
+    __table_args__ = (
+        UniqueConstraint(
+            "prediction_id", "chat_id", name="uq_alert_followup_pred_chat"
+        ),
+    )
+
+    prediction_id = Column(Integer, ForeignKey("predictions.id"), nullable=False)
+    chat_id = Column(String(50), nullable=False, index=True)
+
+    # Follow-up state: None = not yet due, False = abandoned, True = sent
+    sent_1h = Column(Boolean, nullable=True, default=None)
+    sent_1h_at = Column(DateTime, nullable=True)
+    sent_1d = Column(Boolean, nullable=True, default=None)
+    sent_1d_at = Column(DateTime, nullable=True)
+    sent_7d = Column(Boolean, nullable=True, default=None)
+    sent_7d_at = Column(DateTime, nullable=True)
+
+    # Timing
+    original_alert_sent_at = Column(DateTime, nullable=False)
+    next_check_at = Column(DateTime, nullable=False, index=True)
+
+    def __repr__(self):
+        return (
+            f"<AlertFollowup(prediction_id={self.prediction_id}, "
+            f"chat_id={self.chat_id}, "
+            f"1h={self.sent_1h}, 1d={self.sent_1d}, 7d={self.sent_7d})>"
+        )

@@ -4,6 +4,7 @@ CLI entry point for the notifications module.
 Usage:
     python -m notifications check-alerts          # Run alert check (Railway cron)
     python -m notifications briefing              # Send morning briefing (Railway cron)
+    python -m notifications followup-check        # Process due follow-up messages (Railway cron)
     python -m notifications set-webhook <url>     # Register webhook URL with Telegram
     python -m notifications test-alert --chat-id 123  # Send test alert
     python -m notifications list-subscribers      # Show active subscribers
@@ -80,6 +81,19 @@ def cmd_briefing(args: argparse.Namespace) -> int:
     print(
         f"Briefing: {results['sent']} sent, {results['failed']} failed, "
         f"{results['skipped']} skipped, {results['predictions_count']} predictions"
+    )
+    return 0
+
+
+def cmd_followup_check(args: argparse.Namespace) -> int:
+    """Process due follow-up messages."""
+    from notifications.followups import process_due_followups
+
+    results = process_due_followups()
+    print(
+        f"Follow-ups: {results['checked']} checked, {results['sent']} sent, "
+        f"{results['deferred']} deferred, {results['abandoned']} abandoned, "
+        f"{results['skipped']} skipped"
     )
     return 0
 
@@ -210,6 +224,12 @@ def main() -> int:
         help="Send regardless of time or trading day checks",
     )
 
+    # followup-check
+    subparsers.add_parser(
+        "followup-check",
+        help="Process due follow-up messages (T+1h, T+1d, T+7d)",
+    )
+
     # set-webhook
     webhook_parser = subparsers.add_parser(
         "set-webhook",
@@ -247,6 +267,7 @@ def main() -> int:
     commands = {
         "check-alerts": cmd_check_alerts,
         "briefing": cmd_briefing,
+        "followup-check": cmd_followup_check,
         "set-webhook": cmd_set_webhook,
         "test-alert": cmd_test_alert,
         "list-subscribers": cmd_list_subscribers,

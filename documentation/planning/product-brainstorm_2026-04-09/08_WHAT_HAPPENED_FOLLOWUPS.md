@@ -2,7 +2,8 @@
 
 **Feature**: After sending an alert, automatically send follow-up messages at T+1h, T+1d, and T+7d showing actual market moves vs the prediction.
 
-**Status**: Design  
+**Status**: IN PROGRESS  
+**Started**: 2026-04-11  
 **Priority**: Medium-High  
 **Estimated Effort**: 2-3 sessions  
 
