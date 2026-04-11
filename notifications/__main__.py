@@ -3,6 +3,7 @@ CLI entry point for the notifications module.
 
 Usage:
     python -m notifications check-alerts          # Run alert check (Railway cron)
+    python -m notifications briefing              # Send morning briefing (Railway cron)
     python -m notifications set-webhook <url>     # Register webhook URL with Telegram
     python -m notifications test-alert --chat-id 123  # Send test alert
     python -m notifications list-subscribers      # Show active subscribers
@@ -30,6 +31,56 @@ def cmd_check_alerts(args: argparse.Namespace) -> int:
     print(f"Alerts failed:     {results['alerts_failed']}")
     print(f"Filtered out:      {results['filtered']}")
 
+    return 0
+
+
+def cmd_briefing(args: argparse.Namespace) -> int:
+    """Send the pre-market morning briefing."""
+    from notifications.briefing import (
+        is_briefing_day,
+        is_briefing_time,
+        send_morning_briefing,
+    )
+
+    if args.dry_run:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        from notifications.briefing import (
+            aggregate_by_asset,
+            format_briefing_message,
+            get_overnight_predictions,
+        )
+
+        now_et = datetime.now(ZoneInfo("America/New_York"))
+        predictions = get_overnight_predictions(now_et)
+        asset_summary = aggregate_by_asset(predictions) if predictions else {}
+        date_str = now_et.strftime("%A, %B %-d, %Y")
+        message = format_briefing_message(date_str, predictions, asset_summary)
+        print(message)
+        return 0
+
+    if not args.force:
+        if not is_briefing_time():
+            from datetime import datetime
+            from zoneinfo import ZoneInfo
+
+            now_et = datetime.now(ZoneInfo("America/New_York"))
+            print(
+                f"Not briefing time (current ET: {now_et.strftime('%H:%M')}), "
+                "exiting. Use --force to override."
+            )
+            return 0
+
+        if not is_briefing_day():
+            print("Not a trading day, skipping briefing. Use --force to override.")
+            return 0
+
+    results = send_morning_briefing()
+    print(
+        f"Briefing: {results['sent']} sent, {results['failed']} failed, "
+        f"{results['skipped']} skipped, {results['predictions_count']} predictions"
+    )
     return 0
 
 
@@ -143,6 +194,22 @@ def main() -> int:
         help="Check for new predictions and dispatch alerts",
     )
 
+    # briefing
+    briefing_parser = subparsers.add_parser(
+        "briefing",
+        help="Send pre-market morning briefing (8:30 AM ET on trading days)",
+    )
+    briefing_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Generate the briefing and print to stdout (don't send)",
+    )
+    briefing_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Send regardless of time or trading day checks",
+    )
+
     # set-webhook
     webhook_parser = subparsers.add_parser(
         "set-webhook",
@@ -179,6 +246,7 @@ def main() -> int:
 
     commands = {
         "check-alerts": cmd_check_alerts,
+        "briefing": cmd_briefing,
         "set-webhook": cmd_set_webhook,
         "test-alert": cmd_test_alert,
         "list-subscribers": cmd_list_subscribers,

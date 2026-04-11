@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Pre-Market Briefing** — Daily morning digest sent at 8:30 AM ET on trading days
+  - `notifications/briefing.py`: overnight prediction query, per-asset aggregation, MarkdownV2 formatting
+  - Telegram `/briefing` command (on/off/status) for subscriber opt-in/out (default: enabled)
+  - CLI: `python -m notifications briefing [--dry-run] [--force]` with DST-aware scheduling
+  - Quiet night message when no overnight activity; compact format for high-activity nights
+  - 38 new tests in `test_briefing.py`
 - **Watchlist Filtering** — Telegram `/watchlist` commands for subscribers to control which tickers generate alerts
   - Commands: `/watchlist add TSLA NVDA`, `/watchlist remove NVDA`, `/watchlist show`, `/watchlist clear`
   - Validates tickers against `ticker_registry` (active symbols only), applies alias remapping (FB→META), rejects delisted tickers
