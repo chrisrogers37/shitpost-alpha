@@ -36,11 +36,24 @@ class Settings(BaseSettings):
     XAI_API_KEY: Optional[str] = Field(default=None)
     LLM_PROVIDER: str = Field(default="openai")  # openai, anthropic, grok
     LLM_MODEL: str = Field(default="gpt-4")
-    LLM_BASE_URL: Optional[str] = Field(default=None)  # Custom base URL for OpenAI-compatible APIs
+    LLM_BASE_URL: Optional[str] = Field(
+        default=None
+    )  # Custom base URL for OpenAI-compatible APIs
+
+    # Ensemble Configuration
+    ENSEMBLE_ENABLED: bool = Field(
+        default=False
+    )  # Opt-in; set True in Railway to activate
+    ENSEMBLE_PROVIDERS: str = Field(default="openai,anthropic,grok")
+    ENSEMBLE_MIN_PROVIDERS: int = Field(
+        default=2
+    )  # Minimum successful providers for valid ensemble
 
     # Truth Social Shitpost Configuration
     TRUTH_SOCIAL_USERNAME: str = Field(default="realDonaldTrump")
-    TRUTH_SOCIAL_SHITPOST_INTERVAL: int = Field(default=30)  # seconds between shitpost harvests
+    TRUTH_SOCIAL_SHITPOST_INTERVAL: int = Field(
+        default=30
+    )  # seconds between shitpost harvests
 
     # Analysis Configuration
     CONFIDENCE_THRESHOLD: float = Field(default=0.7)
@@ -68,7 +81,9 @@ class Settings(BaseSettings):
     # Telegram Bot Configuration (Phase 2 - Alerting)
     TELEGRAM_BOT_TOKEN: Optional[str] = Field(default=None)
     TELEGRAM_BOT_USERNAME: Optional[str] = Field(default=None)  # Without @ prefix
-    TELEGRAM_WEBHOOK_URL: Optional[str] = Field(default=None)  # For webhook mode (optional)
+    TELEGRAM_WEBHOOK_URL: Optional[str] = Field(
+        default=None
+    )  # For webhook mode (optional)
 
     # Market Data Resilience Configuration
     ALPHA_VANTAGE_API_KEY: Optional[str] = Field(default=None)
@@ -92,13 +107,17 @@ class Settings(BaseSettings):
     AWS_REGION: str = Field(default="us-east-1")
 
     # Multi-Source Harvester Configuration
-    ENABLED_HARVESTERS: str = Field(default="truth_social")  # Comma-separated list of enabled harvester source names
+    ENABLED_HARVESTERS: str = Field(
+        default="truth_social"
+    )  # Comma-separated list of enabled harvester source names
 
     # Twitter/X Configuration (Future)
     TWITTER_API_KEY: Optional[str] = Field(default=None)
     TWITTER_API_SECRET: Optional[str] = Field(default=None)
     TWITTER_BEARER_TOKEN: Optional[str] = Field(default=None)
-    TWITTER_TARGET_USERS: str = Field(default="")  # Comma-separated Twitter usernames to monitor
+    TWITTER_TARGET_USERS: str = Field(
+        default=""
+    )  # Comma-separated Twitter usernames to monitor
 
     # Logging
     LOG_LEVEL: str = Field(default="INFO")
@@ -130,9 +149,7 @@ class Settings(BaseSettings):
             return self.ANTHROPIC_API_KEY
         elif self.LLM_PROVIDER == "grok":
             if not self.XAI_API_KEY:
-                raise ValueError(
-                    "XAI_API_KEY is required when LLM_PROVIDER is 'grok'"
-                )
+                raise ValueError("XAI_API_KEY is required when LLM_PROVIDER is 'grok'")
             return self.XAI_API_KEY
         else:
             raise ValueError(f"Unsupported LLM provider: {self.LLM_PROVIDER}")
