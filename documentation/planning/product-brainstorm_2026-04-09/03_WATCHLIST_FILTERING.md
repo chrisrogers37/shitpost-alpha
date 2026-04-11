@@ -2,7 +2,15 @@
 
 **Feature**: Users specify tickers they care about via Telegram bot commands. Only get alerts when the LLM identifies their watchlist tickers.
 
-**Status**: Planning
+**Status**: COMPLETE
+**Started**: 2026-04-11
+**Completed**: 2026-04-11
+
+### Challenge Resolutions (2026-04-11)
+1. **Separation**: `_validate_watchlist_tickers()` and `_get_ticker_names()` stay in `telegram_bot.py` — they query `ticker_registry` (not notification domain), so putting them in `notifications/db.py` would muddle scope.
+2. **ORM consistency**: `_get_ticker_names()` uses `TickerRegistry` ORM model instead of raw SQL, matching `_validate_watchlist_tickers()`.
+3. **Test scope**: Dropped tests 14-16 (filter_predictions_by_preferences smoke tests) — the filtering logic is unchanged and already covered in `test_alert_engine.py`.
+4. **No implicit add**: `/watchlist TSLA` (no action keyword) returns a usage hint instead of silently adding. Explicit is better than implicit.
 **Date**: 2026-04-09
 **Estimated Effort**: Small (1 session)
 
@@ -350,8 +358,7 @@ def handle_watchlist_command(chat_id: str, args: str = "") -> str:
     elif action == "clear":
         return _handle_watchlist_clear(chat_id, prefs)
     else:
-        # If user typed "/watchlist TSLA", treat as "add TSLA"
-        return _handle_watchlist_add(chat_id, prefs, current_watchlist, parts)
+        return "Unknown action\\. Use `/watchlist add TSLA`, `/watchlist remove TSLA`, or `/watchlist show`\\."
 ```
 
 ### Step 2: Add Helper Functions
@@ -391,26 +398,20 @@ def _get_ticker_names(symbols: list[str]) -> dict[str, str]:
     """Look up company names for a list of symbols."""
     if not symbols:
         return {}
-    from notifications.db import _execute_read, _row_to_dict
-    from sqlalchemy import text
     from shit.db.sync_session import get_session
+    from shit.market_data.models import TickerRegistry
 
     try:
         with get_session() as session:
-            result = session.execute(
-                text("""
-                    SELECT symbol, company_name, sector
-                    FROM ticker_registry
-                    WHERE symbol = ANY(:symbols)
-                """),
-                {"symbols": symbols},
-            )
-            rows = result.fetchall()
-            columns = result.keys()
+            rows = session.query(
+                TickerRegistry.symbol,
+                TickerRegistry.company_name,
+                TickerRegistry.sector,
+            ).filter(TickerRegistry.symbol.in_(symbols)).all()
             return {
-                row[0]: f"{row[1]}" + (f" ({row[2]})" if row[2] else "")
+                row.symbol: f"{row.company_name}" + (f" ({row.sector})" if row.sector else "")
                 for row in rows
-                if row[1]
+                if row.company_name
             }
     except Exception:
         return {}
@@ -476,13 +477,9 @@ Add `_validate_watchlist_tickers()` as shown in the Ticker Validation section ab
 
 13. **`test_watchlist_case_insensitive`**: Add "tsla", verify "TSLA" is stored.
 
-14. **`test_filter_with_watchlist`**: Call `filter_predictions_by_preferences` with `assets_of_interest=["TSLA"]` and prediction with `assets=["AAPL", "TSLA"]`. Verify match.
+14. **`test_process_update_watchlist_command`**: Send `/watchlist add TSLA` through `process_update()`, verify correct handler is called.
 
-15. **`test_filter_with_watchlist_no_match`**: Same but prediction has `assets=["AAPL", "GOOGL"]`. Verify no match.
-
-16. **`test_filter_empty_watchlist`**: `assets_of_interest=[]`, verify all predictions match.
-
-17. **`test_process_update_watchlist_command`**: Send `/watchlist add TSLA` through `process_update()`, verify correct handler is called.
+15. **`test_unknown_action_shows_usage`**: Send `/watchlist TSLA` (no action keyword), verify usage hint response.
 
 ### Existing Test Compatibility
 

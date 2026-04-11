@@ -1,8 +1,8 @@
 """
 Telegram Bot command handlers for Shitpost Alpha.
 
-Handles /start, /stop, /status, /settings, /stats, /latest, /help commands
-and routes incoming webhook updates to the appropriate handler.
+Handles /start, /stop, /status, /settings, /watchlist, /stats, /latest, /help
+commands and routes incoming webhook updates to the appropriate handler.
 """
 
 import json
@@ -67,6 +67,7 @@ You're now subscribed to receive real\\-time prediction alerts\\.
 \u2022 Sentiment: All
 
 *Commands:*
+/watchlist \\- Set which tickers you want alerts for
 /settings \\- View/change your preferences
 /status \\- Check subscription status
 /stats \\- View prediction accuracy
@@ -352,13 +353,18 @@ def handle_help_command() -> str:
 /stop \\- Unsubscribe from alerts
 /status \\- Check your subscription status
 /settings \\- View/change alert preferences
+/watchlist \\- Manage your ticker watchlist
 /stats \\- View prediction accuracy stats
 /latest \\- Show recent predictions
 /help \\- Show this help message
 
+*Watchlist Examples:*
+`/watchlist add TSLA NVDA`
+`/watchlist remove NVDA`
+`/watchlist clear`
+
 *Settings Examples:*
 `/settings confidence 80`
-`/settings assets AAPL TSLA`
 `/settings sentiment bullish`
 
 *About:*
@@ -366,6 +372,304 @@ This bot sends alerts when our LLM detects high\\-confidence trading signals fro
 
 \u26a0\ufe0f _Not financial advice\\. For entertainment only\\._
 """
+
+
+# ============================================================
+# Watchlist Command Handlers
+# ============================================================
+
+MAX_WATCHLIST_SIZE = 50
+
+
+def _escape_md(text: str) -> str:
+    """Escape special characters for Telegram MarkdownV2."""
+    return "".join(f"\\{c}" if c in r"_*[]()~`>#+-=|{}.!" else c for c in text)
+
+
+def _normalize_ticker(symbol: str) -> tuple:
+    """Normalize a ticker symbol via alias remapping.
+
+    Returns:
+        (normalized_symbol, warning) — warning is set if delisted.
+    """
+    from shit.market_data.ticker_validator import TickerValidator
+
+    symbol = symbol.strip().upper()
+    if symbol in TickerValidator.ALIASES:
+        replacement = TickerValidator.ALIASES[symbol]
+        if replacement is None:
+            return symbol, f"{symbol} is no longer publicly traded"
+        return replacement, None
+    return symbol, None
+
+
+def _validate_watchlist_tickers(symbols: list) -> tuple:
+    """Validate tickers against the ticker_registry.
+
+    Returns:
+        (valid_symbols, invalid_symbols)
+    """
+    from shit.db.sync_session import get_session
+    from shit.market_data.models import TickerRegistry
+
+    if not symbols:
+        return [], []
+
+    try:
+        with get_session() as session:
+            known = (
+                session.query(TickerRegistry.symbol)
+                .filter(
+                    TickerRegistry.symbol.in_(symbols),
+                    TickerRegistry.status == "active",
+                )
+                .all()
+            )
+            known_set = {r.symbol for r in known}
+
+        valid = [s for s in symbols if s in known_set]
+        invalid = [s for s in symbols if s not in known_set]
+        return valid, invalid
+    except Exception:
+        # If DB is unavailable, accept all tickers (fail-open)
+        return symbols, []
+
+
+def _get_ticker_names(symbols: list) -> dict:
+    """Look up company names for a list of symbols from ticker_registry."""
+    if not symbols:
+        return {}
+    from shit.db.sync_session import get_session
+    from shit.market_data.models import TickerRegistry
+
+    try:
+        with get_session() as session:
+            rows = (
+                session.query(
+                    TickerRegistry.symbol,
+                    TickerRegistry.company_name,
+                    TickerRegistry.sector,
+                )
+                .filter(TickerRegistry.symbol.in_(symbols))
+                .all()
+            )
+            return {
+                row.symbol: (
+                    f"{row.company_name}" + (f" ({row.sector})" if row.sector else "")
+                )
+                for row in rows
+                if row.company_name
+            }
+    except Exception:
+        return {}
+
+
+def _format_watchlist_display(watchlist: list) -> str:
+    """Format watchlist for display with company names."""
+    if not watchlist:
+        return (
+            "\U0001f4cb *Your Watchlist*\n\n"
+            "Your watchlist is empty \\- you're receiving alerts for ALL tickers\\.\n\n"
+            "To focus on specific tickers, use:\n"
+            "`/watchlist add TSLA NVDA AAPL`"
+        )
+
+    names = _get_ticker_names(watchlist)
+    lines = ["\U0001f4cb *Your Watchlist*\n"]
+    lines.append(f"You're tracking {len(watchlist)} tickers:")
+    for symbol in sorted(watchlist):
+        name = names.get(symbol, "")
+        if name:
+            lines.append(f"\u2022 {symbol} \\- {_escape_md(name)}")
+        else:
+            lines.append(f"\u2022 {symbol}")
+    lines.append(
+        "\nYou'll only receive alerts when these tickers appear in a prediction\\."
+    )
+    lines.append(
+        "\n_Use /watchlist add TICKER or /watchlist remove TICKER to modify\\._"
+    )
+    return "\n".join(lines)
+
+
+def _format_watchlist_summary(watchlist: list) -> str:
+    """Format a compact watchlist summary for add/remove responses."""
+    if not watchlist:
+        return ""
+    names = _get_ticker_names(watchlist)
+    lines = [f"\nYour watchlist \\({len(watchlist)} tickers\\):"]
+    for symbol in sorted(watchlist):
+        name = names.get(symbol, "")
+        if name:
+            lines.append(f"\u2022 {symbol} \\- {_escape_md(name)}")
+        else:
+            lines.append(f"\u2022 {symbol}")
+    return "\n".join(lines)
+
+
+def _handle_watchlist_add(
+    chat_id: str,
+    prefs: Dict[str, Any],
+    current_watchlist: list,
+    tickers_raw: list,
+) -> str:
+    """Handle /watchlist add <tickers>."""
+    if not tickers_raw:
+        return "Usage: `/watchlist add TSLA NVDA AAPL`"
+
+    # Normalize via alias remapping and check for delisted
+    normalized = []
+    delisted_warnings = []
+    for t in tickers_raw:
+        symbol, warning = _normalize_ticker(t)
+        if warning:
+            delisted_warnings.append(warning)
+        else:
+            normalized.append(symbol)
+
+    # Deduplicate while preserving order
+    seen = set()
+    deduped = []
+    for s in normalized:
+        if s not in seen:
+            seen.add(s)
+            deduped.append(s)
+    normalized = deduped
+
+    # Check max size
+    new_count = len(set(current_watchlist) | set(normalized))
+    if new_count > MAX_WATCHLIST_SIZE:
+        return (
+            f"Watchlist is limited to {MAX_WATCHLIST_SIZE} tickers\\. "
+            f"You have {len(current_watchlist)}\\."
+        )
+
+    # Validate against registry
+    valid, invalid = _validate_watchlist_tickers(normalized)
+
+    # Separate already-present from truly new
+    already_present = [s for s in valid if s in current_watchlist]
+    new_additions = [s for s in valid if s not in current_watchlist]
+
+    # Update watchlist if there are new additions
+    if new_additions:
+        updated = current_watchlist + new_additions
+        prefs["assets_of_interest"] = updated
+        update_subscription(chat_id, alert_preferences=prefs)
+        current_watchlist = updated
+
+    # Build response
+    lines = []
+    if new_additions:
+        lines.append(f"\u2705 Added to watchlist: {', '.join(new_additions)}")
+    if already_present:
+        lines.append(f"\u2139\ufe0f Already on watchlist: {', '.join(already_present)}")
+    if invalid:
+        lines.append(
+            f"\u26a0\ufe0f Unknown tickers \\(not in our registry\\): "
+            f"{', '.join(invalid)}"
+        )
+    if delisted_warnings:
+        for w in delisted_warnings:
+            lines.append(f"\u26a0\ufe0f {_escape_md(w)}")
+
+    if not lines:
+        lines.append("No valid tickers to add\\.")
+
+    # Append watchlist summary
+    summary = _format_watchlist_summary(current_watchlist)
+    if summary:
+        lines.append(summary)
+
+    return "\n".join(lines)
+
+
+def _handle_watchlist_remove(
+    chat_id: str,
+    prefs: Dict[str, Any],
+    current_watchlist: list,
+    tickers_raw: list,
+) -> str:
+    """Handle /watchlist remove <tickers>."""
+    if not tickers_raw:
+        return "Usage: `/watchlist remove TSLA NVDA`"
+
+    symbols = [s.strip().upper() for s in tickers_raw if s.strip()]
+
+    present = [s for s in symbols if s in current_watchlist]
+    absent = [s for s in symbols if s not in current_watchlist]
+
+    lines = []
+    if present:
+        updated = [s for s in current_watchlist if s not in present]
+        prefs["assets_of_interest"] = updated
+        update_subscription(chat_id, alert_preferences=prefs)
+        lines.append(f"\u2705 Removed from watchlist: {', '.join(present)}")
+        current_watchlist = updated
+    if absent:
+        lines.append(f"\u2139\ufe0f Not on your watchlist: {', '.join(absent)}")
+
+    if current_watchlist:
+        summary = _format_watchlist_summary(current_watchlist)
+        if summary:
+            lines.append(summary)
+    else:
+        lines.append(
+            "\nYour watchlist is now empty \\- you'll receive alerts for ALL tickers\\."
+        )
+
+    return "\n".join(lines)
+
+
+def _handle_watchlist_clear(chat_id: str, prefs: Dict[str, Any]) -> str:
+    """Handle /watchlist clear."""
+    prefs["assets_of_interest"] = []
+    update_subscription(chat_id, alert_preferences=prefs)
+    return "\u2705 Watchlist cleared\\. You'll now receive alerts for ALL tickers\\."
+
+
+def handle_watchlist_command(chat_id: str, args: str = "") -> str:
+    """Handle /watchlist command — view/modify ticker watchlist.
+
+    Supports:
+        /watchlist              — Show current watchlist
+        /watchlist show         — Same as above
+        /watchlist add TSLA     — Add tickers
+        /watchlist remove TSLA  — Remove tickers
+        /watchlist clear        — Clear watchlist (receive all alerts)
+    """
+    sub = get_subscription(chat_id)
+    if not sub:
+        return "\u2753 You're not subscribed. Send /start first."
+
+    prefs = sub.get("alert_preferences", {})
+    if isinstance(prefs, str):
+        try:
+            prefs = json.loads(prefs)
+        except json.JSONDecodeError:
+            prefs = {}
+
+    current_watchlist = prefs.get("assets_of_interest", [])
+    args = args.strip()
+
+    if not args or args.lower() == "show":
+        return _format_watchlist_display(current_watchlist)
+
+    parts = args.split()
+    action = parts[0].lower()
+    tickers_raw = parts[1:] if len(parts) > 1 else []
+
+    if action == "add":
+        return _handle_watchlist_add(chat_id, prefs, current_watchlist, tickers_raw)
+    elif action == "remove":
+        return _handle_watchlist_remove(chat_id, prefs, current_watchlist, tickers_raw)
+    elif action == "clear":
+        return _handle_watchlist_clear(chat_id, prefs)
+    else:
+        return (
+            "Unknown action\\. Use `/watchlist add TSLA`, "
+            "`/watchlist remove TSLA`, or `/watchlist show`\\."
+        )
 
 
 # ============================================================
@@ -423,6 +727,8 @@ def process_update(update: Dict[str, Any]) -> Optional[str]:
         response = handle_status_command(chat_id)
     elif command == "/settings":
         response = handle_settings_command(chat_id, args)
+    elif command == "/watchlist":
+        response = handle_watchlist_command(chat_id, args)
     elif command == "/stats":
         response = handle_stats_command(chat_id)
     elif command == "/latest":
