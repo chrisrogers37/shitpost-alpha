@@ -5,6 +5,7 @@ Usage:
     python -m notifications check-alerts          # Run alert check (Railway cron)
     python -m notifications briefing              # Send morning briefing (Railway cron)
     python -m notifications followup-check        # Process due follow-up messages (Railway cron)
+    python -m notifications scorecard             # Send weekly scorecard (Railway cron)
     python -m notifications set-webhook <url>     # Register webhook URL with Telegram
     python -m notifications test-alert --chat-id 123  # Send test alert
     python -m notifications list-subscribers      # Show active subscribers
@@ -94,6 +95,26 @@ def cmd_followup_check(args: argparse.Namespace) -> int:
         f"Follow-ups: {results['checked']} checked, {results['sent']} sent, "
         f"{results['deferred']} deferred, {results['abandoned']} abandoned, "
         f"{results['skipped']} skipped"
+    )
+    return 0
+
+
+def cmd_scorecard(args: argparse.Namespace) -> int:
+    """Send the weekly scorecard."""
+    from notifications.scorecard_service import (
+        generate_scorecard,
+        send_weekly_scorecard,
+    )
+
+    if args.dry_run:
+        message = generate_scorecard()
+        print(message)
+        return 0
+
+    stats = send_weekly_scorecard()
+    print(
+        f"Scorecard: {stats['sent']} sent, {stats['failed']} failed, "
+        f"{stats['skipped']} opted out"
     )
     return 0
 
@@ -230,6 +251,17 @@ def main() -> int:
         help="Process due follow-up messages (T+1h, T+1d, T+7d)",
     )
 
+    # scorecard
+    scorecard_parser = subparsers.add_parser(
+        "scorecard",
+        help="Send weekly performance scorecard (Sunday 7 PM ET)",
+    )
+    scorecard_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Generate the scorecard and print to stdout (don't send)",
+    )
+
     # set-webhook
     webhook_parser = subparsers.add_parser(
         "set-webhook",
@@ -268,6 +300,7 @@ def main() -> int:
         "check-alerts": cmd_check_alerts,
         "briefing": cmd_briefing,
         "followup-check": cmd_followup_check,
+        "scorecard": cmd_scorecard,
         "set-webhook": cmd_set_webhook,
         "test-alert": cmd_test_alert,
         "list-subscribers": cmd_list_subscribers,

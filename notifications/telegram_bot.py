@@ -1,7 +1,8 @@
 """
 Telegram Bot command handlers for Shitpost Alpha.
 
-Handles /start, /stop, /status, /settings, /watchlist, /briefing, /followups, /stats, /latest, /help
+Handles /start, /stop, /status, /settings, /watchlist, /briefing, /followups,
+/scorecard, /stats, /latest, /help
 commands and routes incoming webhook updates to the appropriate handler.
 """
 
@@ -70,6 +71,7 @@ You're now subscribed to receive real\\-time prediction alerts\\.
 /watchlist \\- Set which tickers you want alerts for
 /briefing \\- Morning briefing settings
 /followups \\- Follow\\-up message settings
+/scorecard \\- Weekly performance digest
 /settings \\- View/change your preferences
 /status \\- Check subscription status
 /stats \\- View prediction accuracy
@@ -358,6 +360,7 @@ def handle_help_command() -> str:
 /watchlist \\- Manage your ticker watchlist
 /briefing \\- Toggle morning briefing \\(8:30 AM ET\\)
 /followups \\- Toggle prediction follow\\-up messages
+/scorecard \\- Weekly performance scorecard
 /stats \\- View prediction accuracy stats
 /latest \\- Show recent predictions
 /help \\- Show this help message
@@ -485,6 +488,59 @@ def handle_followups_command(chat_id: str, args: str = "") -> str:
         "/followups off \\- Disable follow\\-ups\n"
         "`/followups 1h,7d` \\- Only get 1h and 7d follow\\-ups"
     )
+
+
+# ============================================================
+# Scorecard Command Handler
+# ============================================================
+
+
+def handle_scorecard_command(chat_id: str, args: str = "") -> str:
+    """Handle /scorecard command.
+
+    /scorecard       -- Show status and next delivery time
+    /scorecard on    -- Enable weekly scorecard (default)
+    /scorecard off   -- Disable weekly scorecard
+    /scorecard now   -- Send this week's scorecard immediately (preview)
+    """
+    arg = args.strip().lower()
+
+    if arg == "now":
+        from notifications.scorecard_service import generate_and_send_scorecard
+
+        generate_and_send_scorecard(chat_id=chat_id, preview=True)
+        return None  # Message sent directly by the service
+
+    sub = get_subscription(chat_id)
+    if not sub:
+        return "You're not subscribed\\. Send /start first\\."
+
+    prefs = sub.get("alert_preferences", {})
+    if isinstance(prefs, str):
+        try:
+            prefs = json.loads(prefs)
+        except json.JSONDecodeError:
+            prefs = {}
+
+    if arg == "off":
+        prefs["scorecard_enabled"] = False
+        update_subscription(chat_id, alert_preferences=prefs)
+        return "Weekly scorecard disabled\\. Send /scorecard on to re\\-enable\\."
+    elif arg == "on":
+        prefs["scorecard_enabled"] = True
+        update_subscription(chat_id, alert_preferences=prefs)
+        return "Weekly scorecard enabled\\. Delivery: Sunday 7 PM ET\\."
+    else:
+        current = prefs.get("scorecard_enabled", True)
+        status = "enabled" if current else "disabled"
+        return (
+            f"Weekly scorecard is currently *{status}*\\.\n"
+            "Delivery: Sunday 7 PM ET\n\n"
+            "*Commands:*\n"
+            "/scorecard off \\- Disable\n"
+            "/scorecard on \\- Enable\n"
+            "`/scorecard now` \\- Preview this week's scorecard"
+        )
 
 
 # ============================================================
@@ -846,6 +902,8 @@ def process_update(update: Dict[str, Any]) -> Optional[str]:
         response = handle_briefing_command(chat_id, args)
     elif command == "/followups":
         response = handle_followups_command(chat_id, args)
+    elif command == "/scorecard":
+        response = handle_scorecard_command(chat_id, args)
     elif command == "/stats":
         response = handle_stats_command(chat_id)
     elif command == "/latest":

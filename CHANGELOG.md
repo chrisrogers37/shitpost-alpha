@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Weekly Scorecard** — Sunday evening performance digest with accuracy, P&L, top wins/misses, asset breakdown
+  - 4 new files: `scorecard_queries.py`, `scorecard_formatter.py`, `scorecard_service.py`
+  - Telegram `/scorecard` command (on/off/now preview) for subscriber opt-in/out
+  - CLI: `python -m notifications scorecard [--dry-run]`
+  - Streak tracking (consecutive winning/losing weeks), optional Feature 11 leaderboard integration
+  - 28 new tests in `test_scorecard.py`
+- **"What Happened" Follow-Ups** — Automatic T+1h, T+1d, T+7d follow-up messages showing actual market moves vs predictions
+  - `notifications/followups.py`: tracking creation, due detection, outcome lookup, message formatting
+  - `AlertFollowup` model in `notifications/models.py` with `alert_followups` table
+  - Fail-open integration in `alert_engine.py` and `event_consumer.py` (never breaks alert delivery)
+  - Telegram `/followups` command (on/off/selective horizons like `1h,7d`)
+  - CLI: `python -m notifications followup-check`
+  - Daily limit (15/subscriber), 48h deferral timeout, per-subscriber batching
+  - 33 new tests in `test_followups.py`
 - **Pre-Market Briefing** — Daily morning digest sent at 8:30 AM ET on trading days
   - `notifications/briefing.py`: overnight prediction query, per-asset aggregation, MarkdownV2 formatting
   - Telegram `/briefing` command (on/off/status) for subscriber opt-in/out (default: enabled)

@@ -1,6 +1,7 @@
 # Feature 12: Weekly Scorecard
 
-**Status:** Planning
+**Status:** IN PROGRESS  
+**Started:** 2026-04-11
 **Date:** 2026-04-09
 **Priority:** Medium -- builds trust through transparency, showcases system performance
 
