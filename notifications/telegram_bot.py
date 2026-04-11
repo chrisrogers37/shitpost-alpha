@@ -1,7 +1,8 @@
 """
 Telegram Bot command handlers for Shitpost Alpha.
 
-Handles /start, /stop, /status, /settings, /watchlist, /stats, /latest, /help
+Handles /start, /stop, /status, /settings, /watchlist, /briefing, /followups,
+/scorecard, /stats, /latest, /help
 commands and routes incoming webhook updates to the appropriate handler.
 """
 
@@ -17,7 +18,7 @@ from notifications.db import (
     get_subscription,
     update_subscription,
 )
-from notifications.telegram_sender import send_telegram_message
+from notifications.telegram_sender import escape_markdown, send_telegram_message
 from shit.logging import get_service_logger
 
 logger = get_service_logger("telegram_bot")
@@ -68,6 +69,9 @@ You're now subscribed to receive real\\-time prediction alerts\\.
 
 *Commands:*
 /watchlist \\- Set which tickers you want alerts for
+/briefing \\- Morning briefing settings
+/followups \\- Follow\\-up message settings
+/scorecard \\- Weekly performance digest
 /settings \\- View/change your preferences
 /status \\- Check subscription status
 /stats \\- View prediction accuracy
@@ -354,6 +358,9 @@ def handle_help_command() -> str:
 /status \\- Check your subscription status
 /settings \\- View/change alert preferences
 /watchlist \\- Manage your ticker watchlist
+/briefing \\- Toggle morning briefing \\(8:30 AM ET\\)
+/followups \\- Toggle prediction follow\\-up messages
+/scorecard \\- Weekly performance scorecard
 /stats \\- View prediction accuracy stats
 /latest \\- Show recent predictions
 /help \\- Show this help message
@@ -372,6 +379,168 @@ This bot sends alerts when our LLM detects high\\-confidence trading signals fro
 
 \u26a0\ufe0f _Not financial advice\\. For entertainment only\\._
 """
+
+
+# ============================================================
+# Briefing Command Handler
+# ============================================================
+
+
+def handle_briefing_command(chat_id: str, args: str = "") -> str:
+    """Handle /briefing command — toggle morning briefing.
+
+    Args:
+        chat_id: Telegram chat ID.
+        args: Command arguments ("on", "off", or empty for status).
+
+    Returns:
+        Response message.
+    """
+    sub = get_subscription(chat_id)
+    if not sub:
+        return "You're not subscribed\\. Send /start first\\."
+
+    prefs = sub.get("alert_preferences", {})
+    if isinstance(prefs, str):
+        try:
+            prefs = json.loads(prefs)
+        except json.JSONDecodeError:
+            prefs = {}
+
+    current = prefs.get("briefing_enabled", True)
+    arg = args.strip().lower()
+
+    if arg == "off":
+        prefs["briefing_enabled"] = False
+        update_subscription(chat_id, alert_preferences=prefs)
+        return "Morning briefings disabled\\. Send /briefing on to re\\-enable\\."
+    elif arg == "on":
+        prefs["briefing_enabled"] = True
+        update_subscription(chat_id, alert_preferences=prefs)
+        return (
+            "Morning briefings enabled\\! "
+            "You'll receive a digest at 8:30 AM ET on trading days\\."
+        )
+    else:
+        status = "enabled" if current else "disabled"
+        return (
+            f"Morning briefings are currently *{status}*\\.\n\n"
+            "Send /briefing on or /briefing off to change\\."
+        )
+
+
+# ============================================================
+# Follow-ups Command Handler
+# ============================================================
+
+
+def handle_followups_command(chat_id: str, args: str = "") -> str:
+    """Handle /followups command — toggle follow-up messages.
+
+    Args:
+        chat_id: Telegram chat ID.
+        args: "on", "off", or empty for status. Also "1h,1d" for selective.
+
+    Returns:
+        Response message.
+    """
+    sub = get_subscription(chat_id)
+    if not sub:
+        return "You're not subscribed\\. Send /start first\\."
+
+    prefs = sub.get("alert_preferences", {})
+    if isinstance(prefs, str):
+        try:
+            prefs = json.loads(prefs)
+        except json.JSONDecodeError:
+            prefs = {}
+
+    current = prefs.get("followups_enabled", True)
+    current_horizons = prefs.get("followup_horizons", ["1h", "1d", "7d"])
+    arg = args.strip().lower()
+
+    if arg == "off":
+        prefs["followups_enabled"] = False
+        update_subscription(chat_id, alert_preferences=prefs)
+        return "Follow\\-up messages disabled\\. Send /followups on to re\\-enable\\."
+    elif arg == "on":
+        prefs["followups_enabled"] = True
+        update_subscription(chat_id, alert_preferences=prefs)
+        h_str = ", ".join(current_horizons)
+        return escape_markdown(f"Follow-up messages enabled for: {h_str}")
+    elif all(h in ("1h", "1d", "7d") for h in arg.replace(" ", "").split(",")):
+        horizons = [
+            h.strip() for h in arg.split(",") if h.strip() in ("1h", "1d", "7d")
+        ]
+        if horizons:
+            prefs["followup_horizons"] = horizons
+            prefs["followups_enabled"] = True
+            update_subscription(chat_id, alert_preferences=prefs)
+            return escape_markdown(f"Follow-ups set to: {', '.join(horizons)}")
+    # Default: show status
+    status = "enabled" if current else "disabled"
+    h_str = ", ".join(current_horizons)
+    return (
+        f"Follow\\-ups are currently *{status}*\\.\n"
+        f"Active horizons: {escape_markdown(h_str)}\n\n"
+        "*Commands:*\n"
+        "/followups on \\- Enable all follow\\-ups\n"
+        "/followups off \\- Disable follow\\-ups\n"
+        "`/followups 1h,7d` \\- Only get 1h and 7d follow\\-ups"
+    )
+
+
+# ============================================================
+# Scorecard Command Handler
+# ============================================================
+
+
+def handle_scorecard_command(chat_id: str, args: str = "") -> str:
+    """Handle /scorecard command.
+
+    /scorecard       -- Show status and next delivery time
+    /scorecard on    -- Enable weekly scorecard (default)
+    /scorecard off   -- Disable weekly scorecard
+    /scorecard now   -- Send this week's scorecard immediately (preview)
+    """
+    arg = args.strip().lower()
+
+    if arg == "now":
+        from notifications.scorecard_service import generate_and_send_scorecard
+
+        generate_and_send_scorecard(chat_id=chat_id, preview=True)
+        return None  # Message sent directly by the service
+
+    sub = get_subscription(chat_id)
+    if not sub:
+        return "You're not subscribed\\. Send /start first\\."
+
+    prefs = sub.get("alert_preferences", {})
+    if isinstance(prefs, str):
+        try:
+            prefs = json.loads(prefs)
+        except json.JSONDecodeError:
+            prefs = {}
+
+    if arg == "off":
+        prefs["scorecard_enabled"] = False
+        update_subscription(chat_id, alert_preferences=prefs)
+        return "Weekly scorecard disabled\\. Send /scorecard on to re\\-enable\\."
+    elif arg == "on":
+        prefs["scorecard_enabled"] = True
+        update_subscription(chat_id, alert_preferences=prefs)
+        return "Weekly scorecard enabled\\. Delivery: Sunday 7 PM ET\\."
+    else:
+        current = prefs.get("scorecard_enabled", True)
+        status = "enabled" if current else "disabled"
+        return (
+            f"Weekly scorecard is currently *{status}*\\.\n"
+            "Delivery: Sunday 7 PM ET\n\n"
+            "*Commands:*\n"
+            "/scorecard off \\- Disable\n"
+            "/scorecard on \\- Enable\n"
+            "`/scorecard now` \\- Preview this week's scorecard"
+        )
 
 
 # ============================================================
@@ -729,6 +898,12 @@ def process_update(update: Dict[str, Any]) -> Optional[str]:
         response = handle_settings_command(chat_id, args)
     elif command == "/watchlist":
         response = handle_watchlist_command(chat_id, args)
+    elif command == "/briefing":
+        response = handle_briefing_command(chat_id, args)
+    elif command == "/followups":
+        response = handle_followups_command(chat_id, args)
+    elif command == "/scorecard":
+        response = handle_scorecard_command(chat_id, args)
     elif command == "/stats":
         response = handle_stats_command(chat_id)
     elif command == "/latest":
