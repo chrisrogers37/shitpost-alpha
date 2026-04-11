@@ -1,7 +1,9 @@
 # Feature 12: Weekly Scorecard
 
-**Status:** IN PROGRESS  
-**Started:** 2026-04-11
+**Status:** COMPLETE  
+**Started:** 2026-04-11  
+**Completed:** 2026-04-11  
+**PR:** #137
 **Date:** 2026-04-09
 **Priority:** Medium -- builds trust through transparency, showcases system performance
 

@@ -2,8 +2,10 @@
 
 **Feature**: Every trading day at 8:30 AM ET, send a Telegram digest summarizing overnight Trump activity, sentiment, and historical context.
 
-**Status**: IN PROGRESS  
+**Status**: COMPLETE  
 **Started**: 2026-04-11  
+**Completed**: 2026-04-11  
+**PR**: #137  
 **Priority**: Medium  
 **Estimated Effort**: 2 sessions  
 
