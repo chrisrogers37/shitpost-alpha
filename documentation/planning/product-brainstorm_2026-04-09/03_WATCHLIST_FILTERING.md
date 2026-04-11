@@ -2,8 +2,9 @@
 
 **Feature**: Users specify tickers they care about via Telegram bot commands. Only get alerts when the LLM identifies their watchlist tickers.
 
-**Status**: IN PROGRESS
+**Status**: COMPLETE
 **Started**: 2026-04-11
+**Completed**: 2026-04-11
 
 ### Challenge Resolutions (2026-04-11)
 1. **Separation**: `_validate_watchlist_tickers()` and `_get_ticker_names()` stay in `telegram_bot.py` — they query `ticker_registry` (not notification domain), so putting them in `notifications/db.py` would muddle scope.

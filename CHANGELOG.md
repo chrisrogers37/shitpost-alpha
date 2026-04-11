@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Watchlist Filtering** — Telegram `/watchlist` commands for subscribers to control which tickers generate alerts
+  - Commands: `/watchlist add TSLA NVDA`, `/watchlist remove NVDA`, `/watchlist show`, `/watchlist clear`
+  - Validates tickers against `ticker_registry` (active symbols only), applies alias remapping (FB→META), rejects delisted tickers
+  - Company names displayed via ORM lookup on `TickerRegistry`
+  - 50-ticker cap, case-insensitive input, backward compatible (empty watchlist = all alerts)
+  - Updated `/help` and `/start` welcome messages
+  - 23 new tests in `test_watchlist.py`
 - **Confidence Calibration** — Maps raw LLM confidence to empirical accuracy using historical prediction outcomes
   - `CalibrationService` in `shit/market_data/calibration.py` — bin-based lookup table (10 bins), rolling 6-month window, staleness guard (30-day max age)
   - `CalibrationCurve` model in `shit/market_data/models.py` — JSONB bin_stats and lookup_table, indexed by (timeframe, fitted_at)
