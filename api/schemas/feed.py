@@ -58,6 +58,8 @@ class Prediction(BaseModel):
     assets: list[str] = []
     market_impact: dict[str, str] = {}
     scores: Scores
+    ensemble_results: Optional[dict] = None
+    ensemble_metadata: Optional[dict] = None
 
 
 class Returns(BaseModel):

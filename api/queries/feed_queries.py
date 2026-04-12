@@ -54,6 +54,8 @@ def get_analyzed_post_at_offset(
             p.viral_score,
             p.sentiment_score,
             p.urgency_score,
+            p.ensemble_results,
+            p.ensemble_metadata,
             COUNT(*) OVER() AS total_count
         FROM truth_social_shitposts tss
         INNER JOIN predictions p ON tss.shitpost_id = p.shitpost_id
@@ -76,8 +78,12 @@ def get_analyzed_post_at_offset(
 
     # Parse JSON fields
     json_keys = (
-        "assets", "market_impact", "card",
-        "media_attachments", "in_reply_to", "reblog",
+        "assets",
+        "market_impact",
+        "card",
+        "media_attachments",
+        "in_reply_to",
+        "reblog",
     )
     for key in json_keys:
         if isinstance(row.get(key), str):
@@ -159,5 +165,3 @@ def get_outcomes_for_prediction(prediction_id: int) -> list[dict[str, Any]]:
 
     rows, columns = execute_query(query, {"prediction_id": prediction_id})
     return [dict(zip(columns, row)) for row in rows]
-
-
