@@ -158,7 +158,7 @@ _{escape_markdown(text)}_
 \U0001f4a1 *Thesis:*
 {escape_markdown(thesis)}
 
-{_format_echo_section(alert)}\u26a0\ufe0f _This is NOT financial advice\\. For entertainment only\\._
+{_format_echo_section(alert)}{_format_ensemble_section(alert)}\u26a0\ufe0f _This is NOT financial advice\\. For entertainment only\\._
 """
     return message.strip()
 
@@ -197,6 +197,52 @@ def _format_echo_section(alert: Dict[str, Any]) -> str:
         ]
 
     return "\n".join(lines) + "\n\n"
+
+
+def _format_ensemble_section(alert: Dict[str, Any]) -> str:
+    """Format the ensemble consensus section for a Telegram alert.
+
+    Returns an empty string if no ensemble metadata is available.
+    """
+    metadata = alert.get("ensemble_metadata")
+    if not metadata:
+        return ""
+
+    level = metadata.get("agreement_level", "single")
+    n_succeeded = metadata.get("providers_succeeded", 1)
+    n_queried = metadata.get("providers_queried", 1)
+
+    if level == "single":
+        return ""
+
+    level_labels = {
+        "unanimous": "all agree",
+        "majority": "majority agree",
+        "split": "split decision",
+    }
+    label = level_labels.get(level, level)
+
+    line = escape_markdown(f"[{n_succeeded}/{n_queried} models, {label}]")
+
+    # Show confidence range if available
+    spread = metadata.get("confidence_spread", 0)
+    if spread > 0:
+        line += f" \\| spread: {escape_markdown(f'{spread:.0%}')}"
+
+    # Note dissenting views
+    dissents = metadata.get("dissenting_views", [])
+    if dissents:
+        notes = []
+        for d in dissents[:2]:  # Max 2 dissent notes
+            asset = d.get("asset", "")
+            sents = d.get("sentiments", {})
+            parts = [
+                f"{escape_markdown(p)}: {escape_markdown(s)}" for p, s in sents.items()
+            ]
+            notes.append(f"{escape_markdown(asset)} \\({', '.join(parts)}\\)")
+        line += "\n_Dissent: " + "; ".join(notes) + "_"
+
+    return f"\U0001f916 {line}\n\n"
 
 
 def escape_markdown(text: str) -> str:

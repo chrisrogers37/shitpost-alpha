@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Multi-LLM Ensemble Analysis** — Run posts through GPT-4o, Claude, and Grok in parallel; merge into consensus prediction
+  - Extended `ProviderComparator` with `ConsensusBuilder` (majority-vote sentiment, raw mean confidence, Jaccard asset agreement)
+  - `EnsembleResult`/`ConsensusResult` dataclasses with DB serialization
+  - `ENSEMBLE_ENABLED`, `ENSEMBLE_PROVIDERS`, `ENSEMBLE_MIN_PROVIDERS` settings (opt-in, default off)
+  - `ensemble_results` and `ensemble_metadata` JSONB columns on predictions table
+  - `ShitpostAnalyzer` uses ensemble when enabled, falls back to single-model on failure
+  - Telegram alerts show agreement level, provider count, confidence spread, dissenting views
+  - Both alert paths (cron engine + event consumer) pass ensemble metadata through
+  - React frontend: expandable "Model Comparison" section in PredictionPanel
+  - API schema includes ensemble fields; feed query fetches ensemble columns
+  - 24 new tests (20 consensus/ensemble unit + 4 analyzer integration)
 - **Weekly Scorecard** — Sunday evening performance digest with accuracy, P&L, top wins/misses, asset breakdown
   - 4 new files: `scorecard_queries.py`, `scorecard_formatter.py`, `scorecard_service.py`
   - Telegram `/scorecard` command (on/off/now preview) for subscriber opt-in/out

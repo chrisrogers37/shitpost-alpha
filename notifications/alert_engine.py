@@ -69,6 +69,7 @@ def check_and_dispatch() -> Dict[str, Any]:
             "sentiment": _extract_sentiment(pred.get("market_impact", {})),
             "thesis": pred.get("thesis", ""),
             "timestamp": pred.get("timestamp"),
+            "ensemble_metadata": pred.get("ensemble_metadata"),
         }
         alerts.append(alert)
 

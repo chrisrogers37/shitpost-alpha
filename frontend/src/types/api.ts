@@ -46,6 +46,38 @@ export interface Scores {
   urgency: number | null;
 }
 
+export interface EnsembleProviderResult {
+  provider: string;
+  model: string;
+  assets: string[];
+  market_impact: Record<string, string>;
+  confidence: number;
+  thesis: string;
+  latency_ms: number;
+  success: boolean;
+  error: string | null;
+}
+
+export interface EnsembleResults {
+  providers_queried: number;
+  providers_succeeded: number;
+  results: EnsembleProviderResult[];
+}
+
+export interface EnsembleMetadata {
+  agreement_level: string;
+  asset_agreement: number;
+  sentiment_agreement: number;
+  confidence_spread: number;
+  providers_queried: number;
+  providers_succeeded: number;
+  dissenting_views: Array<{
+    asset: string;
+    sentiments: Record<string, string>;
+    consensus: string;
+  }>;
+}
+
 export interface Prediction {
   prediction_id: number;
   confidence: number | null;
@@ -54,6 +86,8 @@ export interface Prediction {
   assets: string[];
   market_impact: Record<string, string>;
   scores: Scores;
+  ensemble_results: EnsembleResults | null;
+  ensemble_metadata: EnsembleMetadata | null;
 }
 
 export interface BinStat {

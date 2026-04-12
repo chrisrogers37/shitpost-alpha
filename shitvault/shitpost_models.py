@@ -127,9 +127,7 @@ class Prediction(Base, IDMixin, TimestampMixin):
         String(255), ForeignKey("truth_social_shitposts.shitpost_id"), nullable=True
     )
     # New FK -- points to the source-agnostic signals table
-    signal_id = Column(
-        String(255), ForeignKey("signals.signal_id"), nullable=True
-    )
+    signal_id = Column(String(255), ForeignKey("signals.signal_id"), nullable=True)
 
     # Denormalized source post timestamp (avoids N+1 loading shitpost/signal)
     post_timestamp = Column(DateTime(timezone=True), nullable=True)
@@ -180,9 +178,16 @@ class Prediction(Base, IDMixin, TimestampMixin):
     llm_model = Column(String(100), nullable=True)  # gpt-4, claude-3, etc.
     analysis_timestamp = Column(DateTime, nullable=True)
 
+    # Ensemble metadata (Feature 05 — null for single-model predictions)
+    ensemble_results = Column(JSON, nullable=True)  # Per-model outputs
+    ensemble_metadata = Column(JSON, nullable=True)  # Agreement metrics
+
     # Relationships
     shitpost = relationship("TruthSocialShitpost", back_populates="predictions")
-    signal = relationship("Signal", back_populates="predictions", foreign_keys=[signal_id])
+    signal = relationship(
+        "Signal", back_populates="predictions", foreign_keys=[signal_id]
+    )
+
     @property
     def content_id(self) -> str:
         """Return the signal or shitpost ID, whichever is set."""
@@ -213,5 +218,3 @@ Index("idx_predictions_shitpost_id", Prediction.shitpost_id)
 Index("idx_predictions_signal_id", Prediction.signal_id)
 Index("idx_predictions_analysis_status", Prediction.analysis_status)
 Index("idx_predictions_created_at", Prediction.created_at)
-
-

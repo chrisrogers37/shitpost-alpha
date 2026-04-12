@@ -64,9 +64,7 @@ class FeedService:
         if valid_symbols and prediction.assets:
             prediction.assets = [a for a in prediction.assets if a in valid_symbols]
             prediction.market_impact = {
-                k: v
-                for k, v in prediction.market_impact.items()
-                if k in valid_symbols
+                k: v for k, v in prediction.market_impact.items() if k in valid_symbols
             }
 
         navigation = self.build_navigation(offset, total)
@@ -127,6 +125,8 @@ class FeedService:
                 sentiment=row.get("sentiment_score"),
                 urgency=row.get("urgency_score"),
             ),
+            ensemble_results=row.get("ensemble_results"),
+            ensemble_metadata=row.get("ensemble_metadata"),
         )
 
     @staticmethod

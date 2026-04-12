@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 from datetime import datetime
 
 from shit.config.shitpost_settings import settings
-from shit.llm import LLMClient, get_analysis_prompt
+from shit.llm import LLMClient, ProviderComparator, get_analysis_prompt
 from shit.db import DatabaseConfig, DatabaseClient, DatabaseOperations
 from shitvault.shitpost_operations import ShitpostOperations
 from shitvault.prediction_operations import PredictionOperations
@@ -65,6 +65,8 @@ class ShitpostAnalyzer:
         self.llm_client = LLMClient()
         self.bypass_service = BypassService()
         self.ticker_validator = TickerValidator()
+        self.ensemble_enabled = settings.ENSEMBLE_ENABLED
+        self.ensemble_analyzer: ProviderComparator | None = None
         self.launch_date = settings.SYSTEM_LAUNCH_DATE
 
         # Analysis mode configuration
@@ -101,8 +103,27 @@ class ShitpostAnalyzer:
         self.shitpost_ops = ShitpostOperations(self.db_ops)
         self.prediction_ops = PredictionOperations(self.db_ops)
 
-        # Initialize LLM client
+        # Initialize LLM client (single-model fallback)
         await self.llm_client.initialize()
+
+        # Initialize ensemble if enabled
+        if self.ensemble_enabled:
+            provider_ids = [
+                p.strip() for p in settings.ENSEMBLE_PROVIDERS.split(",") if p.strip()
+            ]
+            self.ensemble_analyzer = ProviderComparator(providers=provider_ids)
+            initialized = await self.ensemble_analyzer.initialize()
+            if len(initialized) >= settings.ENSEMBLE_MIN_PROVIDERS:
+                logger.info(
+                    f"Ensemble enabled with {len(initialized)} providers: "
+                    + ", ".join(initialized)
+                )
+            else:
+                logger.warning(
+                    f"Ensemble disabled: only {len(initialized)} providers "
+                    f"initialized (need {settings.ENSEMBLE_MIN_PROVIDERS})"
+                )
+                self.ensemble_analyzer = None
 
         logger.info(
             f"Shitpost Analyzer initialized with launch date: {self.launch_date}"
@@ -476,12 +497,44 @@ class ShitpostAnalyzer:
                 shitpost, fundamentals=fundamentals
             )
 
-            # Analyze with LLM
-            analysis = await self.llm_client.analyze(
-                enhanced_content,
-                prompt_func=get_analysis_prompt,
-                has_fundamentals=bool(fundamentals),
-            )
+            # Analyze with LLM (ensemble or single-model)
+            ensemble_result = None
+            if self.ensemble_analyzer:
+                try:
+                    ensemble_result = await self.ensemble_analyzer.analyze_ensemble(
+                        enhanced_content,
+                    )
+                    # Build analysis dict from consensus
+                    analysis = ensemble_result.consensus.to_analysis_dict()
+                    # Attach ensemble data for storage
+                    analysis["ensemble_results"] = ensemble_result.to_storage_dict()
+                    analysis["ensemble_metadata"] = ensemble_result.to_metadata_dict()
+                    # Use the best provider's metadata for llm_provider/model fields
+                    best = max(
+                        (r for r in ensemble_result.individual_results if r.success),
+                        key=lambda r: r.confidence,
+                        default=None,
+                    )
+                    if best:
+                        analysis["llm_provider"] = best.provider
+                        analysis["llm_model"] = best.model
+                    logger.info(
+                        f"Ensemble analysis: {ensemble_result.providers_succeeded}/"
+                        f"{ensemble_result.providers_queried} providers, "
+                        f"agreement={ensemble_result.consensus.agreement_level}"
+                    )
+                except RuntimeError:
+                    logger.warning(
+                        f"Ensemble failed for {shitpost_id}, falling back to single model"
+                    )
+                    ensemble_result = None
+
+            if ensemble_result is None:
+                analysis = await self.llm_client.analyze(
+                    enhanced_content,
+                    prompt_func=get_analysis_prompt,
+                    has_fundamentals=bool(fundamentals),
+                )
 
             if not analysis:
                 logger.warning(f"LLM analysis failed for shitpost {shitpost_id}")
@@ -538,22 +591,31 @@ class ShitpostAnalyzer:
                         calibrated = None
                         try:
                             from shit.market_data.calibration import CalibrationService
-                            calibrated = CalibrationService(timeframe="t7").calibrate(confidence)
+
+                            calibrated = CalibrationService(timeframe="t7").calibrate(
+                                confidence
+                            )
                         except Exception:
                             pass
 
+                        event_payload = {
+                            "prediction_id": int(analysis_id),
+                            "shitpost_id": shitpost_id,
+                            "signal_id": None,
+                            "assets": assets,
+                            "confidence": confidence,
+                            "calibrated_confidence": calibrated,
+                            "analysis_status": analysis_status,
+                            "post_published_at": post_published,
+                        }
+                        # Include ensemble metadata in event for alert enrichment
+                        if enhanced_analysis.get("ensemble_metadata"):
+                            event_payload["ensemble_metadata"] = enhanced_analysis[
+                                "ensemble_metadata"
+                            ]
                         emit_event(
                             event_type=EventType.PREDICTION_CREATED,
-                            payload={
-                                "prediction_id": int(analysis_id),
-                                "shitpost_id": shitpost_id,
-                                "signal_id": None,
-                                "assets": assets,
-                                "confidence": confidence,
-                                "calibrated_confidence": calibrated,
-                                "analysis_status": analysis_status,
-                                "post_published_at": post_published,
-                            },
+                            payload=event_payload,
                             source_service="analyzer",
                         )
                     except Exception as e:

@@ -378,6 +378,7 @@ def get_new_predictions_since(since: datetime) -> List[Dict[str, Any]]:
             p.confidence,
             p.thesis,
             p.analysis_status,
+            p.ensemble_metadata,
             p.created_at as prediction_created_at
         FROM predictions p
         WHERE p.analysis_status = 'completed'
