@@ -12,7 +12,6 @@ from notifications.db import (
     _execute_write,
     _extract_scalar,
     _row_to_dict,
-    _rows_to_dicts,
 )
 from shit.logging import get_service_logger
 

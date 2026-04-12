@@ -108,9 +108,7 @@ def check_and_dispatch() -> Dict[str, Any]:
         for alert in matched:
             message = format_telegram_alert(alert)
             prediction_id = alert.get("prediction_id")
-            reply_markup = (
-                build_vote_keyboard(prediction_id) if prediction_id else None
-            )
+            reply_markup = build_vote_keyboard(prediction_id) if prediction_id else None
             success, error = send_telegram_message(
                 chat_id, message, reply_markup=reply_markup
             )

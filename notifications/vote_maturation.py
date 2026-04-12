@@ -7,9 +7,9 @@ logic: a bull vote is correct if the majority of the prediction's assets
 had return_t7 > +0.5%, and vice versa for bear.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 
-from notifications.db import _execute_read, _execute_write, _rows_to_dicts
+from notifications.db import _execute_read, _execute_write
 from shit.logging import get_service_logger
 
 logger = get_service_logger("vote_maturation")
