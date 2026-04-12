@@ -122,3 +122,40 @@ class AlertFollowup(Base, IDMixin, TimestampMixin):
             f"chat_id={self.chat_id}, "
             f"1h={self.sent_1h}, 1d={self.sent_1d}, 7d={self.sent_7d})>"
         )
+
+
+class ConvictionVote(Base, IDMixin, TimestampMixin):
+    """Tracks user votes on predictions for crowd-sourced accuracy.
+
+    Each subscriber can vote bull/bear/skip on a prediction. Votes are
+    evaluated against T+7 market outcomes by the vote maturation job.
+    """
+
+    __tablename__ = "conviction_votes"
+    __table_args__ = (
+        UniqueConstraint(
+            "prediction_id",
+            "chat_id",
+            name="uq_conviction_votes_prediction_chat",
+        ),
+    )
+
+    prediction_id = Column(
+        Integer, ForeignKey("predictions.id"), nullable=False, index=True
+    )
+    chat_id = Column(String(50), nullable=False, index=True)
+    username = Column(String(100), nullable=True)
+
+    vote = Column(String(10), nullable=False)  # bull, bear, skip
+    voted_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    # Filled by vote maturation job after T+7 outcomes
+    vote_correct = Column(Boolean, nullable=True)
+    evaluated_at = Column(DateTime, nullable=True)
+
+    def __repr__(self):
+        return (
+            f"<ConvictionVote(prediction_id={self.prediction_id}, "
+            f"chat_id={self.chat_id}, vote={self.vote}, "
+            f"correct={self.vote_correct})>"
+        )
