@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Conviction Voting** — Inline Bull/Bear/Skip voting buttons on Telegram alerts with accuracy tracking
+  - `ConvictionVote` model with `conviction_votes` table (one vote per user per prediction)
+  - `vote_db.py`: CRUD operations (record_vote, get_vote, get_vote_tally, get_user_stats, get_user_streak, get_leaderboard, get_llm_vs_crowd_stats)
+  - `vote_maturation.py`: majority-of-assets correctness evaluation against T+7 outcomes
+  - Telegram sender: `build_vote_keyboard`, `build_voted_keyboard`, `answer_callback_query`, `edit_message_reply_markup`
+  - Bot: callback_query routing in `process_update`, `/mystats` and `/leaderboard` commands
+  - Both alert paths (cron engine + event consumer) attach vote keyboard to alerts
+  - Scorecard integration pre-wired (leaderboard + LLM vs crowd comparison)
+  - 52 new tests across test_vote_db, test_vote_maturation, test_vote_callback
 - **Multi-LLM Ensemble Analysis** — Run posts through GPT-4o, Claude, and Grok in parallel; merge into consensus prediction
   - Extended `ProviderComparator` with `ConsensusBuilder` (majority-vote sentiment, raw mean confidence, Jaccard asset agreement)
   - `EnsembleResult`/`ConsensusResult` dataclasses with DB serialization
