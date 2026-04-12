@@ -1,6 +1,6 @@
 # Feature 11: Conviction Voting
 
-**Status:** Planning
+**Status:** COMPLETE (PR #139, 2026-04-12)
 **Date:** 2026-04-09
 **Priority:** Medium -- social engagement feature, builds community, generates crowd-sourced signal data
 

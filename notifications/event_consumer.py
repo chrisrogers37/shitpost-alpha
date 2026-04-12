@@ -41,6 +41,7 @@ class NotificationsWorker(EventWorker):
             record_error,
         )
         from notifications.telegram_sender import (
+            build_vote_keyboard,
             format_telegram_alert,
             send_telegram_message,
         )
@@ -104,7 +105,12 @@ class NotificationsWorker(EventWorker):
             chat_id = sub["chat_id"]
             for a in matched:
                 message = format_telegram_alert(a)
-                success, error = send_telegram_message(chat_id, message)
+                reply_markup = (
+                    build_vote_keyboard(prediction_id) if prediction_id else None
+                )
+                success, error = send_telegram_message(
+                    chat_id, message, reply_markup=reply_markup
+                )
 
                 if success:
                     record_alert_sent(chat_id)

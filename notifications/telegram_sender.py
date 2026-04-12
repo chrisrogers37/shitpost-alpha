@@ -245,6 +245,140 @@ def _format_ensemble_section(alert: Dict[str, Any]) -> str:
     return f"\U0001f916 {line}\n\n"
 
 
+def build_vote_keyboard(prediction_id: int) -> dict:
+    """Build inline keyboard with voting buttons.
+
+    Args:
+        prediction_id: ID to embed in callback_data.
+
+    Returns:
+        reply_markup dict for Telegram API.
+    """
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "\U0001f7e2 Bull",
+                    "callback_data": f"vote:{prediction_id}:bull",
+                },
+                {
+                    "text": "\U0001f534 Bear",
+                    "callback_data": f"vote:{prediction_id}:bear",
+                },
+                {
+                    "text": "\u23ed Skip",
+                    "callback_data": f"vote:{prediction_id}:skip",
+                },
+            ]
+        ]
+    }
+
+
+def build_voted_keyboard(prediction_id: int, tally: dict) -> dict:
+    """Build keyboard showing current vote tallies.
+
+    Args:
+        prediction_id: Prediction ID.
+        tally: Dict with bull, bear, skip counts.
+
+    Returns:
+        reply_markup dict.
+    """
+    bull_count = tally.get("bull", 0)
+    bear_count = tally.get("bear", 0)
+    skip_count = tally.get("skip", 0)
+
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": f"\U0001f7e2 Bull ({bull_count})",
+                    "callback_data": f"vote:{prediction_id}:bull",
+                },
+                {
+                    "text": f"\U0001f534 Bear ({bear_count})",
+                    "callback_data": f"vote:{prediction_id}:bear",
+                },
+                {
+                    "text": f"\u23ed Skip ({skip_count})",
+                    "callback_data": f"vote:{prediction_id}:skip",
+                },
+            ]
+        ]
+    }
+
+
+def answer_callback_query(
+    callback_query_id: str,
+    text: str,
+    show_alert: bool = False,
+) -> Tuple[bool, Optional[str]]:
+    """Answer a callback query (toast notification to the user).
+
+    Args:
+        callback_query_id: The callback query ID from Telegram.
+        text: Text to show in the toast.
+        show_alert: If True, show as a popup instead of a toast.
+
+    Returns:
+        Tuple of (success, error_message).
+    """
+    bot_token = get_bot_token()
+    if not bot_token:
+        return False, "Bot token not configured"
+
+    url = TELEGRAM_API_BASE.format(token=bot_token, method="answerCallbackQuery")
+    payload = {
+        "callback_query_id": callback_query_id,
+        "text": text,
+        "show_alert": show_alert,
+    }
+
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        data = response.json()
+        return (True, None) if data.get("ok") else (False, data.get("description"))
+    except Exception as e:
+        logger.error(f"Error answering callback query: {e}")
+        return False, str(e)
+
+
+def edit_message_reply_markup(
+    chat_id: str,
+    message_id: int,
+    reply_markup: Optional[dict] = None,
+) -> Tuple[bool, Optional[str]]:
+    """Edit the inline keyboard of an existing message.
+
+    Args:
+        chat_id: Chat where the message lives.
+        message_id: ID of the message to edit.
+        reply_markup: New inline keyboard markup (or None to remove).
+
+    Returns:
+        Tuple of (success, error_message).
+    """
+    bot_token = get_bot_token()
+    if not bot_token:
+        return False, "Bot token not configured"
+
+    url = TELEGRAM_API_BASE.format(token=bot_token, method="editMessageReplyMarkup")
+    payload: Dict[str, Any] = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+    }
+    if reply_markup:
+        payload["reply_markup"] = json.dumps(reply_markup)
+
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        data = response.json()
+        return (True, None) if data.get("ok") else (False, data.get("description"))
+    except Exception as e:
+        logger.error(f"Error editing message reply markup: {e}")
+        return False, str(e)
+
+
 def escape_markdown(text: str) -> str:
     """Escape special Markdown characters for Telegram."""
     if not text:

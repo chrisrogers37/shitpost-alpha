@@ -2,8 +2,8 @@
 Telegram Bot command handlers for Shitpost Alpha.
 
 Handles /start, /stop, /status, /settings, /watchlist, /briefing, /followups,
-/scorecard, /stats, /latest, /help
-commands and routes incoming webhook updates to the appropriate handler.
+/scorecard, /stats, /latest, /mystats, /leaderboard, /help commands,
+inline keyboard vote callbacks, and routes incoming webhook updates.
 """
 
 import json
@@ -18,7 +18,13 @@ from notifications.db import (
     get_subscription,
     update_subscription,
 )
-from notifications.telegram_sender import escape_markdown, send_telegram_message
+from notifications.telegram_sender import (
+    answer_callback_query,
+    build_voted_keyboard,
+    edit_message_reply_markup,
+    escape_markdown,
+    send_telegram_message,
+)
 from shit.logging import get_service_logger
 
 logger = get_service_logger("telegram_bot")
@@ -76,9 +82,12 @@ You're now subscribed to receive real\\-time prediction alerts\\.
 /status \\- Check subscription status
 /stats \\- View prediction accuracy
 /latest \\- Show recent predictions
+/mystats \\- Your voting accuracy
+/leaderboard \\- Top voters leaderboard
 /stop \\- Unsubscribe from alerts
 /help \\- Show all commands
 
+_Alerts include voting buttons \\- tap Bull, Bear, or Skip to track your accuracy\\!_
 _Alerts will be sent when new high\\-confidence predictions are detected\\._
 """
     else:
@@ -363,6 +372,8 @@ def handle_help_command() -> str:
 /scorecard \\- Weekly performance scorecard
 /stats \\- View prediction accuracy stats
 /latest \\- Show recent predictions
+/mystats \\- Your personal voting accuracy
+/leaderboard \\- Top voters vs LLM accuracy
 /help \\- Show this help message
 
 *Watchlist Examples:*
@@ -842,6 +853,172 @@ def handle_watchlist_command(chat_id: str, args: str = "") -> str:
 
 
 # ============================================================
+# Conviction Voting
+# ============================================================
+
+
+def handle_vote_callback(callback_query: dict) -> None:
+    """Process an inline keyboard vote callback.
+
+    Args:
+        callback_query: Telegram callback_query object.
+    """
+    from notifications.vote_db import (
+        get_vote,
+        get_vote_tally,
+        is_prediction_evaluated,
+        record_vote,
+    )
+
+    callback_data = callback_query.get("data", "")
+    from_user = callback_query.get("from", {})
+    chat_id = str(from_user.get("id", ""))
+    username = from_user.get("username")
+    message = callback_query.get("message", {})
+    message_id = message.get("message_id")
+    message_chat_id = str(message.get("chat", {}).get("id", ""))
+    callback_id = callback_query.get("id")
+
+    # Parse callback data: "vote:{prediction_id}:{vote_value}"
+    parts = callback_data.split(":")
+    if len(parts) != 3 or parts[0] != "vote":
+        answer_callback_query(callback_id, "Invalid vote")
+        return
+
+    try:
+        prediction_id = int(parts[1])
+    except (ValueError, TypeError):
+        answer_callback_query(callback_id, "Invalid prediction")
+        return
+
+    vote_value = parts[2]
+    if vote_value not in ("bull", "bear", "skip"):
+        answer_callback_query(callback_id, "Invalid vote value")
+        return
+
+    # Check if voting is closed (prediction already evaluated)
+    if is_prediction_evaluated(prediction_id):
+        answer_callback_query(
+            callback_id, "Voting closed for this prediction", show_alert=True
+        )
+        return
+
+    # Check if user already voted
+    existing = get_vote(prediction_id, chat_id)
+    if existing:
+        vote_emoji = {
+            "bull": "\U0001f7e2",
+            "bear": "\U0001f534",
+            "skip": "\u23ed",
+        }.get(existing["vote"], "")
+        answer_callback_query(
+            callback_id,
+            f"Already voted {vote_emoji} {existing['vote'].upper()}",
+        )
+        return
+
+    # Record the vote
+    record_vote(prediction_id, chat_id, vote_value, username=username)
+
+    # Acknowledge with toast
+    vote_emoji = {
+        "bull": "\U0001f7e2",
+        "bear": "\U0001f534",
+        "skip": "\u23ed",
+    }.get(vote_value, "")
+    answer_callback_query(callback_id, f"{vote_emoji} Voted {vote_value.upper()}")
+
+    # Update keyboard with tallies
+    tally = get_vote_tally(prediction_id)
+    edit_message_reply_markup(
+        chat_id=message_chat_id,
+        message_id=message_id,
+        reply_markup=build_voted_keyboard(prediction_id, tally),
+    )
+
+
+def handle_mystats_command(chat_id: str) -> str:
+    """Handle /mystats command — show personal voting accuracy."""
+    from notifications.vote_db import get_user_stats, get_user_streak
+
+    stats = get_user_stats(chat_id)
+    if stats.get("total_votes", 0) == 0:
+        return (
+            "\U0001f4ca *Your Voting Stats*\n\n"
+            "You haven't voted on any predictions yet\\.\n"
+            "Start voting on alerts to track your accuracy\\!"
+        )
+
+    streak = get_user_streak(chat_id)
+    streak_text = ""
+    if streak.get("streak_type"):
+        streak_emoji = (
+            "\U0001f525" if streak["streak_type"] == "win" else "\u2744\ufe0f"
+        )
+        streak_text = (
+            f"\n{streak_emoji} *Current streak:* "
+            f"{streak['streak_length']} "
+            f"{'wins' if streak['streak_type'] == 'win' else 'losses'}"
+        )
+
+    accuracy = stats["accuracy_pct"]
+    if accuracy >= 60:
+        grade = "\U0001f3c6"
+    elif accuracy >= 50:
+        grade = "\U0001f44d"
+    else:
+        grade = "\U0001f914"
+
+    return (
+        f"\U0001f4ca *Your Voting Stats*\n\n"
+        f"{grade} *Overall Accuracy:* {accuracy}%\n"
+        f"\u2705 Correct: {stats['correct']}\n"
+        f"\u274c Incorrect: {stats['incorrect']}\n"
+        f"\u23f3 Pending: {stats['pending']}\n"
+        f"\u23ed Skipped: {stats['skipped']}\n\n"
+        f"*By Direction:*\n"
+        f"\U0001f7e2 Bull accuracy: {stats['bull_accuracy']}%\n"
+        f"\U0001f534 Bear accuracy: {stats['bear_accuracy']}%"
+        f"{streak_text}\n\n"
+        f"_Stats based on T\\+7 trading day outcomes\\._"
+    )
+
+
+def handle_leaderboard_command(chat_id: str) -> str:
+    """Handle /leaderboard command — show top voters by accuracy."""
+    from notifications.vote_db import get_leaderboard, get_llm_vs_crowd_stats
+
+    leaders = get_leaderboard(limit=10)
+    if not leaders:
+        return (
+            "\U0001f3c6 *Leaderboard*\n\n"
+            "Not enough data yet\\. Need at least 5 evaluated votes per voter\\."
+        )
+
+    lines = ["\U0001f3c6 *Conviction Voting Leaderboard*\n"]
+
+    for i, leader in enumerate(leaders, 1):
+        medal = {1: "\U0001f947", 2: "\U0001f948", 3: "\U0001f949"}.get(i, f"{i}\\.")
+        name = escape_markdown(str(leader["display_name"])[:15])
+        acc = leader["accuracy_pct"]
+        correct = leader["correct"]
+        total = leader["evaluated"]
+        lines.append(f"{medal} *{name}* \\- {acc}% \\({correct}/{total}\\)")
+
+    # LLM vs Crowd comparison
+    comparison = get_llm_vs_crowd_stats()
+    if comparison.get("total_evaluated", 0) >= 5:
+        lines.append("")
+        lines.append("*LLM vs Crowd:*")
+        lines.append(f"\U0001f916 LLM: {comparison['llm_accuracy']}% accurate")
+        lines.append(f"\U0001f465 Crowd: {comparison['crowd_accuracy']}% accurate")
+        lines.append(f"\U0001f91d Agreement: {comparison['agreement_rate']}%")
+
+    lines.append("\n_Min 5 evaluated votes to qualify\\._")
+    return "\n".join(lines)
+
+
+# ============================================================
 # Update Router
 # ============================================================
 
@@ -859,6 +1036,12 @@ def process_update(update: Dict[str, Any]) -> Optional[str]:
     Returns:
         Response message, or None if no response needed.
     """
+    # Handle callback queries (inline keyboard votes)
+    callback_query = update.get("callback_query")
+    if callback_query:
+        handle_vote_callback(callback_query)
+        return None
+
     message = update.get("message", {})
     if not message:
         return None
@@ -908,6 +1091,10 @@ def process_update(update: Dict[str, Any]) -> Optional[str]:
         response = handle_stats_command(chat_id)
     elif command == "/latest":
         response = handle_latest_command(chat_id)
+    elif command == "/mystats":
+        response = handle_mystats_command(chat_id)
+    elif command == "/leaderboard":
+        response = handle_leaderboard_command(chat_id)
     elif command == "/help":
         response = handle_help_command()
 

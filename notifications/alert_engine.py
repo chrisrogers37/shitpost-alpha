@@ -17,7 +17,11 @@ from notifications.db import (
     record_alert_sent,
     record_error,
 )
-from notifications.telegram_sender import format_telegram_alert, send_telegram_message
+from notifications.telegram_sender import (
+    build_vote_keyboard,
+    format_telegram_alert,
+    send_telegram_message,
+)
 from shit.logging import get_service_logger
 
 logger = get_service_logger("alert_engine")
@@ -103,14 +107,17 @@ def check_and_dispatch() -> Dict[str, Any]:
         chat_id = sub["chat_id"]
         for alert in matched:
             message = format_telegram_alert(alert)
-            success, error = send_telegram_message(chat_id, message)
+            prediction_id = alert.get("prediction_id")
+            reply_markup = build_vote_keyboard(prediction_id) if prediction_id else None
+            success, error = send_telegram_message(
+                chat_id, message, reply_markup=reply_markup
+            )
 
             if success:
                 record_alert_sent(chat_id)
                 results["alerts_sent"] += 1
 
                 # Create follow-up tracking (fail-open)
-                prediction_id = alert.get("prediction_id")
                 if prediction_id:
                     try:
                         from notifications.followups import create_followup_tracking
