@@ -62,6 +62,7 @@ class NotificationsWorker(EventWorker):
             "sentiment": "neutral",  # Will be enriched if market_impact available
             "thesis": "",
             "text": "",
+            "ensemble_metadata": payload.get("ensemble_metadata"),
         }
 
         # Enrich alert with Historical Echoes
