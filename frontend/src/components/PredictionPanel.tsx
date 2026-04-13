@@ -187,24 +187,40 @@ function EnsembleSection({
           </div>
 
           {successfulResults.map((r) => (
-            <div key={r.provider} style={providerRow}>
-              <span style={{ fontWeight: 500 }}>
-                {providerLabel(r.provider)}
-              </span>
-              <span style={{ color: "var(--text-secondary)" }}>
-                {Object.entries(r.market_impact)
-                  .map(([sym, sent]) => `${sym} ${sent}`)
-                  .join(", ") || "—"}
-              </span>
-              <span
-                style={{
-                  textAlign: "right",
-                  fontFamily: "var(--font-mono)",
-                  fontWeight: 600,
-                }}
-              >
-                {Math.round(r.confidence * 100)}%
-              </span>
+            <div key={r.provider}>
+              <div style={providerRow}>
+                <span style={{ fontWeight: 500 }}>
+                  {providerLabel(r.provider)}
+                </span>
+                <span style={{ color: "var(--text-secondary)" }}>
+                  {Object.entries(r.market_impact)
+                    .map(([sym, sent]) => `${sym} ${sent}`)
+                    .join(", ") || "—"}
+                </span>
+                <span
+                  style={{
+                    textAlign: "right",
+                    fontFamily: "var(--font-mono)",
+                    fontWeight: 600,
+                  }}
+                >
+                  {Math.round(r.confidence * 100)}%
+                </span>
+              </div>
+              {r.thesis && (
+                <div
+                  style={{
+                    padding: "4px 12px 8px",
+                    fontSize: "0.75rem",
+                    lineHeight: 1.5,
+                    color: "var(--text-muted)",
+                    fontStyle: "italic",
+                    borderBottom: "1px solid var(--border)",
+                  }}
+                >
+                  {r.thesis}
+                </div>
+              )}
             </div>
           ))}
 
@@ -256,9 +272,9 @@ function EnsembleSection({
 
 function providerLabel(id: string): string {
   const labels: Record<string, string> = {
-    openai: "GPT-4o",
-    anthropic: "Claude",
-    grok: "Grok 2",
+    openai: "GPT-5.4",
+    anthropic: "Opus 4.6",
+    grok: "Grok 4",
   };
   return labels[id] ?? id;
 }
