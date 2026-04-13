@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: Optional[str] = Field(default=None)
     XAI_API_KEY: Optional[str] = Field(default=None)
     LLM_PROVIDER: str = Field(default="openai")  # openai, anthropic, grok
-    LLM_MODEL: str = Field(default="gpt-4")
+    LLM_MODEL: str = Field(default="gpt-5.4")
     LLM_BASE_URL: Optional[str] = Field(
         default=None
     )  # Custom base URL for OpenAI-compatible APIs
