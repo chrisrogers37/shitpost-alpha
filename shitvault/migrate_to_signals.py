@@ -159,12 +159,12 @@ async def migrate_shitposts_to_signals(
                 would_migrate = not_in_signals.scalar() or 0
 
                 # Count predictions needing backfill
+                # Use raw SQL — shitpost_id column exists in DB but was
+                # removed from the Prediction Python model.
                 preds_result = await session.execute(
-                    select(func.count())
-                    .select_from(Prediction)
-                    .where(
-                        Prediction.signal_id.is_(None),
-                        Prediction.shitpost_id.isnot(None),
+                    text(
+                        "SELECT count(*) FROM predictions "
+                        "WHERE signal_id IS NULL AND shitpost_id IS NOT NULL"
                     )
                 )
                 would_backfill = preds_result.scalar() or 0
@@ -259,12 +259,11 @@ async def migrate_shitposts_to_signals(
             )
             final_signal_count = final_signals.scalar() or 0
 
+            # Use raw SQL — shitpost_id exists in DB but not on Prediction model
             null_signal_preds = await session.execute(
-                select(func.count())
-                .select_from(Prediction)
-                .where(
-                    Prediction.signal_id.is_(None),
-                    Prediction.shitpost_id.isnot(None),
+                text(
+                    "SELECT count(*) FROM predictions "
+                    "WHERE signal_id IS NULL AND shitpost_id IS NOT NULL"
                 )
             )
             remaining_null = null_signal_preds.scalar() or 0

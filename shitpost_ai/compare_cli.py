@@ -124,27 +124,27 @@ async def compare_main() -> None:
         return
 
     if args.shitpost_id:
-        # Fetch content from database
-        from shit.config.shitpost_settings import settings
-        from shit.db import DatabaseConfig, DatabaseClient, DatabaseOperations
-        from shitvault.shitpost_operations import ShitpostOperations
+        # Fetch content from database via Signal model
+        from sqlalchemy import select as sa_select
 
-        db_config = DatabaseConfig(database_url=settings.DATABASE_URL)
-        db_client = DatabaseClient(db_config)
-        await db_client.initialize()
+        from shit.services import db_service
+        from shit.db import DatabaseOperations
+        from shitvault.signal_models import Signal
 
-        async with db_client.get_session() as session:
-            db_ops = DatabaseOperations(session)
-            shitpost_ops = ShitpostOperations(db_ops)
-            shitpost = await shitpost_ops.get_shitpost_by_id(args.shitpost_id)
+        async with db_service() as db_client:
+            async with db_client.get_session() as session:
+                result = await session.execute(
+                    sa_select(Signal).where(
+                        Signal.signal_id == args.shitpost_id
+                    )
+                )
+                signal = result.scalars().first()
 
-            if not shitpost:
-                print(f"Shitpost {args.shitpost_id} not found in database")
-                return
+                if not signal:
+                    print(f"Signal {args.shitpost_id} not found in database")
+                    return
 
-            content = shitpost.get("text", "")
-
-        await db_client.cleanup()
+                content = signal.text or ""
 
     elif args.content:
         content = args.content
