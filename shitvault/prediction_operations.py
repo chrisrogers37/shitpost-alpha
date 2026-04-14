@@ -46,15 +46,15 @@ class PredictionOperations:
         analysis_data: Dict[str, Any],
         content_data: Dict[str, Any] = None,
         *,
-        use_signal: bool = False,
+        use_signal: bool = True,
     ) -> Optional[str]:
         """Store LLM analysis results in the database with enhanced content data.
 
         Args:
-            content_id: Signal ID or shitpost ID for the content.
+            content_id: Signal ID for the content.
             analysis_data: LLM analysis results dict.
             content_data: Content data dict (signal or shitpost format).
-            use_signal: If True, store as signal_id; otherwise as shitpost_id.
+            use_signal: Deprecated, ignored. Always stores as signal_id.
         """
         try:
             # Calculate engagement scores (use generic names with fallback)
@@ -89,9 +89,7 @@ class PredictionOperations:
                 )
 
             prediction = Prediction(
-                # Dual-FK: set whichever is appropriate
-                shitpost_id=content_id if not use_signal else None,
-                signal_id=content_id if use_signal else None,
+                signal_id=content_id,
                 post_timestamp=post_ts,
                 assets=analysis_data.get("assets", []),
                 market_impact=analysis_data.get("market_impact", {}),
@@ -156,17 +154,17 @@ class PredictionOperations:
         content_data: Dict[str, Any],
         bypass_reason: Optional[BypassReason] = None,
         *,
-        use_signal: bool = False,
+        use_signal: bool = True,
     ) -> Optional[str]:
         """
         Create a prediction record for posts that can't be analyzed.
 
         Args:
-            content_id: Signal ID or shitpost ID for the content.
+            content_id: Signal ID for the content.
             content_data: Content data dictionary (signal or shitpost format).
             bypass_reason: Optional pre-determined bypass reason. If not provided,
                           will be determined using BypassService.
-            use_signal: If True, store as signal_id; otherwise as shitpost_id.
+            use_signal: Deprecated, ignored. Always stores as signal_id.
 
         Returns:
             Prediction ID if successful, None otherwise
@@ -184,9 +182,7 @@ class PredictionOperations:
             )
 
             prediction = Prediction(
-                # Dual-FK: set whichever is appropriate
-                shitpost_id=content_id if not use_signal else None,
-                signal_id=content_id if use_signal else None,
+                signal_id=content_id,
                 post_timestamp=post_ts,
                 analysis_status="bypassed",
                 analysis_comment=reason,
@@ -227,27 +223,24 @@ class PredictionOperations:
         self,
         content_id: str,
         *,
-        use_signal: bool = False,
+        use_signal: bool = True,
         llm_provider: Optional[str] = None,
         llm_model: Optional[str] = None,
     ) -> bool:
-        """Check if a prediction already exists for content.
+        """Check if a prediction already exists for a signal.
 
         Provider-aware: when llm_provider/llm_model are given, checks for
         a prediction from that specific provider+model combination, allowing
         multiple LLM predictions per post.
 
         Args:
-            content_id: Signal ID or shitpost ID to check.
-            use_signal: If True, check signal_id; otherwise check shitpost_id.
+            content_id: Signal ID to check.
+            use_signal: Deprecated, ignored. Always checks signal_id.
             llm_provider: If set, only match predictions from this provider.
             llm_model: If set, only match predictions from this model.
         """
         try:
-            if use_signal:
-                conditions = [Prediction.signal_id == content_id]
-            else:
-                conditions = [Prediction.shitpost_id == content_id]
+            conditions = [Prediction.signal_id == content_id]
 
             if llm_provider is not None:
                 conditions.append(Prediction.llm_provider == llm_provider)

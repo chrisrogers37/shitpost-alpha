@@ -222,33 +222,14 @@ class TestSignalToDict:
         assert result["text"] == "Test content"
 
 
-class TestPredictionDualFK:
-    """Test the dual-FK (shitpost_id + signal_id) on Prediction."""
-
-    def test_prediction_with_shitpost_id(self):
-        """Test creating a Prediction with legacy shitpost_id."""
-        from shitvault.shitpost_models import Prediction
-
-        pred = Prediction(
-            shitpost_id="legacy_123",
-            signal_id=None,
-            confidence=0.8,
-            thesis="Bullish",
-            assets=["TSLA"],
-            market_impact={"TSLA": "bullish"},
-            analysis_status="completed",
-        )
-
-        assert pred.shitpost_id == "legacy_123"
-        assert pred.signal_id is None
-        assert pred.content_id == "legacy_123"
+class TestPredictionSignalFK:
+    """Test the signal_id FK on Prediction."""
 
     def test_prediction_with_signal_id(self):
-        """Test creating a Prediction with new signal_id."""
+        """Test creating a Prediction with signal_id."""
         from shitvault.shitpost_models import Prediction
 
         pred = Prediction(
-            shitpost_id=None,
             signal_id="signal_456",
             confidence=0.9,
             thesis="Bearish",
@@ -257,16 +238,14 @@ class TestPredictionDualFK:
             analysis_status="completed",
         )
 
-        assert pred.shitpost_id is None
         assert pred.signal_id == "signal_456"
         assert pred.content_id == "signal_456"
 
-    def test_prediction_content_id_prefers_signal(self):
-        """Test that content_id prefers signal_id when both are set."""
+    def test_prediction_content_id_returns_signal_id(self):
+        """Test that content_id returns signal_id."""
         from shitvault.shitpost_models import Prediction
 
         pred = Prediction(
-            shitpost_id="legacy_123",
             signal_id="signal_456",
             analysis_status="completed",
         )

@@ -158,7 +158,7 @@ class ShitpostOperations:
             launch_datetime = datetime.fromisoformat(launch_date.replace('Z', '+00:00'))
 
             # Subquery to check if prediction exists (provider-aware)
-            pred_conditions = [Prediction.shitpost_id == TruthSocialShitpost.shitpost_id]
+            pred_conditions = [Prediction.signal_id == TruthSocialShitpost.shitpost_id]
             if llm_provider is not None:
                 pred_conditions.append(Prediction.llm_provider == llm_provider)
             if llm_model is not None:

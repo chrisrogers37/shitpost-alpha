@@ -96,9 +96,6 @@ class TruthSocialShitpost(Base, IDMixin, TimestampMixin):
     # Raw API data for debugging/analysis
     raw_api_data = Column(JSON, nullable=True)  # Store complete API response
 
-    # Relationships
-    predictions = relationship("Prediction", back_populates="shitpost")
-
     def __repr__(self):
         return f"<TruthSocialShitpost(id={self.id}, username='{self.username}', content='{self.content[:50]}...')>"
 
@@ -116,18 +113,10 @@ class Prediction(Base, IDMixin, TimestampMixin):
             "confidence IS NULL OR (confidence >= 0.0 AND confidence <= 1.0)",
             name="ck_predictions_confidence_range",
         ),
-        CheckConstraint(
-            "shitpost_id IS NOT NULL OR signal_id IS NOT NULL",
-            name="ck_predictions_has_content_ref",
-        ),
     )
 
-    # Legacy FK -- nullable now, will be removed after full migration
-    shitpost_id = Column(
-        String(255), ForeignKey("truth_social_shitposts.shitpost_id"), nullable=True
-    )
-    # New FK -- points to the source-agnostic signals table
-    signal_id = Column(String(255), ForeignKey("signals.signal_id"), nullable=True)
+    # FK to source-agnostic signals table
+    signal_id = Column(String(255), ForeignKey("signals.signal_id"), nullable=False)
 
     # Denormalized source post timestamp (avoids N+1 loading shitpost/signal)
     post_timestamp = Column(DateTime(timezone=True), nullable=True)
@@ -183,15 +172,12 @@ class Prediction(Base, IDMixin, TimestampMixin):
     ensemble_metadata = Column(JSON, nullable=True)  # Agreement metrics
 
     # Relationships
-    shitpost = relationship("TruthSocialShitpost", back_populates="predictions")
-    signal = relationship(
-        "Signal", back_populates="predictions", foreign_keys=[signal_id]
-    )
+    signal = relationship("Signal", back_populates="predictions")
 
     @property
     def content_id(self) -> str:
-        """Return the signal or shitpost ID, whichever is set."""
-        return self.signal_id or self.shitpost_id
+        """Return the signal ID."""
+        return self.signal_id
 
     def __repr__(self):
         return f"<Prediction(id={self.id}, confidence={self.confidence}, assets={self.assets})>"
@@ -214,7 +200,6 @@ def prediction_to_dict(prediction: Prediction) -> Dict[str, Any]:
 
 # Indexes for efficient querying on predictions table
 # PostgreSQL does NOT auto-index FK columns — only the referenced key gets one
-Index("idx_predictions_shitpost_id", Prediction.shitpost_id)
 Index("idx_predictions_signal_id", Prediction.signal_id)
 Index("idx_predictions_analysis_status", Prediction.analysis_status)
 Index("idx_predictions_created_at", Prediction.created_at)
