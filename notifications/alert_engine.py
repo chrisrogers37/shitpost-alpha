@@ -66,7 +66,7 @@ def check_and_dispatch() -> Dict[str, Any]:
     for pred in new_predictions:
         alert = {
             "prediction_id": pred.get("prediction_id"),
-            "shitpost_id": pred.get("shitpost_id"),
+            "signal_id": pred.get("signal_id"),
             "text": pred.get("text", "")[:200],
             "confidence": pred.get("confidence"),
             "assets": pred.get("assets", []),

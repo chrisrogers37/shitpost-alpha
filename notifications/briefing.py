@@ -44,7 +44,6 @@ def get_overnight_predictions(briefing_time: datetime) -> List[Dict[str, Any]]:
         """
         SELECT
             p.id as prediction_id,
-            p.shitpost_id,
             p.assets,
             p.market_impact,
             p.confidence,
@@ -52,10 +51,9 @@ def get_overnight_predictions(briefing_time: datetime) -> List[Dict[str, Any]]:
             p.thesis,
             p.post_timestamp,
             p.created_at,
-            COALESCE(s.text, ts.text) as post_text
+            s.text as post_text
         FROM predictions p
         LEFT JOIN signals s ON s.signal_id = p.signal_id
-        LEFT JOIN truth_social_shitposts ts ON ts.shitpost_id = p.shitpost_id
         WHERE p.analysis_status = 'completed'
             AND p.confidence IS NOT NULL
             AND p.assets IS NOT NULL

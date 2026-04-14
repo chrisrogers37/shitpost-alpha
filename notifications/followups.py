@@ -105,11 +105,10 @@ def get_due_followups() -> List[Dict[str, Any]]:
             p.market_impact,
             p.confidence,
             p.calibrated_confidence,
-            COALESCE(s.text, ts.text) as post_text
+            s.text as post_text
         FROM alert_followups af
         JOIN predictions p ON p.id = af.prediction_id
         LEFT JOIN signals s ON s.signal_id = p.signal_id
-        LEFT JOIN truth_social_shitposts ts ON ts.shitpost_id = p.shitpost_id
         JOIN telegram_subscriptions tsub ON tsub.chat_id = af.chat_id
             AND tsub.is_active = true
         WHERE af.next_check_at <= NOW()
