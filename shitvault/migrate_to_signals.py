@@ -208,8 +208,13 @@ async def migrate_shitposts_to_signals(
 
                     try:
                         # Use raw_api_data if available, otherwise reconstruct
-                        if row.raw_api_data:
-                            s3_data = {"raw_api_data": row.raw_api_data}
+                        raw = row.raw_api_data
+                        if raw:
+                            # May be stored as JSON string — parse if needed
+                            if isinstance(raw, str):
+                                import json
+                                raw = json.loads(raw)
+                            s3_data = {"raw_api_data": raw}
                         else:
                             s3_data = {"raw_api_data": _reconstruct_raw_api_data(row)}
 
