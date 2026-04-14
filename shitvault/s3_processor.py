@@ -9,11 +9,8 @@ from typing import Dict, Optional, Any, List
 from datetime import datetime
 
 from shit.db.database_operations import DatabaseOperations
-from shit.db.database_utils import DatabaseUtils
 from shit.s3 import S3DataLake
-from shitvault.shitpost_operations import ShitpostOperations
 from shitvault.signal_operations import SignalOperations
-from shitvault.shitpost_models import TruthSocialShitpost
 from shit.db.signal_utils import SignalTransformer
 
 # Use centralized DatabaseLogger for beautiful logging
@@ -31,7 +28,6 @@ class S3Processor:
         self.s3_data_lake = s3_data_lake
         self.source = source
         self.signal_ops = SignalOperations(db_ops)
-        self.shitpost_ops = ShitpostOperations(db_ops)  # Keep for backward compat
         self._transformer = SignalTransformer.get_transformer(source)
     
     async def process_s3_to_database(self, start_date: Optional[datetime] = None,
@@ -150,27 +146,28 @@ class S3Processor:
             raise
     
     async def _get_most_recent_post_id(self) -> Optional[str]:
-        """Get the most recent processed post ID from the database.
-        
+        """Get the most recent processed signal ID from the database.
+
         Returns:
-            The most recent post ID, or None if no posts exist
+            The most recent signal ID, or None if no signals exist.
         """
         try:
-            # Query for the most recent post by timestamp
             from sqlalchemy import select, desc
-            stmt = select(TruthSocialShitpost.shitpost_id).order_by(desc(TruthSocialShitpost.timestamp)).limit(1)
+            from shitvault.signal_models import Signal
+
+            stmt = select(Signal.signal_id).order_by(desc(Signal.published_at)).limit(1)
             result = await self.db_ops.session.execute(stmt)
             most_recent_id = result.scalar()
-            
+
             if most_recent_id:
-                logger.debug(f"Found most recent post ID in database: {most_recent_id}")
+                logger.debug(f"Found most recent signal ID in database: {most_recent_id}")
                 return most_recent_id
             else:
-                logger.debug("No posts found in database")
+                logger.debug("No signals found in database")
                 return None
-                
+
         except Exception as e:
-            logger.error(f"Error getting most recent post ID: {e}")
+            logger.error(f"Error getting most recent signal ID: {e}")
             return None
     
     async def _find_cutoff_index(self, s3_keys: List[str], target_post_id: str) -> Optional[int]:
@@ -212,13 +209,6 @@ class S3Processor:
                 # Transform using source-specific transformer and store in signals table
                 signal_data = self._transformer(s3_data)
                 result = await self.signal_ops.store_signal(signal_data)
-
-                # Dual-write to legacy truth_social_shitposts table.
-                # This stays until api/queries/feed_queries.py migrates reads
-                # to the signals table. Tracked in:
-                # documentation/planning/SIGNALS_MIGRATION.md
-                legacy_data = DatabaseUtils.transform_s3_data_to_shitpost(s3_data)
-                await self.shitpost_ops.store_shitpost(legacy_data)
 
                 if result:
                     stats['successful'] += 1
