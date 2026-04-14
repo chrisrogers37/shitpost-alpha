@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Signals Migration Complete** — All readers now use `signals` table instead of legacy `truth_social_shitposts`
+  - Analyzer reads from `SignalOperations.get_unprocessed_signals()` instead of `ShitpostOperations`
+  - Predictions now write `signal_id` FK (was `shitpost_id`)
+  - Feed API queries join on `signals` table with column aliases for backward compat
+  - Notifications queries use `signals` for post text (removed COALESCE dual-join pattern)
+  - S3 Processor dual-write removed — signals-only write path
+  - Historical backfill CLI (`shitvault/migrate_to_signals.py`) for one-time data migration
+
+### Removed
+- **ShitpostOperations** — deprecated class deleted, replaced by `SignalOperations`
+- **Prediction.shitpost_id** — legacy FK removed from Python model (database column retained for historical rows)
+
 ### Added
 - **Conviction Voting** — Inline Bull/Bear/Skip voting buttons on Telegram alerts with accuracy tracking
   - `ConvictionVote` model with `conviction_votes` table (one vote per user per prediction)
