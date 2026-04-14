@@ -73,7 +73,7 @@ def analyzer():
 
             a = ShitpostAnalyzer(mode="incremental")
             a.db_ops = MagicMock()
-            a.shitpost_ops = MagicMock()
+            a.signal_ops = MagicMock()
             a.prediction_ops = MagicMock()
             # Pre-populate ticker validator caches to avoid DB calls
             a.ticker_validator._known_active = {"AAPL", "TSLA", "NVDA", "GOOGL", "MSFT"}

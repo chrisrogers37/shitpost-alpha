@@ -55,11 +55,11 @@ async def main():
         async with analyzer.db_client.get_session() as session:
             # Re-initialize operations with session context
             from shit.db import DatabaseOperations
-            from shitvault.shitpost_operations import ShitpostOperations
+            from shitvault.signal_operations import SignalOperations
             from shitvault.prediction_operations import PredictionOperations
-            
+
             analyzer.db_ops = DatabaseOperations(session)
-            analyzer.shitpost_ops = ShitpostOperations(analyzer.db_ops)
+            analyzer.signal_ops = SignalOperations(analyzer.db_ops)
             analyzer.prediction_ops = PredictionOperations(analyzer.db_ops)
             
             if args.dry_run:
