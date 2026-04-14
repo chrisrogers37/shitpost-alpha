@@ -17,7 +17,7 @@ from conftest import make_outcome_row, make_post_row
 def test_get_analyzed_post_at_offset_returns_dict():
     """get_analyzed_post_at_offset returns (dict, total) tuple."""
     rows, columns = make_post_row(
-        shitpost_id="post_1",
+        signal_id="post_1",
         text="Hello",
         content_html=None,
         username="user",
@@ -48,7 +48,7 @@ def test_get_analyzed_post_at_offset_returns_dict():
 
     assert result is not None
     row, total = result
-    assert row["shitpost_id"] == "post_1"
+    assert row["signal_id"] == "post_1"
     assert row["prediction_id"] == 100
     assert row["confidence"] == 0.9
     assert total == 10
@@ -77,7 +77,7 @@ def test_get_analyzed_post_at_offset_returns_none_when_empty():
 def test_get_analyzed_post_at_offset_parses_json_string_assets():
     """When assets is a JSON string, it gets parsed to a list."""
     rows, columns = make_post_row(
-        shitpost_id="post_json",
+        signal_id="post_json",
         assets='["TSLA", "NVDA"]',
         market_impact='{"TSLA": "bullish"}',
     )
@@ -102,7 +102,7 @@ def test_get_analyzed_post_at_offset_parses_json_string_assets():
 def test_get_analyzed_post_at_offset_leaves_native_types():
     """When assets is already a list and market_impact a dict, they are not re-parsed."""
     rows, columns = make_post_row(
-        shitpost_id="post_native",
+        signal_id="post_native",
         assets=["AAPL"],
         market_impact={"AAPL": "bearish"},
     )

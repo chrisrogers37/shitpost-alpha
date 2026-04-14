@@ -36,7 +36,7 @@ def make_post_row(**overrides) -> tuple[list[tuple], list[str]]:
         rows, cols = make_post_row(assets='["SPY"]')          # JSON string variant
     """
     defaults = {
-        "shitpost_id": "post_abc123",
+        "signal_id": "post_abc123",
         "text": "Big tariff announcement coming!",
         "content_html": "<p>Big tariff announcement coming!</p>",
         "timestamp": datetime(2026, 3, 25, 14, 30, 0),

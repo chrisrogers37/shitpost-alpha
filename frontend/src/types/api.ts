@@ -22,7 +22,7 @@ export interface ReplyContext {
 }
 
 export interface Post {
-  shitpost_id: string;
+  signal_id: string;
   text: string;
   content_html: string | null;
   timestamp: string;
