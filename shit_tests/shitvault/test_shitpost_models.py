@@ -194,15 +194,15 @@ class TestPrediction:
     def test_model_creation(self):
         """Test creating a Prediction instance."""
         prediction = Prediction(
-            shitpost_id="123456789",
+            signal_id="123456789",
             assets=["TSLA", "AAPL"],
             market_impact={"TSLA": "bullish", "AAPL": "neutral"},
             confidence=0.85,
             thesis="Positive sentiment about Tesla",
             analysis_status="completed"
         )
-        
-        assert prediction.shitpost_id == "123456789"
+
+        assert prediction.signal_id == "123456789"
         assert prediction.assets == ["TSLA", "AAPL"]
         assert prediction.market_impact == {"TSLA": "bullish", "AAPL": "neutral"}
         assert prediction.confidence == 0.85
@@ -212,15 +212,15 @@ class TestPrediction:
     def test_model_with_default_status(self):
         """Test model with default status."""
         prediction = Prediction(
-            shitpost_id="123",
+            signal_id="123",
             analysis_status="pending",
             has_media=False,
             mentions_count=0,
             hashtags_count=0
         )
-        
+
         # SQLAlchemy defaults don't apply until persisted
-        assert prediction.shitpost_id == "123"
+        assert prediction.signal_id == "123"
         assert prediction.analysis_status == "pending"
         assert prediction.has_media is False
         assert prediction.mentions_count == 0
@@ -228,7 +228,7 @@ class TestPrediction:
     def test_model_with_analysis_scores(self):
         """Test model with enhanced analysis scores."""
         prediction = Prediction(
-            shitpost_id="123",
+            signal_id="123",
             analysis_status="completed",
             engagement_score=0.75,
             viral_score=0.82,
@@ -244,7 +244,7 @@ class TestPrediction:
     def test_model_with_content_analysis(self):
         """Test model with content analysis data."""
         prediction = Prediction(
-            shitpost_id="123",
+            signal_id="123",
             analysis_status="completed",
             has_media=True,
             mentions_count=3,
@@ -260,7 +260,7 @@ class TestPrediction:
     def test_model_with_engagement_at_analysis(self):
         """Test model with engagement metrics at analysis time."""
         prediction = Prediction(
-            shitpost_id="123",
+            signal_id="123",
             analysis_status="completed",
             replies_at_analysis=100,
             reblogs_at_analysis=500,
@@ -277,7 +277,7 @@ class TestPrediction:
         """Test model with LLM provider metadata."""
         analysis_time = datetime(2024, 1, 15, 12, 0, 0)
         prediction = Prediction(
-            shitpost_id="123",
+            signal_id="123",
             analysis_status="completed",
             llm_provider="openai",
             llm_model="gpt-4",
@@ -291,7 +291,7 @@ class TestPrediction:
     def test_model_bypassed_status(self):
         """Test model with bypassed analysis status."""
         prediction = Prediction(
-            shitpost_id="123",
+            signal_id="123",
             analysis_status="bypassed",
             analysis_comment="No text content",
             confidence=None  # Nullable for bypassed posts
@@ -304,7 +304,7 @@ class TestPrediction:
     def test_model_error_status(self):
         """Test model with error status."""
         prediction = Prediction(
-            shitpost_id="123",
+            signal_id="123",
             analysis_status="error",
             analysis_comment="API timeout"
         )
@@ -315,12 +315,12 @@ class TestPrediction:
     def test_model_repr(self):
         """Test model string representation."""
         prediction = Prediction(
-            shitpost_id="123",
+            signal_id="123",
             assets=["TSLA"],
             confidence=0.85,
             analysis_status="completed"
         )
-        
+
         repr_str = repr(prediction)
         assert "Prediction" in repr_str
         assert "0.85" in repr_str or "confidence" in repr_str.lower()
@@ -330,11 +330,12 @@ class TestPrediction:
         assert Prediction.__tablename__ == "predictions"
 
     def test_foreign_key_constraint(self):
-        """Test that shitpost_id has foreign key constraint."""
+        """Test that signal_id has foreign key constraint."""
         mapper = inspect(Prediction)
-        shitpost_id_col = mapper.columns['shitpost_id']
-        assert shitpost_id_col.foreign_keys is not None
-        assert len(shitpost_id_col.foreign_keys) > 0
+        signal_id_col = mapper.columns['signal_id']
+        assert signal_id_col.foreign_keys is not None
+        assert len(signal_id_col.foreign_keys) > 0
+        assert not signal_id_col.nullable
 
 
 class TestUtilityFunctions:
@@ -359,16 +360,16 @@ class TestUtilityFunctions:
     def test_prediction_to_dict(self):
         """Test converting Prediction to dictionary."""
         prediction = Prediction(
-            shitpost_id="123",
+            signal_id="123",
             assets=["TSLA"],
             confidence=0.85,
             analysis_status="completed"
         )
-        
+
         result = prediction_to_dict(prediction)
-        
+
         assert isinstance(result, dict)
-        assert result['shitpost_id'] == "123"
+        assert result['signal_id'] == "123"
         assert result['assets'] == ["TSLA"]
         assert result['confidence'] == 0.85
         assert result['analysis_status'] == "completed"
@@ -378,17 +379,11 @@ class TestUtilityFunctions:
 class TestModelRelationships:
     """Test model relationships."""
 
-    def test_truth_social_shitpost_has_predictions_relationship(self):
-        """Test TruthSocialShitpost has predictions relationship."""
-        mapper = inspect(TruthSocialShitpost)
-        relationships = mapper.relationships
-        assert 'predictions' in relationships.keys()
-
-    def test_prediction_has_shitpost_relationship(self):
-        """Test Prediction has shitpost relationship."""
+    def test_prediction_has_signal_relationship(self):
+        """Test Prediction has signal relationship."""
         mapper = inspect(Prediction)
         relationships = mapper.relationships
-        assert 'shitpost' in relationships.keys()
+        assert 'signal' in relationships.keys()
 
 
 

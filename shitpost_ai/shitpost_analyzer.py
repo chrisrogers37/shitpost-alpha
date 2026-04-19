@@ -11,7 +11,7 @@ from datetime import datetime
 from shit.config.shitpost_settings import settings
 from shit.llm import LLMClient, ProviderComparator, get_analysis_prompt
 from shit.db import DatabaseConfig, DatabaseClient, DatabaseOperations
-from shitvault.shitpost_operations import ShitpostOperations
+from shitvault.signal_operations import SignalOperations
 from shitvault.prediction_operations import PredictionOperations
 from shit.utils.error_handling import handle_exceptions
 from shit.content import BypassService
@@ -59,7 +59,7 @@ class ShitpostAnalyzer:
         self.db_client = DatabaseClient(self.db_config)
         self.session = None  # Will be initialized in initialize()
         self.db_ops = None  # Will be initialized in initialize()
-        self.shitpost_ops = None  # Will be initialized in initialize()
+        self.signal_ops = None  # Will be initialized in initialize()
         self.prediction_ops = None  # Will be initialized in initialize()
 
         self.llm_client = LLMClient()
@@ -100,7 +100,7 @@ class ShitpostAnalyzer:
 
         # Initialize operation classes with DatabaseOperations wrapping the session
         self.db_ops = DatabaseOperations(self.session)
-        self.shitpost_ops = ShitpostOperations(self.db_ops)
+        self.signal_ops = SignalOperations(self.db_ops)
         self.prediction_ops = PredictionOperations(self.db_ops)
 
         # Initialize LLM client (single-model fallback)
@@ -177,7 +177,7 @@ class ShitpostAnalyzer:
                 )
 
                 # Get batch of unprocessed shitposts
-                shitposts = await self.shitpost_ops.get_unprocessed_shitposts(
+                shitposts = await self.signal_ops.get_unprocessed_signals(
                     launch_date=self.launch_date, limit=self.batch_size
                 )
 
@@ -246,7 +246,7 @@ class ShitpostAnalyzer:
                 )
 
                 # Get batch of unprocessed shitposts
-                shitposts = await self.shitpost_ops.get_unprocessed_shitposts(
+                shitposts = await self.signal_ops.get_unprocessed_signals(
                     launch_date=self.launch_date, limit=self.batch_size
                 )
 
@@ -335,7 +335,7 @@ class ShitpostAnalyzer:
 
         try:
             # Get batch of unprocessed shitposts
-            shitposts = await self.shitpost_ops.get_unprocessed_shitposts(
+            shitposts = await self.signal_ops.get_unprocessed_signals(
                 launch_date=self.launch_date, limit=self.batch_size
             )
 
@@ -391,7 +391,7 @@ class ShitpostAnalyzer:
                     skipped_count += 1
                     continue
 
-                if await self.prediction_ops.check_prediction_exists(shitpost_id):
+                if await self.prediction_ops.check_prediction_exists(shitpost_id, use_signal=True):
                     print(
                         f"⏭️  Post {i}/{len(shitposts)}: {shitpost_id} already analyzed, skipping"
                     )
@@ -475,7 +475,7 @@ class ShitpostAnalyzer:
                 if not dry_run:
                     # Create bypassed prediction record
                     await self.prediction_ops.handle_no_text_prediction(
-                        shitpost_id, shitpost, bypass_reason
+                        shitpost_id, shitpost, bypass_reason, use_signal=True
                     )
 
                 return {
@@ -562,7 +562,7 @@ class ShitpostAnalyzer:
             if not dry_run:
                 # Store analysis in database
                 analysis_id = await self.prediction_ops.store_analysis(
-                    shitpost_id, enhanced_analysis, shitpost
+                    shitpost_id, enhanced_analysis, shitpost, use_signal=True
                 )
 
                 if analysis_id:
@@ -600,8 +600,8 @@ class ShitpostAnalyzer:
 
                         event_payload = {
                             "prediction_id": int(analysis_id),
-                            "shitpost_id": shitpost_id,
-                            "signal_id": None,
+                            "shitpost_id": None,
+                            "signal_id": shitpost_id,
                             "assets": assets,
                             "confidence": confidence,
                             "calibrated_confidence": calibrated,
@@ -629,7 +629,7 @@ class ShitpostAnalyzer:
                                 self._embed_prediction,
                                 int(analysis_id),
                                 post_text,
-                                shitpost_id,
+                                signal_id=shitpost_id,
                             )
                     except Exception as e:
                         logger.warning(
@@ -875,7 +875,7 @@ class ShitpostAnalyzer:
 
     @staticmethod
     def _embed_prediction(
-        prediction_id: int, text: str, shitpost_id: str | None = None
+        prediction_id: int, text: str, signal_id: str | None = None
     ) -> None:
         """Generate and store embedding for a prediction (sync, for asyncio.to_thread)."""
         from shit.echoes.echo_service import EchoService
@@ -884,7 +884,7 @@ class ShitpostAnalyzer:
         service.embed_and_store(
             prediction_id=prediction_id,
             text=text,
-            shitpost_id=shitpost_id,
+            signal_id=signal_id,
         )
 
     async def _trigger_reactive_backfill(

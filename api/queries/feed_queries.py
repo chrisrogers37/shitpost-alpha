@@ -25,24 +25,24 @@ def get_analyzed_post_at_offset(
     """
     query = """
         SELECT
-            tss.shitpost_id,
-            tss.text,
-            tss.content AS content_html,
-            tss.timestamp,
-            tss.username,
-            tss.url,
-            tss.replies_count,
-            tss.reblogs_count,
-            tss.favourites_count,
-            tss.upvotes_count,
-            tss.downvotes_count,
-            tss.account_verified,
-            tss.account_followers_count,
-            tss.card,
-            tss.media_attachments,
-            tss.in_reply_to_id,
-            tss.in_reply_to,
-            tss.reblog,
+            s.signal_id,
+            s.text,
+            s.content_html,
+            s.published_at AS timestamp,
+            s.author_username AS username,
+            s.source_url AS url,
+            s.replies_count,
+            s.shares_count AS reblogs_count,
+            s.likes_count AS favourites_count,
+            (s.platform_data->>'upvotes_count')::int AS upvotes_count,
+            (s.platform_data->>'downvotes_count')::int AS downvotes_count,
+            s.author_verified AS account_verified,
+            s.author_followers AS account_followers_count,
+            s.platform_data->'card' AS card,
+            s.platform_data->'media_attachments' AS media_attachments,
+            s.platform_data->>'in_reply_to_id' AS in_reply_to_id,
+            s.platform_data->'in_reply_to' AS in_reply_to,
+            s.platform_data->'reblog' AS reblog,
             p.id AS prediction_id,
             p.assets,
             p.market_impact,
@@ -57,14 +57,14 @@ def get_analyzed_post_at_offset(
             p.ensemble_results,
             p.ensemble_metadata,
             COUNT(*) OVER() AS total_count
-        FROM truth_social_shitposts tss
-        INNER JOIN predictions p ON tss.shitpost_id = p.shitpost_id
+        FROM signals s
+        INNER JOIN predictions p ON s.signal_id = p.signal_id
         WHERE p.analysis_status = 'completed'
             AND p.confidence IS NOT NULL
             AND p.assets IS NOT NULL
             AND p.assets::text <> '[]'
             AND p.assets::text <> 'null'
-        ORDER BY tss.timestamp DESC
+        ORDER BY s.published_at DESC
         OFFSET :offset
         LIMIT 1
     """

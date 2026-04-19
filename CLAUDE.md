@@ -76,7 +76,6 @@ shitpost_alpha/
 │   └── utils/              # Error handling utilities
 ├── shitvault/              # Data persistence & S3 processing
 │   ├── shitpost_models.py  # Domain-specific SQLAlchemy models
-│   ├── shitpost_operations.py  # Shitpost CRUD operations
 │   ├── prediction_operations.py  # Prediction CRUD operations
 │   ├── s3_processor.py     # S3 → Database processor
 │   ├── statistics.py       # Analytics & reporting
@@ -220,7 +219,7 @@ python -m shitposts --mode backfill --from 2024-01-01 --to 2024-12-31
 - `range`: Process files within date range
 
 **Database Tables**:
-- `shitposts` - All posts (original content and retruths)
+- `signals` - All posts (source-agnostic content model)
 - `predictions` - LLM analysis results
 - `statistics` - Aggregate metrics
 
@@ -231,8 +230,8 @@ python -m shitposts --mode backfill --from 2024-01-01 --to 2024-12-31
 **Key Class**: `ShitpostAnalyzer`
 
 **Analysis Flow**:
-1. Fetch unanalyzed posts from database
-2. Check if post is analyzable (skip retruths)
+1. Fetch unanalyzed signals from database
+2. Check if signal is analyzable (skip retruths)
 3. Send to GPT-4 with financial analysis prompt
 4. Parse structured response (sentiment, assets, timeframes, confidence)
 5. Store predictions in database
@@ -245,7 +244,7 @@ python -m shitposts --mode backfill --from 2024-01-01 --to 2024-12-31
 
 ### Key Tables
 
-**`truth_social_shitposts`** - All Truth Social posts (field names match API structure)
+**`truth_social_shitposts`** - *(Archived -- no new writes, retained for historical reference)*
 - `id` (integer, auto-increment primary key)
 - `shitpost_id` (string, unique) -- Original Truth Social post ID
 - `content` (text) -- HTML content of the post
@@ -261,8 +260,8 @@ python -m shitposts --mode backfill --from 2024-01-01 --to 2024-12-31
 
 **`predictions`** - LLM analysis results
 - `id` (integer, auto-increment primary key)
-- `shitpost_id` (string, nullable FK → truth_social_shitposts.shitpost_id)
-- `signal_id` (string, nullable FK → signals.signal_id) -- Dual-FK: one of shitpost_id or signal_id will be set
+- `signal_id` (string, FK → signals.signal_id) -- Primary content FK
+- `shitpost_id` (string, nullable, legacy) -- Retained for historical rows; not written by new code
 - `assets` (JSON) -- List of asset tickers, e.g. ["AAPL", "TSLA"]
 - `market_impact` (JSON) -- Dict of asset → sentiment, e.g. {"AAPL": "bullish"}
 - `confidence` (float, nullable) -- 0.0-1.0, null for bypassed posts
@@ -325,7 +324,7 @@ python -m shitposts --mode backfill --from 2024-01-01 --to 2024-12-31
 - `signals`: (`signal_id` unique), (`source`, `published_at`)
 - `ticker_registry`: (`symbol` unique), (`status`), (`first_seen_date`)
 - `truth_social_shitposts`: (`shitpost_id` unique), (`timestamp`)
-- `predictions`: (`shitpost_id`)
+- `predictions`: (`signal_id`)
 - `market_prices`: (`symbol`, `date` unique composite)
 - `prediction_outcomes`: (`prediction_id`), (`symbol`, `prediction_date`)
 
@@ -560,9 +559,9 @@ await db_client.initialize()
 
 # Use async sessions via the database client
 # Domain operations are accessed through operation classes:
-from shitvault.shitpost_operations import ShitpostOperations
-shitpost_ops = ShitpostOperations(db_ops)
-unprocessed = await shitpost_ops.get_unprocessed_shitposts(launch_date="2025-01-01", limit=10)
+from shitvault.signal_operations import SignalOperations
+signal_ops = SignalOperations(db_ops)
+unprocessed = await signal_ops.get_unprocessed_signals(launch_date="2025-01-01", limit=10)
 ```
 
 ### 3. S3 Data Lake Organization

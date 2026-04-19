@@ -1,8 +1,12 @@
 # Signals Migration Plan
 
-**Status**: Planning
+**Status**: Complete
 **Created**: 2026-03-26
-**Context**: Data model audit revealed `signals` table is 100% write-only. S3 Processor dual-writes every post to both `signals` and legacy `truth_social_shitposts`, but all 21+ downstream queries still read from the legacy table. This wastes write I/O and blocks the multi-source architecture.
+**Completed**: 2026-04-14
+
+All readers migrated to signals table. Dual-write removed. ShitpostOperations deleted. The `truth_social_shitposts` table is archived (no new writes, retained for historical reference).
+
+**Original Context**: Data model audit revealed `signals` table is 100% write-only. S3 Processor dual-writes every post to both `signals` and legacy `truth_social_shitposts`, but all 21+ downstream queries still read from the legacy table. This wastes write I/O and blocks the multi-source architecture.
 
 ---
 

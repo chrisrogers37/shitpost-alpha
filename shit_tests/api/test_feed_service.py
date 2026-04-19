@@ -131,7 +131,7 @@ class TestBuildNavigation:
 class TestBuildPost:
     def test_basic_post(self):
         row = {
-            "shitpost_id": "post_1",
+            "signal_id": "post_1",
             "text": "Hello",
             "content_html": "<p>Hello</p>",
             "timestamp": datetime(2026, 3, 25, 14, 30, 0),
@@ -150,7 +150,7 @@ class TestBuildPost:
             "reblog": None,
         }
         post = FeedService.build_post(row, "market_open", "0m")
-        assert post.shitpost_id == "post_1"
+        assert post.signal_id == "post_1"
         assert post.text == "Hello"
         assert post.engagement.replies == 10
         assert post.verified is True
@@ -159,7 +159,7 @@ class TestBuildPost:
 
     def test_none_text_defaults_to_empty(self):
         row = {
-            "shitpost_id": "p",
+            "signal_id": "p",
             "text": None,
             "timestamp": datetime(2026, 1, 1),
             "username": "u",
@@ -174,7 +174,7 @@ class TestBuildPost:
 
     def test_reblog_sets_is_repost(self):
         row = {
-            "shitpost_id": "p",
+            "signal_id": "p",
             "text": "rt",
             "timestamp": datetime(2026, 1, 1),
             "username": "u",
@@ -325,7 +325,7 @@ class TestGetFeedResponse:
 
     def test_happy_path(self):
         row = {
-            "shitpost_id": "post_1",
+            "signal_id": "post_1",
             "text": "Test",
             "content_html": None,
             "timestamp": datetime(2026, 3, 25, 14, 30, 0),
@@ -367,7 +367,7 @@ class TestGetFeedResponse:
             result = service.get_feed_response(0)
 
         assert result is not None
-        assert result.post.shitpost_id == "post_1"
+        assert result.post.signal_id == "post_1"
         assert result.prediction.assets == ["SPY"]
         assert result.outcomes == []
         assert result.navigation.total_posts == 10
@@ -375,7 +375,7 @@ class TestGetFeedResponse:
     def test_filters_invalid_tickers_from_assets(self):
         """Assets in prediction that have no outcome (filtered by SQL) should be removed."""
         row = {
-            "shitpost_id": "post_2",
+            "signal_id": "post_2",
             "text": "Defense and stocks",
             "content_html": None,
             "timestamp": datetime(2026, 3, 25, 14, 30, 0),

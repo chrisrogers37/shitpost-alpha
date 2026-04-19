@@ -58,7 +58,7 @@ class TestShitpostAnalyzer:
             )
             # Create mock operations for tests
             analyzer.db_ops = MagicMock()
-            analyzer.shitpost_ops = MagicMock()
+            analyzer.signal_ops = MagicMock()
             analyzer.prediction_ops = MagicMock()
             return analyzer
 
@@ -120,10 +120,10 @@ class TestShitpostAnalyzer:
 
     @pytest.mark.asyncio
     async def test_initialize(self, analyzer):
-        """Test analyzer initialization sets db_ops, shitpost_ops, prediction_ops."""
+        """Test analyzer initialization sets db_ops, signal_ops, prediction_ops."""
         # Reset ops to None to verify initialize() sets them
         analyzer.db_ops = None
-        analyzer.shitpost_ops = None
+        analyzer.signal_ops = None
         analyzer.prediction_ops = None
 
         mock_session = MagicMock()
@@ -137,7 +137,7 @@ class TestShitpostAnalyzer:
             mock_llm_init.assert_called_once()
             assert analyzer.session is mock_session
             assert analyzer.db_ops is not None
-            assert analyzer.shitpost_ops is not None
+            assert analyzer.signal_ops is not None
             assert analyzer.prediction_ops is not None
 
     @pytest.mark.asyncio
@@ -186,7 +186,7 @@ class TestShitpostAnalyzer:
         """Test incremental analysis mode."""
         await analyzer.initialize()
         
-        with patch.object(analyzer.shitpost_ops, 'get_unprocessed_shitposts', new_callable=AsyncMock) as mock_get, \
+        with patch.object(analyzer.signal_ops, 'get_unprocessed_signals', new_callable=AsyncMock) as mock_get, \
              patch.object(analyzer, '_analyze_batch', new_callable=AsyncMock, return_value=3) as mock_batch:
             
             mock_get.return_value = [sample_shitpost_data]
@@ -205,7 +205,7 @@ class TestShitpostAnalyzer:
         """Test incremental analysis with no posts."""
         await analyzer.initialize()
         
-        with patch.object(analyzer.shitpost_ops, 'get_unprocessed_shitposts', new_callable=AsyncMock) as mock_get:
+        with patch.object(analyzer.signal_ops, 'get_unprocessed_signals', new_callable=AsyncMock) as mock_get:
             mock_get.return_value = []
             
             result = await analyzer._analyze_incremental(dry_run=False)
@@ -217,7 +217,7 @@ class TestShitpostAnalyzer:
         """Test incremental analysis with error."""
         await analyzer.initialize()
         
-        with patch.object(analyzer.shitpost_ops, 'get_unprocessed_shitposts', new_callable=AsyncMock) as mock_get, \
+        with patch.object(analyzer.signal_ops, 'get_unprocessed_signals', new_callable=AsyncMock) as mock_get, \
              patch('shitpost_ai.shitpost_analyzer.handle_exceptions', new_callable=AsyncMock) as mock_handle:
             
             mock_get.side_effect = Exception("Database error")
@@ -232,7 +232,7 @@ class TestShitpostAnalyzer:
         """Test backfill analysis mode."""
         await analyzer.initialize()
         
-        with patch.object(analyzer.shitpost_ops, 'get_unprocessed_shitposts', new_callable=AsyncMock) as mock_get, \
+        with patch.object(analyzer.signal_ops, 'get_unprocessed_signals', new_callable=AsyncMock) as mock_get, \
              patch.object(analyzer, '_analyze_batch', new_callable=AsyncMock, return_value=5) as mock_batch, \
              patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
             
@@ -254,7 +254,7 @@ class TestShitpostAnalyzer:
         analyzer.limit = 10
         await analyzer.initialize()
         
-        with patch.object(analyzer.shitpost_ops, 'get_unprocessed_shitposts', new_callable=AsyncMock) as mock_get, \
+        with patch.object(analyzer.signal_ops, 'get_unprocessed_signals', new_callable=AsyncMock) as mock_get, \
              patch.object(analyzer, '_analyze_batch', new_callable=AsyncMock, return_value=5) as mock_batch, \
              patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
             
@@ -275,7 +275,7 @@ class TestShitpostAnalyzer:
         """Test backfill analysis with error."""
         await analyzer.initialize()
         
-        with patch.object(analyzer.shitpost_ops, 'get_unprocessed_shitposts', new_callable=AsyncMock) as mock_get, \
+        with patch.object(analyzer.signal_ops, 'get_unprocessed_signals', new_callable=AsyncMock) as mock_get, \
              patch('shitpost_ai.shitpost_analyzer.handle_exceptions', new_callable=AsyncMock) as mock_handle:
             
             mock_get.side_effect = Exception("Database error")
@@ -295,7 +295,7 @@ class TestShitpostAnalyzer:
         analyzer.end_datetime = datetime.fromisoformat("2024-01-31")
         await analyzer.initialize()
         
-        with patch.object(analyzer.shitpost_ops, 'get_unprocessed_shitposts', new_callable=AsyncMock) as mock_get, \
+        with patch.object(analyzer.signal_ops, 'get_unprocessed_signals', new_callable=AsyncMock) as mock_get, \
              patch.object(analyzer, '_analyze_batch', new_callable=AsyncMock, return_value=3) as mock_batch, \
              patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
             
@@ -321,7 +321,7 @@ class TestShitpostAnalyzer:
         old_post = sample_shitpost_data.copy()
         old_post['timestamp'] = '2024-01-10T10:30:00Z'
         
-        with patch.object(analyzer.shitpost_ops, 'get_unprocessed_shitposts', new_callable=AsyncMock) as mock_get, \
+        with patch.object(analyzer.signal_ops, 'get_unprocessed_signals', new_callable=AsyncMock) as mock_get, \
              patch.object(analyzer, '_analyze_batch', new_callable=AsyncMock, return_value=0) as mock_batch:
             
             mock_get.return_value = [old_post]
@@ -349,7 +349,7 @@ class TestShitpostAnalyzer:
             result = await analyzer._analyze_batch(shitposts, dry_run=False, batch_number=1)
             
             assert result == 1
-            mock_check.assert_called_once_with(sample_shitpost_data['shitpost_id'])
+            mock_check.assert_called_once_with(sample_shitpost_data['shitpost_id'], use_signal=True)
             mock_analyze.assert_called_once_with(sample_shitpost_data, False)
 
     @pytest.mark.asyncio

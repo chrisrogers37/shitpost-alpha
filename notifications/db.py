@@ -370,7 +370,6 @@ def get_new_predictions_since(since: datetime) -> List[Dict[str, Any]]:
         """
         SELECT
             p.post_timestamp AS timestamp,
-            p.shitpost_id,
             p.signal_id,
             p.id as prediction_id,
             p.assets,

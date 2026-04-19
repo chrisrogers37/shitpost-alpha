@@ -26,7 +26,7 @@ class ReplyContext(BaseModel):
 
 
 class Post(BaseModel):
-    shitpost_id: str
+    signal_id: str
     text: str
     content_html: Optional[str] = None
     timestamp: str

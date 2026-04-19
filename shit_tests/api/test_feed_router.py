@@ -77,7 +77,7 @@ def test_get_latest_post_happy_path(client, mock_execute_query):
     assert response.status_code == 200
 
     data = response.json()
-    assert data["post"]["shitpost_id"] == "post_abc123"
+    assert data["post"]["signal_id"] == "post_abc123"
     assert data["post"]["text"] == "Big tariff announcement coming!"
     assert data["post"]["username"] == "realDonaldTrump"
     assert data["post"]["engagement"]["replies"] == 42
@@ -136,7 +136,7 @@ def test_get_post_at_offset_zero(client, mock_execute_query):
 
     response = client.get("/api/feed/at?offset=0")
     assert response.status_code == 200
-    assert response.json()["post"]["shitpost_id"] == "post_abc123"
+    assert response.json()["post"]["signal_id"] == "post_abc123"
     assert response.json()["navigation"]["current_offset"] == 0
 
 
@@ -330,7 +330,7 @@ def test_market_impact_json_string_parsed_to_dict(client, mock_execute_query):
 def test_post_with_none_text_defaults_to_empty_string(client, mock_execute_query):
     """When text is None in the DB row, the response should use an empty string."""
     post_rows, post_cols = make_post_row(
-        shitpost_id="post_null_text",
+        signal_id="post_null_text",
         text=None,
     )
 
@@ -353,7 +353,7 @@ def test_post_with_none_text_defaults_to_empty_string(client, mock_execute_query
 def test_post_with_none_engagement_defaults_to_zero(client, mock_execute_query):
     """When engagement counts are None, the response should default them to 0."""
     post_rows, post_cols = make_post_row(
-        shitpost_id="post_none_eng",
+        signal_id="post_none_eng",
         text="Test post",
         replies_count=None,
         reblogs_count=None,
@@ -407,7 +407,7 @@ def test_feed_response_with_no_outcomes(client, mock_execute_query):
 def test_scores_with_none_values(client, mock_execute_query):
     """When score fields are None, they serialize as null in the JSON response."""
     post_rows, post_cols = make_post_row(
-        shitpost_id="post_no_scores",
+        signal_id="post_no_scores",
         replies_count=5,
         reblogs_count=10,
         favourites_count=20,

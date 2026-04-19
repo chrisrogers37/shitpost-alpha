@@ -20,7 +20,6 @@ from shit.logging import (
     print_info,
     print_warning
 )
-from .shitpost_operations import ShitpostOperations
 from .prediction_operations import PredictionOperations
 from .s3_processor import S3Processor
 from .statistics import Statistics

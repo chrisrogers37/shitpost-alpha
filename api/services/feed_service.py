@@ -83,7 +83,7 @@ class FeedService:
         """Build a Post schema from a raw query row."""
         ts = row["timestamp"]
         return Post(
-            shitpost_id=row["shitpost_id"],
+            signal_id=row["signal_id"],
             text=row["text"] or "",
             content_html=row.get("content_html"),
             timestamp=ts.isoformat() if hasattr(ts, "isoformat") else str(ts),

@@ -148,7 +148,7 @@ export function FeedPage() {
       <main className="feed-main" style={mainStyle}>
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
-            key={data.post.shitpost_id}
+            key={data.post.signal_id}
             custom={direction}
             variants={slideVariants}
             initial="enter"
