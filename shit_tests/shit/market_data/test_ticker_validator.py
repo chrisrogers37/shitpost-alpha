@@ -61,6 +61,20 @@ class TestBlocklist:
         validator = TickerValidator()
         assert validator.validate_symbols(["", "  ", "\t"]) == []
 
+    def test_blocklist_rejects_commodity_words(self):
+        """Verify common words that collide with tickers are blocked."""
+        validator = TickerValidator()
+        commodity_words = ["GOLD", "STEEL", "COAL", "SILVER", "CORN", "GAS"]
+        result = validator.validate_symbols(commodity_words)
+        assert result == [], f"Expected all blocked, got {result}"
+
+    def test_blocklist_rejects_political_words(self):
+        """Verify political words that collide with tickers are blocked."""
+        validator = TickerValidator()
+        political_words = ["TAX", "USA", "NEWS", "WIN", "WAR", "VOTE", "JOBS"]
+        result = validator.validate_symbols(political_words)
+        assert result == [], f"Expected all blocked, got {result}"
+
 
 class TestAliases:
     """Tests for alias remapping (corporate actions)."""

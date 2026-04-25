@@ -24,18 +24,16 @@ class TickerValidator:
     # Known non-ticker strings the LLM commonly extracts
     BLOCKLIST: frozenset[str] = frozenset(
         {
-            "DEFENSE",
-            "CRYPTO",
-            "ECONOMY",
-            "NEWSMAX",
-            "TARIFF",
-            "GDP",
-            "CPI",
-            "FED",
-            "NATO",
-            "CEO",
-            "IPO",
-            "ESG",
+            # Economic/financial terms
+            "DEFENSE", "CRYPTO", "ECONOMY", "TARIFF",
+            "GDP", "CPI", "FED", "IPO", "ESG",
+            # Media/orgs
+            "NEWSMAX", "NATO", "CEO",
+            # Commodities-as-words (Trump frequently references these)
+            "GOLD", "STEEL", "COAL", "SILVER", "CORN", "GAS",
+            # Political/news words that collide with tickers
+            "TAX", "USA", "NEWS", "WIN", "WAR", "VOTE", "JOBS",
+            "NICE", "FAST", "REAL", "TRUE", "HOPE", "BEAR", "BULL",
         }
     )
 
