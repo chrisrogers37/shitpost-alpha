@@ -27,6 +27,54 @@ from shit.logging import get_service_logger
 logger = get_service_logger("alert_engine")
 
 
+def enrich_alert(alert: dict) -> dict:
+    """Enrich an alert dict with calibrated confidence and historical echoes.
+
+    Called by both the cron alert engine and the event consumer to ensure
+    identical alert quality regardless of dispatch path.
+
+    Failures in any enrichment step are logged and skipped — never block the alert.
+    """
+    prediction_id = alert.get("prediction_id")
+
+    # Calibrated confidence
+    if alert.get("calibrated_confidence") is None:
+        try:
+            from shit.market_data.calibration import CalibrationService
+
+            raw_confidence = alert.get("confidence")
+            if raw_confidence is not None:
+                calibrated = CalibrationService(timeframe="t7").calibrate(
+                    raw_confidence
+                )
+                if calibrated is not None:
+                    alert["calibrated_confidence"] = calibrated
+        except Exception as e:
+            logger.debug(f"Calibration skipped for prediction {prediction_id}: {e}")
+
+    # Historical Echoes
+    if prediction_id and not alert.get("echoes"):
+        try:
+            from shit.echoes.echo_service import EchoService
+
+            echo_service = EchoService()
+            embedding = echo_service.get_embedding(prediction_id)
+            if embedding:
+                matches = echo_service.find_similar_posts(
+                    embedding,
+                    limit=5,
+                    exclude_prediction_id=prediction_id,
+                )
+                if matches:
+                    alert["echoes"] = echo_service.aggregate_echoes(
+                        matches, timeframe="t7"
+                    )
+        except Exception as e:
+            logger.debug(f"Echo lookup skipped for prediction {prediction_id}: {e}")
+
+    return alert
+
+
 def check_and_dispatch() -> Dict[str, Any]:
     """
     Main alert function called by cron.
@@ -69,13 +117,14 @@ def check_and_dispatch() -> Dict[str, Any]:
             "signal_id": pred.get("signal_id"),
             "text": pred.get("text", "")[:200],
             "confidence": pred.get("confidence"),
+            "calibrated_confidence": pred.get("calibrated_confidence"),
             "assets": pred.get("assets", []),
             "sentiment": _extract_sentiment(pred.get("market_impact", {})),
             "thesis": pred.get("thesis", ""),
             "timestamp": pred.get("timestamp"),
             "ensemble_metadata": pred.get("ensemble_metadata"),
         }
-        alerts.append(alert)
+        alerts.append(enrich_alert(alert))
 
     # Get active subscribers
     subscriptions = get_active_subscriptions()
