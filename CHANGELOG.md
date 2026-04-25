@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Alert Quality (Play 4)** — Unified alert enrichment across both dispatch paths
+  - Calibrated confidence displayed in all Telegram alerts
+  - Historical Echoes (similar posts + win rate) included in alerts via shared `enrich_alert()`
+  - Ticker blocklist expanded: GOLD, STEEL, COAL, and 12 other false positives now blocked
+  - Both cron engine and event consumer produce identically enriched alerts
 - **Signals Migration Complete** — All readers now use `signals` table instead of legacy `truth_social_shitposts`
   - Analyzer reads from `SignalOperations.get_unprocessed_signals()` instead of `ShitpostOperations`
   - Predictions now write `signal_id` FK (was `shitpost_id`)
