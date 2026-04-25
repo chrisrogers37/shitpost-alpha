@@ -375,11 +375,14 @@ def get_new_predictions_since(since: datetime) -> List[Dict[str, Any]]:
             p.assets,
             p.market_impact,
             p.confidence,
+            p.calibrated_confidence,
             p.thesis,
             p.analysis_status,
             p.ensemble_metadata,
-            p.created_at as prediction_created_at
+            p.created_at as prediction_created_at,
+            s.text as text
         FROM predictions p
+        LEFT JOIN signals s ON s.signal_id = p.signal_id
         WHERE p.analysis_status = 'completed'
             AND p.created_at > :since
             AND p.confidence IS NOT NULL
