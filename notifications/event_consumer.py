@@ -66,21 +66,10 @@ class NotificationsWorker(EventWorker):
             "ensemble_metadata": payload.get("ensemble_metadata"),
         }
 
-        # Enrich alert with Historical Echoes
-        try:
-            from shit.echoes.echo_service import EchoService
+        # Enrich alert with calibrated confidence and historical echoes
+        from notifications.alert_engine import enrich_alert
 
-            echo_service = EchoService()
-            embedding = echo_service.get_embedding(prediction_id)
-            if embedding:
-                matches = echo_service.find_similar_posts(
-                    embedding,
-                    limit=5,
-                    exclude_prediction_id=prediction_id,
-                )
-                alert["echoes"] = echo_service.aggregate_echoes(matches, timeframe="t7")
-        except Exception as e:
-            logger.debug(f"Echo lookup skipped for prediction {prediction_id}: {e}")
+        alert = enrich_alert(alert)
 
         results = {"alerts_sent": 0, "alerts_failed": 0, "filtered": 0}
 

@@ -151,7 +151,12 @@ class TestNotificationsWorker:
         assert result["alerts_sent"] == 1
         assert result["alerts_failed"] == 0
         assert result["filtered"] == 0
-        mock_send.assert_called_once_with(12345, "Alert: TSLA prediction")
+        mock_send.assert_called_once()
+        call_args = mock_send.call_args
+        assert call_args[0][0] == 12345
+        assert call_args[0][1] == "Alert: TSLA prediction"
+        # reply_markup is passed as keyword arg when prediction_id is present
+        assert "reply_markup" in call_args[1]
         mock_record_sent.assert_called_once_with(12345)
 
     @patch("notifications.telegram_sender.send_telegram_message")

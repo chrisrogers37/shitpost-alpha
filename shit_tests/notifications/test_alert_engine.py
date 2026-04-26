@@ -8,6 +8,7 @@ from unittest.mock import patch
 from notifications.alert_engine import (
     _extract_sentiment,
     check_and_dispatch,
+    enrich_alert,
     filter_predictions_by_preferences,
     is_in_quiet_hours,
 )
@@ -333,3 +334,67 @@ class TestCalibratedConfidenceFiltering:
         alert = {"prediction_id": 1, "confidence": 0.85, "assets": ["AAPL"], "sentiment": "bullish"}
         result = filter_predictions_by_preferences([alert], self._prefs(0.7))
         assert len(result) == 1
+
+
+class TestEnrichAlert:
+    """Tests for the unified alert enrichment function.
+
+    CalibrationService and EchoService are imported lazily inside enrich_alert()
+    via `from X import Y` inside try blocks.  Those imports resolve through their
+    source modules, so we patch them there.
+    """
+
+    def test_adds_calibrated_confidence(self):
+        """enrich_alert adds calibrated_confidence from CalibrationService."""
+        alert = {"prediction_id": 1, "confidence": 0.8}
+        with patch("shit.market_data.calibration.CalibrationService") as mock_cal:
+            mock_cal.return_value.calibrate.return_value = 0.65
+            result = enrich_alert(alert)
+        assert result["calibrated_confidence"] == 0.65
+
+    def test_skips_calibration_if_already_set(self):
+        """enrich_alert does not overwrite existing calibrated_confidence."""
+        alert = {"prediction_id": 1, "confidence": 0.8, "calibrated_confidence": 0.7}
+        result = enrich_alert(alert)
+        assert result["calibrated_confidence"] == 0.7
+
+    def test_adds_echoes(self):
+        """enrich_alert adds echoes from EchoService."""
+        alert = {"prediction_id": 1, "confidence": 0.8}
+        echoes_result = {"count": 3, "win_rate": 0.67, "avg_return": 1.2}
+        with patch("shit.echoes.echo_service.EchoService") as mock_echo:
+            mock_echo.return_value.get_embedding.return_value = [0.1] * 1536
+            mock_echo.return_value.find_similar_posts.return_value = [{"prediction_id": 2}]
+            mock_echo.return_value.aggregate_echoes.return_value = echoes_result
+            with patch("shit.market_data.calibration.CalibrationService") as mock_cal:
+                mock_cal.return_value.calibrate.return_value = None
+                result = enrich_alert(alert)
+        assert result["echoes"] == echoes_result
+
+    def test_skips_echoes_if_no_prediction_id(self):
+        """enrich_alert skips echo lookup when prediction_id is missing."""
+        alert = {"confidence": 0.8}
+        result = enrich_alert(alert)
+        assert "echoes" not in result
+
+    def test_calibration_failure_does_not_block(self):
+        """enrich_alert continues when calibration raises an exception."""
+        alert = {"prediction_id": 1, "confidence": 0.8}
+        with patch(
+            "shit.market_data.calibration.CalibrationService",
+            side_effect=Exception("boom"),
+        ):
+            result = enrich_alert(alert)
+        assert "calibrated_confidence" not in result
+
+    def test_echo_failure_does_not_block(self):
+        """enrich_alert continues when echo service raises an exception."""
+        alert = {"prediction_id": 1, "confidence": 0.8}
+        with patch("shit.market_data.calibration.CalibrationService") as mock_cal:
+            mock_cal.return_value.calibrate.return_value = None
+            with patch(
+                "shit.echoes.echo_service.EchoService",
+                side_effect=Exception("boom"),
+            ):
+                result = enrich_alert(alert)
+        assert "echoes" not in result
