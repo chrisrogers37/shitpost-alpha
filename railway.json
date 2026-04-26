@@ -52,6 +52,26 @@
       "startCommand": "python -m shit.market_data mature-outcomes --emit-event",
       "cronSchedule": "0 6 * * *"
     },
+    "briefing-sender": {
+      "source": ".",
+      "startCommand": "python -m notifications briefing",
+      "cronSchedule": "30 12 * * 1-5"
+    },
+    "followup-sender": {
+      "source": ".",
+      "startCommand": "python -m notifications followup-check",
+      "cronSchedule": "*/5 * * * *"
+    },
+    "weekly-scorecard": {
+      "source": ".",
+      "startCommand": "python -m notifications scorecard",
+      "cronSchedule": "0 0 * * 1"
+    },
+    "calibration-refit": {
+      "source": ".",
+      "startCommand": "python -m shit.market_data.calibration --refit",
+      "cronSchedule": "0 0 * * 0"
+    },
     "shitpost-alpha-web": {
       "source": ".",
       "buildCommand": "cd frontend && npm ci && npm run build",
