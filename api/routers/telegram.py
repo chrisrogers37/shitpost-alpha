@@ -1,8 +1,11 @@
 """Telegram webhook router."""
 
+import hmac
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from shit.config.shitpost_settings import settings
 from shit.logging import get_service_logger
 
 logger = get_service_logger("api_telegram")
@@ -12,7 +15,14 @@ router = APIRouter()
 
 @router.post("/telegram/webhook")
 async def telegram_webhook(request: Request):
-    """Receive Telegram updates. Always returns 200 to prevent retries."""
+    """Receive Telegram updates. Verifies secret token when configured."""
+    if settings.TELEGRAM_WEBHOOK_SECRET:
+        token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+        if not token or not hmac.compare_digest(
+            token, settings.TELEGRAM_WEBHOOK_SECRET
+        ):
+            return JSONResponse({"ok": False}, status_code=403)
+
     try:
         update = await request.json()
     except Exception:

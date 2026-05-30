@@ -6,11 +6,12 @@ Serves the React frontend and JSON API for the single-post feed experience.
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from api.dependencies import verify_api_key  # noqa: F401 — used in router deps
 from api.routers import calibration, echoes, feed, prices, telegram
 
 
@@ -45,11 +46,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# API routers
-app.include_router(calibration.router, prefix="/api/calibration", tags=["calibration"])
-app.include_router(echoes.router, prefix="/api/echoes", tags=["echoes"])
-app.include_router(feed.router, prefix="/api/feed", tags=["feed"])
-app.include_router(prices.router, prefix="/api/prices", tags=["prices"])
+# API routers — authenticated
+_auth = [Depends(verify_api_key)]
+app.include_router(
+    calibration.router,
+    prefix="/api/calibration",
+    tags=["calibration"],
+    dependencies=_auth,
+)
+app.include_router(
+    echoes.router, prefix="/api/echoes", tags=["echoes"], dependencies=_auth
+)
+app.include_router(feed.router, prefix="/api/feed", tags=["feed"], dependencies=_auth)
+app.include_router(
+    prices.router, prefix="/api/prices", tags=["prices"], dependencies=_auth
+)
+# Telegram router — webhook has its own secret-token verification
 app.include_router(telegram.router, tags=["telegram"])
 
 

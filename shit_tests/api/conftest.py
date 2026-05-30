@@ -18,6 +18,11 @@ if project_root not in sys.path:
 # Set DATABASE_URL env var so sync_session module can import
 os.environ.setdefault("DATABASE_URL", "sqlite:///test.db")
 
+# Disable API auth and webhook secret by default so existing tests pass.
+# Dedicated auth tests override these via settings patches.
+os.environ.setdefault("API_KEY", "")
+os.environ.setdefault("TELEGRAM_WEBHOOK_SECRET", "")
+
 
 # ---------------------------------------------------------------------------
 # Row factory functions
