@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **API Key Authentication** — All data endpoints (`/api/feed`, `/api/prices`, `/api/calibration`, `/api/echoes`) now require an `X-API-Key` header when `API_KEY` env var is set. Health endpoints remain public. Frontend passes the key via `VITE_API_KEY` build-time env var.
+- **Telegram Webhook Verification** — `POST /telegram/webhook` now verifies the `X-Telegram-Bot-Api-Secret-Token` header against `TELEGRAM_WEBHOOK_SECRET` env var when configured. Prevents spoofed webhook payloads.
+
 ### Changed
 - **Alert Quality (Play 4)** — Unified alert enrichment across both dispatch paths
   - Calibrated confidence displayed in all Telegram alerts

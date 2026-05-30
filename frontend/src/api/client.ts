@@ -3,9 +3,14 @@
 import type { CalibrationCurveData, FeedResponse, LiveQuote, PriceResponse } from "../types/api";
 
 const BASE_URL = "";
+const API_KEY = import.meta.env.VITE_API_KEY ?? "";
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${url}`);
+  const headers: Record<string, string> = {};
+  if (API_KEY) {
+    headers["X-API-Key"] = API_KEY;
+  }
+  const res = await fetch(`${BASE_URL}${url}`, { headers });
   if (!res.ok) {
     throw new Error(`API error ${res.status}: ${res.statusText}`);
   }
