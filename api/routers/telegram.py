@@ -5,6 +5,7 @@ import hmac
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from api.rate_limit import limiter
 from shit.config.shitpost_settings import settings
 from shit.logging import get_service_logger
 
@@ -14,6 +15,7 @@ router = APIRouter()
 
 
 @router.post("/telegram/webhook")
+@limiter.limit("60/minute")
 async def telegram_webhook(request: Request):
     """Receive Telegram updates. Verifies secret token when configured."""
     if settings.TELEGRAM_WEBHOOK_SECRET:

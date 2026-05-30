@@ -10,8 +10,12 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from api.dependencies import verify_api_key  # noqa: F401 — used in router deps
+from api.middleware import SecurityHeadersMiddleware
+from api.rate_limit import limiter
 from api.routers import calibration, echoes, feed, prices, telegram
 
 
@@ -27,6 +31,13 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan,
 )
+
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Security headers
+app.add_middleware(SecurityHeadersMiddleware)
 
 # CORS — restrict origins in production, allow all in development
 _default_origins = "https://shitpost-alpha-web-production.up.railway.app"
