@@ -1,5 +1,6 @@
 """Shared dependencies for FastAPI endpoints."""
 
+import hmac  # noqa: F401 — used in verify_api_key
 from typing import Any
 
 from fastapi import HTTPException, Security
@@ -26,7 +27,7 @@ async def verify_api_key(
     """
     if not settings.API_KEY:
         return None
-    if not api_key or api_key != settings.API_KEY:
+    if not api_key or not hmac.compare_digest(api_key, settings.API_KEY):
         raise HTTPException(status_code=403, detail="Invalid or missing API key")
     return api_key
 
