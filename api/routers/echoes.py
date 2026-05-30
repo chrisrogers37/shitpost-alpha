@@ -1,12 +1,17 @@
 """API router for Historical Echoes — semantic similarity matches."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+
+from api.rate_limit import limiter
 
 router = APIRouter()
 
 
 @router.get("/for-prediction/{prediction_id}")
-def get_echoes(prediction_id: int, timeframe: str = "t7", limit: int = 5):
+@limiter.limit("30/minute")
+def get_echoes(
+    request: Request, prediction_id: int, timeframe: str = "t7", limit: int = 5
+):
     """Get historical echo matches for a prediction.
 
     Args:

@@ -2,16 +2,18 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from api.queries.price_queries import get_price_data
+from api.rate_limit import limiter
 from api.schemas.feed import LiveQuoteResponse, PriceResponse
 
 router = APIRouter()
 
 
 @router.get("/{symbol}/live", response_model=LiveQuoteResponse)
-def get_live_quote(symbol: str):
+@limiter.limit("30/minute")
+def get_live_quote(request: Request, symbol: str):
     """Get the current live price for a symbol.
 
     Uses yfinance fast_info for a lightweight single HTTP call (~300ms).
@@ -34,7 +36,9 @@ def get_live_quote(symbol: str):
 
 
 @router.get("/{symbol}", response_model=PriceResponse)
+@limiter.limit("30/minute")
 def get_prices(
+    request: Request,
     symbol: str,
     days: int = Query(default=30, ge=1, le=365),
     post_timestamp: Optional[str] = Query(default=None),

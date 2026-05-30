@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **API Key Authentication** — All data endpoints (`/api/feed`, `/api/prices`, `/api/calibration`, `/api/echoes`) now require an `X-API-Key` header when `API_KEY` env var is set. Health endpoints remain public. Frontend passes the key via `VITE_API_KEY` build-time env var.
 - **Telegram Webhook Verification** — `POST /telegram/webhook` now verifies the `X-Telegram-Bot-Api-Secret-Token` header against `TELEGRAM_WEBHOOK_SECRET` env var when configured. Prevents spoofed webhook payloads.
 
+### Added
+- **API Rate Limiting** — Per-IP rate limiting via `slowapi` on all REST endpoints
+  - `/api/feed/*`: 60 req/min
+  - `/api/prices/*`: 30 req/min (protects upstream yfinance)
+  - `/api/calibration/*`: 10 req/min
+  - `/api/echoes/*`: 30 req/min
+  - `/telegram/webhook`: 60 req/min
+- **Security Headers Middleware** — Standard security headers on all responses
+  - `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`
+  - `Strict-Transport-Security` (HSTS), `Referrer-Policy`, `Permissions-Policy`
+
 ### Changed
 - **Alert Quality (Play 4)** — Unified alert enrichment across both dispatch paths
   - Calibrated confidence displayed in all Telegram alerts

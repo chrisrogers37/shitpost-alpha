@@ -1,14 +1,17 @@
 """Calibration curve API endpoint."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
+from api.rate_limit import limiter
 from api.schemas.calibration import CalibrationCurveResponse
 
 router = APIRouter()
 
 
 @router.get("/curve", response_model=CalibrationCurveResponse)
+@limiter.limit("10/minute")
 def get_calibration_curve(
+    request: Request,
     timeframe: str = Query("t7", pattern="^t(1|3|7|30)$"),
 ):
     """Get the latest calibration curve for a given timeframe."""
