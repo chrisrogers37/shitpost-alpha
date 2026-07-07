@@ -4,9 +4,11 @@
 **Scan date**: 2026-07-02
 **Scan scope**: Full system — `shit/` (core infra), `shitposts/` + `shitvault/` + `shitpost_ai/` (pipeline), `shit/market_data/`, `api/` (FastAPI), `frontend/` (React), `notifications/` (Telegram), `shit/events/` (event queue), and the `shitpost_alpha.py` orchestrator.
 **Method**: Read-only source review of every subsystem. Highest-severity findings were spot-verified against the code.
-**Archive destination**: `documentation/archive/tech-debt-2026-07-02/` (move here when all workstreams close).
+**Location**: `documentation/planning/tech-debt-2026-07-02/` — durable analysis artifacts. Archive to `documentation/archive/` when all workstreams close.
 
-> This is a **triage tracker**, not a set of applied fixes. No production code was changed. Each finding has a stable ID (`C#`/`H#`/`M#`/`L#`) and is grouped into an actionable workstream (`01`–`12`) in the sibling files in this directory. `gh` is read-only in this environment, so findings are tracked here as markdown rather than as GitHub issues; each workstream file is written so it can be pasted into a GitHub issue verbatim.
+> This is a **triage tracker**, not a set of applied fixes. No production code was changed. Each finding has a stable ID (`C#`/`H#`/`M#`/`L#`) and is grouped into an actionable workstream (`01`–`14`) in the sibling files in this directory.
+>
+> **GitHub issues:** the CRITICAL (P0) and HIGH (P1) findings are filed as **individual** GitHub issues; MEDIUM (P2) and LOW (P3/P4/nice-to-have) findings are filed as **clustered** issues grouped by workstream/theme. See [`ISSUE_MAP.md`](ISSUE_MAP.md) for the finding-ID → issue-number mapping. Priority mapping: **P0 = CRITICAL, P1 = HIGH, P2 = MEDIUM, P3/P4/nice-to-have = LOW**.
 
 ---
 

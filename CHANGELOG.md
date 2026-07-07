@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Tech-Debt Tracker (2026-07-02)** — Full-system review triaged into `documentation/tech-debt-2026-07-02/`
+- **Tech-Debt Tracker (2026-07-02)** — Full-system review triaged into `documentation/planning/tech-debt-2026-07-02/` (durable analysis artifacts) and filed as GitHub issues
   - `00_TECH_DEBT.md` overview with a complete, ID'd inventory (5 CRITICAL, 16 HIGH, plus MEDIUM/LOW) across `shit/`, the pipeline, `api/`, `frontend/`, `notifications/`, and the event queue
   - 14 issue-ready workstream files (`01`–`14`), each scoped to one PR with findings, file/line references, proposed fixes, and acceptance criteria
   - Flags top production-correctness risks: degraded Telegram alerts (hardcoded neutral sentiment/empty thesis), analyzer range-mode infinite loop, dual CLI+event execution double-spend, orphaned `claimed` events, and missing alert-delivery idempotency
