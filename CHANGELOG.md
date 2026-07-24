@@ -46,6 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - **ShitpostOperations** — deprecated class deleted, replaced by `SignalOperations`
 - **Prediction.shitpost_id** — legacy FK removed from Python model (database column retained for historical rows)
+- **Dead-code cleanup (Phase 1)** — removed ~1,000 LOC of unused code (#187, #189, #192, #194)
+  - `shitvault/migrate_to_signals.py` — completed one-shot signals migration script (no runtime caller)
+  - `DatabaseUtils.transform_s3_data_to_shitpost` — superseded by `SignalTransformer` on the S3→`signals` path
+  - Unused resilience machinery in `shit/utils/error_handling.py` — `async_retry`, `sync_retry`, `CircuitBreaker`, `RateLimiter`, and their module-global instances (never wired into any live path; `handle_exceptions` retained)
+  - `shit/logging/progress_tracker.py` — dead progress-tracking module and its import-time `Icons.PROGRESS` monkeypatch
 
 ### Added
 - **Conviction Voting** — Inline Bull/Bear/Skip voting buttons on Telegram alerts with accuracy tracking
