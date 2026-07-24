@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Tech-Debt Tracker (2026-07-02)** — Full-system review triaged into `documentation/planning/tech-debt-2026-07-02/` (durable analysis artifacts) and filed as GitHub issues
+  - `00_TECH_DEBT.md` overview with a complete, ID'd inventory (5 CRITICAL, 16 HIGH, plus MEDIUM/LOW) across `shit/`, the pipeline, `api/`, `frontend/`, `notifications/`, and the event queue
+  - 14 issue-ready workstream files (`01`–`14`), each scoped to one PR with findings, file/line references, proposed fixes, and acceptance criteria
+  - Flags top production-correctness risks: degraded Telegram alerts (hardcoded neutral sentiment/empty thesis), analyzer range-mode infinite loop, dual CLI+event execution double-spend, orphaned `claimed` events, and missing alert-delivery idempotency
+  - Notes CHANGELOG drift: prior `[Unreleased]` claims of "Signals Migration Complete" and "identically enriched alerts" are contradicted by `shitvault/statistics.py` (legacy table) and `notifications/event_consumer.py` (hardcoded neutral)
+
 ### Security
 - **API Key Authentication** — All data endpoints (`/api/feed`, `/api/prices`, `/api/calibration`, `/api/echoes`) now require an `X-API-Key` header when `API_KEY` env var is set. Health endpoints remain public. Frontend passes the key via `VITE_API_KEY` build-time env var.
 - **Telegram Webhook Verification** — `POST /telegram/webhook` now verifies the `X-Telegram-Bot-Api-Secret-Token` header against `TELEGRAM_WEBHOOK_SECRET` env var when configured. Prevents spoofed webhook payloads.
