@@ -1,8 +1,10 @@
 ---
 title: "Phase 1 — Dead-code deletions"
 session: dead-code-cleanup_2026-07-24
-status: IN PROGRESS
+status: COMPLETE
 started: 2026-07-24
+completed: 2026-07-24
+pr: 234
 issues: [187, 189, 192, 194]
 code_area: shitvault, shit/db, shit/utils, shit/logging
 risk: very low
