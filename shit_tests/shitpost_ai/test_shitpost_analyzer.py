@@ -349,7 +349,7 @@ class TestShitpostAnalyzer:
             result = await analyzer._analyze_batch(shitposts, dry_run=False, batch_number=1)
             
             assert result == 1
-            mock_check.assert_called_once_with(sample_shitpost_data['shitpost_id'], use_signal=True)
+            mock_check.assert_called_once_with(sample_shitpost_data['shitpost_id'])
             mock_analyze.assert_called_once_with(sample_shitpost_data, False)
 
     @pytest.mark.asyncio

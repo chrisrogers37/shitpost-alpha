@@ -181,7 +181,8 @@ def mock_settings():
         mock_settings.ANTHROPIC_API_KEY = "test_anthropic_key"
         mock_settings.LLM_PROVIDER = "openai"
         mock_settings.LLM_MODEL = "gpt-4"
-        mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+        mock_settings.TRUTH_SOCIAL_USER_ID = "107780257626128497"
+        mock_settings.SCRAPECREATORS_BASE_URL = "https://api.scrapecreators.com/v1"
         mock_settings.TRUTH_SOCIAL_SHITPOST_INTERVAL = 30
         mock_settings.SCRAPECREATORS_API_KEY = "test_scrapecreators_key"
         mock_settings.CONFIDENCE_THRESHOLD = 0.7
@@ -543,7 +544,7 @@ def setup_test_environment():
     os.environ['XAI_API_KEY'] = 'test_xai_key'
     os.environ['LLM_PROVIDER'] = 'openai'
     os.environ['LLM_MODEL'] = 'gpt-4'
-    os.environ['TRUTH_SOCIAL_USERNAME'] = 'realDonaldTrump'
+    os.environ['TRUTH_SOCIAL_USER_ID'] = '107780257626128497'
     os.environ['TRUTH_SOCIAL_MONITOR_INTERVAL'] = '30'
     os.environ['CONFIDENCE_THRESHOLD'] = '0.7'
     os.environ['MAX_POST_LENGTH'] = '4000'
@@ -553,7 +554,7 @@ def setup_test_environment():
     # Cleanup
     for key in ['ENVIRONMENT', 'DEBUG', 'DATABASE_URL', 'OPENAI_API_KEY',
                 'ANTHROPIC_API_KEY', 'XAI_API_KEY', 'LLM_PROVIDER', 'LLM_MODEL',
-                'TRUTH_SOCIAL_USERNAME', 'TRUTH_SOCIAL_MONITOR_INTERVAL',
+                'TRUTH_SOCIAL_USER_ID', 'TRUTH_SOCIAL_MONITOR_INTERVAL',
                 'CONFIDENCE_THRESHOLD', 'MAX_POST_LENGTH']:
         if key in os.environ:
             del os.environ[key]

@@ -28,7 +28,7 @@ class TestSettingsInitialization:
         assert hasattr(settings, 'ANTHROPIC_API_KEY')
         assert hasattr(settings, 'LLM_PROVIDER')
         assert hasattr(settings, 'LLM_MODEL')
-        assert hasattr(settings, 'TRUTH_SOCIAL_USERNAME')
+        assert hasattr(settings, 'TRUTH_SOCIAL_USER_ID')
         assert hasattr(settings, 'TRUTH_SOCIAL_SHITPOST_INTERVAL')
         assert hasattr(settings, 'CONFIDENCE_THRESHOLD')
         assert hasattr(settings, 'MAX_SHITPOST_LENGTH')
@@ -50,7 +50,7 @@ class TestSettingsInitialization:
         assert isinstance(settings.DATABASE_URL, str)
         assert isinstance(settings.LLM_PROVIDER, str)
         assert isinstance(settings.LLM_MODEL, str)
-        assert isinstance(settings.TRUTH_SOCIAL_USERNAME, str)
+        assert isinstance(settings.TRUTH_SOCIAL_USER_ID, str)
         assert isinstance(settings.TRUTH_SOCIAL_SHITPOST_INTERVAL, int)
         assert isinstance(settings.CONFIDENCE_THRESHOLD, float)
         assert isinstance(settings.MAX_SHITPOST_LENGTH, int)
@@ -70,7 +70,7 @@ class TestSettingsInitialization:
             'ANTHROPIC_API_KEY': 'test-anthropic-key',
             'LLM_PROVIDER': 'anthropic',
             'LLM_MODEL': 'claude-3-sonnet',
-            'TRUTH_SOCIAL_USERNAME': 'testuser',
+            'TRUTH_SOCIAL_USER_ID': 'testuser',
             'TRUTH_SOCIAL_SHITPOST_INTERVAL': '60',
             'CONFIDENCE_THRESHOLD': '0.8',
             'MAX_SHITPOST_LENGTH': '5000',
@@ -98,7 +98,7 @@ class TestSettingsInitialization:
             assert settings.ANTHROPIC_API_KEY == "test-anthropic-key"
             assert settings.LLM_PROVIDER == "anthropic"
             assert settings.LLM_MODEL == "claude-3-sonnet"
-            assert settings.TRUTH_SOCIAL_USERNAME == "testuser"
+            assert settings.TRUTH_SOCIAL_USER_ID == "testuser"
             assert settings.TRUTH_SOCIAL_SHITPOST_INTERVAL == 60
             assert settings.CONFIDENCE_THRESHOLD == 0.8
             assert settings.MAX_SHITPOST_LENGTH == 5000
@@ -413,7 +413,8 @@ class TestGlobalSettingsInstance:
         assert settings.ENVIRONMENT == "development"
         assert settings.DEBUG is True
         assert settings.LLM_PROVIDER == "openai"
-        assert settings.TRUTH_SOCIAL_USERNAME == "realDonaldTrump"
+        assert settings.TRUTH_SOCIAL_USER_ID == "107780257626128497"
+        assert settings.SCRAPECREATORS_BASE_URL == "https://api.scrapecreators.com/v1"
 
 
 class TestEnvironmentFileLoading:
@@ -556,11 +557,11 @@ class TestEdgeCases:
         unicode_bucket = "shitpost-alpha-raw-data-测试"
         
         settings = Settings(
-            TRUTH_SOCIAL_USERNAME=unicode_username,
+            TRUTH_SOCIAL_USER_ID=unicode_username,
             S3_BUCKET_NAME=unicode_bucket
         )
         
-        assert settings.TRUTH_SOCIAL_USERNAME == unicode_username
+        assert settings.TRUTH_SOCIAL_USER_ID == unicode_username
         assert settings.S3_BUCKET_NAME == unicode_bucket
 
     def test_special_characters_in_values(self):
@@ -591,7 +592,7 @@ class TestSettingsDocumentation:
         assert settings.DATABASE_URL is not None
         assert settings.LLM_PROVIDER is not None
         assert settings.LLM_MODEL is not None
-        assert settings.TRUTH_SOCIAL_USERNAME is not None
+        assert settings.TRUTH_SOCIAL_USER_ID is not None
         assert settings.TRUTH_SOCIAL_SHITPOST_INTERVAL is not None
         assert settings.CONFIDENCE_THRESHOLD is not None
         assert settings.MAX_SHITPOST_LENGTH is not None
@@ -636,7 +637,7 @@ class TestSettingsDocumentation:
         assert isinstance(settings.DATABASE_URL, str)
         assert isinstance(settings.LLM_PROVIDER, str)
         assert isinstance(settings.LLM_MODEL, str)
-        assert isinstance(settings.TRUTH_SOCIAL_USERNAME, str)
+        assert isinstance(settings.TRUTH_SOCIAL_USER_ID, str)
         assert isinstance(settings.TRUTH_SOCIAL_SHITPOST_INTERVAL, int)
         assert isinstance(settings.CONFIDENCE_THRESHOLD, float)
         assert isinstance(settings.MAX_SHITPOST_LENGTH, int)

@@ -46,7 +46,8 @@ class TestTruthSocialS3Harvester:
     def harvester(self):
         """TruthSocialS3Harvester instance for testing."""
         with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
-            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+            mock_settings.SCRAPECREATORS_BASE_URL = "https://api.scrapecreators.com/v1"
+            mock_settings.TRUTH_SOCIAL_USER_ID = "107780257626128497"
             mock_settings.SCRAPECREATORS_API_KEY = "test_key"
             mock_settings.S3_BUCKET_NAME = "test-bucket"
             mock_settings.S3_PREFIX = "test-prefix"
@@ -65,7 +66,8 @@ class TestTruthSocialS3Harvester:
     def test_initialization_defaults(self):
         """Test harvester initialization with default values."""
         with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
-            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+            mock_settings.SCRAPECREATORS_BASE_URL = "https://api.scrapecreators.com/v1"
+            mock_settings.TRUTH_SOCIAL_USER_ID = "107780257626128497"
             mock_settings.SCRAPECREATORS_API_KEY = "test_key"
             mock_settings.S3_BUCKET_NAME = "test-bucket"
             mock_settings.S3_PREFIX = "test-prefix"
@@ -80,13 +82,13 @@ class TestTruthSocialS3Harvester:
             assert harvester.end_date is None
             assert harvester.limit is None
             assert harvester.max_id is None
-            assert harvester.username == "realDonaldTrump"
             assert harvester.user_id == "107780257626128497"
 
     def test_initialization_with_parameters(self):
         """Test harvester initialization with all parameters."""
         with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
-            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+            mock_settings.SCRAPECREATORS_BASE_URL = "https://api.scrapecreators.com/v1"
+            mock_settings.TRUTH_SOCIAL_USER_ID = "107780257626128497"
             mock_settings.SCRAPECREATORS_API_KEY = "test_key"
             mock_settings.S3_BUCKET_NAME = "test-bucket"
             mock_settings.S3_PREFIX = "test-prefix"
@@ -113,7 +115,8 @@ class TestTruthSocialS3Harvester:
         """Test harvester initialization defaults end_date to today."""
         with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings, \
              patch('shitposts.base_harvester.datetime') as mock_datetime:
-            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+            mock_settings.SCRAPECREATORS_BASE_URL = "https://api.scrapecreators.com/v1"
+            mock_settings.TRUTH_SOCIAL_USER_ID = "107780257626128497"
             mock_settings.SCRAPECREATORS_API_KEY = "test_key"
             mock_settings.S3_BUCKET_NAME = "test-bucket"
             mock_settings.S3_PREFIX = "test-prefix"
@@ -136,7 +139,8 @@ class TestTruthSocialS3Harvester:
     def test_source_name(self):
         """Test that get_source_name returns correct value."""
         with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
-            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+            mock_settings.SCRAPECREATORS_BASE_URL = "https://api.scrapecreators.com/v1"
+            mock_settings.TRUTH_SOCIAL_USER_ID = "107780257626128497"
             mock_settings.SCRAPECREATORS_API_KEY = "test_key"
             harvester = TruthSocialS3Harvester()
             assert harvester.get_source_name() == "truth_social"
@@ -144,7 +148,8 @@ class TestTruthSocialS3Harvester:
     def test_s3_prefix_backward_compat(self):
         """Test that S3 prefix uses hyphenated form for backward compatibility."""
         with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
-            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+            mock_settings.SCRAPECREATORS_BASE_URL = "https://api.scrapecreators.com/v1"
+            mock_settings.TRUTH_SOCIAL_USER_ID = "107780257626128497"
             mock_settings.SCRAPECREATORS_API_KEY = "test_key"
             harvester = TruthSocialS3Harvester()
             assert harvester._get_s3_prefix() == "truth-social"
@@ -597,7 +602,8 @@ class TestTruthSocialS3Harvester:
     async def test_harvest_range_mode_date_filtering(self):
         """Test harvesting with date range filtering."""
         with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
-            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+            mock_settings.SCRAPECREATORS_BASE_URL = "https://api.scrapecreators.com/v1"
+            mock_settings.TRUTH_SOCIAL_USER_ID = "107780257626128497"
             mock_settings.SCRAPECREATORS_API_KEY = "test_key"
 
             harvester = TruthSocialS3Harvester(
@@ -652,7 +658,8 @@ class TestTruthSocialS3Harvester:
     async def test_harvest_stops_before_start_date(self):
         """Test harvest stops when reaching posts before start date."""
         with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
-            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+            mock_settings.SCRAPECREATORS_BASE_URL = "https://api.scrapecreators.com/v1"
+            mock_settings.TRUTH_SOCIAL_USER_ID = "107780257626128497"
             mock_settings.SCRAPECREATORS_API_KEY = "test_key"
 
             harvester = TruthSocialS3Harvester(

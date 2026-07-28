@@ -108,9 +108,10 @@ async def get_data_stats(self) -> S3Stats
 ### Environment Variables
 ```bash
 # Truth Social Configuration
-TRUTH_SOCIAL_USERNAME=realDonaldTrump        # Target username
+TRUTH_SOCIAL_USER_ID=107780257626128497      # Target account id (selects the account)
 TRUTH_SOCIAL_SHITPOST_INTERVAL=30            # Harvest interval (seconds)
 SCRAPECREATORS_API_KEY=your_api_key_here     # ScrapeCreators API key
+SCRAPECREATORS_BASE_URL=https://api.scrapecreators.com/v1  # API base URL (default; override rarely needed)
 
 # S3 Data Lake Configuration
 S3_BUCKET_NAME=your-s3-bucket-name           # S3 bucket for raw data storage

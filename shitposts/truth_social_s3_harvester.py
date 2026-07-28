@@ -38,11 +38,10 @@ class TruthSocialS3Harvester(SignalHarvester):
         super().__init__(mode=mode, start_date=start_date, end_date=end_date, limit=limit)
 
         # Truth Social-specific config
-        self.username = settings.TRUTH_SOCIAL_USERNAME
         self.max_id = max_id
         self.api_key = settings.SCRAPECREATORS_API_KEY
-        self.base_url = "https://api.scrapecreators.com/v1"
-        self.user_id = "107780257626128497"  # Trump's Truth Social user ID
+        self.base_url = settings.SCRAPECREATORS_BASE_URL
+        self.user_id = settings.TRUTH_SOCIAL_USER_ID
 
         # HTTP session (created in _test_connection)
         self.session: Optional[aiohttp.ClientSession] = None
