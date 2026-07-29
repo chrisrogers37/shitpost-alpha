@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **Ignore Claude fleet bot telemetry paths** — narrow any-depth `.gitignore` rules for `data/events/fleet-*.jsonl`, `data/.last-tool-call`, `data/.idle`: the files Claudlobby supervision hooks can write relative to the session cwd when the bot environment is absent (Claudfather/Claudlobby#874). Prevents a broad `git add` in an agent checkout from staging fleet telemetry into this public repo; product `data/` paths are unaffected.
+
 ### Added
 - **Tech-Debt Tracker (2026-07-02)** — Full-system review triaged into `documentation/planning/tech-debt-2026-07-02/` (durable analysis artifacts) and filed as GitHub issues
   - `00_TECH_DEBT.md` overview with a complete, ID'd inventory (5 CRITICAL, 16 HIGH, plus MEDIUM/LOW) across `shit/`, the pipeline, `api/`, `frontend/`, `notifications/`, and the event queue
