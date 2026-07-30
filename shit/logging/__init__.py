@@ -37,6 +37,7 @@ from .service_loggers import (
     get_s3_logger,
     get_database_logger,
     get_llm_logger,
+    get_cli_logger,
 )
 
 from .cli_logging import (
