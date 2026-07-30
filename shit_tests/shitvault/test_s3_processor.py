@@ -379,3 +379,60 @@ class TestS3Processor:
 
         assert stats['successful'] == 0
         assert stats['failed'] == 1
+
+    # --- #191: shared process_keys / _emit_signals_stored ---
+
+    @pytest.mark.asyncio
+    async def test_process_keys_returns_stats_without_signal_ids(
+        self, s3_processor, mock_s3_data_lake, sample_s3_data
+    ):
+        """process_keys runs the loop and returns stats with signal_ids popped."""
+        mock_s3_data_lake.get_raw_data = AsyncMock(return_value=sample_s3_data)
+
+        with patch.object(s3_processor, "_emit_signals_stored") as mock_emit:
+            result = await s3_processor.process_keys(["k1.json", "k2.json"], dry_run=False)
+
+        assert result["total_processed"] == 2
+        assert result["successful"] == 2
+        assert result["failed"] == 0
+        assert result["skipped"] == 0
+        # signal_ids is popped before return (matches the streaming path contract)
+        assert "signal_ids" not in result
+        mock_emit.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_process_keys_empty_list_is_graceful(self, s3_processor):
+        """An empty key list returns a zeroed stats dict and emits nothing."""
+        with patch.object(s3_processor, "_emit_signals_stored") as mock_emit:
+            result = await s3_processor.process_keys([], dry_run=False)
+
+        assert result["total_processed"] == 0
+        assert "signal_ids" not in result
+        # helper is still called with the empty list; it no-ops internally
+        mock_emit.assert_called_once_with([], False)
+
+    def test_emit_signals_stored_fires_once(self, s3_processor):
+        """_emit_signals_stored emits exactly one SIGNALS_STORED event."""
+        with patch("shit.events.producer.emit_event") as mock_emit_event:
+            s3_processor._emit_signals_stored(["sig1", "sig2"], dry_run=False)
+
+        assert mock_emit_event.call_count == 1
+        _, kwargs = mock_emit_event.call_args
+        assert kwargs["payload"]["signal_ids"] == ["sig1", "sig2"]
+        assert kwargs["payload"]["count"] == 2
+
+    def test_emit_signals_stored_noop_on_empty_or_dry_run(self, s3_processor):
+        """No event is emitted for an empty list or in dry-run mode."""
+        with patch("shit.events.producer.emit_event") as mock_emit_event:
+            s3_processor._emit_signals_stored([], dry_run=False)
+            s3_processor._emit_signals_stored(["sig1"], dry_run=True)
+
+        mock_emit_event.assert_not_called()
+
+    def test_emit_signals_stored_best_effort_swallows(self, s3_processor):
+        """A failing emit is swallowed (best-effort) rather than raised."""
+        with patch(
+            "shit.events.producer.emit_event", side_effect=RuntimeError("boom")
+        ):
+            # Must not raise — signals are already committed by this point.
+            s3_processor._emit_signals_stored(["sig1"], dry_run=False)

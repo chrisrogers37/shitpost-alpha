@@ -1,7 +1,8 @@
 ---
 title: "Phase 5 — Structural cleanup + small correctness"
 session: dead-code-cleanup_2026-07-24
-status: READY
+status: IN PROGRESS
+started: 2026-07-30
 issues: [191, 231]
 code_area: shitvault, shit/db, shit/content, api
 risk: low-medium

@@ -81,32 +81,33 @@ class S3Processor:
             logger.info(f"Date range: {start_date} to {end_date}")
             logger.info(f"Limit: {limit}")
             
-            stats = {
-                'total_processed': 0,
-                'successful': 0,
-                'failed': 0,
-                'skipped': 0,
-                'signal_ids': [],
-            }
-            
             # Process S3 data (use filtered keys if in incremental mode)
             if incremental and most_recent_post_id and 's3_keys' in locals():
-                # Process only the filtered S3 keys (newer posts)
-                for s3_key in s3_keys:
-                    stats['total_processed'] += 1
-                    s3_data = await self.s3_data_lake.get_raw_data(s3_key)
-                    if s3_data:
-                        await self._process_single_s3_data(s3_data, stats, dry_run)
+                # Delegate to the shared key-processing path (builds stats, runs
+                # the get_raw_data -> _process_single_s3_data loop, and emits
+                # SIGNALS_STORED once via _emit_signals_stored).
+                stats = await self.process_keys(s3_keys, dry_run)
             else:
                 # Normal processing - stream all data
+                stats = {
+                    'total_processed': 0,
+                    'successful': 0,
+                    'failed': 0,
+                    'skipped': 0,
+                    'signal_ids': [],
+                }
                 async for s3_data in self.s3_data_lake.stream_raw_data(start_date, end_date, limit):
                     stats['total_processed'] += 1
                     await self._process_single_s3_data(s3_data, stats, dry_run)
-                
+
                 # Log progress (less frequently)
                 if stats['total_processed'] % 500 == 0:
                     logger.info(f"Processed {stats['total_processed']} records...")
-            
+
+                # Emit once for the streamed signals (shared best-effort helper).
+                signal_ids = stats.pop('signal_ids', [])
+                self._emit_signals_stored(signal_ids, dry_run)
+
             if dry_run:
                 logger.info(f"S3 to Database processing completed (DRY RUN):")
                 logger.info(f"  Total processed: {stats['total_processed']}")
@@ -119,31 +120,64 @@ class S3Processor:
                 logger.info(f"  Successful: {stats['successful']}")
                 logger.info(f"  Failed: {stats['failed']}")
                 logger.info(f"  Skipped: {stats['skipped']}")
-            
-            # Emit event for downstream consumers
-            signal_ids = stats.pop('signal_ids', [])
-            if signal_ids and not dry_run:
-                try:
-                    from shit.events.producer import emit_event
-                    from shit.events.event_types import EventType
-
-                    emit_event(
-                        event_type=EventType.SIGNALS_STORED,
-                        payload={
-                            "signal_ids": signal_ids,
-                            "source": self.source,
-                            "count": len(signal_ids),
-                        },
-                        source_service="s3_processor",
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to emit signals_stored event: {e}")
 
             return stats
 
         except Exception as e:
             logger.error(f"Error in S3 to Database processing: {e}")
             raise
+
+    async def process_keys(self, s3_keys, dry_run: bool = False) -> Dict[str, int]:
+        """Process a list of S3 keys into the database and emit SIGNALS_STORED.
+
+        Single shared entry point for both the incremental branch of
+        process_s3_to_database and the event-driven S3ProcessorWorker, so the
+        stats-building + get_raw_data -> _process_single_s3_data loop + event
+        emission live in exactly one place (no cross-module reach into the
+        private _process_single_s3_data). Handles an empty key list gracefully
+        (returns a zeroed stats dict and emits nothing).
+        """
+        stats = {
+            'total_processed': 0,
+            'successful': 0,
+            'failed': 0,
+            'skipped': 0,
+            'signal_ids': [],
+        }
+        for s3_key in s3_keys:
+            stats['total_processed'] += 1
+            s3_data = await self.s3_data_lake.get_raw_data(s3_key)
+            if s3_data:
+                await self._process_single_s3_data(s3_data, stats, dry_run)
+
+        signal_ids = stats.pop('signal_ids', [])
+        self._emit_signals_stored(signal_ids, dry_run)
+        return stats
+
+    def _emit_signals_stored(self, signal_ids, dry_run: bool = False) -> None:
+        """Emit a single SIGNALS_STORED event (best-effort).
+
+        Extracted so the streaming branch and process_keys share one emission
+        block. Best-effort: the signals are already committed by this point, so
+        an emit failure is logged and swallowed rather than failing the batch.
+        """
+        if not signal_ids or dry_run:
+            return
+        try:
+            from shit.events.producer import emit_event
+            from shit.events.event_types import EventType
+
+            emit_event(
+                event_type=EventType.SIGNALS_STORED,
+                payload={
+                    "signal_ids": signal_ids,
+                    "source": self.source,
+                    "count": len(signal_ids),
+                },
+                source_service="s3_processor",
+            )
+        except Exception as e:
+            logger.warning(f"Failed to emit signals_stored event: {e}")
     
     async def _get_most_recent_post_id(self) -> Optional[str]:
         """Get the most recent processed signal ID from the database.
