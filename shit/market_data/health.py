@@ -4,7 +4,7 @@ Monitors data freshness, provider availability, and overall pipeline health.
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 
 from sqlalchemy import func
@@ -237,7 +237,7 @@ def run_health_check(
         summary = f"{len(issues)} issue(s) detected: " + "; ".join(issues)
 
     report = HealthReport(
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         overall_healthy=overall_healthy,
         providers=providers_status,
         freshness=freshness_status,

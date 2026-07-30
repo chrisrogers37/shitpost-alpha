@@ -6,7 +6,7 @@ Uses the project's sync session pattern from shit/db/sync_session.py.
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
@@ -296,7 +296,7 @@ def update_subscription(chat_id: str, **kwargs: Any) -> bool:
 def deactivate_subscription(chat_id: str) -> bool:
     """Deactivate (unsubscribe) a Telegram subscription."""
     return update_subscription(
-        chat_id, is_active=False, unsubscribed_at=datetime.utcnow()
+        chat_id, is_active=False, unsubscribed_at=datetime.now(timezone.utc)
     )
 
 

@@ -3,7 +3,7 @@ Market Data Models
 SQLAlchemy models for tracking stock prices and prediction outcomes.
 """
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Optional
 from sqlalchemy import (
     CheckConstraint,
@@ -51,7 +51,7 @@ class MarketPrice(Base, IDMixin, TimestampMixin):
     # Data source tracking
     source = Column(String(50), default="yfinance")  # yfinance, alpha_vantage, etc.
     last_updated = Column(
-        DateTime, default=datetime.utcnow
+        DateTime, default=lambda: datetime.now(timezone.utc)
     )  # When this data was fetched
 
     # Metadata

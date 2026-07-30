@@ -111,12 +111,12 @@ class NotificationsWorker(EventWorker):
                             from notifications.followups import (
                                 create_followup_tracking,
                             )
-                            from datetime import datetime
+                            from datetime import datetime, timezone
 
                             create_followup_tracking(
                                 prediction_id=prediction_id,
                                 chat_id=chat_id,
-                                alert_sent_at=datetime.utcnow(),
+                                alert_sent_at=datetime.now(timezone.utc),
                             )
                         except Exception:
                             logger.debug(

@@ -5,7 +5,7 @@ Uses generic Base class from shit/db/data_models.
 Note: Field names match Truth Social API structure for direct mapping.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
 from sqlalchemy import (
     CheckConstraint,
@@ -34,7 +34,7 @@ class TruthSocialShitpost(Base, IDMixin, TimestampMixin):
         String(255), unique=True, index=True
     )  # Original Truth Social post ID
     content = Column(Text, nullable=False)
-    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
+    timestamp = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     username = Column(String(100), nullable=False)
     platform = Column(String(50), default="truth_social")
 

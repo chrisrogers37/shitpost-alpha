@@ -7,7 +7,7 @@ every 2 minutes, completely decoupled from the dashboard.
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 from notifications.db import (
@@ -95,7 +95,7 @@ def check_and_dispatch() -> Dict[str, Any]:
     # Determine the time window
     last_check = get_last_alert_check()
     if last_check is None:
-        since = datetime.utcnow() - timedelta(minutes=5)
+        since = datetime.now(timezone.utc) - timedelta(minutes=5)
     else:
         since = last_check
 
@@ -174,7 +174,7 @@ def check_and_dispatch() -> Dict[str, Any]:
                         create_followup_tracking(
                             prediction_id=prediction_id,
                             chat_id=chat_id,
-                            alert_sent_at=datetime.utcnow(),
+                            alert_sent_at=datetime.now(timezone.utc),
                         )
                     except Exception:
                         logger.debug(
