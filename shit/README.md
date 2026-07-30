@@ -223,9 +223,10 @@ LLM_PROVIDER=openai  # or anthropic
 LLM_MODEL=gpt-4  # or claude-3-sonnet-20240229
 
 # Truth Social Configuration
-TRUTH_SOCIAL_USERNAME=realDonaldTrump
+TRUTH_SOCIAL_USER_ID=107780257626128497
 TRUTH_SOCIAL_SHITPOST_INTERVAL=30
 SCRAPECREATORS_API_KEY=your_scrapecreators_api_key
+SCRAPECREATORS_BASE_URL=https://api.scrapecreators.com/v1
 
 # Analysis Configuration
 CONFIDENCE_THRESHOLD=0.7

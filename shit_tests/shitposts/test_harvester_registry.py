@@ -177,14 +177,16 @@ class TestCreateDefaultRegistry:
 
     def test_includes_truth_social(self):
         with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
-            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+            mock_settings.SCRAPECREATORS_BASE_URL = "https://api.scrapecreators.com/v1"
+            mock_settings.TRUTH_SOCIAL_USER_ID = "107780257626128497"
             mock_settings.SCRAPECREATORS_API_KEY = "test_key"
             registry = create_default_registry()
             assert "truth_social" in registry.list_sources()
 
     def test_truth_social_is_enabled(self):
         with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
-            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+            mock_settings.SCRAPECREATORS_BASE_URL = "https://api.scrapecreators.com/v1"
+            mock_settings.TRUTH_SOCIAL_USER_ID = "107780257626128497"
             mock_settings.SCRAPECREATORS_API_KEY = "test_key"
             registry = create_default_registry()
             assert "truth_social" in registry.list_enabled_sources()
@@ -192,7 +194,8 @@ class TestCreateDefaultRegistry:
     def test_creates_truth_social_harvester(self):
         from shitposts.truth_social_s3_harvester import TruthSocialS3Harvester
         with patch('shitposts.truth_social_s3_harvester.settings') as mock_settings:
-            mock_settings.TRUTH_SOCIAL_USERNAME = "realDonaldTrump"
+            mock_settings.SCRAPECREATORS_BASE_URL = "https://api.scrapecreators.com/v1"
+            mock_settings.TRUTH_SOCIAL_USER_ID = "107780257626128497"
             mock_settings.SCRAPECREATORS_API_KEY = "test_key"
             registry = create_default_registry()
             harvester = registry.create_harvester("truth_social")

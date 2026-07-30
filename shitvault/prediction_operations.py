@@ -45,8 +45,6 @@ class PredictionOperations:
         content_id: str,
         analysis_data: Dict[str, Any],
         content_data: Dict[str, Any] = None,
-        *,
-        use_signal: bool = True,
     ) -> Optional[str]:
         """Store LLM analysis results in the database with enhanced content data.
 
@@ -54,7 +52,6 @@ class PredictionOperations:
             content_id: Signal ID for the content.
             analysis_data: LLM analysis results dict.
             content_data: Content data dict (signal or shitpost format).
-            use_signal: Deprecated, ignored. Always stores as signal_id.
         """
         try:
             # Calculate engagement scores (use generic names with fallback)
@@ -153,8 +150,6 @@ class PredictionOperations:
         content_id: str,
         content_data: Dict[str, Any],
         bypass_reason: Optional[BypassReason] = None,
-        *,
-        use_signal: bool = True,
     ) -> Optional[str]:
         """
         Create a prediction record for posts that can't be analyzed.
@@ -164,7 +159,6 @@ class PredictionOperations:
             content_data: Content data dictionary (signal or shitpost format).
             bypass_reason: Optional pre-determined bypass reason. If not provided,
                           will be determined using BypassService.
-            use_signal: Deprecated, ignored. Always stores as signal_id.
 
         Returns:
             Prediction ID if successful, None otherwise
@@ -223,7 +217,6 @@ class PredictionOperations:
         self,
         content_id: str,
         *,
-        use_signal: bool = True,
         llm_provider: Optional[str] = None,
         llm_model: Optional[str] = None,
     ) -> bool:
@@ -235,7 +228,6 @@ class PredictionOperations:
 
         Args:
             content_id: Signal ID to check.
-            use_signal: Deprecated, ignored. Always checks signal_id.
             llm_provider: If set, only match predictions from this provider.
             llm_model: If set, only match predictions from this model.
         """

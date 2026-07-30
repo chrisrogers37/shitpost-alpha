@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `Strict-Transport-Security` (HSTS), `Referrer-Policy`, `Permissions-Policy`
 
 ### Changed
+- **Truth Social harvester identity now settings-driven (Phase 2, #195)** — harvester `base_url` and account `user_id` now read from new `SCRAPECREATORS_BASE_URL` and `TRUTH_SOCIAL_USER_ID` settings (both defaulted) instead of hardcoded literals in `__init__`. New env vars: `SCRAPECREATORS_BASE_URL`, `TRUTH_SOCIAL_USER_ID` (replaces the removed `TRUTH_SOCIAL_USERNAME`).
 - **Alert Quality (Play 4)** — Unified alert enrichment across both dispatch paths
   - Calibrated confidence displayed in all Telegram alerts
   - Historical Echoes (similar posts + win rate) included in alerts via shared `enrich_alert()`
@@ -54,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `DatabaseUtils.transform_s3_data_to_shitpost` — superseded by `SignalTransformer` on the S3→`signals` path
   - Unused resilience machinery in `shit/utils/error_handling.py` — `async_retry`, `sync_retry`, `CircuitBreaker`, `RateLimiter`, and their module-global instances (never wired into any live path; `handle_exceptions` retained)
   - `shit/logging/progress_tracker.py` — dead progress-tracking module and its import-time `Icons.PROGRESS` monkeypatch
+- **Dead params & config (Phase 2)** — removed dead parameters and a dead setting (#188 ≡ #229 L15, #195)
+  - `use_signal` keyword-only parameter — no-op backwards-compat shim from the signals migration; removed from `PredictionOperations.store_analysis`/`handle_no_text_prediction`/`check_prediction_exists` and their three analyzer call-sites (predictions always store/check `signal_id`)
+  - `TRUTH_SOCIAL_USERNAME` setting — loaded into `self.username` but never read anywhere; the ScrapeCreators API selects the account by numeric user id, not username
 
 ### Added
 - **Conviction Voting** — Inline Bull/Bear/Skip voting buttons on Telegram alerts with accuracy tracking

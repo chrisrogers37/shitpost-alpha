@@ -391,7 +391,7 @@ class ShitpostAnalyzer:
                     skipped_count += 1
                     continue
 
-                if await self.prediction_ops.check_prediction_exists(shitpost_id, use_signal=True):
+                if await self.prediction_ops.check_prediction_exists(shitpost_id):
                     print(
                         f"⏭️  Post {i}/{len(shitposts)}: {shitpost_id} already analyzed, skipping"
                     )
@@ -475,7 +475,7 @@ class ShitpostAnalyzer:
                 if not dry_run:
                     # Create bypassed prediction record
                     await self.prediction_ops.handle_no_text_prediction(
-                        shitpost_id, shitpost, bypass_reason, use_signal=True
+                        shitpost_id, shitpost, bypass_reason
                     )
 
                 return {
@@ -562,7 +562,7 @@ class ShitpostAnalyzer:
             if not dry_run:
                 # Store analysis in database
                 analysis_id = await self.prediction_ops.store_analysis(
-                    shitpost_id, enhanced_analysis, shitpost, use_signal=True
+                    shitpost_id, enhanced_analysis, shitpost
                 )
 
                 if analysis_id:

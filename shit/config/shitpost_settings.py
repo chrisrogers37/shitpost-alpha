@@ -50,7 +50,9 @@ class Settings(BaseSettings):
     )  # Minimum successful providers for valid ensemble
 
     # Truth Social Shitpost Configuration
-    TRUTH_SOCIAL_USERNAME: str = Field(default="realDonaldTrump")
+    TRUTH_SOCIAL_USER_ID: str = Field(
+        default="107780257626128497"
+    )  # Trump's Truth Social account id
     TRUTH_SOCIAL_SHITPOST_INTERVAL: int = Field(
         default=30
     )  # seconds between shitpost harvests
@@ -102,6 +104,7 @@ class Settings(BaseSettings):
 
     # ScrapeCreators API Configuration
     SCRAPECREATORS_API_KEY: Optional[str] = Field(default=None)
+    SCRAPECREATORS_BASE_URL: str = Field(default="https://api.scrapecreators.com/v1")
 
     # S3 Data Lake Configuration
     S3_BUCKET_NAME: str = Field(default="shitpost-alpha-raw-data")

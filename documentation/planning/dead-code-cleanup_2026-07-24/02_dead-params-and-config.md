@@ -1,7 +1,10 @@
 ---
 title: "Phase 2 — Dead params & config"
 session: dead-code-cleanup_2026-07-24
-status: READY
+status: COMPLETE
+started: 2026-07-28
+completed: 2026-07-28
+pr: 235
 issues: [188, 195]
 code_area: shitvault, shitpost_ai, shitposts, shit/config
 risk: low
@@ -120,13 +123,13 @@ selects the account. Both are low-risk and were verified line-by-line against
 13. `ruff check .` / `ruff format .`; run the targeted test suites.
 
 ## Acceptance Criteria
-- [ ] No `use_signal` token remains in any `.py` file (`rg use_signal -g '*.py'` is empty); remaining matches are only historical CHANGELOG/spec/plan/archive/overview docs, intentionally retained.
-- [ ] `store_analysis` / `handle_no_text_prediction` no longer have a dangling `*,`; `check_prediction_exists` keeps `*,` for `llm_provider`/`llm_model`. Module imports without `SyntaxError`.
-- [ ] Harvester reads `base_url` + user id from settings (`settings.SCRAPECREATORS_BASE_URL`, `settings.TRUTH_SOCIAL_USER_ID`); `self.username` is gone and `TRUTH_SOCIAL_USERNAME` is removed from `shit/config/shitpost_settings.py`.
-- [ ] `rg 'self\.username' shitposts/` and `rg TRUTH_SOCIAL_USERNAME -g '*.py'` are both empty.
-- [ ] `source venv/bin/activate && pytest shit_tests/shitpost_ai/ shit_tests/shitvault/ shit_tests/shitposts/ shit_tests/shit/config/` green.
-- [ ] `ruff check .` / `ruff format .` clean.
-- [ ] `CHANGELOG.md` `[Unreleased]` updated (Removed + Changed; new env-var names noted).
+- [x] No `use_signal` token remains in any `.py` file (`rg use_signal -g '*.py'` is empty); remaining matches are only historical CHANGELOG/spec/plan/archive/overview docs, intentionally retained.
+- [x] `store_analysis` / `handle_no_text_prediction` no longer have a dangling `*,`; `check_prediction_exists` keeps `*,` for `llm_provider`/`llm_model`. Module imports without `SyntaxError`.
+- [x] Harvester reads `base_url` + user id from settings (`settings.SCRAPECREATORS_BASE_URL`, `settings.TRUTH_SOCIAL_USER_ID`); `self.username` is gone and `TRUTH_SOCIAL_USERNAME` is removed from `shit/config/shitpost_settings.py`.
+- [x] `rg 'self\.username' shitposts/` and `rg TRUTH_SOCIAL_USERNAME -g '*.py'` are both empty.
+- [x] `source venv/bin/activate && pytest shit_tests/shitpost_ai/ shit_tests/shitvault/ shit_tests/shitposts/ shit_tests/shit/config/` green — **503 passed**.
+- [x] Lint-neutral: `ruff check` on the 9 touched files shows the **same 53 pre-existing errors on this branch as on `main`** (no new findings). Repo-wide `ruff format .` was deliberately NOT run — it would reformat ~1,300 lines of pre-existing quote-style drift across the test tree; formatting was kept to the touched lines to avoid unrelated churn.
+- [x] `CHANGELOG.md` `[Unreleased]` updated (Removed + Changed; new env-var names noted).
 
 ## Test Plan
 - **#188:** run `shit_tests/shitpost_ai/test_shitpost_analyzer.py` (the :352 assertion is the only test that references `use_signal`) and `shit_tests/shitvault/test_prediction_operations.py` (confirms the three methods still behave — those tests never passed `use_signal`, so they should pass unchanged once the signatures drop the param).
