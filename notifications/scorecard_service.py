@@ -2,7 +2,13 @@
 Weekly Scorecard Service
 
 Orchestrates data collection, formatting, and delivery of the weekly scorecard.
-Called by Railway cron every Sunday at 7 PM ET.
+
+Scheduling / DST: the Railway ``weekly-scorecard`` cron fires at 00:00 UTC Monday
+(Railway cron is UTC-only), which resolves to **Sun 19:00 ET in winter (EST)** and
+**Sun 20:00 ET in summer (EDT)**. Unlike the briefing, the scorecard has no in-job
+ET guard, so it simply sends at whichever ET time the fixed UTC schedule resolves
+to; this up-to-1h drift across DST is accepted (the scorecard is not time-critical).
+See railway.json ``weekly-scorecard`` and #230 L3.
 """
 
 import json
