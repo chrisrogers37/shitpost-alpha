@@ -5,14 +5,19 @@ Falls back to the market_prices database table if yfinance fails.
 """
 
 import time
+from collections import OrderedDict
 from datetime import datetime, timedelta, date
 from typing import Any, Optional
 
 from api.dependencies import execute_query, logger
 
-# TTL cache: avoid hammering yfinance on repeated requests
-_price_cache: dict[tuple[str, int], tuple[list[dict[str, Any]], float]] = {}
+# Bounded TTL cache: avoid hammering yfinance on repeated requests. LRU-evicts
+# past _CACHE_MAX so distinct (symbol, days) keys can't grow the dict forever.
+_price_cache: OrderedDict[
+    tuple[str, int], tuple[list[dict[str, Any]], float]
+] = OrderedDict()
 _CACHE_TTL = 300  # 5 minutes
+_CACHE_MAX = 256  # max distinct (symbol, days) entries retained
 
 
 def _fetch_from_yfinance(symbol: str, start: date, end: date) -> list[dict[str, Any]]:
@@ -72,6 +77,7 @@ def _get_candles(symbol: str, days: int) -> list[dict[str, Any]]:
     if cache_key in _price_cache:
         cached_candles, cached_at = _price_cache[cache_key]
         if now - cached_at < _CACHE_TTL:
+            _price_cache.move_to_end(cache_key)  # mark most-recently-used
             return cached_candles
 
     start_date = (datetime.now() - timedelta(days=days)).date()
@@ -87,6 +93,9 @@ def _get_candles(symbol: str, days: int) -> list[dict[str, Any]]:
         candles = _fetch_from_database(symbol.upper(), start_date)
 
     _price_cache[cache_key] = (candles, now)
+    _price_cache.move_to_end(cache_key)  # mark most-recently-used
+    while len(_price_cache) > _CACHE_MAX:
+        _price_cache.popitem(last=False)  # evict least-recently-used
     return candles
 
 

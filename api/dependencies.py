@@ -6,7 +6,6 @@ from typing import Any
 from fastapi import HTTPException, Security
 from fastapi.security import APIKeyHeader
 from sqlalchemy import text
-from sqlalchemy.orm import Session
 
 from shit.config.shitpost_settings import settings
 from shit.db.sync_session import SessionLocal
@@ -30,11 +29,6 @@ async def verify_api_key(
     if not api_key or not hmac.compare_digest(api_key, settings.API_KEY):
         raise HTTPException(status_code=403, detail="Invalid or missing API key")
     return api_key
-
-
-def get_db() -> Session:
-    """Get a synchronous database session."""
-    return SessionLocal()
 
 
 def execute_query(

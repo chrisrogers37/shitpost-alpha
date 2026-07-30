@@ -9,6 +9,7 @@ Covers:
 - Edge cases
 """
 
+from collections import OrderedDict
 from unittest.mock import patch
 
 
@@ -19,7 +20,7 @@ from unittest.mock import patch
 
 def test_get_prices_happy_path(client, mock_execute_query):
     """GET /api/prices/AAPL returns PriceResponse with candles from yfinance."""
-    with patch("api.queries.price_queries._price_cache", {}):
+    with patch("api.queries.price_queries._price_cache", OrderedDict()):
         with patch("api.queries.price_queries._fetch_from_yfinance") as mock_yf:
             mock_yf.return_value = [
                 {
@@ -50,7 +51,7 @@ def test_get_prices_happy_path(client, mock_execute_query):
 
 def test_get_prices_respects_days_param(client, mock_execute_query):
     """GET /api/prices/AAPL?days=7 passes days=7 to get_price_data."""
-    with patch("api.queries.price_queries._price_cache", {}):
+    with patch("api.queries.price_queries._price_cache", OrderedDict()):
         with patch("api.queries.price_queries._fetch_from_yfinance") as mock_yf:
             mock_yf.return_value = [
                 {
@@ -132,7 +133,7 @@ def test_get_prices_with_post_timestamp(client, mock_execute_query):
         },
     ]
 
-    with patch("api.queries.price_queries._price_cache", {}):
+    with patch("api.queries.price_queries._price_cache", OrderedDict()):
         with patch("api.queries.price_queries._fetch_from_yfinance") as mock_yf:
             mock_yf.return_value = candles
             response = client.get(
@@ -152,7 +153,7 @@ def test_get_prices_with_post_timestamp(client, mock_execute_query):
 
 def test_get_prices_invalid_post_timestamp(client, mock_execute_query):
     """An invalid post_timestamp is silently ignored; post_date_index is None."""
-    with patch("api.queries.price_queries._price_cache", {}):
+    with patch("api.queries.price_queries._price_cache", OrderedDict()):
         with patch("api.queries.price_queries._fetch_from_yfinance") as mock_yf:
             mock_yf.return_value = [
                 {
@@ -177,7 +178,7 @@ def test_get_prices_invalid_post_timestamp(client, mock_execute_query):
 
 def test_get_prices_both_sources_fail_returns_empty_candles(client, mock_execute_query):
     """When yfinance returns [] and DB fallback also returns [], candles is empty."""
-    with patch("api.queries.price_queries._price_cache", {}):
+    with patch("api.queries.price_queries._price_cache", OrderedDict()):
         with patch("api.queries.price_queries._fetch_from_yfinance") as mock_yf:
             mock_yf.return_value = []
             response = client.get("/api/prices/AAPL")
@@ -204,7 +205,7 @@ def test_get_prices_cache_hit(client, mock_execute_query):
         },
     ]
 
-    with patch("api.queries.price_queries._price_cache", {}):
+    with patch("api.queries.price_queries._price_cache", OrderedDict()):
         with patch("api.queries.price_queries._fetch_from_yfinance") as mock_yf:
             mock_yf.return_value = candles
 
@@ -226,7 +227,7 @@ def test_get_prices_cache_hit(client, mock_execute_query):
 
 def test_get_prices_symbol_uppercased(client, mock_execute_query):
     """Symbol is uppercased in the response regardless of input casing."""
-    with patch("api.queries.price_queries._price_cache", {}):
+    with patch("api.queries.price_queries._price_cache", OrderedDict()):
         with patch("api.queries.price_queries._fetch_from_yfinance") as mock_yf:
             mock_yf.return_value = []
             response = client.get("/api/prices/aapl")
@@ -247,7 +248,7 @@ def test_get_prices_yfinance_fails_db_fallback(
     db_rows, db_cols = sample_candle_rows
     mock_execute_query.return_value = (db_rows, db_cols)
 
-    with patch("api.queries.price_queries._price_cache", {}):
+    with patch("api.queries.price_queries._price_cache", OrderedDict()):
         with patch("api.queries.price_queries._fetch_from_yfinance") as mock_yf:
             mock_yf.return_value = []
             response = client.get("/api/prices/AAPL")
@@ -284,7 +285,7 @@ def test_post_timestamp_between_dates_picks_earlier(client, mock_execute_query):
         },
     ]
 
-    with patch("api.queries.price_queries._price_cache", {}):
+    with patch("api.queries.price_queries._price_cache", OrderedDict()):
         with patch("api.queries.price_queries._fetch_from_yfinance") as mock_yf:
             mock_yf.return_value = candles
             response = client.get(

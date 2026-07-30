@@ -10,16 +10,6 @@ router = APIRouter()
 _service = FeedService()
 
 
-@router.get("/latest", response_model=FeedResponse)
-@limiter.limit("60/minute")
-def get_latest_post(request: Request):
-    """Get the most recent analyzed shitpost."""
-    result = _service.get_feed_response(0)
-    if result is None:
-        raise HTTPException(status_code=404, detail="No post found at this offset")
-    return result
-
-
 @router.get("/at", response_model=FeedResponse)
 @limiter.limit("60/minute")
 def get_post_at_offset(request: Request, offset: int = Query(default=0, ge=0)):

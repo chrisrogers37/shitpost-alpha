@@ -1,7 +1,7 @@
 """Tests for the feed API router (api/routers/feed.py).
 
 Covers:
-- GET /api/feed/latest
+- GET /api/feed/at?offset=0
 - GET /api/feed/at?offset=N
 - Navigation bounds
 - JSON field parsing
@@ -13,12 +13,12 @@ from conftest import make_outcome_rows, make_post_row
 
 
 # ---------------------------------------------------------------------------
-# GET /api/feed/latest — happy path
+# GET /api/feed/at?offset=0 — happy path
 # ---------------------------------------------------------------------------
 
 
-def test_get_latest_post_happy_path(client, mock_execute_query):
-    """GET /api/feed/latest returns a complete FeedResponse with post, prediction, outcomes."""
+def test_get_post_at_offset_zero_happy_path(client, mock_execute_query):
+    """GET /api/feed/at?offset=0 returns a complete FeedResponse with post, prediction, outcomes."""
     post_rows, post_cols = make_post_row()
     outcome_rows, outcome_cols = make_outcome_rows(
         {
@@ -73,7 +73,7 @@ def test_get_latest_post_happy_path(client, mock_execute_query):
         ([], []),  # snapshots
     ]
 
-    response = client.get("/api/feed/latest")
+    response = client.get("/api/feed/at?offset=0")
     assert response.status_code == 200
 
     data = response.json()
@@ -103,15 +103,15 @@ def test_get_latest_post_happy_path(client, mock_execute_query):
 
 
 # ---------------------------------------------------------------------------
-# GET /api/feed/latest — empty database
+# GET /api/feed/at?offset=0 — empty database
 # ---------------------------------------------------------------------------
 
 
-def test_get_latest_post_empty_database(client, mock_execute_query):
-    """GET /api/feed/latest returns 404 when no analyzed posts exist."""
+def test_get_post_at_offset_empty_database(client, mock_execute_query):
+    """GET /api/feed/at?offset=0 returns 404 when no analyzed posts exist."""
     mock_execute_query.return_value = ([], [])
 
-    response = client.get("/api/feed/latest")
+    response = client.get("/api/feed/at?offset=0")
     assert response.status_code == 404
     assert "No post found" in response.json()["detail"]
 
@@ -122,7 +122,7 @@ def test_get_latest_post_empty_database(client, mock_execute_query):
 
 
 def test_get_post_at_offset_zero(client, mock_execute_query):
-    """GET /api/feed/at?offset=0 behaves identically to /api/feed/latest."""
+    """GET /api/feed/at?offset=0 behaves identically to /api/feed/at?offset=0."""
     post_rows, post_cols = make_post_row()
     outcome_rows, outcome_cols = make_outcome_rows(
         {"symbol": "AAPL"}, {"symbol": "TSLA"}
@@ -288,7 +288,7 @@ def test_assets_json_string_parsed_to_list(client, mock_execute_query):
         ([], []),  # snapshots
     ]
 
-    response = client.get("/api/feed/latest")
+    response = client.get("/api/feed/at?offset=0")
     assert response.status_code == 200
 
     data = response.json()
@@ -314,7 +314,7 @@ def test_market_impact_json_string_parsed_to_dict(client, mock_execute_query):
         ([], []),  # snapshots
     ]
 
-    response = client.get("/api/feed/latest")
+    response = client.get("/api/feed/at?offset=0")
     assert response.status_code == 200
 
     data = response.json()
@@ -340,7 +340,7 @@ def test_post_with_none_text_defaults_to_empty_string(client, mock_execute_query
         ([], []),  # snapshots
     ]
 
-    response = client.get("/api/feed/latest")
+    response = client.get("/api/feed/at?offset=0")
     assert response.status_code == 200
     assert response.json()["post"]["text"] == ""
 
@@ -368,7 +368,7 @@ def test_post_with_none_engagement_defaults_to_zero(client, mock_execute_query):
         ([], []),  # snapshots
     ]
 
-    response = client.get("/api/feed/latest")
+    response = client.get("/api/feed/at?offset=0")
     assert response.status_code == 200
 
     eng = response.json()["post"]["engagement"]
@@ -394,7 +394,7 @@ def test_feed_response_with_no_outcomes(client, mock_execute_query):
         ([], []),  # snapshots
     ]
 
-    response = client.get("/api/feed/latest")
+    response = client.get("/api/feed/at?offset=0")
     assert response.status_code == 200
     assert response.json()["outcomes"] == []
 
@@ -427,7 +427,7 @@ def test_scores_with_none_values(client, mock_execute_query):
         ([], []),  # snapshots
     ]
 
-    response = client.get("/api/feed/latest")
+    response = client.get("/api/feed/at?offset=0")
     assert response.status_code == 200
 
     scores = response.json()["prediction"]["scores"]
@@ -475,7 +475,7 @@ def test_timestamp_serialized_as_iso_string(client, mock_execute_query):
         ([], []),  # snapshots
     ]
 
-    response = client.get("/api/feed/latest")
+    response = client.get("/api/feed/at?offset=0")
     assert response.status_code == 200
 
     ts = response.json()["post"]["timestamp"]

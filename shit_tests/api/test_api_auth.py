@@ -31,38 +31,38 @@ def _make_client():
 
 
 def test_feed_rejects_missing_api_key(mock_execute_query):
-    """GET /api/feed/latest returns 403 when API_KEY is set but no key provided."""
+    """GET /api/feed/at?offset=0 returns 403 when API_KEY is set but no key provided."""
     with patch("api.dependencies.settings") as mock_settings:
         mock_settings.API_KEY = TEST_API_KEY
         client = _make_client()
-        response = client.get("/api/feed/latest")
+        response = client.get("/api/feed/at?offset=0")
     assert response.status_code == 403
 
 
 def test_feed_rejects_wrong_api_key(mock_execute_query):
-    """GET /api/feed/latest returns 403 when the wrong API key is provided."""
+    """GET /api/feed/at?offset=0 returns 403 when the wrong API key is provided."""
     with patch("api.dependencies.settings") as mock_settings:
         mock_settings.API_KEY = TEST_API_KEY
         client = _make_client()
-        response = client.get("/api/feed/latest", headers={"X-API-Key": "wrong-key"})
+        response = client.get("/api/feed/at?offset=0", headers={"X-API-Key": "wrong-key"})
     assert response.status_code == 403
 
 
 def test_feed_accepts_correct_api_key(client, mock_execute_query):
-    """GET /api/feed/latest succeeds with the correct API key (or no key configured)."""
+    """GET /api/feed/at?offset=0 succeeds with the correct API key (or no key configured)."""
     # With API_KEY unset (default in test conftest), requests pass through
     mock_execute_query.return_value = ([], [])
-    response = client.get("/api/feed/latest")
+    response = client.get("/api/feed/at?offset=0")
     assert response.status_code in (200, 404)  # 404 = no posts, but auth passed
 
 
 def test_feed_accepts_correct_api_key_when_configured(mock_execute_query):
-    """GET /api/feed/latest succeeds with the correct API key."""
+    """GET /api/feed/at?offset=0 succeeds with the correct API key."""
     with patch("api.dependencies.settings") as mock_settings:
         mock_settings.API_KEY = TEST_API_KEY
         client = _make_client()
         mock_execute_query.return_value = ([], [])
-        response = client.get("/api/feed/latest", headers={"X-API-Key": TEST_API_KEY})
+        response = client.get("/api/feed/at?offset=0", headers={"X-API-Key": TEST_API_KEY})
     assert response.status_code in (200, 404)
 
 
@@ -147,6 +147,6 @@ def test_open_mode_allows_all_requests(client, mock_execute_query):
     """When API_KEY is not configured, all API requests are allowed."""
     mock_execute_query.return_value = ([], [])
     # These should all pass auth (may 404 on empty data, but not 403)
-    for path in ["/api/feed/latest", "/api/health"]:
+    for path in ["/api/feed/at?offset=0", "/api/health"]:
         response = client.get(path)
         assert response.status_code != 403, f"{path} returned 403 in open mode"
