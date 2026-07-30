@@ -1,8 +1,10 @@
 ---
 title: "Phase 5 — Structural cleanup + small correctness"
 session: dead-code-cleanup_2026-07-24
-status: IN PROGRESS
+status: COMPLETE
 started: 2026-07-30
+completed: 2026-07-30
+pr: 239
 issues: [191, 231]
 code_area: shitvault, shit/db, shit/content, api
 risk: low-medium
@@ -66,12 +68,14 @@ require no migration. Note the `/latest` removal is product-safe (the React app 
 9. Add a `CHANGELOG.md` `[Unreleased]` entry (Changed: S3 processing consolidation, bounded price cache; Fixed: echo TOCTOU; Removed: dead `get_db`, duplicate `/latest`, empty `lifespan`).
 
 ## Acceptance Criteria
-- [ ] Event consumer and incremental S3 path both call `S3Processor.process_keys`; no duplicated emission block (single `_emit_signals_stored` helper).
-- [ ] Concurrent `embed_and_store` for the same key is idempotent (no dup rows, no unhandled unique violation).
-- [ ] Dead `get_db()` removed; `/latest` removed (per frontend evidence) with api tests repointed to `/at`; `_price_cache` bounded; `lifespan` removed (or given a real body).
-- [ ] `pytest shit_tests/shitvault/ shit_tests/api/ shit_tests/echoes/ shit_tests/` green.
-- [ ] `ruff check .` / `ruff format .` clean.
-- [ ] `CHANGELOG.md` `[Unreleased]` updated.
+- [x] Event consumer and incremental S3 path both call `S3Processor.process_keys`; no duplicated emission block (single `_emit_signals_stored` helper). — worker delegates; incremental branch delegates; streaming branch shares the helper.
+- [x] Concurrent `embed_and_store` for the same key is idempotent (no dup rows, no unhandled unique violation). — `ON CONFLICT (prediction_id) DO NOTHING`; `rowcount==0` → success; conflict-path test added.
+- [x] Dead `get_db()` removed; `/latest` removed (per frontend evidence) with api tests repointed to `/at`; `_price_cache` bounded; `lifespan` removed. — 14 live test calls repointed, 2 tests renamed; `_price_cache` is now an OrderedDict LRU (cap 256, TTL kept); empty `lifespan` + import + kwarg deleted.
+- [x] `pytest shit_tests/shitvault/ shit_tests/api/ shit_tests/echoes/` green. — **273 passed** (140 + 106 + 27). (Required `pip install slowapi>=0.1.10` locally — declared in requirements.txt, was missing from the venv, blocking api/echoes collection.)
+- [x] `ruff check` lint-neutral. — 15 touched files show the **same 8 pre-existing findings as `main`** (F401/F541/F841; the two s3_processor F541s shifted one line by the splice); zero new. `ruff format .` not run (whole-file reformat churn on the never-formatted majority).
+- [x] `CHANGELOG.md` `[Unreleased]` updated — `### Fixed` (echo TOCTOU), `### Changed` (#191 consolidation, bounded cache), `### Removed` (dead get_db / dup /latest / empty lifespan).
+
+**Completed 2026-07-30 — PR #239.** Both #191 and #231 (full scope: L16 + L18) closed. Decision recorded in the challenge round: worker `SIGNALS_STORED` emission harmonized to best-effort (matching the processor path); `/latest` removed rather than kept as an alias (frontend-proven safe).
 
 ## Test Plan
 - **#231 L16 (conflict path):** New test in `shit_tests/echoes/test_echo_service.py` — mock the session so the `on_conflict_do_nothing` execute returns `rowcount == 0`; assert `embed_and_store` returns `True` and raises nothing (idempotent conflict = success). Existing `test_stores_new_embedding` / `test_skips_duplicate` must be updated: they currently assert `mock_session.add.called` (line 57) — repoint to `mock_session.execute` and simulate `rowcount == 1`. Empty/None-text fast paths (75-82) are unchanged.
