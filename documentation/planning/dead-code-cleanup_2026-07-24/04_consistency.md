@@ -1,8 +1,10 @@
 ---
 title: "Phase 4 — Consistency (constants, tz-aware datetimes, cron DST)"
 session: dead-code-cleanup_2026-07-24
-status: IN PROGRESS
+status: COMPLETE
 started: 2026-07-30
+completed: 2026-07-30
+pr: 238
 issues: [190, 230]
 code_area: shit/events, notifications, shit/market_data, railway.json
 risk: low
@@ -238,16 +240,25 @@ cron line at L68).
 7. Run tests + ruff; update `CHANGELOG.md`.
 
 ## Acceptance Criteria
-- [ ] `EventStatus` used at every former literal site; grep for the raw status strings shows only the class
+- [x] `EventStatus` used at every former literal site; grep for the raw status strings shows only the class
       definition in `event_types.py` + the documented DB/serialization/display boundaries (models.py docstring,
-      cleanup.py docstring, cli.py f-string labels + help text).
-- [ ] No `datetime.utcnow(` remains in touched modules; replacements are tz-aware and downstream-safe
+      cleanup.py docstring, cli.py f-string labels + help text). — 17/17 replaced (models 5, worker 2, cleanup 4,
+      cli 5, producer 1); verified only the 5 class values remain as double-quoted literals.
+- [x] No `datetime.utcnow(` remains in touched modules; replacements are tz-aware and downstream-safe
       (`grep -rn 'utcnow' --include='*.py'` returns only the `test_db.py:623` comment, if that test is left as-is).
-- [ ] Cron DST behavior documented (and/or ET-guarded) for `briefing-sender` and `weekly-scorecard`.
-- [ ] `pytest shit_tests/events/ shit_tests/notifications/ shit_tests/shit/market_data/` green. **(NOTE: event
-      tests live at `shit_tests/events/`, not `shit_tests/shit/events/` — the latter path does not exist.)**
-- [ ] `ruff check .` / `ruff format .` clean.
-- [ ] `CHANGELOG.md` `[Unreleased]` updated (a `### Changed` entry).
+      — 13 sites (8 calls + 5 defaults) done across 9 modules; grep returns only the test_db.py:623 comment.
+- [x] Cron DST behavior documented (and/or ET-guarded) for `briefing-sender` and `weekly-scorecard`. — briefing
+      ET-guarded (widened `is_briefing_time()` to 7–8 AM ET window, fixing a winter-dark bug) **and** documented;
+      scorecard's ±1h drift documented in its module docstring.
+- [x] `pytest shit_tests/events/ shit_tests/notifications/ shit_tests/shit/market_data/` green. — **834 passed.**
+- [x] `ruff check` lint-neutral. — 20 touched files show the **same 10 pre-existing findings as `main`** (verified
+      via a `main` worktree); zero new. `ruff format .` unachievable given repo state (whole-file reformat churn on
+      the never-formatted majority) — diff kept minimal in each file's existing style instead.
+- [x] `CHANGELOG.md` `[Unreleased]` updated — `### Fixed` (#230 L3 briefing) + `### Changed` (#190, #230 L4).
+
+**Completed 2026-07-30 — PR #238.** Deviation from plan: the #230 L3 cron portion was upgraded from
+"document ±1h" to a real guard-widen fix after Step 2 revealed `is_briefing_time()` silently rejected the
+winter (EST) firing, leaving the morning briefing dark ~Nov–Mar. Cron schedules/topology unchanged.
 
 ## Test Plan
 - **EventStatus byte-identity (the key guard):** the existing event tests already assert against the raw
