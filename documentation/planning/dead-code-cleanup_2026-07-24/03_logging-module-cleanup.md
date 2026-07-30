@@ -1,7 +1,10 @@
 ---
 title: "Phase 3 — Logging module cleanup"
 session: dead-code-cleanup_2026-07-24
-status: READY
+status: COMPLETE
+started: 2026-07-30
+completed: 2026-07-30
+pr: 237
 issues: [196, 197]
 code_area: shit/logging
 risk: low
@@ -163,12 +166,12 @@ the exact message text and full `extra` dict for every method.
 7. **Lint/format + CHANGELOG.** `ruff check .`, `ruff format .`, and add an `[Unreleased]` entry.
 
 ## Acceptance Criteria
-- [ ] `from shit.logging import get_cli_logger` works AND `from shit.logging import *` does not raise.
-- [ ] Only one `get_cli_logger` definition remains (in `service_loggers.py`, returning `CLILogger`).
-- [ ] All four service loggers delegate to `_emit` on a shared base; every public method name and signature is unchanged, and `self.logger` still exists as an instance attribute.
-- [ ] `pytest shit_tests/shit/logging/` green (`test_service_loggers.py` unmodified; `test_cli_logging.py` only loses the three plain-Logger `get_cli_logger` tests).
-- [ ] `ruff check .` / `ruff format .` clean.
-- [ ] `CHANGELOG.md` `[Unreleased]` updated (closes #196 ≡ #230 L12, and #197).
+- [x] `from shit.logging import get_cli_logger` works AND `from shit.logging import *` does not raise. (Reproduced the `AttributeError` on `main`; now succeeds.)
+- [x] Only one `get_cli_logger` definition remains (in `service_loggers.py`, returning `CLILogger`).
+- [x] All four service loggers delegate to `_emit` on a shared base; every public method name and signature is unchanged, and `self.logger` still exists as an instance attribute. **`_emit` takes the per-call `extra` as a dict (not `**fields`)** — callers legitimately pass keys like `operation` via `**kwargs` (`progress(25, operation="harvest_posts")`), which collide with a formal param; the dict form reproduces the original override semantics exactly (caught by `test_progress_without_total`).
+- [x] `pytest shit_tests/shit/logging/` green — **126 passed**. `test_service_loggers.py`'s existing tests are unmodified; it gains a `TestPackageStarImport` regression class (user-approved). `test_cli_logging.py` loses the three plain-Logger `get_cli_logger` tests.
+- [x] Lint-neutral: `ruff check` on the touched files shows the **same 8 pre-existing F401s as `main`** (no new findings). Repo-wide `ruff format .` deliberately NOT run (would churn unrelated pre-existing drift); the class section was spliced deterministically, head/tail preserved byte-for-byte.
+- [x] `CHANGELOG.md` `[Unreleased]` updated — `### Fixed` (#196 ≡ #230 L12) + `### Changed` (#197).
 
 ## Test Plan
 - **Existing harness (must stay green, unmodified):** `shit_tests/shit/logging/test_service_loggers.py` asserts, for every method, the exact message string — including the suffix forms `"...(1KB)"`, `"...(5 rows)"`, `"...(150 tokens)"`, `"...(confidence: 85.0%)"` and the *no-suffix* forms `"✅ Uploaded to S3: test-key"`, `"✅ Query completed: INSERT"`, `"✅ LLM API call completed: gpt-4"` — plus the full `extra` dict (`service`, `operation`, and each field, e.g. `extra['size'] is None` in `test_uploaded_without_size`) and the log level (`.info`/`.debug`/`.error`). Passing this harness after the refactor is the proof of behavior preservation.
