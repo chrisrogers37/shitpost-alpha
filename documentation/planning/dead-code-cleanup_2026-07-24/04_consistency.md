@@ -1,7 +1,8 @@
 ---
 title: "Phase 4 — Consistency (constants, tz-aware datetimes, cron DST)"
 session: dead-code-cleanup_2026-07-24
-status: READY
+status: IN PROGRESS
+started: 2026-07-30
 issues: [190, 230]
 code_area: shit/events, notifications, shit/market_data, railway.json
 risk: low

@@ -10,6 +10,7 @@ from sqlalchemy import and_
 
 from shit.db.sync_session import get_session
 from shit.events.models import Event
+from shit.events.event_types import EventStatus
 from shit.logging import get_service_logger
 
 logger = get_service_logger("event_cleanup")
@@ -31,7 +32,7 @@ def cleanup_completed_events(older_than_days: int = 7) -> int:
             session.query(Event)
             .filter(
                 and_(
-                    Event.status == "completed",
+                    Event.status == EventStatus.COMPLETED,
                     Event.completed_at < cutoff,
                 )
             )
@@ -63,7 +64,7 @@ def cleanup_dead_letter_events(older_than_days: int = 30) -> int:
             session.query(Event)
             .filter(
                 and_(
-                    Event.status == "dead_letter",
+                    Event.status == EventStatus.DEAD_LETTER,
                     Event.updated_at < cutoff,
                 )
             )
@@ -96,7 +97,7 @@ def retry_dead_letter_events(
         Number of events re-queued.
     """
     with get_session() as session:
-        query = session.query(Event).filter(Event.status == "dead_letter")
+        query = session.query(Event).filter(Event.status == EventStatus.DEAD_LETTER)
 
         if event_type:
             query = query.filter(Event.event_type == event_type)
@@ -106,7 +107,7 @@ def retry_dead_letter_events(
         events = query.limit(max_events).all()
 
         for event in events:
-            event.status = "pending"
+            event.status = EventStatus.PENDING
             event.attempt = 0
             event.error = None
             event.claimed_by = None

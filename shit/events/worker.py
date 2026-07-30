@@ -21,6 +21,7 @@ from sqlalchemy import and_, or_
 
 from shit.db.sync_session import get_session, SessionLocal  # noqa: F401 (get_session patched in tests)
 from shit.events.models import Event
+from shit.events.event_types import EventStatus
 from shit.logging import get_service_logger
 
 
@@ -146,7 +147,7 @@ class EventWorker(abc.ABC):
                 .filter(
                     and_(
                         Event.consumer_group == self.consumer_group,
-                        Event.status == "pending",
+                        Event.status == EventStatus.PENDING,
                         or_(
                             Event.next_retry_at.is_(None),
                             Event.next_retry_at <= now,
@@ -187,7 +188,7 @@ class EventWorker(abc.ABC):
         try:
             # Re-attach event to this session
             db_event = session.get(Event, event.id)
-            if db_event is None or db_event.status != "claimed":
+            if db_event is None or db_event.status != EventStatus.CLAIMED:
                 session.commit()
                 return
 

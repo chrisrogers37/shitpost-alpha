@@ -7,6 +7,7 @@ Commands for inspecting and managing the event queue.
 import argparse
 import sys
 
+from shit.events.event_types import EventStatus
 from shit.logging import setup_cli_logging, get_service_logger
 
 setup_cli_logging(service_name="events")
@@ -43,11 +44,11 @@ def cmd_queue_stats(args: argparse.Namespace) -> int:
 
     # Summary totals
     total = sum(r[2] for r in rows)
-    pending = sum(r[2] for r in rows if r[1] == "pending")
-    claimed = sum(r[2] for r in rows if r[1] == "claimed")
-    completed = sum(r[2] for r in rows if r[1] == "completed")
-    failed = sum(r[2] for r in rows if r[1] == "failed")
-    dead = sum(r[2] for r in rows if r[1] == "dead_letter")
+    pending = sum(r[2] for r in rows if r[1] == EventStatus.PENDING)
+    claimed = sum(r[2] for r in rows if r[1] == EventStatus.CLAIMED)
+    completed = sum(r[2] for r in rows if r[1] == EventStatus.COMPLETED)
+    failed = sum(r[2] for r in rows if r[1] == EventStatus.FAILED)
+    dead = sum(r[2] for r in rows if r[1] == EventStatus.DEAD_LETTER)
 
     print("-" * 45)
     print(f"Total: {total}  (pending={pending}, claimed={claimed}, "
