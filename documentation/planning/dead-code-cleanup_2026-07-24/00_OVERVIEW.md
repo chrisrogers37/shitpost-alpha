@@ -90,7 +90,7 @@ Each phase doc was verified against current `main` before being written. Materia
 - [ ] `pytest` green after each phase; `ruff check .` and `ruff format .` clean.
 - [ ] Net LOC reduced (dead code removed, not relocated).
 - [ ] Each phase PR updates `CHANGELOG.md` under `[Unreleased]`.
-- [ ] No behavior change in Phases 1–4; Phase 5/6 behavior changes are covered by tests.
+- [ ] No behavior change in Phases 1–4; Phase 5/6 behavior changes are covered by tests. **(Amended: Phase 4 (PR #238) includes one intended behavior fix — widening `is_briefing_time()` to stop the morning briefing going dark every winter (EST); the #230 L3 cron item turned out to hide a real bug rather than a doc tweak. Covered by tests.)**
 
 ---
 
