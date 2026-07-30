@@ -243,6 +243,21 @@ class TestScheduling:
         t = datetime(2026, 4, 9, 8, 35, tzinfo=ET)
         assert is_briefing_time(t) is True
 
+    def test_is_briefing_time_winter_est(self):
+        # The 12:30 UTC cron lands at 7:30 ET in winter (EST); the widened
+        # window must still send so the briefing isn't dark Nov-Mar (#230 L3).
+        t = datetime(2026, 1, 12, 7, 30, tzinfo=ET)
+        assert is_briefing_time(t) is True
+
+    def test_is_briefing_time_winter_edge(self):
+        t = datetime(2026, 1, 12, 7, 25, tzinfo=ET)
+        assert is_briefing_time(t) is True
+
+    def test_is_briefing_time_below_window(self):
+        # Window widens to 7 AM but no further: 6:30 ET must not send.
+        t = datetime(2026, 1, 12, 6, 30, tzinfo=ET)
+        assert is_briefing_time(t) is False
+
     @patch("notifications.briefing.MarketCalendar")
     def test_is_briefing_day_trading_day(self, mock_cal_cls):
         mock_cal = MagicMock()

@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, DateTime, Integer, JSON, Index
 
 from shit.db.data_models import Base, IDMixin, TimestampMixin
+from shit.events.event_types import EventStatus
 
 
 class Event(Base, IDMixin, TimestampMixin):
@@ -34,7 +35,7 @@ class Event(Base, IDMixin, TimestampMixin):
     payload = Column(JSON, default=dict, nullable=False)
 
     # Processing state
-    status = Column(String(20), nullable=False, default="pending", index=True)
+    status = Column(String(20), nullable=False, default=EventStatus.PENDING, index=True)
     claimed_by = Column(String(100), nullable=True)
     claimed_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
@@ -72,24 +73,24 @@ class Event(Base, IDMixin, TimestampMixin):
 
     def mark_claimed(self, worker_id: str) -> None:
         """Mark this event as claimed by a worker."""
-        self.status = "claimed"
+        self.status = EventStatus.CLAIMED
         self.claimed_by = worker_id
         self.claimed_at = datetime.now(timezone.utc)
         self.attempt += 1
 
     def mark_completed(self, result: dict | None = None) -> None:
         """Mark this event as successfully processed."""
-        self.status = "completed"
+        self.status = EventStatus.COMPLETED
         self.completed_at = datetime.now(timezone.utc)
         self.result = result
 
     def mark_failed(self, error_message: str) -> None:
         """Mark this event as failed and schedule retry or dead-letter."""
         if self.attempt >= self.max_attempts:
-            self.status = "dead_letter"
+            self.status = EventStatus.DEAD_LETTER
             self.error = error_message
         else:
-            self.status = "pending"
+            self.status = EventStatus.PENDING
             self.error = error_message
             # Exponential backoff: 30s * 2^attempt, capped at 1 hour
             backoff_seconds = min(30 * (2 ** self.attempt), 3600)

@@ -4,7 +4,7 @@ Fetches stock/asset prices using pluggable providers and stores in database.
 """
 
 import time
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import List, Optional, Dict, Any
 
 from sqlalchemy.orm import Session
@@ -64,7 +64,7 @@ def _send_failure_alert(symbol: str, error: str) -> None:
             "\u26a0\ufe0f *MARKET DATA FAILURE*\n\n"
             f"*Symbol:* `{symbol}`\n"
             f"*Error:* {error}\n"
-            f"*Time:* {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n\n"
+            f"*Time:* {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n\n"
             "All price providers failed. Prediction outcomes may be affected."
         )
         success, err = send_telegram_message(chat_id, message)
@@ -283,7 +283,7 @@ class MarketDataClient:
             price_obj.volume = record.volume
             price_obj.adjusted_close = record.adjusted_close
             price_obj.source = record.source
-            price_obj.last_updated = datetime.utcnow()
+            price_obj.last_updated = datetime.now(timezone.utc)
             price_obj.is_market_open = True
 
             if not existing_price:

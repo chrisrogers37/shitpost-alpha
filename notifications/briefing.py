@@ -310,17 +310,26 @@ def send_morning_briefing() -> Dict[str, Any]:
 
 
 def is_briefing_time(now_et: Optional[datetime] = None) -> bool:
-    """Check if now is within the briefing send window (8:25-8:35 AM ET).
+    """Check if now is within the briefing send window (7:25-7:35 or 8:25-8:35 ET).
+
+    The window intentionally spans two ET hours to absorb DST drift. The Railway
+    ``briefing-sender`` cron fires once daily at 12:30 UTC (Railway cron has no
+    per-service timezone), which resolves to **8:30 ET in summer (EDT, UTC-4)**
+    but **7:30 ET in winter (EST, UTC-5)**. Accepting BRIEFING_HOUR and the hour
+    before it lets that single fixed-UTC cron send year-round at the intended
+    pre-market time; the resulting up-to-1h drift across DST (7:30 EST / 8:30
+    EDT) is accepted. The cron fires once per day, so the two-hour window can
+    never cause a double send. See railway.json ``briefing-sender`` and #230 L3.
 
     Args:
         now_et: Current time in ET. Defaults to now.
 
     Returns:
-        True if within the 10-minute send window.
+        True if within the send window.
     """
     if now_et is None:
         now_et = datetime.now(ET)
-    return now_et.hour == BRIEFING_HOUR and 25 <= now_et.minute <= 35
+    return now_et.hour in (BRIEFING_HOUR - 1, BRIEFING_HOUR) and 25 <= now_et.minute <= 35
 
 
 def is_briefing_day(now_et: Optional[datetime] = None) -> bool:

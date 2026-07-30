@@ -25,6 +25,22 @@ class ConsumerGroup:
     NOTIFICATIONS = "notifications"
 
 
+class EventStatus:
+    """Constants for the event lifecycle status column.
+
+    Values MUST stay byte-identical to the strings persisted in
+    ``events.status`` and matched by SQL filters. FAILED is a defined-but-dormant
+    value: ``Event.mark_failed()`` only ever writes DEAD_LETTER or PENDING, so the
+    CLI tally for FAILED is always 0 (kept for a complete, honest status vocabulary).
+    """
+
+    PENDING = "pending"
+    CLAIMED = "claimed"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    DEAD_LETTER = "dead_letter"
+
+
 # Fan-out map: event_type -> list of consumer groups that receive a copy.
 # emit_event() creates one row per consumer group listed here.
 CONSUMER_GROUPS: dict[str, list[str]] = {

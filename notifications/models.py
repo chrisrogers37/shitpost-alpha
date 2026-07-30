@@ -3,7 +3,7 @@ Notification Models
 SQLAlchemy models for the notifications subsystem.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import (
     Boolean,
     Column,
@@ -47,7 +47,7 @@ class TelegramSubscription(Base, IDMixin, TimestampMixin):
 
     # Subscription status
     is_active = Column(Boolean, default=True, index=True)
-    subscribed_at = Column(DateTime, default=datetime.utcnow)
+    subscribed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     unsubscribed_at = Column(DateTime, nullable=True)
 
     # Alert preferences (stored as JSON for flexibility)
@@ -67,7 +67,7 @@ class TelegramSubscription(Base, IDMixin, TimestampMixin):
     last_alert_at = Column(DateTime, nullable=True)
     alerts_sent_count = Column(Integer, default=0)
     last_interaction_at = Column(
-        DateTime, default=datetime.utcnow
+        DateTime, default=lambda: datetime.now(timezone.utc)
     )  # Last command received
 
     # Error tracking
@@ -147,7 +147,7 @@ class ConvictionVote(Base, IDMixin, TimestampMixin):
     username = Column(String(100), nullable=True)
 
     vote = Column(String(10), nullable=False)  # bull, bear, skip
-    voted_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    voted_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
     # Filled by vote maturation job after T+7 outcomes
     vote_correct = Column(Boolean, nullable=True)

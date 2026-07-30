@@ -1,7 +1,7 @@
 """Tests for health.py -- provider health checks and data freshness."""
 
 import pytest
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch, MagicMock
 
 from shit.market_data.health import (
@@ -194,6 +194,26 @@ class TestRunHealthCheck:
         assert d["providers"][0]["name"] == "yfinance"
         assert len(d["freshness"]) == 1
         assert d["freshness"][0]["symbol"] == "SPY"
+
+    def test_report_to_dict_aware_timestamp_has_utc_suffix(self):
+        """run_health_check() now builds the report with an aware UTC timestamp
+        (#230 L4); to_dict() serializes via .isoformat(), which appends '+00:00'.
+
+        Pins this intentional, externally-visible format change so any consumer
+        parsing the JSON timestamp is not surprised by the offset suffix.
+        """
+        report = HealthReport(
+            timestamp=datetime(2026, 1, 15, 10, 0, 0, tzinfo=timezone.utc),
+            overall_healthy=True,
+            providers=[],
+            freshness=[],
+            total_symbols=0,
+            stale_symbols=0,
+            summary="OK",
+        )
+        d = report.to_dict()
+        assert d["timestamp"] == "2026-01-15T10:00:00+00:00"
+        assert d["timestamp"].endswith("+00:00")
 
     def test_report_to_dict_empty(self):
         report = HealthReport(

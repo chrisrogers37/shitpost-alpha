@@ -10,7 +10,7 @@ from typing import Optional
 
 from shit.db.sync_session import get_session
 from shit.events.models import Event
-from shit.events.event_types import CONSUMER_GROUPS
+from shit.events.event_types import CONSUMER_GROUPS, EventStatus
 from shit.logging import get_service_logger
 
 logger = get_service_logger("event_producer")
@@ -67,7 +67,7 @@ def emit_event(
                 event_type=event_type,
                 consumer_group=consumer_group,
                 payload=payload,
-                status="pending",
+                status=EventStatus.PENDING,
                 source_service=source_service,
                 correlation_id=correlation_id,
                 max_attempts=max_attempts,

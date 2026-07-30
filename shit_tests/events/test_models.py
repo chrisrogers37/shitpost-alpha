@@ -4,6 +4,7 @@ import pytest
 from datetime import datetime, timezone
 
 from shit.events.models import Event
+from shit.events.event_types import EventStatus
 
 
 class TestEventModel:
@@ -203,3 +204,39 @@ class TestEventModel:
         assert len(retry_times) == 3
         assert retry_times[1] > retry_times[0]
         assert retry_times[2] > retry_times[1]
+
+
+class TestEventStatusConstants:
+    """Pin the EventStatus constants to their persisted string values (#190).
+
+    These constants are matched by SQL filters and stored in ``events.status``;
+    a drift from the raw literals would silently break claim/prune/retry queries
+    with no compile-time signal. The transition tests elsewhere in this module
+    still assert the raw strings directly, which is what proves byte-identity.
+    """
+
+    def test_status_values_are_byte_identical(self):
+        """Each constant equals the exact string persisted before the refactor."""
+        assert EventStatus.PENDING == "pending"
+        assert EventStatus.CLAIMED == "claimed"
+        assert EventStatus.COMPLETED == "completed"
+        assert EventStatus.FAILED == "failed"
+        assert EventStatus.DEAD_LETTER == "dead_letter"
+
+    def test_mark_failed_exhausted_writes_dead_letter_constant(self, event_session):
+        """An exhausted event's status is exactly EventStatus.DEAD_LETTER == 'dead_letter'."""
+        event = Event(
+            event_type="posts_harvested",
+            consumer_group="s3_processor",
+            payload={},
+            max_attempts=1,
+        )
+        event_session.add(event)
+        event_session.commit()
+
+        event.mark_claimed("worker-abc")  # attempt 1 == max_attempts
+        event.mark_failed("boom")  # exhausted -> dead_letter
+        event_session.commit()
+
+        assert event.status == EventStatus.DEAD_LETTER
+        assert event.status == "dead_letter"

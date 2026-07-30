@@ -7,7 +7,7 @@ inline keyboard vote callbacks, and routes incoming webhook updates.
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from notifications.db import (
@@ -1053,7 +1053,7 @@ def process_update(update: Dict[str, Any]) -> Optional[str]:
     from_user = message.get("from", {})
 
     # Update last interaction
-    update_subscription(chat_id, last_interaction_at=datetime.utcnow())
+    update_subscription(chat_id, last_interaction_at=datetime.now(timezone.utc))
 
     if not text.startswith("/"):
         return None
