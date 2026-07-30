@@ -13,7 +13,6 @@ from shit.logging.cli_logging import (
     setup_harvester_logging,
     setup_analyzer_logging,
     setup_database_logging,
-    get_cli_logger,
     _suppress_third_party_logging
 )
 
@@ -372,32 +371,6 @@ class TestSetupDatabaseLogging:
             mock_database_logger.setLevel.assert_called_once_with(logging.INFO)
 
 
-class TestGetCLILogger:
-    """Test get_cli_logger function."""
-    
-    def test_get_cli_logger(self):
-        """Test get_cli_logger function."""
-        with patch('logging.getLogger') as mock_get_logger:
-            mock_logger = MagicMock()
-            mock_get_logger.return_value = mock_logger
-            
-            result = get_cli_logger("test_module")
-            
-            mock_get_logger.assert_called_once_with("test_module")
-            assert result == mock_logger
-    
-    def test_get_cli_logger_without_module(self):
-        """Test get_cli_logger function with empty module name."""
-        with patch('logging.getLogger') as mock_get_logger:
-            mock_logger = MagicMock()
-            mock_get_logger.return_value = mock_logger
-            
-            result = get_cli_logger("")
-            
-            mock_get_logger.assert_called_once_with("")
-            assert result == mock_logger
-
-
 class TestCLILoggingEdgeCases:
     """Test edge cases and error scenarios for CLI logging."""
     
@@ -500,17 +473,6 @@ class TestCLILoggingEdgeCases:
             
             # Should have called setup_cli_logging
             mock_setup_cli.assert_called_once_with(verbose=True, service_name='harvester')
-    
-    def test_get_cli_logger_with_special_characters(self):
-        """Test get_cli_logger with special characters in module name."""
-        with patch('logging.getLogger') as mock_get_logger:
-            mock_logger = MagicMock()
-            mock_get_logger.return_value = mock_logger
-            
-            result = get_cli_logger("test-module_123")
-            
-            mock_get_logger.assert_called_once_with("test-module_123")
-            assert result == mock_logger
     
     def test_setup_cli_logging_clears_existing_handlers(self):
         """Test that setup_cli_logging clears existing handlers."""

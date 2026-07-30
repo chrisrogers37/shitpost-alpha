@@ -577,3 +577,26 @@ class TestServiceLoggerEdgeCases:
             
             logger = get_service_logger("test-service_123")
             assert logger.name == "test-service_123"
+
+
+class TestPackageStarImport:
+    """Regression guard for the shit.logging package __all__ / re-export wiring.
+
+    #196 shipped a broken export: __all__ listed 'get_cli_logger' but no module
+    imported it, so `from shit.logging import *` raised AttributeError and
+    `from shit.logging import get_cli_logger` raised ImportError. This test pins
+    that every __all__ name resolves and that get_cli_logger returns a CLILogger.
+    """
+
+    def test_star_import_resolves_all_exports(self):
+        """`from shit.logging import *` must not raise (validates every __all__ entry)."""
+        ns = {}
+        exec("from shit.logging import *", ns)  # raises AttributeError if __all__ drifts
+        assert "get_cli_logger" in ns
+
+    def test_get_cli_logger_from_package_root_returns_clilogger(self):
+        """The single surviving get_cli_logger is the CLILogger factory."""
+        from shit.logging import get_cli_logger as pkg_get_cli_logger
+        from shit.logging import CLILogger as PkgCLILogger
+
+        assert isinstance(pkg_get_cli_logger("x"), PkgCLILogger)

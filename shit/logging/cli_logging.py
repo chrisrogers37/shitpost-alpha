@@ -192,15 +192,3 @@ def setup_database_logging(verbose: bool = False) -> None:
         database_logger.setLevel(logging.DEBUG)
     else:
         database_logger.setLevel(logging.INFO)
-
-
-def get_cli_logger(module_name: str):
-    """Get a logger for a CLI module.
-    
-    Args:
-        module_name: Name of the CLI module
-        
-    Returns:
-        Logger instance
-    """
-    return logging.getLogger(module_name)

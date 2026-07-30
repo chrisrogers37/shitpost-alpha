@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Broken `shit.logging` star-export (Phase 3, #196 ≡ #230 L12)** — `__all__` listed `get_cli_logger` but no module imported it, so `from shit.logging import *` raised `AttributeError` and `from shit.logging import get_cli_logger` raised `ImportError`. Wired the surviving `CLILogger` factory into the package root and deleted the duplicate plain-`logging.Logger` `get_cli_logger` in `cli_logging.py`. Added a regression test pinning `import *` and the package-root export.
+
+### Changed
+- **DRY service loggers (Phase 3, #197)** — the four service-logger classes (`S3Logger`, `DatabaseLogger`, `LLMLogger`, `CLILogger`) now share a private `_BaseServiceLogger._emit` helper instead of each re-implementing the same message + `extra`-dict scaffolding. No public class/method/signature change; behavior is pinned byte-for-byte by the existing `test_service_loggers.py` harness.
+
 ### Security
 - **Ignore Claude fleet bot telemetry paths** — narrow any-depth `.gitignore` rules for `data/events/fleet-*.jsonl`, `data/.last-tool-call`, `data/.idle`: the files Claudlobby supervision hooks can write relative to the session cwd when the bot environment is absent (Claudfather/Claudlobby#874). Prevents a broad `git add` in an agent checkout from staging fleet telemetry into this public repo; product `data/` paths are unaffected.
 
