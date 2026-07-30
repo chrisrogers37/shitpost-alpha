@@ -4,7 +4,6 @@ Serves the React frontend and JSON API for the single-post feed experience.
 """
 
 import os
-from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,17 +18,10 @@ from api.rate_limit import limiter
 from api.routers import calibration, echoes, feed, prices, telegram
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan — startup/shutdown hooks."""
-    yield
-
-
 app = FastAPI(
     title="Shitpost Alpha API",
     description="Weaponizing Shitposts for American Profit",
     version="2.0.0",
-    lifespan=lifespan,
 )
 
 # Rate limiting

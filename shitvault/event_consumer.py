@@ -7,7 +7,7 @@ Runs as a standalone worker via ``python -m shitvault.event_consumer --once``.
 
 import sys
 
-from shit.events.event_types import EventType, ConsumerGroup
+from shit.events.event_types import ConsumerGroup
 from shit.events.worker import EventWorker, run_worker_main
 from shit.logging import get_service_logger
 
@@ -49,39 +49,11 @@ class S3ProcessorWorker(EventWorker):
                 async with db_client.get_session() as session:
                     db_ops = DatabaseOperations(session)
                     processor = S3Processor(db_ops, s3_data_lake, source=source)
-
-                    stats = {
-                        "total_processed": 0,
-                        "successful": 0,
-                        "failed": 0,
-                        "skipped": 0,
-                        "signal_ids": [],
-                    }
-
-                    for s3_key in s3_keys:
-                        stats["total_processed"] += 1
-                        s3_data = await s3_data_lake.get_raw_data(s3_key)
-                        if s3_data:
-                            await processor._process_single_s3_data(
-                                s3_data, stats, dry_run=False
-                            )
-
-                    # Emit downstream event
-                    signal_ids = stats.pop("signal_ids", [])
-                    if signal_ids:
-                        from shit.events.producer import emit_event
-
-                        emit_event(
-                            event_type=EventType.SIGNALS_STORED,
-                            payload={
-                                "signal_ids": signal_ids,
-                                "source": source,
-                                "count": len(signal_ids),
-                            },
-                            source_service="s3_processor",
-                        )
-
-                    return stats
+                    # Delegate to the shared path: builds stats, runs the
+                    # get_raw_data -> _process_single_s3_data loop, and emits
+                    # SIGNALS_STORED once (best-effort). No more cross-module
+                    # reach into the private _process_single_s3_data.
+                    return await processor.process_keys(s3_keys, dry_run=False)
 
         return asyncio.run(_process())
 

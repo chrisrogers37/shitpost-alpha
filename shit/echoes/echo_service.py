@@ -9,6 +9,7 @@ import hashlib
 from typing import Optional
 
 from sqlalchemy import text as sql_text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from shit.db.sync_session import get_session
 from shit.llm.embeddings import EmbeddingClient
@@ -65,9 +66,15 @@ class EchoService:
 
         embedding = self.embedding_client.embed(text)
 
-        with get_session() as session:
-            text_hash = hashlib.sha256(text.encode()).hexdigest()
-            record = PostEmbedding(
+        text_hash = hashlib.sha256(text.encode()).hexdigest()
+        # INSERT ... ON CONFLICT (prediction_id) DO NOTHING closes the TOCTOU race
+        # between the pre-check above and this insert: two concurrent workers can
+        # both pass the existence check, both embed, and race to insert. Column
+        # inference (index_elements) is name-agnostic — it matches whichever unique
+        # index covers (prediction_id), so we don't depend on the constraint name.
+        stmt = (
+            pg_insert(PostEmbedding)
+            .values(
                 prediction_id=prediction_id,
                 shitpost_id=shitpost_id,
                 signal_id=signal_id,
@@ -75,9 +82,21 @@ class EchoService:
                 embedding=embedding,
                 model=EMBEDDING_MODEL,
             )
-            session.add(record)
+            .on_conflict_do_nothing(index_elements=["prediction_id"])
+        )
+        with get_session() as session:
+            inserted = session.execute(stmt).rowcount
 
-        logger.info(f"Stored embedding for prediction {prediction_id}")
+        if inserted:
+            logger.info(f"Stored embedding for prediction {prediction_id}")
+        else:
+            # A concurrent writer stored this prediction's embedding between our
+            # pre-check and insert. The desired end-state holds, so the conflict
+            # is success, not an error — no unhandled IntegrityError / retry.
+            logger.debug(
+                f"Embedding for prediction {prediction_id} already present "
+                "(concurrent insert); treating as success"
+            )
         return True
 
     def get_embedding(self, prediction_id: int) -> Optional[list[float]]:

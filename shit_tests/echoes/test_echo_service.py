@@ -26,7 +26,7 @@ def _mock_embedding_client(vector=None):
     return mock
 
 
-def _mock_session_ctx(query_results=None):
+def _mock_session_ctx(query_results=None, rowcount=1):
     """Create a mock get_session context manager."""
     mock_session = MagicMock()
     if query_results is not None:
@@ -35,6 +35,8 @@ def _mock_session_ctx(query_results=None):
         )
     else:
         mock_session.query.return_value.filter.return_value.first.return_value = None
+    # session.execute(stmt).rowcount: 1 = inserted, 0 = ON CONFLICT (concurrent writer)
+    mock_session.execute.return_value.rowcount = rowcount
     mock_ctx = MagicMock()
     mock_ctx.__enter__ = MagicMock(return_value=mock_session)
     mock_ctx.__exit__ = MagicMock(return_value=False)
@@ -54,7 +56,22 @@ class TestEmbedAndStore:
 
         assert result is True
         mock_client.embed.assert_called_once_with("Drill baby drill!")
-        assert mock_session.add.called
+        assert mock_session.execute.called
+
+    def test_conflict_treated_as_success(self):
+        """ON CONFLICT (rowcount == 0) → idempotent success, no raise (#231 L16)."""
+        mock_client = _mock_embedding_client()
+        # Pre-check passes (None), but a concurrent writer won the insert race.
+        mock_ctx, mock_session = _mock_session_ctx(query_results=None, rowcount=0)
+
+        service = EchoService(embedding_client=mock_client)
+        with patch(_SESSION_PATCH, return_value=mock_ctx):
+            result = service.embed_and_store(
+                prediction_id=1, text="Drill baby drill!"
+            )
+
+        assert result is True
+        assert mock_session.execute.called
 
     def test_skips_duplicate(self):
         mock_client = _mock_embedding_client()

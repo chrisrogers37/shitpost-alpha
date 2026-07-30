@@ -172,7 +172,7 @@ def mock_execute_query():
     Usage in tests:
         def test_something(client, mock_execute_query):
             mock_execute_query.return_value = (rows, columns)
-            response = client.get("/api/feed/latest")
+            response = client.get("/api/feed/at?offset=0")
     """
     mock_eq = MagicMock()
     mock_eq.return_value = ([], [])

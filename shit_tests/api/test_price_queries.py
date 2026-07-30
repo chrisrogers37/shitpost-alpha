@@ -4,6 +4,7 @@ Unit tests for the query/cache layer, mocking yfinance and execute_query.
 """
 
 import time
+from collections import OrderedDict
 from datetime import date
 from unittest.mock import patch, MagicMock
 
@@ -149,7 +150,7 @@ def test_get_candles_cache_miss():
         }
     ]
 
-    with patch("api.queries.price_queries._price_cache", {}):
+    with patch("api.queries.price_queries._price_cache", OrderedDict()):
         with patch(
             "api.queries.price_queries._fetch_from_yfinance", return_value=candles
         ):
@@ -177,7 +178,7 @@ def test_get_candles_cache_hit():
             "volume": 100,
         }
     ]
-    cache = {("AAPL", 30): (cached_candles, time.time())}
+    cache = OrderedDict({("AAPL", 30): (cached_candles, time.time())})
 
     with patch("api.queries.price_queries._price_cache", cache):
         with patch("api.queries.price_queries._fetch_from_yfinance") as mock_yf:
@@ -187,6 +188,61 @@ def test_get_candles_cache_hit():
 
     mock_yf.assert_not_called()
     assert result == cached_candles
+
+
+# ---------------------------------------------------------------------------
+# _get_candles — bounded cache (LRU eviction past _CACHE_MAX)
+# ---------------------------------------------------------------------------
+
+
+def test_get_candles_cache_eviction():
+    """_get_candles evicts least-recently-used entries past _CACHE_MAX."""
+    cache = OrderedDict()
+    candles = [
+        {"date": "2026-03-25", "open": 1, "high": 2, "low": 0, "close": 1, "volume": 10}
+    ]
+
+    with patch("api.queries.price_queries._price_cache", cache):
+        with patch("api.queries.price_queries._CACHE_MAX", 3):
+            with patch(
+                "api.queries.price_queries._fetch_from_yfinance", return_value=candles
+            ):
+                from api.queries.price_queries import _get_candles
+
+                # Insert 5 distinct (symbol, days) keys into a cap-3 cache.
+                for i in range(5):
+                    _get_candles(f"SYM{i}", 30)
+
+    # Size never exceeds the cap; the two oldest keys were evicted.
+    assert len(cache) == 3
+    assert ("SYM0", 30) not in cache
+    assert ("SYM1", 30) not in cache
+    assert ("SYM4", 30) in cache
+
+
+def test_get_candles_cache_hit_marks_recently_used():
+    """A fresh cache hit moves its key to most-recently-used (LRU ordering)."""
+    now = time.time()
+    candles = [
+        {"date": "2026-03-25", "open": 1, "high": 2, "low": 0, "close": 1, "volume": 10}
+    ]
+    cache = OrderedDict(
+        [
+            (("A", 30), (candles, now)),
+            (("B", 30), (candles, now)),
+        ]
+    )
+
+    with patch("api.queries.price_queries._price_cache", cache):
+        with patch("api.queries.price_queries._fetch_from_yfinance") as mock_yf:
+            from api.queries.price_queries import _get_candles
+
+            # Hit the oldest key ("A"); it should move to the end.
+            result = _get_candles("A", 30)
+
+    mock_yf.assert_not_called()
+    assert result == candles
+    assert list(cache.keys())[-1] == ("A", 30)
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +263,7 @@ def test_get_price_data_response_structure():
         }
     ]
 
-    with patch("api.queries.price_queries._price_cache", {}):
+    with patch("api.queries.price_queries._price_cache", OrderedDict()):
         with patch(
             "api.queries.price_queries._fetch_from_yfinance", return_value=candles
         ):
