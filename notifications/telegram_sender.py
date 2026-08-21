@@ -96,9 +96,16 @@ def set_webhook(webhook_url: str) -> Tuple[bool, Optional[str]]:
         return False, "Telegram bot token not configured"
 
     url = TELEGRAM_API_BASE.format(token=bot_token, method="setWebhook")
+    payload: Dict[str, Any] = {"url": webhook_url}
+    # Register the secret token so Telegram echoes it back in the
+    # X-Telegram-Bot-Api-Secret-Token header; the webhook verifies it.
+    # Without this, configuring TELEGRAM_WEBHOOK_SECRET makes every genuine
+    # update fail verification.
+    if settings.TELEGRAM_WEBHOOK_SECRET:
+        payload["secret_token"] = settings.TELEGRAM_WEBHOOK_SECRET
 
     try:
-        response = requests.post(url, json={"url": webhook_url}, timeout=10)
+        response = requests.post(url, json=payload, timeout=10)
         data = response.json()
 
         if data.get("ok"):

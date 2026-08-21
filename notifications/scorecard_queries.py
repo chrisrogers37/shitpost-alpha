@@ -8,6 +8,21 @@ from shit.logging import get_service_logger
 
 logger = get_service_logger("scorecard_queries")
 
+# Canonical timeframe keys. These are interpolated directly into column names
+# (correct_t7, pnl_t30, ...), so they must be validated against this allowlist
+# before reaching SQL to keep the interpolation injection-safe.
+# NOTE: this set is duplicated across shit/market_data/ (see #169); consolidate
+# there rather than adding more copies.
+VALID_TIMEFRAMES = ("t1", "t3", "t7", "t30")
+
+
+def _validate_timeframe(timeframe: str) -> None:
+    """Reject any timeframe not in VALID_TIMEFRAMES before it reaches SQL."""
+    if timeframe not in VALID_TIMEFRAMES:
+        raise ValueError(
+            f"Invalid timeframe: {timeframe!r}. Must be one of {VALID_TIMEFRAMES}"
+        )
+
 
 def get_weekly_prediction_stats(
     week_start: date,
@@ -56,6 +71,7 @@ def get_weekly_accuracy(
     Returns:
         Dict with correct, incorrect, pending, bullish/bearish splits.
     """
+    _validate_timeframe(timeframe)
     correct_col = f"correct_{timeframe}"
 
     return _execute_read(
@@ -94,6 +110,7 @@ def get_weekly_pnl(
     Returns:
         Dict with total_pnl, avg_pnl, best_pnl, worst_pnl, trade_count.
     """
+    _validate_timeframe(timeframe)
     pnl_col = f"pnl_{timeframe}"
 
     return _execute_read(
@@ -123,6 +140,7 @@ def get_top_wins(
     timeframe: str = "t7",
 ) -> List[Dict[str, Any]]:
     """Get the best-performing predictions of the week."""
+    _validate_timeframe(timeframe)
     pnl_col = f"pnl_{timeframe}"
     return_col = f"return_{timeframe}"
 
@@ -154,6 +172,7 @@ def get_worst_misses(
     timeframe: str = "t7",
 ) -> List[Dict[str, Any]]:
     """Get the worst-performing predictions of the week."""
+    _validate_timeframe(timeframe)
     pnl_col = f"pnl_{timeframe}"
     return_col = f"return_{timeframe}"
 
@@ -184,6 +203,7 @@ def get_asset_breakdown(
     timeframe: str = "t7",
 ) -> List[Dict[str, Any]]:
     """Get per-asset performance summary."""
+    _validate_timeframe(timeframe)
     correct_col = f"correct_{timeframe}"
     pnl_col = f"pnl_{timeframe}"
 

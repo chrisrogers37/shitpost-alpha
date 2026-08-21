@@ -89,6 +89,35 @@ class TestSetWebhook:
         success, error = set_webhook("https://example.com/webhook")
         assert success is False
 
+    @patch("notifications.telegram_sender.get_bot_token")
+    @patch("notifications.telegram_sender.requests.post")
+    def test_registers_secret_token_when_configured(self, mock_post, mock_token):
+        """setWebhook sends secret_token so Telegram echoes the verification header."""
+        mock_token.return_value = "test_token"
+        mock_post.return_value = MagicMock(json=lambda: {"ok": True})
+
+        with patch("notifications.telegram_sender.settings") as mock_settings:
+            mock_settings.TELEGRAM_WEBHOOK_SECRET = "s3cr3t"
+            set_webhook("https://example.com/webhook")
+
+        payload = mock_post.call_args.kwargs["json"]
+        assert payload["url"] == "https://example.com/webhook"
+        assert payload["secret_token"] == "s3cr3t"
+
+    @patch("notifications.telegram_sender.get_bot_token")
+    @patch("notifications.telegram_sender.requests.post")
+    def test_omits_secret_token_when_unset(self, mock_post, mock_token):
+        """No secret_token is sent when TELEGRAM_WEBHOOK_SECRET is unset."""
+        mock_token.return_value = "test_token"
+        mock_post.return_value = MagicMock(json=lambda: {"ok": True})
+
+        with patch("notifications.telegram_sender.settings") as mock_settings:
+            mock_settings.TELEGRAM_WEBHOOK_SECRET = ""
+            set_webhook("https://example.com/webhook")
+
+        payload = mock_post.call_args.kwargs["json"]
+        assert "secret_token" not in payload
+
 
 class TestFormatTelegramAlert:
     """Test Telegram alert message formatting."""
@@ -237,13 +266,17 @@ class TestCalibratedConfidenceDisplay:
 
     def test_shows_both_when_calibrated_available(self):
         """Shows 'raw / calibrated' format when calibrated confidence exists."""
-        message = format_telegram_alert(self._make_alert(confidence=0.85, calibrated=0.62))
+        message = format_telegram_alert(
+            self._make_alert(confidence=0.85, calibrated=0.62)
+        )
         assert "85% raw" in message or "85\\% raw" in message
         assert "62% calibrated" in message or "62\\% calibrated" in message
 
     def test_shows_only_raw_when_no_calibration(self):
         """Shows only raw confidence when calibrated is None."""
-        message = format_telegram_alert(self._make_alert(confidence=0.85, calibrated=None))
+        message = format_telegram_alert(
+            self._make_alert(confidence=0.85, calibrated=None)
+        )
         assert "85%" in message
         assert "calibrated" not in message
 

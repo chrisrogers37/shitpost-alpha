@@ -97,3 +97,37 @@ def test_webhook_invalid_json_after_secret_check(mock_execute_query):
             },
         )
     assert response.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Fail-closed in production when no secret is configured
+# ---------------------------------------------------------------------------
+
+
+def test_webhook_fails_closed_in_production_without_secret(mock_execute_query):
+    """POST /telegram/webhook returns 403 in production when no secret is set."""
+    with patch("api.routers.telegram.settings") as mock_settings:
+        mock_settings.TELEGRAM_WEBHOOK_SECRET = ""
+        mock_settings.is_production.return_value = True
+        client = _make_client()
+        response = client.post(
+            "/telegram/webhook",
+            json={"update_id": 1, "message": {"text": "/start"}},
+        )
+    assert response.status_code == 403
+    assert response.json()["ok"] is False
+
+
+def test_webhook_open_in_development_without_secret(mock_execute_query):
+    """POST /telegram/webhook stays open in development when no secret is set."""
+    with patch("api.routers.telegram.settings") as mock_settings:
+        mock_settings.TELEGRAM_WEBHOOK_SECRET = ""
+        mock_settings.is_production.return_value = False
+        client = _make_client()
+        with patch("notifications.telegram_bot.process_update"):
+            response = client.post(
+                "/telegram/webhook",
+                json={"update_id": 1, "message": {"text": "/start"}},
+            )
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
