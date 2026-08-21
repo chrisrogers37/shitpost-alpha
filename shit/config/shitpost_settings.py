@@ -88,9 +88,6 @@ class Settings(BaseSettings):
     )  # For webhook mode (optional)
     TELEGRAM_WEBHOOK_SECRET: Optional[str] = Field(default=None)
 
-    # API Authentication
-    API_KEY: Optional[str] = Field(default=None)
-
     # Market Data Resilience Configuration
     ALPHA_VANTAGE_API_KEY: Optional[str] = Field(default=None)
     MARKET_DATA_PRIMARY_PROVIDER: str = Field(default="yfinance")

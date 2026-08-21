@@ -17,13 +17,23 @@ router = APIRouter()
 @router.post("/telegram/webhook")
 @limiter.limit("60/minute")
 async def telegram_webhook(request: Request):
-    """Receive Telegram updates. Verifies secret token when configured."""
+    """Receive Telegram updates. Verifies the secret token.
+
+    Fails closed in production: an unset secret leaves the webhook open to
+    spoofed updates (chat_ids are enumerable), so it is rejected there.
+    Development stays open when no secret is configured for local testing.
+    """
     if settings.TELEGRAM_WEBHOOK_SECRET:
         token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
         if not token or not hmac.compare_digest(
             token, settings.TELEGRAM_WEBHOOK_SECRET
         ):
             return JSONResponse({"ok": False}, status_code=403)
+    elif settings.is_production():
+        logger.error(
+            "TELEGRAM_WEBHOOK_SECRET is unset in production; rejecting webhook"
+        )
+        return JSONResponse({"ok": False}, status_code=403)
 
     try:
         update = await request.json()
