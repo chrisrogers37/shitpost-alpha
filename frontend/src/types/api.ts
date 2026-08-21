@@ -162,7 +162,6 @@ export interface Outcome {
   confidence: number | null;
   price_at_prediction: number | null;
   price_at_post: number | null;
-  current_price: number | null;
   returns: Returns;
   correct: Correct;
   pnl: Pnl;

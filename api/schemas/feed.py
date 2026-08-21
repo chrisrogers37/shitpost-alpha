@@ -117,7 +117,6 @@ class Outcome(BaseModel):
     confidence: Optional[float] = None
     price_at_prediction: Optional[float] = None
     price_at_post: Optional[float] = None
-    current_price: Optional[float] = None
     returns: Returns
     correct: Correct
     pnl: Pnl

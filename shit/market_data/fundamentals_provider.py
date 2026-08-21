@@ -14,23 +14,6 @@ from shit.logging import get_service_logger
 
 logger = get_service_logger("fundamentals_provider")
 
-# Mapping from yfinance .info keys to TickerRegistry column names
-_INFO_FIELD_MAP: Dict[str, str] = {
-    "longName": "company_name",
-    "shortName": "company_name",  # fallback if longName missing
-    "sector": "sector",
-    "industry": "industry",
-    "marketCap": "market_cap",
-    "trailingPE": "pe_ratio",
-    "forwardPE": "forward_pe",
-    "dividendYield": "dividend_yield",
-    "beta": "beta",
-    "exchange": "exchange",
-    "quoteType": "asset_type",
-    "longBusinessSummary": "description",
-    "shortBusinessSummary": "description",  # fallback
-}
-
 # yfinance quoteType -> our asset_type mapping
 _QUOTE_TYPE_MAP: Dict[str, str] = {
     "EQUITY": "stock",

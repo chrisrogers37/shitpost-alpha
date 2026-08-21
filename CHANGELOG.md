@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **Dead `_INFO_FIELD_MAP` in fundamentals_provider (#168)** — removed the unreferenced yfinance-key→column mapping dict; `_extract_fundamentals` hand-rolls every field and nothing else read it (verified zero references repo-wide).
+- **Orphaned `Outcome.current_price` field (#183)** — removed the field from `api/schemas/feed.py` and its `frontend/src/types/api.ts` counterpart; `FeedService.build_outcome` never set it (always serialized `null`) and no consumer read it (the frontend derives current price from the live quote).
+
 ### Fixed
 - **Broken `shit.logging` star-export (Phase 3, #196 ≡ #230 L12)** — `__all__` listed `get_cli_logger` but no module imported it, so `from shit.logging import *` raised `AttributeError` and `from shit.logging import get_cli_logger` raised `ImportError`. Wired the surviving `CLILogger` factory into the package root and deleted the duplicate plain-`logging.Logger` `get_cli_logger` in `cli_logging.py`. Added a regression test pinning `import *` and the package-root export.
 - **Morning briefing dark all winter (Phase 4, #230 L3)** — the `briefing-sender` cron fires at 12:30 UTC, which is 7:30 ET under EST; the `is_briefing_time()` guard hard-gated to 8:25–8:35 ET and silently rejected that firing, so the morning briefing never sent on any weekday from ~Nov–Mar. Widened the guard to a 7–8 AM ET window so the single fixed-UTC cron sends year-round (7:30 EST / 8:30 EDT, an accepted ±1h DST drift); the once-daily cron makes a double-send impossible. `weekly-scorecard`'s analogous (un-guarded, harmless) ±1h drift is now documented.
