@@ -9,18 +9,22 @@ every request's HTTP status plus Cloudflare and rate-limit headers, and the firs
 each Trump post appears, with `lag_s` = first seen minus the post's `created_at`.
 Read-only: no credentials, no database, no S3, no environment variables.
 
-By default it polls only the mirrors (`cnn` every 20 s, `trumpstruth` every 60 s).
+By default it polls only the mirrors: `cnn` every 20 s, and `trumpstruth` and
+`trumpstruth_fresh` every 60 s.
 The `direct` sources are off until Chris decides whether to poll truthsocial.com;
-turning them on is a start-command change: `--sources direct,direct_cf,cnn,trumpstruth`.
+turning them on is a start-command change: `--sources direct,direct_cf,cnn,trumpstruth,trumpstruth_fresh`.
 
 | Source | What it hits |
 |---|---|
 | `direct` | truthsocial.com public statuses API, no auth, plain `urllib` |
 | `direct_cf` | same URL via `curl_cffi` Chrome impersonation |
 | `cnn` | CNN archive JSON (`ix.cnn.io`) |
-| `trumpstruth` | trumpstruth.org RSS |
+| `trumpstruth` | trumpstruth.org RSS as Cloudflare caches it (can be 100+ min stale) |
+| `trumpstruth_fresh` | same feed with a unique `?t=` query, which skips the cache |
 
-Polls use ETag conditional requests, so an unchanged feed answers 304 with no body.
+Polls use gzip and ETag conditional requests, so an unchanged feed answers 304 with
+no body. Logs keep `cf-cache-status`, `age` and `last-modified` to separate cache lag
+from the mirror's own lag.
 The RSS and the direct API (if enabled) are held to one request a minute, well under
 the 300-per-window limit the direct API reports.
 
@@ -45,5 +49,5 @@ Prints success rate and status codes per source, and median / p90 / max lag over
 posts seen during the run.
 
 ## Tests
-`pytest probes/truth_social_latency` runs offline fixture tests (block, new post,
-RSS item without a status ID).
+`pytest probes/truth_social_latency` runs offline fixture tests (block, new post, ETag
+304, gzip, RSS item without a status ID, RSS item linking another post).

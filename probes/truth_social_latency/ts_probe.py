@@ -9,7 +9,8 @@ Sources:
   direct     truthsocial.com public Mastodon-style statuses endpoint (no auth)
   direct_cf  same URL via curl_cffi Chrome impersonation, if curl_cffi is installed
   cnn        CNN archive JSON (ix.cnn.io)
-  trumpstruth  trumpstruth.org RSS feed
+  trumpstruth  trumpstruth.org RSS feed (as Cloudflare caches it)
+  trumpstruth_fresh  same feed with a cache-busting query
 
 Usage:
   python ts_probe.py poll [--interval 20] [--hours 24] [--out probe.jsonl]
@@ -17,7 +18,7 @@ Usage:
 
 Default sources are the mirrors only (cnn, trumpstruth). The direct sources stay
 off until Chris opts in to polling truthsocial.com; enable them with
---sources direct,direct_cf,cnn,trumpstruth.
+--sources direct,direct_cf,cnn,trumpstruth,trumpstruth_fresh.
 
 Conditional GETs (ETag / If-None-Match) keep frequent polls cheap: an unchanged
 feed answers 304 with no body.
@@ -29,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import email.utils
+import gzip
 import json
 import re
 import statistics
@@ -46,7 +48,7 @@ DIRECT_URL = (
     "?exclude_replies=true&limit=20"
 )
 CNN_URL = "https://ix.cnn.io/data/truth-social/truth_archive.json"
-TRUMPSTRUTH_URL = "https://trumpstruth.org/feed"
+TRUMPSTRUTH_URL = "https://www.trumpstruth.org/feed"  # bare domain 301s here
 UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
@@ -54,12 +56,20 @@ UA = (
 STATUS_ID_RE = re.compile(r"truthsocial\.com/@realDonaldTrump/(?:posts/)?(\d{15,})")
 # Seconds between polls per source, on top of --interval. Keeps load on the
 # volunteer-run RSS and on truthsocial.com at one request a minute.
-MIN_INTERVAL_S = {"direct": 60, "direct_cf": 60, "trumpstruth": 60}
+MIN_INTERVAL_S = {
+    "direct": 60,
+    "direct_cf": 60,
+    "trumpstruth": 60,
+    "trumpstruth_fresh": 60,
+}
 ETAGS: dict[str, str] = {}
 KEEP_HEADERS = (
     "etag",
     "server",
     "cf-ray",
+    "cf-cache-status",
+    "age",
+    "last-modified",
     "cf-mitigated",
     "retry-after",
     "x-ratelimit-limit",
@@ -96,17 +106,17 @@ def parse_rfc822(value: str) -> Optional[datetime]:
 def fetch_urllib(
     url: str, etag: Optional[str] = None, timeout: int = 20
 ) -> tuple[int, dict, bytes]:
-    headers = {"User-Agent": UA, "Accept": "*/*"}
+    # gzip cuts the 20 MB CNN archive to ~4 MB per changed download.
+    headers = {"User-Agent": UA, "Accept": "*/*", "Accept-Encoding": "gzip"}
     if etag:
         headers["If-None-Match"] = etag
     req = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return (
-                resp.status,
-                {k.lower(): v for k, v in resp.headers.items()},
-                resp.read(),
-            )
+            body = resp.read()
+            if resp.headers.get("Content-Encoding") == "gzip":
+                body = gzip.decompress(body)
+            return resp.status, {k.lower(): v for k, v in resp.headers.items()}, body
     except urllib.error.HTTPError as e:
         return e.code, {k.lower(): v for k, v in e.headers.items()}, e.read()
 
@@ -158,10 +168,11 @@ def parse_rss(body: bytes) -> list[dict]:
             filter(
                 None,
                 (
+                    # originalUrl first: the description can link other Trump posts.
+                    *(el.text or "" for el in item if el.tag.endswith("originalUrl")),
                     item.findtext("link"),
                     item.findtext("guid"),
                     item.findtext("description"),
-                    *(el.text or "" for el in item if el.tag.endswith("originalUrl")),
                 ),
             )
         )
@@ -181,6 +192,12 @@ SOURCES: dict[str, tuple[str, Callable, Callable]] = {
     "direct_cf": (DIRECT_URL, fetch_curl_cffi, parse_mastodon),
     "cnn": (CNN_URL, fetch_urllib, parse_cnn),
     "trumpstruth": (TRUMPSTRUTH_URL, fetch_urllib, parse_rss),
+    # Cloudflare serves /feed from cache for 90+ minutes; a unique query skips it.
+    "trumpstruth_fresh": (
+        TRUMPSTRUTH_URL,
+        lambda url, etag=None: fetch_urllib(f"{url}?t={int(time.time())}"),
+        parse_rss,
+    ),
 }
 
 
@@ -313,7 +330,7 @@ def main() -> None:
     p = sub.add_parser("poll")
     p.add_argument("--interval", type=int, default=20)
     p.add_argument("--hours", type=float, default=24)
-    p.add_argument("--sources", default="cnn,trumpstruth")
+    p.add_argument("--sources", default="cnn,trumpstruth,trumpstruth_fresh")
     p.add_argument("--out")
     s = sub.add_parser("summarize")
     s.add_argument("file")

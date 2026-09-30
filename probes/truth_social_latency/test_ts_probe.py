@@ -112,3 +112,40 @@ def test_etag_is_sent_and_304_is_logged_without_parsing(tmp_path, monkeypatch) -
     records = [json.loads(line) for line in log.read_text().splitlines()]
     assert sent == [None, '"v1"']
     assert [r["status"] for r in records] == [200, 304]
+
+
+def test_parse_rss_prefers_original_url_over_linked_post() -> None:
+    posts = tp.parse_rss(
+        _rss(
+            '<item xmlns:truth="https://truthsocial.com/ns">'
+            "<link>https://www.trumpstruth.org/statuses/41825</link>"
+            '<description>&lt;a href="https://truthsocial.com/@realDonaldTrump/'
+            '117304284426928910"&gt;earlier post&lt;/a&gt;</description>'
+            "<pubDate>Sun, 21 Sep 2026 14:00:00 +0000</pubDate>"
+            "<truth:originalUrl>https://truthsocial.com/@realDonaldTrump/"
+            "117307289681145880</truth:originalUrl></item>"
+        )
+    )
+    assert posts[0]["id"] == "117307289681145880"
+
+
+def test_fetch_urllib_decompresses_gzip(monkeypatch) -> None:
+    import gzip
+    import io
+    import urllib.request
+
+    class Resp(io.BytesIO):
+        status = 200
+        headers = {"Content-Encoding": "gzip", "ETag": '"v1"'}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(
+        urllib.request, "urlopen", lambda req, timeout: Resp(gzip.compress(b"[1]"))
+    )
+    status, headers, body = tp.fetch_urllib("https://example.test")
+    assert (status, body, headers["etag"]) == (200, b"[1]", '"v1"')
