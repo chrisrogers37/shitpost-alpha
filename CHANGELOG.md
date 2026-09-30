@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Temporary Truth Social latency probe** - `probes/truth_social_latency/` measures, from Railway, whether free sources (direct public API, CNN archive JSON, trumpstruth.org RSS) are blocked and how late each Trump post appears
+- **Temporary Truth Social latency probe** - `probes/truth_social_latency/` measures, from Railway, whether free mirror sources (CNN archive JSON, trumpstruth.org RSS) are reachable and how late each Trump post appears; direct truthsocial.com polling is present but off by default
   - Read-only, self-contained, not wired into the root `railway.json`; runs as a separate throwaway Railway service
   - Flagged for removal: delete the directory and the service after the 24-hour run
 

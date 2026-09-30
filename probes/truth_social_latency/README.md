@@ -4,10 +4,14 @@
 > choosing a free replacement for ScrapeCreators. Nothing else in the repo imports it,
 > it has no tables, and it is not wired into the root `railway.json`.
 
-`ts_probe.py` polls each free source once a minute for 24 hours and logs JSON lines:
+`ts_probe.py` polls the free mirror sources for 24 hours and logs JSON lines:
 every request's HTTP status plus Cloudflare and rate-limit headers, and the first time
 each Trump post appears, with `lag_s` = first seen minus the post's `created_at`.
 Read-only: no credentials, no database, no S3, no environment variables.
+
+By default it polls only the mirrors (`cnn` every 20 s, `trumpstruth` every 60 s).
+The `direct` sources are off until Chris decides whether to poll truthsocial.com;
+turning them on is a start-command change: `--sources direct,direct_cf,cnn,trumpstruth`.
 
 | Source | What it hits |
 |---|---|
@@ -16,8 +20,9 @@ Read-only: no credentials, no database, no S3, no environment variables.
 | `cnn` | CNN archive JSON (`ix.cnn.io`) |
 | `trumpstruth` | trumpstruth.org RSS |
 
-Load is 1 request per minute per source (1,440 a day), well under the 300-per-window
-limit the direct API reports.
+Polls use ETag conditional requests, so an unchanged feed answers 304 with no body.
+The RSS and the direct API (if enabled) are held to one request a minute, well under
+the 300-per-window limit the direct API reports.
 
 ## Run on Railway
 Create a **new, separate** service in the shitpost-alpha project so the live harvester

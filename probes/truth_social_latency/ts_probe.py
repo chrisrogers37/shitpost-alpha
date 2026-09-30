@@ -12,8 +12,15 @@ Sources:
   trumpstruth  trumpstruth.org RSS feed
 
 Usage:
-  python ts_probe.py poll [--interval 60] [--hours 24] [--out probe.jsonl]
+  python ts_probe.py poll [--interval 20] [--hours 24] [--out probe.jsonl]
   python ts_probe.py summarize probe.jsonl
+
+Default sources are the mirrors only (cnn, trumpstruth). The direct sources stay
+off until Chris opts in to polling truthsocial.com; enable them with
+--sources direct,direct_cf,cnn,trumpstruth.
+
+Conditional GETs (ETag / If-None-Match) keep frequent polls cheap: an unchanged
+feed answers 304 with no body.
 
 Standard library only (curl_cffi optional). No credentials, no database.
 """
@@ -45,7 +52,12 @@ UA = (
     "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
 )
 STATUS_ID_RE = re.compile(r"truthsocial\.com/@realDonaldTrump/(?:posts/)?(\d{15,})")
+# Seconds between polls per source, on top of --interval. Keeps load on the
+# volunteer-run RSS and on truthsocial.com at one request a minute.
+MIN_INTERVAL_S = {"direct": 60, "direct_cf": 60, "trumpstruth": 60}
+ETAGS: dict[str, str] = {}
 KEEP_HEADERS = (
+    "etag",
     "server",
     "cf-ray",
     "cf-mitigated",
@@ -81,8 +93,13 @@ def parse_rfc822(value: str) -> Optional[datetime]:
 # ── Fetchers: return (http_status, headers dict, body bytes) ──────────────
 
 
-def fetch_urllib(url: str, timeout: int = 20) -> tuple[int, dict, bytes]:
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
+def fetch_urllib(
+    url: str, etag: Optional[str] = None, timeout: int = 20
+) -> tuple[int, dict, bytes]:
+    headers = {"User-Agent": UA, "Accept": "*/*"}
+    if etag:
+        headers["If-None-Match"] = etag
+    req = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return (
@@ -94,10 +111,13 @@ def fetch_urllib(url: str, timeout: int = 20) -> tuple[int, dict, bytes]:
         return e.code, {k.lower(): v for k, v in e.headers.items()}, e.read()
 
 
-def fetch_curl_cffi(url: str, timeout: int = 20) -> tuple[int, dict, bytes]:
+def fetch_curl_cffi(
+    url: str, etag: Optional[str] = None, timeout: int = 20
+) -> tuple[int, dict, bytes]:
     from curl_cffi import requests as cffi  # optional dependency
 
-    resp = cffi.get(url, impersonate="chrome", timeout=timeout)
+    headers = {"If-None-Match": etag} if etag else None
+    resp = cffi.get(url, impersonate="chrome", timeout=timeout, headers=headers)
     return (
         resp.status_code,
         {k.lower(): v for k, v in resp.headers.items()},
@@ -179,19 +199,24 @@ def poll_once(
     started = now_utc()
     rec = {"type": "poll", "source": name, "at": started.isoformat()}
     try:
-        status, headers, body = fetch(url)
+        status, headers, body = fetch(url, ETAGS.get(name))
         rec.update(
             status=status,
             ms=int((now_utc() - started).total_seconds() * 1000),
             bytes=len(body),
             headers={k: headers[k] for k in KEEP_HEADERS if k in headers},
         )
+        if status == 304:
+            emit(rec, out)
+            return
         if status != 200:
             rec["body_head"] = body[:200].decode("utf-8", "replace")
             emit(rec, out)
             return
         posts = parse(body)
         rec["n_posts"] = len(posts)
+        if headers.get("etag"):
+            ETAGS[name] = headers["etag"]
     except ImportError:
         return  # curl_cffi not installed; skip direct_cf silently
     except Exception as e:  # noqa: BLE001 - probe logs every failure mode
@@ -238,10 +263,13 @@ def cmd_poll(args: argparse.Namespace) -> None:
         },
         out,
     )
+    last_poll = {n: float("-inf") for n in names}
     while time.monotonic() < deadline:
         tick = time.monotonic()
         for name in names:
-            poll_once(name, seen, first_poll, out)
+            if tick - last_poll[name] >= MIN_INTERVAL_S.get(name, 0):
+                last_poll[name] = tick
+                poll_once(name, seen, first_poll, out)
         time.sleep(max(0, args.interval - (time.monotonic() - tick)))
 
 
@@ -258,7 +286,7 @@ def cmd_summarize(args: argparse.Namespace) -> None:
         elif r.get("type") == "new_post" and r.get("lag_s") is not None:
             lags.setdefault(r["source"], []).append(r["lag_s"])
     for src, rs in polls.items():
-        ok = sum(1 for r in rs if r.get("status") == 200 and "error" not in r)
+        ok = sum(1 for r in rs if r.get("status") in (200, 304) and "error" not in r)
         codes: dict = {}
         for r in rs:
             key = r.get("status", r.get("error", "?")[:40])
@@ -283,9 +311,9 @@ def main() -> None:
     )
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("poll")
-    p.add_argument("--interval", type=int, default=60)
+    p.add_argument("--interval", type=int, default=20)
     p.add_argument("--hours", type=float, default=24)
-    p.add_argument("--sources", default="direct,direct_cf,cnn,trumpstruth")
+    p.add_argument("--sources", default="cnn,trumpstruth")
     p.add_argument("--out")
     s = sub.add_parser("summarize")
     s.add_argument("file")

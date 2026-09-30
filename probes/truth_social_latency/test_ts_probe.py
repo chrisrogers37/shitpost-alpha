@@ -56,7 +56,7 @@ def test_poll_logs_block_and_only_new_posts_after_baseline(
         {
             "direct": (
                 "u",
-                lambda url: (
+                lambda url, etag=None: (
                     200,
                     {"server": "cloudflare"},
                     json.dumps(feed[0]).encode(),
@@ -65,7 +65,11 @@ def test_poll_logs_block_and_only_new_posts_after_baseline(
             ),
             "direct_cf": (
                 "u",
-                lambda url: (403, {"cf-mitigated": "challenge"}, b"Just a moment"),
+                lambda url, etag=None: (
+                    403,
+                    {"cf-mitigated": "challenge"},
+                    b"Just a moment",
+                ),
                 tp.parse_mastodon,
             ),
         },
@@ -87,3 +91,24 @@ def test_poll_logs_block_and_only_new_posts_after_baseline(
     tp.cmd_summarize(argparse.Namespace(file=str(log)))
     summary = capsys.readouterr().out
     assert "direct_cf    ok 0/2" in summary and "direct       ok 2/2" in summary
+
+
+def test_etag_is_sent_and_304_is_logged_without_parsing(tmp_path, monkeypatch) -> None:
+    sent = []
+
+    def fetch(url, etag=None):
+        sent.append(etag)
+        if etag == '"v1"':
+            return 304, {"etag": '"v1"'}, b""
+        return 200, {"etag": '"v1"'}, json.dumps([OLD]).encode()
+
+    monkeypatch.setattr(tp, "SOURCES", {"cnn": ("u", fetch, tp.parse_mastodon)})
+    monkeypatch.setattr(tp, "ETAGS", {})
+    seen, first = {"cnn": set()}, {"cnn": True}
+    log = tmp_path / "probe.jsonl"
+    with open(log, "w") as out:
+        tp.poll_once("cnn", seen, first, out)
+        tp.poll_once("cnn", seen, first, out)
+    records = [json.loads(line) for line in log.read_text().splitlines()]
+    assert sent == [None, '"v1"']
+    assert [r["status"] for r in records] == [200, 304]
