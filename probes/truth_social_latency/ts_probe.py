@@ -16,9 +16,9 @@ Usage:
   python ts_probe.py poll [--interval 20] [--hours 24] [--out probe.jsonl]
   python ts_probe.py summarize probe.jsonl
 
-Default sources are the mirrors only (cnn, trumpstruth). The direct sources stay
-off until Chris opts in to polling truthsocial.com; enable them with
---sources direct,direct_cf,cnn,trumpstruth,trumpstruth_fresh.
+All sources run by default. Chris opted in (2026-09-30) to polling truthsocial.com
+for this test only, to see whether it is faster than the mirrors or blocked from
+Railway. Drop the direct sources with --sources cnn,trumpstruth,trumpstruth_fresh.
 
 Conditional GETs (ETag / If-None-Match) keep frequent polls cheap: an unchanged
 feed answers 304 with no body.
@@ -330,7 +330,9 @@ def main() -> None:
     p = sub.add_parser("poll")
     p.add_argument("--interval", type=int, default=20)
     p.add_argument("--hours", type=float, default=24)
-    p.add_argument("--sources", default="cnn,trumpstruth,trumpstruth_fresh")
+    p.add_argument(
+        "--sources", default="direct,direct_cf,cnn,trumpstruth,trumpstruth_fresh"
+    )
     p.add_argument("--out")
     s = sub.add_parser("summarize")
     s.add_argument("file")
