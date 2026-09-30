@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Temporary Truth Social latency probe** - `probes/truth_social_latency/` measures, from Railway, whether free sources (direct public API, CNN archive JSON, trumpstruth.org RSS) are blocked and how late each Trump post appears
+  - Read-only, self-contained, not wired into the root `railway.json`; runs as a separate throwaway Railway service
+  - Flagged for removal: delete the directory and the service after the 24-hour run
+
 ### Removed
 - **Dead `_INFO_FIELD_MAP` in fundamentals_provider (#168)** — removed the unreferenced yfinance-key→column mapping dict; `_extract_fundamentals` hand-rolls every field and nothing else read it (verified zero references repo-wide).
 - **Orphaned `Outcome.current_price` field (#183)** — removed the field from `api/schemas/feed.py` and its `frontend/src/types/api.ts` counterpart; `FeedService.build_outcome` never set it (always serialized `null`) and no consumer read it (the frontend derives current price from the live quote).
