@@ -31,6 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Scorecard timeframe SQL allowlist (#233)** — `notifications/scorecard_queries.py` interpolates `timeframe` directly into SQL column names; every query function now validates it against `{t1,t3,t7,t30}` first, matching the existing `shit/market_data/calibration.py` pattern. Not attacker-reachable today (all callers pass a hardcoded value) but removes the latent injection footgun.
 
 ### Added
+- **Signal engine foundation (engine PR 1)** - New `engine/` package, separate from the old code, with its own `pyproject.toml`, tests and CI.
+  - `python -m engine migrate | run | status`; settings come from `ENGINE_*` variables (`ENGINE_DATABASE_URL`, never `DATABASE_URL`).
+  - One Alembic history with three schemas: `engine` (web role reads), `prices` (engine only), `app` (later plans). Tables `engine.engine_meta` (fixed `stream_id` + status), `engine.engine_lease`, `engine.job_runs`. Grants to `ENGINE_WEB_ROLE` run on every migrate, only if the role exists.
+  - One copy at a time: a database-clock lease (renew 10 s, expiry 30 s); only the holder runs workers and jobs, and it stops both at once if the lease is lost. SIGTERM releases the lease for a fast handover.
+  - Daily jobs at New York times, logged in `job_runs`; a missed run is caught up once; failed or interrupted runs retry up to 3 times, then one operator message. Heavy jobs run in a separate process.
+  - Crash-safe per-item stage runner: stage and attempt count stored with each item, resumes after a restart, final error state with its reason and one operator message after 3 attempts.
+  - Plug-in points: `register_job`, `register_worker` and `notify_operator` (logs only for now).
+  - `engine/railway.json` (start `python -m engine run`, pre-deploy `python -m engine migrate`, restart always); no service uses it yet.
+  - `.github/workflows/engine.yml`: ruff, mypy, pytest against Postgres 16, and a single-Alembic-head check, on PRs that touch `engine/`.
 - **AGENTS.md (Cursor Cloud setup notes)** — Added `AGENTS.md` with a `## Cursor Cloud specific instructions` section documenting the dev environment: Python venv usage, that the dashboard feed requires PostgreSQL (not the default SQLite), how to start local Postgres + create the schema, backend/frontend dev commands and ports, the SPA catch-all route gotcha, and how to run tests/lint/build (including known pre-existing test failures that need real credentials).
 - **Tech-Debt Tracker (2026-07-02)** — Full-system review triaged into `documentation/planning/tech-debt-2026-07-02/` (durable analysis artifacts) and filed as GitHub issues
   - `00_TECH_DEBT.md` overview with a complete, ID'd inventory (5 CRITICAL, 16 HIGH, plus MEDIUM/LOW) across `shit/`, the pipeline, `api/`, `frontend/`, `notifications/`, and the event queue
