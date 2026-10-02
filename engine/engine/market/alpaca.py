@@ -19,7 +19,7 @@ import httpx
 
 from engine.db import raise_if_cancelling
 from engine.feeds.base import UNEXPECTED
-from engine.http_client import make_client, request_error_text
+from engine.http_client import make_client, request_error_text, scrub
 from engine.settings import Settings
 
 log = logging.getLogger(__name__)
@@ -203,6 +203,8 @@ class Alpaca:
                 self._fail(f"{path}: unexpected answer: {exc!r}")
             if not token:
                 return bars
+            if not isinstance(token, str):
+                self._fail(f"{path}: unexpected answer: a page token of {token!r}")
             if token in tokens:
                 self._fail(f"{path}: Alpaca repeated a page token")
             tokens.add(token)
@@ -249,9 +251,9 @@ class Alpaca:
         return request_error_text(exc, self._client.headers)
 
     def _fail(self, text: str) -> NoReturn:
-        """Raise AlpacaError. It chains no cause: the cause's own text (an httpx error
-        quoting a header) could hold a key."""
-        raise AlpacaError(text) from None
+        """Raise AlpacaError with the keys cut out of `text` (an answer body could quote
+        one). It chains no cause: the cause's own text could hold a key."""
+        raise AlpacaError(scrub(text, self._client.headers)) from None
 
     def _backoff(self, attempt: int) -> float:
         """A wait doubling from the setting each try; never past a minute."""
@@ -259,8 +261,10 @@ class Alpaca:
         return min(wait, LONGEST_WAIT_SECONDS)
 
     def _retry_wait(self, response: httpx.Response, attempt: int) -> float:
-        """Until the reset Alpaca names (X-RateLimit-Reset, epoch seconds), else the
-        back-off; at least the setting and never past a minute."""
+        """A 429 waits until the reset Alpaca names (X-RateLimit-Reset, epoch seconds), at
+        least the setting and never past a minute; a 5xx, or a 429 without one, backs off."""
+        if response.status_code != 429:
+            return self._backoff(attempt)
         try:
             wait = float(response.headers["X-RateLimit-Reset"]) - time.time()
         except (KeyError, ValueError):

@@ -6,10 +6,19 @@ import httpx
 import psycopg
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from engine.market.alpaca import Bar
-from engine.market.bars import MinuteCache, backfill_daily, run_backfill, upsert_bars
+import engine.market.bars as bars_module
+from engine.market.alpaca import Alpaca, Bar
+from engine.market.bars import (
+    Backfilled,
+    MinuteCache,
+    ShortHistory,
+    backfill_daily,
+    run_backfill,
+    upsert_bars,
+)
 from engine.market.instruments import Instrument, instrument_by_slug
 from engine.migrate import migrate
 from engine.settings import Settings
@@ -127,6 +136,40 @@ async def test_a_new_adjustment_refetches_the_whole_history(
     )
 
 
+@pytest.mark.parametrize("dropped", [6, 2_000, None])  # None: an empty answer
+async def test_a_whole_history_that_comes_back_short_changes_nothing(
+    db: AsyncEngine, migrated: Settings, dropped: int | None
+) -> None:
+    """Later runs look back only 14 days, so stored days deleted on a short answer would
+    never come back."""
+    spy = await seeded(db, "spy")
+    fake = FakeAlpaca()
+    spy_history(fake)
+    settings = market_settings(migrated)
+    async with fake.client(settings) as alpaca:
+        await backfill_daily(db, alpaca, spy)
+    before = await stored(db, spy)
+    spy_history(fake, scale=0.5)  # a split
+    split = fake.series["SPY"]
+    whole = [] if dropped is None else split[dropped:]
+    fake.route = lambda request: httpx.Response(
+        200,
+        json={
+            "bars": {"SPY": whole if request.url.params["start"] < "2024" else split},
+            "next_page_token": None,
+        },
+    )
+    async with fake.client(settings, now=NOW + timedelta(days=1)) as alpaca:
+        with pytest.raises(ShortHistory, match="nothing changed"):
+            await backfill_daily(db, alpaca, spy)
+    assert await stored(db, spy) == before
+    assert (await seeded(db, "spy")).rebased_at == NOW
+    fake.route = None  # Alpaca serves the whole history again
+    async with fake.client(settings, now=NOW + timedelta(days=2)) as alpaca:
+        done = await backfill_daily(db, alpaca, spy)
+    assert (done.refetched, done.removed, done.first) == (True, 0, date(2016, 1, 4))
+
+
 async def test_coins_are_stored_raw_and_a_moved_coin_close_is_written_over(
     db: AsyncEngine, migrated: Settings
 ) -> None:
@@ -168,6 +211,36 @@ async def test_backfill_without_keys_fills_coins_and_reports_stocks(migrated: Se
     assert "ALPACA_API_KEY_ID" in lines[0] and "failed: AlpacaKeysMissing" in lines[0]
     assert lines[1].startswith("btc: 5 daily bars")
     assert lines[-1] == "2 of 4 instruments backfilled"
+
+
+async def test_a_database_error_fails_one_instrument_in_one_line(
+    migrated: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = bars_module.backfill_daily
+
+    async def drop_spy(db: AsyncEngine, alpaca: Alpaca, instrument: Instrument) -> Backfilled:
+        if instrument.slug == "spy":
+            raise OperationalError(
+                "INSERT INTO prices.market_bars ...",
+                {"instrument_id": instrument.id},
+                Exception("server closed the connection unexpectedly\nSSL SYSCALL error"),
+            )
+        return await real(db, alpaca, instrument)
+
+    monkeypatch.setattr(bars_module, "backfill_daily", drop_spy)
+    fake = FakeAlpaca()
+    for symbol in ("BTC/USD", "ETH/USD"):
+        fake.series[symbol] = [daily_bar(date.today() - timedelta(days=2), 1.0, coin=True)]
+    fake.series["QQQ"] = [
+        daily_bar(day, 1.0) for day in weekdays(date(2024, 7, 1), date(2024, 7, 5))
+    ]
+    lines: list[str] = []
+    code = await run_backfill(
+        market_settings(migrated), lines.append, httpx.MockTransport(fake.handle)
+    )
+    assert code == 1
+    assert lines[0] == "spy: failed: OperationalError: server closed the connection unexpectedly"
+    assert lines[-1] == "3 of 4 instruments backfilled"
 
 
 async def test_a_rebase_makes_cached_minute_windows_fetch_again(

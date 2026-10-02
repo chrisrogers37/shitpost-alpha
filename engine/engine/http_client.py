@@ -41,14 +41,18 @@ def make_client(
     )
 
 
-def request_error_text(exc: httpx.HTTPError, *sent: Mapping[str, str]) -> str:
-    """`exc` as text for logs, status rows and operator messages, with the value of every
-    key header in `sent` (the client's headers, the request's) blanked out: httpx's
-    protocol errors quote a header value they refuse."""
-    text = f"{type(exc).__name__}: {exc}"
+def scrub(text: str, *sent: Mapping[str, str]) -> str:
+    """`text` with the value of every key header in `sent` (the client's headers, the
+    request's) blanked out, as bytes and as text."""
     for headers in sent:
         for name, value in headers.items():
             if name.lower() in SECRET_HEADERS and (key := value.strip()):
-                for shown in (repr(key.encode())[2:-1], key):  # as bytes, then as text
+                for shown in (repr(key.encode())[2:-1], key):
                     text = text.replace(shown, "[key]")
     return text
+
+
+def request_error_text(exc: httpx.HTTPError, *sent: Mapping[str, str]) -> str:
+    """`exc` as text for logs, status rows and operator messages, scrubbed of the keys
+    in `sent`: httpx's protocol errors quote a header value they refuse."""
+    return scrub(f"{type(exc).__name__}: {exc}", *sent)

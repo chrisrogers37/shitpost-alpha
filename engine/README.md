@@ -84,7 +84,8 @@ the trading calendar, and bar storage. Nothing here scores, grades or sends.
   A slug is the lowercase symbol at creation and never changes; a ticker change
   (`change_symbol`) updates the symbol and adds an `old_ticker` alias from the previous
   change (if any) up to the day before (`fb` is META up to 2022-06-08). Running it again
-  with the same new symbol corrects that day; a symbol another instrument holds, a symbol
+  with the same new symbol corrects that day, and a typo fixed the same day leaves no
+  alias. A symbol another instrument holds, a date before the previous change, a symbol
   that isn't a US ticker, or a coin is refused. `engine.instrument_aliases` also holds
   names (PR 4 fills them); adding an alias again with the same start sets its new end.
   `resolve_alias(alias, on)` reads it.
@@ -112,10 +113,14 @@ the trading calendar, and bar storage. Nothing here scores, grades or sends.
   daily bar is final once its day has passed), only what's missing. Adjusted prices change
   whenever a split or dividend lands, so each run refetches the last 14 days, and if any
   stored stock close moved it refetches the stock's whole history and removes any stored
-  day the new answer lacks: the table never mixes adjustment bases. Every whole fetch (the
-  first, or after a move) sets the instrument's `rebased_at`. Coin prices are raw, so a
-  coin close that moved is a correction, written over without a whole fetch. One
-  instrument's failure (Alpaca or the database) doesn't stop the others; the run exits 1.
+  day the new answer lacks: the table never mixes adjustment bases. A whole answer that is
+  empty or lacks more than 5 stored days fails that instrument and changes nothing, so the
+  next run tries again (later runs look back only 14 days, so deleted days would never
+  come back). Every whole fetch (the first, or after a move) sets the instrument's
+  `rebased_at`. Coin prices are raw, so a coin close that moved is a correction, written
+  over without a whole fetch. One instrument's failure (Alpaca or the database) doesn't
+  stop the others; the run exits 1. A failed call is tried 5 times, 2, 4, 8 and 16 seconds
+  apart, so with Alpaca unreachable the run takes at least half a minute per instrument.
 - **Minute bars** (`MinuteCache`): cached per window as JSON files under
   `ENGINE_BARS_CACHE_DIR` (default `~/.cache/shitpost-engine/bars`, outside the repo), so a
   rerun makes no calls. Files are kept per slug (a reused ticker never shares an old

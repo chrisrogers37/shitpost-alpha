@@ -139,6 +139,16 @@ async def test_a_symbol_change_is_checked_and_running_it_again_corrects_the_day(
         assert await resolve_alias(conn, "fb", date(2022, 12, 1)) == []
         assert [i.symbol for i in await resolve_alias(conn, "fb", date(2023, 6, 1))] == ["MTA"]
 
+        # A typo fixed the same day held no day, so it leaves no alias.
+        await change_symbol(conn, fb.id, "METAA", date(2025, 2, 3))
+        await change_symbol(conn, fb.id, "META", date(2025, 2, 3))
+        assert (await old_tickers(conn, fb.id))[-1] == ("mta", date(2024, 1, 8), date(2025, 2, 2))
+        # A change dated before the last one is refused before anything changes.
+        with pytest.raises(ValueError, match="before META became the symbol, on 2025-02-03"):
+            await change_symbol(conn, fb.id, "MTB", date(2025, 2, 1))
+        now = await instrument_by_slug(conn, fb.slug)
+        assert now is not None and now.symbol == "META"
+
 
 async def test_name_aliases_and_validity_windows(db: AsyncEngine, migrated: Settings) -> None:
     async with db.begin() as conn:
@@ -250,6 +260,21 @@ async def test_a_stock_with_no_bar_yet_today_is_asked_again_and_yesterday_decide
         calls = len(fake.requests)
         assert await listings.counts("AAPL", "stock", datetime(2024, 7, 2, 15, tzinfo=UTC))
         assert len(fake.requests) == calls
+
+
+async def test_a_cached_history_is_asked_again_once_a_new_session_settles() -> None:
+    """IPOCO first trades on Thursday 11 July 2024. Its history, cached on Thursday
+    morning, can't answer for Thursday on Friday."""
+    fake = FakeAlpaca()
+    stock_days(fake, "IPOCO", [])
+    clock = {"now": datetime(2024, 7, 11, 14, tzinfo=UTC)}  # Thursday 10:00 New York
+    transport = httpx.MockTransport(fake.handle)
+    async with Alpaca(market_settings(), transport, clock=lambda: clock["now"]) as alpaca:
+        listings = Listings(alpaca)
+        assert not await listings.counts("IPOCO", "stock", datetime(2024, 7, 10, 15, tzinfo=UTC))
+        stock_days(fake, "IPOCO", [date(2024, 7, 11)])
+        clock["now"] = datetime(2024, 7, 12, 15, tzinfo=UTC)  # Friday: Thursday has settled
+        assert await listings.counts("IPOCO", "stock", datetime(2024, 7, 11, 16, tzinfo=UTC))
 
 
 async def test_adding_an_instrument_checks_it_counts_first(
