@@ -84,6 +84,8 @@ def migrated(settings: Settings) -> Settings:
 @pytest.fixture
 async def db(migrated: Settings) -> AsyncIterator[AsyncEngine]:
     engine = make_engine(migrated.db_url)
+    async with engine.connect():  # a slow first connect must not land in a test's timed part
+        pass
     yield engine
     await engine.dispose()
 
