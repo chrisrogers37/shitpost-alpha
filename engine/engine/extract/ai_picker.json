@@ -1,31 +1,17 @@
 {
-  "about": "AI picker version settings: the two models (both must agree), their settings and prices, the window start, the answer schema and the reason line's model. Pinned with the prompts by ai.json. Prices are US dollars per million tokens, from each provider's pricing page on the day in 'checked'. temperature null means the provider takes none. The window starts 3 months after the latest model cutoff (Haiku 4.5's, July 2025), at the start of the next New York day.",
+  "about": "AI picker version settings: the two models (both must agree) and their settings, the window start, and the answer schema. Pinned with the prompt by ai.json. temperature null means the provider takes none. The window starts on the New York day after the latest model cutoff (Haiku 4.5's, July 2025) plus 3 months, at midnight. The prices are in ai_models.json and the reason line in reason.json, outside this version.",
   "models": {
     "openai": {
       "model": "gpt-4.1-2025-04-14",
       "temperature": 0,
       "cutoff": "2024-06-01",
-      "cutoff_source": "https://developers.openai.com/api/docs/models/gpt-4.1",
-      "retirement": "none announced (https://developers.openai.com/api/docs/deprecations, checked 2026-10-02)",
-      "prices": {
-        "input": 2.0,
-        "cached_input": 0.5,
-        "output": 8.0,
-        "checked": "2026-10-02"
-      }
+      "cutoff_source": "https://developers.openai.com/api/docs/models/gpt-4.1"
     },
     "anthropic": {
       "model": "claude-haiku-4-5-20251001",
       "temperature": 0,
       "cutoff": "2025-07-31",
-      "cutoff_source": "https://platform.claude.com/docs/en/models/overview (training data Jul 2025; reliable knowledge Feb 2025)",
-      "retirement": "none announced; not sooner than 2026-10-15 (https://platform.claude.com/docs/en/about-claude/model-deprecations, checked 2026-10-02)",
-      "prices": {
-        "input": 1.0,
-        "cached_input": 0.1,
-        "output": 5.0,
-        "checked": "2026-10-02"
-      }
+      "cutoff_source": "https://platform.claude.com/docs/en/models/overview (training data Jul 2025; reliable knowledge Feb 2025)"
     }
   },
   "settings": {
@@ -34,7 +20,7 @@
     "max_instruments": 8,
     "why_max_chars": 100
   },
-  "window_start": "2025-11-01T00:00:00-04:00",
+  "window_start": "2025-11-01",
   "schema": {
     "type": "object",
     "properties": {
@@ -90,12 +76,5 @@
       "instruments"
     ],
     "additionalProperties": false
-  },
-  "reason": {
-    "version": 1,
-    "prompt": "extract/prompts/reason.md",
-    "provider": "anthropic",
-    "max_output_tokens": 80,
-    "max_chars": 120
   }
 }

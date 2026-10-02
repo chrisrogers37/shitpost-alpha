@@ -102,14 +102,14 @@ async def answers(
     answers are left out)."""
     found = await conn.execute(
         select(extractions.c.id, extractions.c.signal_key, extractions.c.market_link,
-               extractions.c.topic, extractions.c.result)
+               extractions.c.topic, extractions.c.error)
         .where(extractions.c.method == method, extractions.c.version == version,
                extractions.c.run == 1, extractions.c.signal_key.in_(list(keys)))
     )  # fmt: skip
     by_id = {}
     result: dict[str, Answer] = {}
     for row in found:
-        if method.startswith("ai:") and method != "ai:vote" and row.result is None:
+        if row.error is not None:
             continue  # that model failed on this post
         result[row.signal_key] = Answer(row.market_link, row.topic)
         by_id[row.id] = row.signal_key

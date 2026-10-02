@@ -28,6 +28,7 @@ from engine.extract.names import load_book
 from engine.extract.rules import Rules, current_rules
 from engine.extract.score import (
     new_ticker_adder,
+    other_files,
     quoted_words,
     record_ai,
     record_rules,
@@ -228,21 +229,6 @@ AI_PICK_LOCK = 4_042_001
 for the same posts, and the second's answers would be dropped unrecorded."""
 
 
-async def other_prompt(conn: AsyncConnection, config: AiConfig) -> bool:
-    """Whether this version already has answers recorded with other files (a prompt,
-    schema or model changed without raising the version)."""
-    found = await conn.execute(
-        select(extractions.c.id)
-        .where(
-            extractions.c.method == "ai:vote",
-            extractions.c.version == config.version,
-            extractions.c.result["picker_hash"].astext != config.hash,
-        )
-        .limit(1)
-    )
-    return found.first() is not None
-
-
 async def run_ai_pick(
     settings: Settings,
     chosen: Selection,
@@ -299,11 +285,8 @@ async def _ai_pick(
     config = picker.config
     max_usd, max_total_usd = limits
     async with db.connect() as conn:
-        if await other_prompt(conn, config):
-            say(
-                f"AI picker version {config.version} has answers recorded with other files; "
-                "raise the version in ai.json"
-            )
+        if problem := await other_files(conn, config):
+            say(problem)
             return 2
         rows = await select_posts(conn, chosen, config.version, run)
         texts = [PostText(normalize(r.text), await quoted_words(conn, r)) for r in rows]

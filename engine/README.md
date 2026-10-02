@@ -189,8 +189,11 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
   side, OpenAI's `gpt-4.1-2025-04-14` and Anthropic's `claude-haiku-4-5-20251001`; a
   name or a market link counts only when both make it, and if either fails (an error, an
   invalid answer or more than 15 s) the rules stand in (`ai_fallback`). Its prompt,
-  schema, models, prices and window start (2025-11-01, three months after Haiku's July
-  2025 cutoff) are pinned the same way in `extract/ai.json` as version 1. Keys only from
+  schema, models and window start (2025-11-01, three months after Haiku's July 2025
+  cutoff) are pinned the same way in `extract/ai.json` as version 1, which is frozen:
+  the engine refuses its files if they change. The prices (`extract/ai_models.json`) and
+  the reason line (`extract/reason.json`, its own version) sit outside it, so either can
+  change without a new picker version. Keys only from
   `ENGINE_OPENAI_KEY` and `ENGINE_ANTHROPIC_KEY`, and it needs both. Clients never follow
   a redirect; `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID`, `OPENAI_CUSTOM_HEADERS` and
   `ANTHROPIC_CUSTOM_HEADERS` must not be set (the SDKs would add them to every

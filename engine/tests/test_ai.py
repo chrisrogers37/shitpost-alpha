@@ -17,6 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from engine.extract.ai import (
     MANIFEST,
+    MODEL_FACTS,
+    REASON_MANIFEST,
     SDK_HEADER_VARIABLES,
     AiPick,
     AiPicker,
@@ -31,6 +33,7 @@ from engine.extract.ai import (
     build_clients,
     current_ai_config,
     load_ai_config,
+    load_reason,
     map_item,
     parse_answer,
     vote,
@@ -49,6 +52,8 @@ WHEN = datetime(2026, 3, 2, 15, tzinfo=UTC)
 CONFIG = ready_config()
 OPENAI_KEY = "sk-test-openai-DO-NOT-LOG-1234567890"
 ANTHROPIC_KEY = "sk-ant-test-DO-NOT-LOG-1122334455"
+V1_HASH = "750126437c71c40cf07dcd9f870fb2742b9a81c4e173c2ff9989344ecce250b1"
+"""AI picker version 1 as frozen in PR 4: its answers in the window are the backtest's."""
 
 
 def ai_fixture(name: str) -> dict[str, Any]:
@@ -84,6 +89,35 @@ def test_version_1_is_two_dated_models_with_checked_prices_and_its_window() -> N
         models={**config.models, "anthropic": replace(config.models["anthropic"], model=None)},
     )
     assert unpinned.problems() == ["anthropic: no model pinned"]
+    assert replace(config, window_start=None).problems() == ["no window start"]
+
+
+def test_version_1_is_frozen_and_a_changed_file_is_refused_even_when_repinned(
+    tmp_path: Path,
+) -> None:
+    assert current_ai_config().hash == V1_HASH
+    pinned = json.loads(MANIFEST.read_text("utf-8"))
+    assert pinned["frozen"] == V1_HASH
+    repinned = tmp_path / MANIFEST.name
+    repinned.write_text(json.dumps(pinned | {"frozen": "0" * 64}), "utf-8")
+    with pytest.raises(RulesFileChanged, match="frozen"):
+        load_ai_config(repinned)
+
+
+def test_prices_and_the_reason_line_change_without_a_new_picker_version(
+    tmp_path: Path,
+) -> None:
+    facts = json.loads(MODEL_FACTS.read_text("utf-8"))
+    facts["claude-haiku-4-5-20251001"]["prices"]["input"] = 3.0
+    repriced = tmp_path / MODEL_FACTS.name
+    repriced.write_text(json.dumps(facts), "utf-8")
+    config = load_ai_config(model_facts=repriced)
+    assert config.hash == V1_HASH
+    assert (price := config.models["anthropic"].price) and price.input == Decimal(3)
+    picker_files = json.loads(MANIFEST.read_text("utf-8"))["files"]
+    reason_files = json.loads(REASON_MANIFEST.read_text("utf-8"))["files"]
+    assert not set(picker_files) & set(reason_files)
+    assert config.reason == load_reason() and config.reason.version == 1
 
 
 def test_cost_counts_cached_input_apart() -> None:
@@ -238,14 +272,26 @@ async def test_the_picker_from_settings_hides_its_keys(
     assert not any(key in shown for key in ALL_KEYS.values())
 
 
-@pytest.mark.parametrize("name", list(json.loads(MANIFEST.read_text("utf-8"))["files"]))
-def test_a_changed_picker_file_is_refused(tmp_path: Path, name: str) -> None:
-    pinned = json.loads(MANIFEST.read_text("utf-8"))
+@pytest.mark.parametrize(
+    ("manifest", "name"),
+    [
+        (manifest, name)
+        for manifest in (MANIFEST, REASON_MANIFEST)
+        for name in json.loads(manifest.read_text("utf-8"))["files"]
+    ],
+)
+def test_a_changed_picker_or_reason_file_is_refused(
+    tmp_path: Path, manifest: Path, name: str
+) -> None:
+    pinned = json.loads(manifest.read_text("utf-8"))
     pinned["files"][name] = "0" * 64
-    changed = tmp_path / MANIFEST.name
+    changed = tmp_path / manifest.name
     changed.write_text(json.dumps(pinned), "utf-8")
     with pytest.raises(RulesFileChanged, match=f"{name} changed"):
-        load_ai_config(changed)
+        if manifest == MANIFEST:
+            load_ai_config(changed)
+        else:
+            load_reason(changed)
 
 
 def test_clients_get_the_engine_keys_passed_in(settings: Settings) -> None:
@@ -590,6 +636,7 @@ async def test_the_picker_asks_both_and_votes() -> None:
     rows = result.extractions(BOOK, CONFIG)
     assert [e.method for e in rows] == ["ai:openai", "ai:anthropic", "ai:vote"]
     assert rows[-1].result and rows[-1].result["ai_fallback"] is False
+    assert all(e.result and e.result["picker_hash"] == CONFIG.hash for e in rows)
 
 
 async def test_a_model_past_the_deadline_sends_the_post_to_the_rules() -> None:
@@ -603,8 +650,9 @@ async def test_a_model_past_the_deadline_sends_the_post_to_the_rules() -> None:
     rules = pick(BOOK, words, WHEN)
     result = await picker.pick(BOOK, PostText(words), WHEN, rules, None)
     assert result.vote.fallback and result.vote.mentions == rules.mentions
-    vote_row = result.extractions(BOOK, CONFIG)[-1]
+    late_row, vote_row = result.extractions(BOOK, CONFIG)[1:]
     assert vote_row.result and vote_row.result["ai_fallback"] is True
+    assert late_row.error and late_row.result == {"picker_hash": CONFIG.hash}
 
 
 async def test_a_post_of_only_links_asks_no_model() -> None:

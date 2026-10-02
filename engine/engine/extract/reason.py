@@ -1,10 +1,10 @@
 """The reason line: one line of 120 characters or fewer saying why a post may matter for
-the instruments it names. One designated model writes it (ai.json's "reason"; by default
-the pinned Anthropic model). It decides nothing: the alert is already decided when it is
-asked. A rule check rejects a line that states a direction, a price, a target or advice,
-a number the post doesn't have, or that is too long. It fails closed: on a rejection, an
-error, a cut-off reply or a 15 s timeout there is no line and the alert goes out without
-one. PR 6 calls it."""
+the instruments it names. One of the AI picker's pinned models writes it (the Anthropic
+one). It has its own version, reason.json, so changing it needs no new picker version.
+It decides nothing: the alert is already decided when it is asked. A rule check rejects a
+line that states a direction, a price, a target or advice, a number the post doesn't
+have, or that is too long. It fails closed: on a rejection, an error, a cut-off reply or
+a 15 s timeout there is no line and the alert goes out without one. PR 6 calls it."""
 
 import asyncio
 import logging
