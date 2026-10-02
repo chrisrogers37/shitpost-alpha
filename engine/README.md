@@ -37,7 +37,8 @@ wins (`engine.signals`), and every feed's first sighting is kept (`engine.signal
   one odd item in an answer is skipped and logged. A poll that fails for any other reason
   (a post the database refuses, a bug) counts as an error and shows in status.
 - `engine/http_client.py` is the one HTTP client for anything the engine fetches: honest
-  User-Agent, no redirects, connections kept 75 s so a feed polled on time reuses one.
+  User-Agent, no redirects, connections kept 75 s so the feeds polled every 15 or 60 s
+  reuse one.
   API keys are stripped of a pasted space or newline and must be printable ASCII; error
   text blanks every key header (`SECRET_HEADERS`), so a key never reaches a log, a status
   row or an operator message.
@@ -52,7 +53,8 @@ wins (`engine.signals`), and every feed's first sighting is kept (`engine.signal
   copy (a deploy, a restart) carries on without re-polling a blocked host.
 - If no feed answers for 10 minutes, one operator message, and status shows "dark since".
 - A post's time comes from its status id (`id >> 16` is milliseconds since the epoch).
-  NUL characters are dropped from a post's text and payload (Postgres refuses them).
+  NULs and lone surrogates are dropped from a post's text and payload (Postgres refuses
+  them), and a post dated more than a day ahead is skipped as odd.
 - Text posts wait at stage `score` (PR 4). Reposts, posts without text and imported
   history are saved at `done`, with the reason in `not_scored`. `import-history` checks
   the database before it downloads anything and leaves posts under an hour old to the

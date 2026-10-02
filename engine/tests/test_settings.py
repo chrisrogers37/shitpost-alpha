@@ -67,6 +67,7 @@ def test_api_keys_are_stripped_and_checked_without_showing_them() -> None:
             key(bad)
         [error] = caught.value.errors()  # the CLI prints only each error's place and message
         assert error["loc"] == ("scrapecreators_key",) and "0123" not in error["msg"]
+        assert "0123" not in str(caught.value)  # as alembic's env.py would print it
 
 
 def test_heavy_jobs_must_be_picklable() -> None:

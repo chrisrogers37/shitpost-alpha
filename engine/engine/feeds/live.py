@@ -168,6 +168,7 @@ class FeedPoller:
         # read back at the poll rate. A stored answer with no catch-up owed resets it.
         self.catch_up_wait = self._doubled(self.catch_up_wait)
         self.catch_up_after = time.monotonic() + self.catch_up_wait
+        self.catch_up_error = f"catch-up to {mark} not stored yet"
         try:
             back = await self.feed.read_back(posts, mark)
         except FeedBlocked as exc:

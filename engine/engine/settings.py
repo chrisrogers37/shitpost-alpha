@@ -12,7 +12,9 @@ FEED_NAMES = ("direct", "trumpstruth", "cnn", "scrapecreators")
 class Settings(BaseSettings):
     """All engine configuration. Timings are settings so tests can shrink them."""
 
-    model_config = SettingsConfigDict(env_prefix="ENGINE_", frozen=True, populate_by_name=True)
+    model_config = SettingsConfigDict(
+        env_prefix="ENGINE_", frozen=True, populate_by_name=True, hide_input_in_errors=True
+    )
 
     database_url: SecretStr = Field(min_length=1)
     """Engine database. Never the old system's DATABASE_URL. Secret, so it never prints."""
