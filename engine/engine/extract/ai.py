@@ -1,6 +1,6 @@
-"""The AI picker: three models, one from each provider, say whether a post has a market
-link and which instruments it names or implies; a link or an instrument counts when 2 of
-3 make it.
+"""The AI picker: two models, OpenAI's and Anthropic's, say whether a post has a market
+link and which instruments it names or implies; a link or an instrument counts only when
+both make it.
 
 Its version is ai.json: the prompt, the schema, the model ids, the settings, the price
 table and the window start, pinned by hash like the rules. Every client is built with its
@@ -8,11 +8,10 @@ key passed from the ENGINE_ settings, never from the old system's variables, and
 built without its key.
 
 Each call has a deadline (15 s). A model that errs, answers invalid JSON or misses the
-deadline counts as failed: with one failed the other two must agree, with two or more
-failed the post takes the rules' answer and is marked ai_fallback. Batch runs retry rate
-limits and server errors with back-off; a deadline is never retried, since live it would
-be missed. An error no retry can fix (a bad key, a model id the provider doesn't know)
-is marked fatal, and `ai-pick` stops on it.
+deadline counts as failed, and then the post takes the rules' answer and is marked
+ai_fallback. Batch runs retry rate limits and server errors with back-off; a deadline is
+never retried, since live it would be missed. An error no retry can fix (a bad key, a
+model id the provider doesn't know) is marked fatal, and `ai-pick` stops on it.
 """
 
 import asyncio
@@ -50,11 +49,10 @@ from engine.settings import Settings
 log = logging.getLogger(__name__)
 
 MANIFEST = Path(__file__).with_name("ai.json")
-Provider = Literal["openai", "xai", "anthropic"]
-PROVIDERS: tuple[Provider, ...] = ("openai", "xai", "anthropic")
+Provider = Literal["openai", "anthropic"]
+PROVIDERS: tuple[Provider, ...] = ("openai", "anthropic")
 BASE_URLS: dict[Provider, str] = {
     "openai": "https://api.openai.com/v1",
-    "xai": "https://api.x.ai/v1",
     "anthropic": "https://api.anthropic.com",
 }
 """Passed to every SDK client, so an OPENAI_BASE_URL or ANTHROPIC_BASE_URL left in the
@@ -69,8 +67,8 @@ SDK_HEADER_VARIABLES = (
     "OPENAI_CUSTOM_HEADERS",
     "ANTHROPIC_CUSTOM_HEADERS",
 )
-"""Read by the SDKs from the environment and sent as headers, to xAI too: the engine
-refuses to build a client while any is set."""
+"""Read by the SDKs from the environment and added to every request: the engine refuses
+to build a client while any is set."""
 
 
 class NotReady(RuntimeError):
@@ -242,12 +240,12 @@ class Client(Protocol):
 
 
 class OpenAIChat:
-    """OpenAI, and xAI through the same SDK at its own host: chat completions with a
-    strict JSON schema."""
+    """OpenAI's chat completions with a strict JSON schema."""
+
+    provider: Provider = "openai"
 
     def __init__(
         self,
-        provider: Provider,
         model: str,
         key: str,
         *,
@@ -255,12 +253,11 @@ class OpenAIChat:
         timeout: float,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
-        self.provider = provider
         self.model = model
         self.temperature = temperature
         self.client = openai.AsyncOpenAI(
             api_key=key,
-            base_url=BASE_URLS[provider],
+            base_url=BASE_URLS["openai"],
             timeout=timeout,
             max_retries=0,
             # A redirect is refused rather than followed with the key.
@@ -384,7 +381,7 @@ def build_clients(settings: Settings, config: AiConfig) -> dict[str, Client]:
             )
         else:
             clients[provider] = OpenAIChat(
-                provider, spec.model, key, temperature=spec.temperature, timeout=timeout
+                spec.model, key, temperature=spec.temperature, timeout=timeout
             )
     return clients
 
@@ -634,7 +631,7 @@ class Vote:
     answered: int
     """Models with a valid answer."""
     fallback: bool
-    """Fewer than two answered: the rules' picks stand in (ai_fallback)."""
+    """A model failed: the rules' picks stand in (ai_fallback)."""
 
     def result(self, book: NameBook, config: AiConfig) -> dict[str, Any]:
         symbols = sorted(
@@ -650,14 +647,15 @@ class Vote:
         }
 
 
-NEEDED = 2
-"""Models that must make a link or name an instrument for it to count."""
+NEEDED = len(PROVIDERS)
+"""Models that must make a link or name an instrument for it to count: both."""
 
 
 def vote(
     answers: Sequence[ModelAnswer], mapped: Mapping[str, Sequence[Mention]], rules: RulesPick
 ) -> Vote:
-    """2 of 3; with one failed, the other two must agree; with two failed, the rules."""
+    """Both models must make a link or name an instrument for it to count; if either
+    failed, the rules' picks stand in."""
     ok = [a for a in answers if a.ok]
     if len(ok) < NEEDED:
         return Vote(rules.market_link, rules.mentions, len(ok), fallback=True)
@@ -787,9 +785,9 @@ class AiPicker:
 
     @classmethod
     def from_settings(cls, settings: Settings, config: AiConfig) -> "AiPicker":
-        """The picker with all three models. NotReady says why there is none: the version
-        isn't complete, or a key is missing (with fewer than three models every post
-        would fall back or need the two to agree, and still be paid for)."""
+        """The picker with both models. NotReady says why there is none: the version isn't
+        complete, or a key is missing (with one model every post would fall back to the
+        rules, and still be paid for)."""
         if problems := config.problems():
             raise NotReady(f"AI picker version {config.version} isn't ready: {'; '.join(problems)}")
         clients = build_clients(settings, config)

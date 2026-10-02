@@ -182,7 +182,7 @@ class Scorer:
 
 def live_ai(settings: Settings, config: AiConfig | None = None) -> AiPicker | None:
     """The AI picker for the live stage: off unless ENGINE_AI_LIVE is on and the version
-    and all three keys are ready."""
+    and both keys are ready."""
     if not settings.ai_live:
         return None
     try:

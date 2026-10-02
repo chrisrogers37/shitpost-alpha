@@ -1,5 +1,5 @@
 {
-  "about": "AI picker version settings: the models, their settings and prices, the window start, the answer schema and the reason line's model. Pinned with the prompts by ai.json. Prices are US dollars per million tokens, from each provider's pricing page on the day in 'checked'. temperature null means the provider takes none. The window starts 3 months after the latest model cutoff, at the start of the next New York day.",
+  "about": "AI picker version settings: the two models (both must agree), their settings and prices, the window start, the answer schema and the reason line's model. Pinned with the prompts by ai.json. Prices are US dollars per million tokens, from each provider's pricing page on the day in 'checked'. temperature null means the provider takes none. The window starts 3 months after the latest model cutoff (Haiku 4.5's, July 2025), at the start of the next New York day.",
   "models": {
     "openai": {
       "model": "gpt-4.1-2025-04-14",
@@ -11,19 +11,6 @@
         "input": 2.0,
         "cached_input": 0.5,
         "output": 8.0,
-        "checked": "2026-10-02"
-      }
-    },
-    "xai": {
-      "model": "grok-4.20-0309-non-reasoning",
-      "temperature": 0,
-      "cutoff": "2025-09-01",
-      "cutoff_source": "unofficial: xAI publishes none; https://openrouter.ai/x-ai/grok-4.20",
-      "retirement": "none announced (https://docs.x.ai/developers/models, checked 2026-10-02)",
-      "prices": {
-        "input": 1.25,
-        "cached_input": 0.2,
-        "output": 2.5,
         "checked": "2026-10-02"
       }
     },
@@ -47,7 +34,7 @@
     "max_instruments": 8,
     "why_max_chars": 100
   },
-  "window_start": null,
+  "window_start": "2025-11-01T00:00:00-04:00",
   "schema": {
     "type": "object",
     "properties": {

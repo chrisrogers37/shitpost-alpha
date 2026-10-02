@@ -1,7 +1,7 @@
 """Precision and recall of the pickers on PR 4's 300 held-out posts (run from engine/, on a
 database with the history imported and the pickers' answers recorded):
 
-    python scripts/precision.py [--window-start 2025-11-01] [--spot-check FILE]
+    python scripts/precision.py [--window-start YYYY-MM-DD] [--spot-check FILE]
 
 Each picker (the rules, the AI vote and each AI model, when their answers are there) is
 scored against precision/labels.csv, with 95% Wilson intervals, for each group in
@@ -12,10 +12,9 @@ precision/samples.csv:
   found the name (the rules' cashtags, tickers and names, and the AI's explicit links, are
   explicit; the AI's implied links are implied), recall by the label's kind.
 
---window-start splits the window group at a later start, at New York midnight like the
-AI picker's window (B2 may move it). --spot-check
-writes each post's id, text, labels and the pickers' output for reading by hand; it holds
-post text, so it goes outside the repo.
+The window group is split at the AI picker version's window start (New York midnight), or
+at --window-start. --spot-check writes each post's id, text, labels and the pickers'
+output for reading by hand; it holds post text, so it goes outside the repo.
 """
 
 import argparse
@@ -169,12 +168,12 @@ async def measure(settings: Settings, window_start: date | None, spot_check: Pat
     labels = read_labels()
     groups = read_groups()
     rules_version = current_rules().version
-    ai_version = current_ai_config().version
+    ai_config = current_ai_config()
+    ai_version = ai_config.version
     methods = [
         ("rules", rules_version),
         ("ai:vote", ai_version),
         ("ai:openai", ai_version),
-        ("ai:xai", ai_version),
         ("ai:anthropic", ai_version),
     ]
     db = make_engine(settings.db_url)
@@ -195,6 +194,8 @@ async def measure(settings: Settings, window_start: date | None, spot_check: Pat
     if missing:
         raise SystemExit(f"{len(missing)} labelled posts aren't in this database")
 
+    if window_start is None and ai_config.window_start is not None:
+        window_start = ai_config.window_start.astimezone(NEW_YORK).date()
     if window_start is not None:
         start = datetime.combine(window_start, datetime.min.time(), NEW_YORK)
         for key, group in list(groups.items()):

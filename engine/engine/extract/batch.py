@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from engine.db import make_engine
 from engine.extract.ai import (
+    NEEDED,
     AiConfig,
     AiPicker,
     FatalAnswer,
@@ -366,7 +367,7 @@ async def _ai_pick(
 
 async def review_list(conn: AsyncConnection, rules_version: int, ai_version: int) -> list[str]:
     """Names the AI vote counted that the rules missed, with how many posts, for the next
-    rules version; then names two or more models gave that mapped to no instrument."""
+    rules version; then names both models gave that mapped to no instrument."""
     vote = extractions.alias("vote")
     said = signal_mentions.alias("said")
     ruled = extractions.alias("ruled")
@@ -397,11 +398,11 @@ async def review_list(conn: AsyncConnection, rules_version: int, ai_version: int
     unmapped = await conn.execute(
         select(said.c.normalized, said.c.ticker, said.c.unmapped, func.count())
         .select_from(said.join(vote, is_vote))
-        .where(said.c.instrument_id.is_(None), said.c.models >= 2)
+        .where(said.c.instrument_id.is_(None), said.c.models >= NEEDED)
         .group_by(said.c.normalized, said.c.ticker, said.c.unmapped)
         .order_by(func.count().desc())
     )
-    lines.append("named by two or more models, not mapped:")
+    lines.append("named by both models, not mapped:")
     lines += [f"  {name!r} {ticker or '-'} ({why}): {n} posts" for name, ticker, why, n in unmapped]
     return lines
 

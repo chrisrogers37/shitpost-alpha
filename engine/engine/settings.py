@@ -85,10 +85,9 @@ class Settings(BaseSettings):
     """Minute-bar cache (ENGINE_BARS_CACHE_DIR), outside the repo."""
 
     openai_key: SecretStr | None = None
-    xai_key: SecretStr | None = None
     anthropic_key: SecretStr | None = None
-    """The AI picker's keys (ENGINE_OPENAI_KEY, ENGINE_XAI_KEY, ENGINE_ANTHROPIC_KEY), each
-    under its own spend cap. Never the old system's OPENAI_API_KEY and the like: every
+    """The AI picker's keys (ENGINE_OPENAI_KEY, ENGINE_ANTHROPIC_KEY), each under its own
+    spend cap. Never the old system's OPENAI_API_KEY and the like: every
     client gets its key passed from here, and none is built without one."""
     ai_live: bool = False
     """ENGINE_AI_LIVE: the live score stage asks the AI picker too. Off until PR 7."""
@@ -103,7 +102,6 @@ class Settings(BaseSettings):
         "alpaca_key_id",
         "alpaca_secret_key",
         "openai_key",
-        "xai_key",
         "anthropic_key",
         mode="before",
     )
@@ -158,8 +156,8 @@ class Settings(BaseSettings):
 
     @property
     def ai_keys(self) -> dict[str, str]:
-        """The AI picker keys that are set, by provider (openai, xai, anthropic)."""
-        keys = {"openai": self.openai_key, "xai": self.xai_key, "anthropic": self.anthropic_key}
+        """The AI picker keys that are set, by provider (openai, anthropic)."""
+        keys = {"openai": self.openai_key, "anthropic": self.anthropic_key}
         return {name: key.get_secret_value() for name, key in keys.items() if key is not None}
 
     @property

@@ -276,7 +276,7 @@ backfill; minute bars only for alert windows (PR 7). Prices are Alpaca's, adjust
 splits and dividends (adjustment 'all'; coins have nothing to adjust, 'raw'). feed: 'sip'
 for stocks and ETFs, 'crypto_us' for coins. fetched_at: when these values were fetched."""
 
-EXTRACTION_METHODS = ("rules", "ai:openai", "ai:xai", "ai:anthropic", "ai:vote")
+EXTRACTION_METHODS = ("rules", "ai:openai", "ai:anthropic", "ai:vote")
 FOUND_BY = ("cashtag", "ticker", "alias", "ai_explicit", "ai_implied")
 
 extractions = Table(
@@ -306,11 +306,11 @@ extractions = Table(
 )
 """What a picker said about a post: one row per signal, method and version (rules: the
 rules version; ai:*: the AI picker version). run 1 is the answer; a stability rerun is
-run 2, so a rerun never overwrites. model: the pinned model id (ai:openai, ai:xai,
+run 2, so a rerun never overwrites. model: the pinned model id (ai:openai,
 ai:anthropic). response: the provider's response body (no request headers), result: the
 normalised answer; market_link and topic (rules only) as columns. Tokens and cost_usd come
 from the response and the AI picker's price table. error: why a model's answer is missing
-(an error, an invalid answer, a timeout); the vote then counts it as missed."""
+(an error, an invalid answer, a timeout); the vote then takes the rules' picks."""
 
 signal_mentions = Table(
     "signal_mentions",
