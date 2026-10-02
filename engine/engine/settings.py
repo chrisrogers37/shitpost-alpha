@@ -121,4 +121,5 @@ class Settings(BaseSettings):
 
     @property
     def db_url(self) -> str:
+        """The database URL as plain text, for the driver. Never log or print it."""
         return self.database_url.get_secret_value()

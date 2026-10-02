@@ -24,6 +24,8 @@ class EngineContext:
 
 @dataclass(frozen=True)
 class JobContext(EngineContext):
+    """What a job gets: the engine context plus the slot this run is for."""
+
     scheduled_for: datetime
 
 
@@ -33,6 +35,8 @@ WorkerFunc = Callable[[EngineContext], Awaitable[None]]
 
 @dataclass(frozen=True)
 class Job:
+    """A registered daily job."""
+
     name: str
     at: time
     """New York wall-clock time the job runs at each day."""
