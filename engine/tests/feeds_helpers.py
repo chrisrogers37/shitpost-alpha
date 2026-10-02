@@ -74,6 +74,17 @@ def status(code: int) -> Route:
     return lambda request: httpx.Response(code)
 
 
+def html_page(request: httpx.Request) -> httpx.Response:
+    """A challenge page answered 200."""
+    return httpx.Response(
+        200, text="<html>Just a moment...</html>", headers={"content-type": "text/html"}
+    )
+
+
+def cf_mitigated(request: httpx.Request) -> httpx.Response:
+    return json_response([], headers={"cf-mitigated": "challenge"})
+
+
 class FakeWeb:
     """Answers each feed's host with a route tests can swap; records every request."""
 
@@ -101,16 +112,13 @@ class FakeWeb:
 
 
 def feed_settings(settings: Settings, **overrides: object) -> Settings:
-    """Fast feed timings for tests, plus overrides."""
+    """Fast poll intervals for tests (back-off and the rest keep their defaults), plus
+    overrides."""
     fast: dict[str, object] = {
         "direct_interval_seconds": 0.05,
         "trumpstruth_interval_seconds": 0.05,
         "cnn_interval_seconds": 0.05,
         "scrapecreators_fallback_seconds": 0.05,
-        "scrapecreators_check_seconds": 3600.0,
-        "feed_backoff_min_seconds": 60.0,
-        "feed_backoff_max_seconds": 1800.0,
         "feed_tick_seconds": 0.01,
-        "feeds_dark_after_seconds": 600.0,
     }
     return settings.model_copy(update=fast | overrides)

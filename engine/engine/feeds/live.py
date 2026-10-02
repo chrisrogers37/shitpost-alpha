@@ -2,22 +2,31 @@
 
 Feeds run side by side and the first copy of a post wins. A feed that answers 403 or 429,
 sends a challenge page, or fails five times in a row is blocked: it backs off from 1
-minute, doubling up to 30, with one operator message per incident and one on recovery.
-ScrapeCreators (paid) polls every 2 minutes only while direct is blocked or off, else
-once an hour. If no feed answers for 10 minutes the feeds are dark: one operator message,
-and "dark since" in `python -m engine status` until a feed answers.
+minute, doubling up to 30 (and never sooner than its usual interval), with one operator
+message per incident and one on recovery. ScrapeCreators (paid) polls every 2 minutes
+only while direct is blocked or off, else once an hour as a check. If no feed answers for
+10 minutes the feeds are dark: one operator message, and "dark since" in
+`python -m engine status` until a feed answers.
+
+Each feed has its own catch-up mark: the newest post time it has read without a gap. A
+read that doesn't reach back to the mark reads back first, so whichever feed can page
+back fills a gap, in whatever order the feeds answer. Block state, back-off, last poll
+and mark are in engine.feed_status: the next copy (a deploy, a restart) carries on.
 """
 
 import asyncio
 import logging
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import httpx
-from sqlalchemy import func, select, update
+from sqlalchemy import Row, func, select, update
 from sqlalchemy.exc import SQLAlchemyError
 
+from engine.db import db_now
 from engine.feeds.base import Feed, FeedBlocked, FeedFailed, Read, make_client
 from engine.feeds.cnn import CnnFeed
 from engine.feeds.mastodon import DirectFeed, ScrapeCreatorsFeed
@@ -32,13 +41,11 @@ from engine.feeds.store import (
 from engine.feeds.trumpstruth import TrumpstruthFeed
 from engine.notify import notify_operator
 from engine.registry import EngineContext, WorkerFunc
-from engine.tables import engine_meta
+from engine.tables import engine_meta, feed_status
 
 log = logging.getLogger(__name__)
 
 FEEDS: tuple[type[Feed], ...] = (DirectFeed, TrumpstruthFeed, CnnFeed, ScrapeCreatorsFeed)
-
-Clock = Callable[[], float]
 
 
 def feeds_worker(transport: httpx.AsyncBaseTransport | None = None) -> WorkerFunc:
@@ -59,6 +66,18 @@ def unique(posts: Iterable[Post]) -> list[Post]:
     return list({post.key: post for post in posts}.values())
 
 
+@dataclass(frozen=True)
+class Polled:
+    """A read's posts after any catch-up, and the feed's mark once they are stored."""
+
+    posts: list[Post]
+    caught_up_to: datetime | None
+    complete: bool = True
+    """False while a catch-up is owed: the mark stays and the ETag isn't kept, so the
+    next poll after the catch-up's wait tries again."""
+    error: str | None = None
+
+
 class FeedPoller:
     """One feed: poll it, store what it shows, and track whether it is up or blocked."""
 
@@ -72,52 +91,90 @@ class FeedPoller:
         """Seconds until the next try while blocked."""
         self.blocked_since: datetime | None = None
         self.last_poll: float | None = None
+        self.caught_up_to: datetime | None = None
+        self.catch_up_wait = 0.0
+        """Seconds a failed catch-up waits before its next try; doubles like the back-off."""
+        self.catch_up_after = 0.0
         self._last_keys: frozenset[str] = frozenset()
 
     @property
     def name(self) -> str:
         return self.feed.name
 
+    def restore(self, row: Row[Any] | None, newest: datetime | None, now: datetime) -> None:
+        """Carry on from the feed's status row. `newest`: the newest stored post when this
+        copy started; `now`: the database time."""
+        if row is None or row.state == "off":
+            self.caught_up_to = newest  # no reading back over the time a feed was off
+            return
+        self.caught_up_to = row.caught_up_to or newest
+        self.last_poll = time.monotonic() - (now - row.updated_at).total_seconds()
+        if row.state == "blocked":
+            self.state, self.blocked_since = "blocked", row.blocked_since
+            self.backoff = row.backoff_seconds or self.live.settings.feed_backoff_min_seconds
+
     def due_in(self, now: float) -> float:
         """Seconds until the next poll (0 or less: due now)."""
         if self.last_poll is None:
             return 0.0
-        wait = self.backoff if self.state == "blocked" else self.live.interval(self.name)
+        interval = self.live.interval(self.name)
+        wait = max(self.backoff, interval) if self.state == "blocked" else interval
         return self.last_poll + wait - now
 
     async def poll(self) -> None:
-        self.last_poll = self.live.clock()
+        self.last_poll = time.monotonic()
         try:
             read = await self.feed.read()
-            posts = await self._with_catch_up(read.posts)
+            polled = await self._catch_up(read.posts)
         except FeedBlocked as exc:
             await self._failed(str(exc), blocked=True)
         except FeedFailed as exc:
             await self._failed(str(exc), blocked=False)
+        except Exception as exc:  # a bug, or an answer nothing expected: never a crash
+            log.exception("%s: unexpected error reading the feed", self.name)
+            await self._failed(f"unexpected error: {exc!r}", blocked=False)
         else:
-            await self._answered(read, posts)
+            await self._answered(read, polled)
 
-    async def _with_catch_up(self, posts: list[Post]) -> list[Post]:
-        """If the read doesn't reach back to the newest stored post, fetch more."""
+    async def _catch_up(self, posts: list[Post]) -> Polled:
+        """Read back first if this read doesn't reach the feed's mark."""
+        mark = self.caught_up_to
         if not posts:
-            return posts
-        async with self.live.db.connect() as conn:
-            newest = await newest_posted_at(conn, self.live.source_id)
-        if newest is None or min(post.posted_at for post in posts) <= newest:
-            return posts
-        log.info("%s: catching up to the newest stored post (%s)", self.name, newest)
-        caught_up = unique([*posts, *await self.feed.read_back(posts, newest)])
-        if min(post.posted_at for post in caught_up) > newest:
-            log.warning(
-                "%s could not read back to %s; the other feeds may fill the gap", self.name, newest
+            return Polled(posts, mark)
+        newest = max(post.posted_at for post in posts)
+        if mark is None or min(post.posted_at for post in posts) <= mark:
+            return Polled(posts, max(newest, mark or newest))
+        if self.live.only_checking(self.name):
+            return Polled(posts, newest)  # direct is healthy: no paid catch-up
+        if time.monotonic() < self.catch_up_after:
+            return Polled(posts, mark, complete=False)
+        log.info("%s: catching up to %s", self.name, mark)
+        try:
+            back = await self.feed.read_back(posts, mark)
+        except FeedFailed as exc:
+            settings = self.live.settings
+            self.catch_up_wait = min(
+                max(2 * self.catch_up_wait, settings.feed_backoff_min_seconds),
+                settings.feed_backoff_max_seconds,
             )
-        return caught_up
+            self.catch_up_after = time.monotonic() + self.catch_up_wait
+            log.warning(
+                "%s: catch-up to %s failed (%s); storing this read, trying again in %s",
+                self.name,
+                mark,
+                exc,
+                _minutes(self.catch_up_wait),
+            )
+            return Polled(posts, mark, complete=False, error=f"catch-up failed: {exc}")
+        self.catch_up_wait = 0.0
+        if not back.reached:
+            log.warning("%s could not read back to %s; other feeds may fill it", self.name, mark)
+        return Polled(unique([*posts, *back.posts]), newest)
 
-    async def _answered(self, read: Read, posts: list[Post]) -> None:
+    async def _answered(self, read: Read, polled: Polled) -> None:
         live = self.live
-        fresh = unique(post for post in posts if post.key not in self._last_keys)
-        recovered = self.state == "blocked"
-        if recovered:
+        fresh = unique(post for post in polled.posts if post.key not in self._last_keys)
+        if self.state == "blocked":
             await notify_operator(
                 "feed_recovered", f"{self.name} answers again (blocked since {self.blocked_since})"
             )
@@ -129,12 +186,19 @@ class FeedPoller:
                 self.name,
                 polls=1,
                 not_modified=int(read.not_modified),
+                errors=int(polled.error is not None),
                 posts_seen=stored.seen,
                 posts_first=stored.first,
             )
-            await set_feed_status(conn, self.name, "up", ok=True)
-        if posts:
-            self._last_keys = frozenset(post.key for post in posts)
+            await set_feed_status(
+                conn, self.name, "up", ok=True, caught_up_to=polled.caught_up_to, error=polled.error
+            )
+        # Stored: the next poll goes on from this one.
+        self.caught_up_to = polled.caught_up_to
+        if polled.complete and not read.not_modified:
+            self.feed.etag = read.etag
+        if polled.posts:
+            self._last_keys = frozenset(post.key for post in polled.posts)
         if stored.first:
             log.info("%s: %d new posts", self.name, stored.first)
         await live.answered()
@@ -150,6 +214,7 @@ class FeedPoller:
             self.backoff = min(self.backoff * 2, settings.feed_backoff_max_seconds)
         elif entering:
             self.state, self.backoff = "blocked", settings.feed_backoff_min_seconds
+            self.blocked_since = datetime.now(UTC)  # the database's time replaces it below
             await notify_operator(
                 "feed_blocked",
                 f"{self.name} is blocked ({reason}); backing off from "
@@ -163,6 +228,7 @@ class FeedPoller:
                 self.name,
                 self.state,
                 blocked_since=func.now() if entering else self.blocked_since,
+                backoff=self.backoff if self.state == "blocked" else None,
                 error=reason,
             )
         if entering:
@@ -172,12 +238,9 @@ class FeedPoller:
 class Live:
     """All feeds for one lease holder."""
 
-    def __init__(
-        self, ctx: EngineContext, client: httpx.AsyncClient, clock: Clock = time.monotonic
-    ) -> None:
+    def __init__(self, ctx: EngineContext, client: httpx.AsyncClient) -> None:
         self.settings = ctx.settings
         self.db = ctx.db
-        self.clock = clock
         self.pollers: dict[str, FeedPoller] = {}
         self.off: dict[str, str] = {}
         """Feeds that are off, with the reason."""
@@ -190,16 +253,16 @@ class Live:
             else:
                 self.pollers[name] = FeedPoller(feed_type(client, self.settings), self)
         self.source_id = 0
-        self.last_answer = clock()
+        self.last_answer = time.monotonic()
         self.dark_since: datetime | None = None
+        self._dark = asyncio.Lock()
 
     def interval(self, name: str) -> float:
         settings = self.settings
         if name == ScrapeCreatorsFeed.name:
-            direct = self.pollers.get(DirectFeed.name)
-            if direct is None or direct.state == "blocked":
-                return settings.scrapecreators_fallback_seconds
-            return settings.scrapecreators_check_seconds
+            if self.only_checking(name):
+                return settings.scrapecreators_check_seconds
+            return settings.scrapecreators_fallback_seconds
         intervals = {
             DirectFeed.name: settings.direct_interval_seconds,
             TrumpstruthFeed.name: settings.trumpstruth_interval_seconds,
@@ -207,9 +270,19 @@ class Live:
         }
         return intervals[name]
 
+    def only_checking(self, name: str) -> bool:
+        """ScrapeCreators while direct is healthy: an hourly check of the key, no more."""
+        direct = self.pollers.get(DirectFeed.name)
+        return name == ScrapeCreatorsFeed.name and direct is not None and direct.state == "up"
+
     async def start(self) -> None:
         async with self.db.begin() as conn:
             self.source_id = await trump_source_id(conn)
+            newest = await newest_posted_at(conn, self.source_id)
+            now = await db_now(conn)
+            rows = {row.feed: row for row in await conn.execute(select(feed_status))}
+            for name, poller in self.pollers.items():
+                poller.restore(rows.get(name), newest, now)
             for name, reason in self.off.items():
                 await set_feed_status(conn, name, "off", error=reason)
             self.dark_since = (
@@ -217,6 +290,9 @@ class Live:
             ).scalar_one_or_none()
         off = ", ".join(f"{name} ({reason})" for name, reason in self.off.items())
         log.info("feeds on: %s; off: %s", ", ".join(self.pollers) or "none", off or "none")
+        for poller in self.pollers.values():
+            if poller.state == "blocked":
+                log.info("%s is still blocked (since %s)", poller.name, poller.blocked_since)
 
     async def run(self) -> None:
         await self.start()
@@ -227,7 +303,7 @@ class Live:
 
     async def _run_feed(self, poller: FeedPoller) -> None:
         while True:
-            wait = poller.due_in(self.clock())
+            wait = poller.due_in(time.monotonic())
             if wait > 0:
                 await asyncio.sleep(min(wait, self.settings.feed_tick_seconds))
                 continue
@@ -235,38 +311,47 @@ class Live:
                 await poller.poll()
             except (SQLAlchemyError, OSError) as exc:
                 log.warning("%s: database write failed, retrying next poll: %s", poller.name, exc)
+            except Exception:  # never let one feed's bug stop the others
+                log.exception("%s: poll failed; trying again next poll", poller.name)
 
     async def answered(self) -> None:
         """A feed answered: the feeds are not dark."""
-        self.last_answer = self.clock()
-        if self.dark_since is None:
-            return
-        async with self.db.begin() as conn:
-            await conn.execute(update(engine_meta).values(feeds_dark_since=None))
-        since, self.dark_since = self.dark_since, None
+        async with self._dark:
+            self.last_answer = time.monotonic()
+            if self.dark_since is None:
+                return
+            async with self.db.begin() as conn:
+                await conn.execute(update(engine_meta).values(feeds_dark_since=None))
+            since, self.dark_since = self.dark_since, None
         await notify_operator("feeds_back", f"a feed answers again; feeds were dark since {since}")
 
     async def _watch_dark(self) -> None:
         while True:
             await asyncio.sleep(self.settings.feed_tick_seconds)
-            silent = self.clock() - self.last_answer
+            silent = time.monotonic() - self.last_answer
             if self.dark_since is None and silent >= self.settings.feeds_dark_after_seconds:
-                await self._go_dark(silent)
+                await self._go_dark()
 
-    async def _go_dark(self, silent: float) -> None:
-        since = datetime.now(UTC) - timedelta(seconds=silent)
+    async def _go_dark(self) -> None:
+        async with self._dark:
+            silent = time.monotonic() - self.last_answer
+            if self.dark_since is not None or silent < self.settings.feeds_dark_after_seconds:
+                return  # a feed answered meanwhile
+            since: datetime
+            try:
+                async with self.db.begin() as conn:
+                    since = (
+                        await conn.execute(
+                            update(engine_meta)
+                            .values(feeds_dark_since=func.now() - timedelta(seconds=silent))
+                            .returning(engine_meta.c.feeds_dark_since)
+                        )
+                    ).scalar_one()
+            except (SQLAlchemyError, OSError) as exc:
+                log.warning("could not record dark feeds in the status row: %s", exc)
+                since = datetime.now(UTC) - timedelta(seconds=silent)
+            self.dark_since = since
         await notify_operator(
-            "feeds_dark", f"no feed has answered since {since:%Y-%m-%d %H:%M:%S %Z}"
+            "feeds_dark",
+            f"no feed has answered since {since.astimezone(UTC):%Y-%m-%d %H:%M:%S} UTC",
         )
-        self.dark_since = since
-        try:
-            async with self.db.begin() as conn:
-                self.dark_since = (
-                    await conn.execute(
-                        update(engine_meta)
-                        .values(feeds_dark_since=func.now() - timedelta(seconds=silent))
-                        .returning(engine_meta.c.feeds_dark_since)
-                    )
-                ).scalar_one()
-        except (SQLAlchemyError, OSError) as exc:
-            log.warning("could not record dark feeds in the status row: %s", exc)

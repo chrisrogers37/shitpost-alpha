@@ -4,11 +4,11 @@ The direct and ScrapeCreators fixtures are hand-built until PR 7 records real an
 Railway; the sandbox never calls either host.
 """
 
+import json
 from abc import abstractmethod
 from datetime import datetime
-from typing import Any
 
-from engine.feeds.base import Feed, FeedBlocked, FeedFailed, Read
+from engine.feeds.base import CaughtUp, Feed, FeedBlocked, FeedFailed, Read, unexpected_answer
 from engine.feeds.posts import ACCOUNT_ID, Post, html_text, parse_status_id, split_quote
 
 DIRECT_URL = f"https://truthsocial.com/api/v1/accounts/{ACCOUNT_ID}/statuses"
@@ -16,8 +16,10 @@ SCRAPECREATORS_URL = "https://api.scrapecreators.com/v1/truthsocial/user/posts"
 PAGE_SIZE = "20"
 
 
-def mastodon_post(status: dict[str, Any]) -> Post | None:
+def mastodon_post(status: object) -> Post | None:
     """Map one status; None for a status from another account."""
+    if not isinstance(status, dict):
+        raise TypeError(f"status is a {type(status).__name__}, not an object")
     account = status.get("account") or {}
     if str(account.get("id", ACCOUNT_ID)) != ACCOUNT_ID:
         return None
@@ -35,38 +37,38 @@ def mastodon_post(status: dict[str, Any]) -> Post | None:
     return Post(status_id, "quote" if quoted else "post", quoted, own, has_media, status)
 
 
-def mastodon_posts(statuses: object) -> list[Post]:
-    if not isinstance(statuses, list):
-        raise FeedFailed(f"expected a list of statuses, got {type(statuses).__name__}")
-    return [post for status in statuses if (post := mastodon_post(status)) is not None]
-
-
 class PagedFeed(Feed):
-    """Pages back by status id: `max_id` returns statuses older than that id."""
-
-    expects = "json"
+    """Pages back by status id: each page holds the statuses older than the id given."""
 
     @abstractmethod
-    async def page(self, max_id: str | None) -> list[Post] | None:
-        """One page, newest first; None when the newest page is not modified."""
+    async def page(self, max_id: str | None) -> Read:
+        """One page, newest first. Only the newest page (no `max_id`) is conditional."""
+
+    def statuses(self, statuses: object) -> list[Post]:
+        if not isinstance(statuses, list):
+            raise FeedFailed(f"expected a list of statuses, got {type(statuses).__name__}")
+        return self.map_items(statuses, mastodon_post)
 
     async def read(self) -> Read:
-        posts = await self.page(None)
-        return Read([], not_modified=True) if posts is None else Read(posts)
+        return await self.page(None)
 
-    async def read_back(self, newest: list[Post], until: datetime) -> list[Post]:
+    async def read_back(self, newest: list[Post], until: datetime) -> CaughtUp:
         older: list[Post] = []
+        reached = False
         before = min(newest, key=lambda post: int(post.status_id)).status_id
         for _ in range(self.settings.catchup_max_pages):
-            page = await self.page(before)
+            page = (await self.page(before)).posts
             if not page:
                 break
             older += page
             oldest = min(page, key=lambda post: int(post.status_id))
-            if int(oldest.status_id) >= int(before) or oldest.posted_at <= until:
+            if oldest.posted_at <= until:
+                reached = True
                 break
+            if int(oldest.status_id) >= int(before):
+                break  # no progress: the feed ignores the page parameter
             before = oldest.status_id
-        return older
+        return CaughtUp([post for post in older if post.posted_at > until], reached)
 
 
 class DirectFeed(PagedFeed):
@@ -74,17 +76,16 @@ class DirectFeed(PagedFeed):
 
     name = "direct"
 
-    async def page(self, max_id: str | None) -> list[Post] | None:
+    async def page(self, max_id: str | None) -> Read:
         params = {"exclude_replies": "true", "limit": PAGE_SIZE}
         if max_id:
             params["max_id"] = max_id
-        response = await self.get(DIRECT_URL, params=params, conditional=max_id is None)
-        if response is None:
-            return None
-        try:
-            return mastodon_posts(response.json())
-        except (ValueError, KeyError, TypeError) as exc:
-            raise FeedFailed(f"unexpected answer: {exc!r}") from exc
+        answer = await self.get(DIRECT_URL, params=params, conditional=max_id is None)
+        if answer is None:
+            return Read([], not_modified=True)
+        with unexpected_answer():
+            statuses = json.loads(answer.body)
+        return Read(self.statuses(statuses), etag=answer.headers.get("etag"))
 
 
 class ScrapeCreatorsFeed(PagedFeed):
@@ -93,21 +94,20 @@ class ScrapeCreatorsFeed(PagedFeed):
     name = "scrapecreators"
     block_statuses = frozenset({401, 402, 403, 429})
 
-    async def page(self, max_id: str | None) -> list[Post] | None:
+    async def page(self, max_id: str | None) -> Read:
         key = self.settings.scrapecreators_key
         if key is None:
             raise FeedBlocked("no ENGINE_SCRAPECREATORS_KEY")
         params = {"user_id": ACCOUNT_ID, "limit": PAGE_SIZE}
         if max_id:
             params["next_max_id"] = max_id
-        response = await self.get(
+        answer = await self.get(
             SCRAPECREATORS_URL, params=params, headers={"x-api-key": key.get_secret_value()}
         )
-        assert response is not None  # not conditional
-        try:
-            body = response.json()
-            if not body.get("success"):
+        assert answer is not None  # not conditional
+        with unexpected_answer():
+            body = json.loads(answer.body)
+            if body.get("success") is not True:
                 raise FeedFailed(f"ScrapeCreators answered success={body.get('success')!r}")
-            return mastodon_posts(body.get("posts"))
-        except (ValueError, KeyError, TypeError, AttributeError) as exc:
-            raise FeedFailed(f"unexpected answer: {exc!r}") from exc
+            statuses = body.get("posts")
+        return Read(self.statuses(statuses))

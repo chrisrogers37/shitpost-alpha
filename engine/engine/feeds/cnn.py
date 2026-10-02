@@ -12,8 +12,8 @@ from typing import Any
 
 import httpx
 
-from engine.feeds.base import Feed, FeedFailed, Read
-from engine.feeds.posts import Post, mirror_post, parse_status_id, plain_text
+from engine.feeds.base import UNEXPECTED, CaughtUp, Feed, FeedFailed, Read
+from engine.feeds.posts import Post, mirror_post, parse_status_id, plain_text, status_time
 from engine.settings import Settings
 
 log = logging.getLogger(__name__)
@@ -21,22 +21,26 @@ log = logging.getLogger(__name__)
 URL = "https://ix.cnn.io/data/truth-social/truth_archive.json"
 HEAD_BYTES = 32 * 1024
 DOWNLOAD_ATTEMPTS = 3
+RETRY_PAUSE_SECONDS = 2.0
+"""Pause before a download's second try; twice that before its third."""
 
 
-def cnn_post(item: dict[str, Any]) -> Post:
+def cnn_post(item: object) -> Post:
     """Map one archive item. CC0's copy of the archive has the same shape."""
+    if not isinstance(item, dict):
+        raise TypeError(f"archive item is a {type(item).__name__}, not an object")
     text = plain_text(item.get("content") or "")
     return mirror_post(parse_status_id(item["id"]), text, bool(item.get("media")), item)
 
 
-def leading_items(body: bytes) -> list[dict[str, Any]]:
-    """The complete objects at the start of a JSON list cut off part way."""
+def leading_items(body: bytes) -> list[Any]:
+    """The complete items at the start of a JSON list cut off part way."""
     text = body.decode("utf-8", errors="ignore")  # the cut can split a character
+    start = len(text) - len(text.lstrip())
+    if not text.startswith("[", start):
+        raise FeedFailed(f"the archive does not start with a JSON list: {text[:80]!r}")
     decoder = json.JSONDecoder()
-    start = text.find("[")
-    if start < 0:
-        raise FeedFailed("the archive does not start with a JSON list")
-    items: list[dict[str, Any]] = []
+    items: list[Any] = []
     at = start + 1
     while True:
         while at < len(text) and text[at] in " \t\r\n,":
@@ -44,12 +48,13 @@ def leading_items(body: bytes) -> list[dict[str, Any]]:
         try:
             item, at = decoder.raw_decode(text, at)
         except json.JSONDecodeError:
-            return items  # the cut-off object, or the end of the list
+            return items  # the cut-off item, or the end of the list
         items.append(item)
 
 
-async def download_archive(client: httpx.AsyncClient, settings: Settings) -> list[dict[str, Any]]:
-    """The whole file, gzipped. Downloads sometimes end early, so it retries."""
+async def download_archive(client: httpx.AsyncClient, settings: Settings) -> list[Any]:
+    """The whole file, gzipped. Downloads sometimes end early, so it retries; a block or
+    another status ends it at once."""
     for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
         try:
             response = await client.get(
@@ -57,15 +62,13 @@ async def download_archive(client: httpx.AsyncClient, settings: Settings) -> lis
                 headers={"Accept-Encoding": "gzip"},
                 timeout=settings.cnn_download_timeout_seconds,
             )
-            response.raise_for_status()
-            items = response.json()
+            CnnFeed.check(response)
+            items = await asyncio.to_thread(json.loads, response.content)  # ~20 MB
         except (httpx.RequestError, ValueError) as exc:
             if attempt == DOWNLOAD_ATTEMPTS:
                 raise FeedFailed(f"CNN archive download failed {attempt}x: {exc!r}") from exc
             log.warning("CNN archive download attempt %d failed: %r; retrying", attempt, exc)
-            await asyncio.sleep(2 * attempt)
-        except httpx.HTTPStatusError as exc:
-            raise FeedFailed(f"CNN archive download: HTTP {exc.response.status_code}") from exc
+            await asyncio.sleep(RETRY_PAUSE_SECONDS * attempt)
         else:
             if not isinstance(items, list):
                 raise FeedFailed("the CNN archive is not a JSON list")
@@ -73,27 +76,25 @@ async def download_archive(client: httpx.AsyncClient, settings: Settings) -> lis
     raise AssertionError("unreachable")
 
 
+def _posted_after(item: Any, until: datetime) -> bool:
+    try:
+        return status_time(parse_status_id(item["id"])) > until
+    except UNEXPECTED:
+        return True  # mapping reports it
+
+
 class CnnFeed(Feed):
     name = "cnn"
-    expects = "json"
 
     async def read(self) -> Read:
-        response = await self.get(
-            URL,
-            headers={"Range": f"bytes=0-{HEAD_BYTES - 1}", "Accept-Encoding": "identity"},
-            conditional=True,
-        )
-        if response is None:
+        answer = await self.get(URL, conditional=True, range_bytes=HEAD_BYTES)
+        if answer is None:
             return Read([], not_modified=True)
-        try:
-            items = response.json() if response.status_code == 200 else None
-            return Read([cnn_post(item) for item in items or leading_items(response.content)])
-        except (ValueError, KeyError, TypeError) as exc:
-            raise FeedFailed(f"unexpected answer: {exc!r}") from exc
+        posts = self.map_items(leading_items(answer.body), cnn_post)
+        return Read(posts, etag=answer.headers.get("etag"))
 
-    async def read_back(self, newest: list[Post], until: datetime) -> list[Post]:
-        try:
-            posts = [cnn_post(item) for item in await download_archive(self.client, self.settings)]
-        except (ValueError, KeyError, TypeError) as exc:
-            raise FeedFailed(f"unexpected archive item: {exc!r}") from exc
-        return [post for post in posts if post.posted_at > until]
+    async def read_back(self, newest: list[Post], until: datetime) -> CaughtUp:
+        """The whole file: every post newer than `until` (the file goes back to 2022)."""
+        items = await download_archive(self.client, self.settings)
+        newer = [item for item in items if _posted_after(item, until)]
+        return CaughtUp(self.map_items(newer, cnn_post), reached=len(newer) < len(items))

@@ -14,7 +14,7 @@ from engine.feeds.history import Part, clone_cc0, import_part, measure_bursts, r
 from engine.feeds.store import store_posts, trump_source_id
 from engine.settings import Settings
 from engine.tables import signal_sightings, signals
-from tests.feeds_helpers import fixture_json
+from tests.feeds_helpers import fixture_json, status_id_at
 
 
 async def import_both(db: AsyncEngine) -> list[Part]:
@@ -73,9 +73,11 @@ async def test_import_leaves_posts_the_live_feeds_stored_alone(db: AsyncEngine) 
 async def test_run_import_prints_counts_that_add_up(
     migrated: Settings, db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    fresh = {"id": status_id_at(datetime.now(UTC) - timedelta(minutes=5)), "content": "new"}
+
     async def fake_download(client: object, settings: Settings) -> list[dict[str, Any]]:
         result: list[dict[str, Any]] = fixture_json("archive_cnn_slice.json")
-        return result
+        return [fresh, *result]
 
     monkeypatch.setattr(
         history, "clone_cc0", lambda into: (fixture_json("archive_cc0_slice.json"), "abc1234")
@@ -85,8 +87,10 @@ async def test_run_import_prints_counts_that_add_up(
     await run_import(migrated, lines.append)
     assert lines[0].startswith("cc0 archive (") and "at abc1234, CC0): 6 read, 6 added" in lines[0]
     assert lines[1] == "cnn file (ix.cnn.io): 6 read, 4 added, 2 already stored"
-    assert lines[2] == "total: 12 read, 10 added, 2 already stored"
-    assert lines[3].startswith("bursts over 4 imported text posts")
+    assert lines[2] == "left 1 posts under 1:00:00 old to the live feeds"
+    assert lines[3] == "total: 12 read, 10 added, 2 already stored"
+    assert lines[4].startswith("bursts over 4 imported text posts")
+    assert fresh["id"] not in await all_signals(db)
 
 
 def make_repo(path: Path, license_text: str) -> Path:

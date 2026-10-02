@@ -3,7 +3,7 @@
 All times here come from the database clock (`now()`), like the lease and the scheduler.
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -21,6 +21,12 @@ SCORE = "score"
 """The first live stage. PR 4 handles it; nothing in PR 2 runs a stage over signals."""
 
 BATCH = 500
+"""Rows per statement: one statement may carry at most 65,535 parameters."""
+
+
+def batches[T](items: Sequence[T]) -> Iterator[Sequence[T]]:
+    for start in range(0, len(items), BATCH):
+        yield items[start : start + BATCH]
 
 
 async def trump_source_id(conn: AsyncConnection) -> int:
@@ -69,10 +75,10 @@ async def insert_signals(
     """Insert posts not stored yet. Returns the keys this call added."""
     rows = [signal_row(post, source_id, via, imported=imported) for post in posts]
     added: set[str] = set()
-    for start in range(0, len(rows), BATCH):
+    for batch in batches(rows):
         stmt = (
             insert(signals)
-            .values(rows[start : start + BATCH])
+            .values(batch)
             .on_conflict_do_nothing(index_elements=[signals.c.key])
             .returning(signals.c.key)
         )
@@ -99,21 +105,23 @@ async def store_posts(
     if not posts:
         return Stored(0, 0)
     added = await insert_signals(conn, source_id, feed, posts, imported=False)
-    rows = [{"signal_key": post.key, "feed": feed, "seen_at": func.now()} for post in posts]
-    sighted = set(
-        (
-            await conn.execute(
-                insert(signal_sightings)
-                .values(rows)
-                .on_conflict_do_nothing()
-                .returning(signal_sightings.c.signal_key)
-            )
-        ).scalars()
-    )
-    if sighted - added:
+    sighted: set[str] = set()
+    for batch in batches(posts):
+        rows = [{"signal_key": post.key, "feed": feed, "seen_at": func.now()} for post in batch]
+        sighted.update(
+            (
+                await conn.execute(
+                    insert(signal_sightings)
+                    .values(rows)
+                    .on_conflict_do_nothing()
+                    .returning(signal_sightings.c.signal_key)
+                )
+            ).scalars()
+        )
+    for keys in batches(sorted(sighted - added)):
         await conn.execute(
             update(signals)
-            .where(signals.c.key.in_(sighted - added), signals.c.first_seen_at > func.now())
+            .where(signals.c.key.in_(keys), signals.c.first_seen_at > func.now())
             .values(first_seen_at=func.now(), first_seen_via=feed)
         )
     return Stored(seen=len(sighted), first=len(added))
@@ -138,20 +146,26 @@ async def set_feed_status(
     *,
     ok: bool = False,
     blocked_since: datetime | ColumnElement[Any] | None = None,
+    backoff: float | None = None,
+    caught_up_to: datetime | None = None,
     error: str | None = None,
 ) -> datetime:
     """Record a feed's state after a poll (or at start, for a feed that is off).
+    `caught_up_to` is kept when not given.
 
     Returns the database time of the write.
     """
     values: dict[str, Any] = {
         "state": state,
         "blocked_since": blocked_since,
+        "backoff_seconds": backoff,
         "last_error": error,
         "updated_at": func.now(),
     }
     if ok:
         values["last_ok_at"] = func.now()
+    if caught_up_to is not None:
+        values["caught_up_to"] = caught_up_to
     stmt = insert(feed_status).values(feed=feed, **values)
     now: datetime = (
         await conn.execute(

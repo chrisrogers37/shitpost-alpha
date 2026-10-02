@@ -11,6 +11,7 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Identity,
     Index,
@@ -96,6 +97,11 @@ sources = Table(
 SIGNAL_KINDS = ("post", "reply", "quote", "repost")
 NOT_SCORED = ("repost", "no_text", "imported")
 
+
+def _one_of(column: str, values: tuple[str, ...]) -> str:
+    return f"{column} IN ({', '.join(f"'{value}'" for value in values)})"
+
+
 signals = Table(
     "signals",
     metadata,
@@ -113,10 +119,8 @@ signals = Table(
     Column("first_seen_via", Text, nullable=False),
     Column("not_scored", Text),
     *stage_columns(),
-    CheckConstraint("kind IN ('post', 'reply', 'quote', 'repost')", name="signals_kind_check"),
-    CheckConstraint(
-        "not_scored IN ('repost', 'no_text', 'imported')", name="signals_not_scored_check"
-    ),
+    CheckConstraint(_one_of("kind", SIGNAL_KINDS), name="signals_kind_check"),
+    CheckConstraint(_one_of("not_scored", NOT_SCORED), name="signals_not_scored_check"),
     Index("signals_source_id_posted_at_idx", "source_id", "posted_at"),
     Index(
         "signals_text_search_idx",
@@ -170,9 +174,14 @@ feed_status = Table(
     Column("state", Text, nullable=False),
     Column("last_ok_at", DateTime(timezone=True)),
     Column("blocked_since", DateTime(timezone=True)),
+    Column("backoff_seconds", Float),
+    Column("caught_up_to", DateTime(timezone=True)),
     Column("last_error", Text),
     Column("updated_at", DateTime(timezone=True), nullable=False),
     CheckConstraint("state IN ('up', 'blocked', 'off')", name="feed_status_state_check"),
     schema="engine",
 )
-"""Each feed's current state, for `python -m engine status`."""
+"""Each feed's current state, for `python -m engine status` and for the next copy to
+pick up from. backoff_seconds: the wait before the next try while blocked (counted from
+updated_at, the last poll). caught_up_to: the newest post time this feed has read back to
+without a gap; a read that doesn't reach back to it starts a catch-up."""

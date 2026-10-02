@@ -28,9 +28,12 @@ STATUS_URL = re.compile(
 _REPOST_OF_URL = re.compile(r"RT:\s*" + STATUS_URL.pattern)
 _QUOTE_MARKER = re.compile(r"(?:^|\s)RE:\s*" + STATUS_URL.pattern)
 # UTF-8 bytes that were decoded as Latin-1 (CNN's archive has about 900 such posts).
+# Repaired only in CNN's text: elsewhere a pair like "É " is correct text.
 _MOJIBAKE = re.compile(
     r"[\xc2-\xdf][\x80-\xbf]|[\xe0-\xef][\x80-\xbf]{2}|[\xf0-\xf4][\x80-\xbf]{3}"
 )
+# What is left of a no-break space ("Â\xa0") when the space was trimmed away.
+_ORPHAN_A = re.compile(r"Â(?=\s|$)")
 
 
 def parse_status_id(value: object) -> str:
@@ -109,15 +112,20 @@ def split_quote(text: str) -> tuple[str, str | None]:
 
 
 def clean_text(text: str) -> str:
-    """Repair mojibake, turn no-break spaces into spaces and trim blank space."""
-    text = _MOJIBAKE.sub(_redecode, text).replace("\xa0", " ")
-    lines = (line.rstrip() for line in text.splitlines())
+    """Turn no-break spaces into spaces and trim blank space."""
+    lines = (line.rstrip() for line in text.replace("\xa0", " ").splitlines())
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
 def plain_text(content: str) -> str:
-    """Text from a mirror that sends plain text with HTML entities (CNN)."""
-    return clean_text(html.unescape(content))
+    """Text from CNN's archive (and its CC0 copy): plain text with HTML entities, a few
+    posts escaped twice, and UTF-8 that was decoded as Latin-1 in about 900 posts."""
+    for _ in range(3):
+        unescaped = html.unescape(content)
+        if unescaped == content:
+            break
+        content = unescaped
+    return clean_text(_ORPHAN_A.sub("", _MOJIBAKE.sub(_redecode, content)))
 
 
 def html_text(content: str) -> str:

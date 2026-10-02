@@ -19,5 +19,6 @@ calls Truth Social or ScrapeCreators):
 
 - `direct_statuses.unverified.json`: Mastodon statuses as Truth Social's API returns them:
   a post, a repost, a reply, a media-only post and a quote.
-- `scrapecreators_posts.unverified.json`: ScrapeCreators' `{"success": true, "posts": [...]}`.
+- `scrapecreators_posts.unverified.json`: ScrapeCreators' `{"success": true, "posts": [...]}`
+  around the same five statuses.
 - `challenge.unverified.html`: a Cloudflare challenge page.

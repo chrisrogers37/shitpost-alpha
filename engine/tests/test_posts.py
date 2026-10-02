@@ -81,6 +81,13 @@ def test_plain_text_repairs_mojibake_and_entities() -> None:
     cnn = "Stocks &amp; NASDAQ! CRYPTO, \u00e2\x80\x9cThrough the Roof.\u00e2\x80\x9d"
     assert plain_text(cnn) == "Stocks & NASDAQ! CRYPTO, \u201cThrough the Roof.\u201d"
     assert plain_text("Florida!\n\xa0\nWilton  ") == "Florida!\n\nWilton"
+    assert plain_text("Tariffs &amp;amp;amp; trade") == "Tariffs & trade"  # escaped twice
+    assert plain_text("GOD BLESS HIM!\u00c2") == "GOD BLESS HIM!"  # a trimmed "\u00c2\xa0"
+
+
+def test_only_cnn_text_is_repaired() -> None:
+    """ "É" followed by a no-break space reads as mojibake; in HTML text it is correct."""
+    assert html_text("<p>CAF\u00c9&nbsp;OWNERS</p>") == "CAF\u00c9 OWNERS"
 
 
 def test_html_text_keeps_line_breaks_and_drops_tags() -> None:

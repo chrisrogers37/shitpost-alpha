@@ -26,19 +26,27 @@ wins (`engine.signals`), and every feed's first sighting is kept (`engine.signal
 | --- | --- | --- |
 | `direct` | Truth Social's own API | 60 s |
 | `trumpstruth` | trumpstruth.org RSS, with `?t=` to skip Cloudflare's cache | 60 s |
-| `cnn` | first 32 KB of CNN's archive file (a range read) | 15 s |
+| `cnn` | first 32 KB of CNN's archive file (a range read; a 200 is a failure) | 15 s |
 | `scrapecreators` | paid API; only with `ENGINE_SCRAPECREATORS_KEY` | 2 min while direct is blocked or off, else hourly |
 
 - `ENGINE_SOURCES_OFF=direct,scrapecreators` switches feeds off; the others carry on.
 - A 403, a 429, a challenge page or five failures in a row mark a feed blocked: it backs
-  off from 1 minute, doubling up to 30, with one operator message per incident and one on
-  recovery. No proxies, rotating addresses, browser impersonation or logins, ever.
-- When a read doesn't reach back to the newest stored post, the feed catches up: CNN reads
-  its whole file, direct and ScrapeCreators page back. trumpstruth can't page back.
+  off from 1 minute, doubling up to 30 (never sooner than its usual interval), with one
+  operator message per incident and one on recovery. No proxies, rotating addresses,
+  browser impersonation or logins, ever. An answer of an unexpected shape is a failure;
+  one odd item in an answer is skipped and logged.
+- Each feed has a catch-up mark (the newest post it has read without a gap). A read that
+  doesn't reach back to it catches up first: CNN reads its whole file, direct and
+  ScrapeCreators page back (ScrapeCreators only while it stands in for direct).
+  trumpstruth can't page back. A failed catch-up keeps the new posts and tries again
+  after a back-off.
+- `engine.feed_status` keeps each feed's state, back-off, last poll and mark, so the next
+  copy (a deploy, a restart) carries on without re-polling a blocked host.
 - If no feed answers for 10 minutes, one operator message, and status shows "dark since".
 - A post's time comes from its status id (`id >> 16` is milliseconds since the epoch).
 - Text posts wait at stage `score` (PR 4). Reposts, posts without text and imported
-  history are saved at `done`, with the reason in `not_scored`.
+  history are saved at `done`, with the reason in `not_scored`. `import-history` leaves
+  posts under an hour old to the live feeds.
 
 ## Database
 

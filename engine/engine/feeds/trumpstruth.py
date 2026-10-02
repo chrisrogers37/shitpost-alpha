@@ -21,31 +21,29 @@ def item_status_id(item: ET.Element) -> str:
         return parse_status_id(original_id)
     original_url = (item.findtext(f"{TRUTH_NS}originalUrl") or "").strip()
     if (url := STATUS_URL.fullmatch(original_url)) is None:
-        raise ValueError("item has neither truth:originalId nor truth:originalUrl")
+        raise ValueError(
+            f"item {item.findtext('guid')!r} has neither truth:originalId "
+            "nor a status link in truth:originalUrl"
+        )
     return url["id"]
 
 
-def parse_feed(body: bytes) -> list[Post]:
+def feed_post(item: ET.Element) -> Post:
+    raw = {child.tag.removeprefix(TRUTH_NS): child.text for child in item}
+    return mirror_post(item_status_id(item), html_text(raw.get("description") or ""), None, raw)
+
+
+def parse_items(body: bytes) -> list[ET.Element]:
     try:
-        root = ET.fromstring(body)
+        return list(ET.fromstring(body).iter("item"))
     except ET.ParseError as exc:
         raise FeedFailed(f"feed does not parse: {exc}") from exc
-    posts = []
-    for item in root.iter("item"):
-        raw = {child.tag.removeprefix(TRUTH_NS): child.text for child in item}
-        try:
-            status_id = item_status_id(item)
-        except ValueError as exc:
-            raise FeedFailed(f"feed item {raw.get('guid')!r}: {exc}") from exc
-        posts.append(mirror_post(status_id, html_text(raw.get("description") or ""), None, raw))
-    return posts
 
 
 class TrumpstruthFeed(Feed):
     name = "trumpstruth"
-    expects = "xml"
 
     async def read(self) -> Read:
-        response = await self.get(URL, params={"t": str(int(time.time()))})
-        assert response is not None  # not conditional
-        return Read(parse_feed(response.content))
+        answer = await self.get(URL, params={"t": str(int(time.time()))})
+        assert answer is not None  # not conditional
+        return Read(self.map_items(parse_items(answer.body), feed_post))

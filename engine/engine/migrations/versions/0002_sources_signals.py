@@ -118,6 +118,8 @@ def upgrade() -> None:
         sa.Column("state", sa.Text, nullable=False),
         sa.Column("last_ok_at", sa.DateTime(timezone=True)),
         sa.Column("blocked_since", sa.DateTime(timezone=True)),
+        sa.Column("backoff_seconds", sa.Float),
+        sa.Column("caught_up_to", sa.DateTime(timezone=True)),
         sa.Column("last_error", sa.Text),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.CheckConstraint("state IN ('up', 'blocked', 'off')", name="feed_status_state_check"),
