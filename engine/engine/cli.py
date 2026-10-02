@@ -1,5 +1,6 @@
 """Command line: `python -m engine migrate | run | status | import-history | backfill-bars |
-sync-names | extract | fetch-model | embed | ai-pick | review-list`."""
+sync-names | extract | fetch-model | embed | ai-pick | review-list | build-moves |
+backtest`."""
 
 import argparse
 import asyncio
@@ -68,6 +69,28 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
     commands.add_parser(
         "review-list", help="names the AI vote counted that the rules missed, for review"
     )
+    build_moves = commands.add_parser(
+        "build-moves", help="fill signal_moves and random_baselines for the sample to --to"
+    )
+    build_moves.add_argument(
+        "--to", dest="end", type=date.fromisoformat, required=True, help="the last day"
+    )
+    backtest = commands.add_parser("backtest", help="run Gate 0 v1 and write the report")
+    which = backtest.add_mutually_exclusive_group()
+    which.add_argument(
+        "--to", dest="end", type=date.fromisoformat, help="the last day (default: latest built)"
+    )
+    which.add_argument(
+        "--rebuild",
+        action="store_true",
+        help="write the report again from saved data and check it matches the last run",
+    )
+    backtest.add_argument("--out", type=Path, help="where the report goes (engine/reports)")
+    backtest.add_argument(
+        "--divergent-days",
+        type=Path,
+        help="PR 3's cross-check output: also print BTC without those days (sandbox only)",
+    )
     args = parser.parse_args(argv)
 
     configure_logging()
@@ -95,6 +118,8 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
             return asyncio.run(run_backfill(settings))
         if args.command in EXTRACT_COMMANDS:
             return _extract_command(args, settings)
+        if args.command in ("build-moves", "backtest"):
+            return _backtest_command(args, settings)
         return asyncio.run(_status(settings))
     except OperationalError as exc:
         print(database_error_line(exc), file=sys.stderr)
@@ -167,6 +192,29 @@ def _extract_command(args: argparse.Namespace, settings: Settings) -> int:
         print(f"{args.command} failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
     except OSError as exc:  # the --keys file
+        print(f"{args.command} failed: {exc}", file=sys.stderr)
+        return 1
+
+
+def _backtest_command(args: argparse.Namespace, settings: Settings) -> int:
+    """build-moves and backtest (numpy and pandas load only for these)."""
+    from engine.backtest import build, gate, run
+    from engine.extract import similarity
+    from engine.extract.rules import RulesFileChanged
+    from engine.market.alpaca import AlpacaError
+
+    try:
+        if args.command == "build-moves":
+            return asyncio.run(build.run_build_moves(settings, args.end))
+        return asyncio.run(
+            run.run_backtest_command(
+                settings, args.end, args.rebuild, args.out or gate.REPORTS_DIR, args.divergent_days
+            )
+        )
+    except (similarity.ModelMissing, RulesFileChanged, AlpacaError) as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    except OSError as exc:  # the cache directory, the report directory, --divergent-days
         print(f"{args.command} failed: {exc}", file=sys.stderr)
         return 1
 

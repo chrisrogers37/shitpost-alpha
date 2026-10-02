@@ -19,6 +19,9 @@ Run from this directory, with `ENGINE_DATABASE_URL` set (never the old `DATABASE
     python -m engine embed            # a similarity vector for every text post (per model version)
     python -m engine ai-pick --from 2025-11-01 --to 2025-11-30 --max-usd 5   # or --keys FILE
     python -m engine review-list      # names the AI vote counted that the rules missed
+    python -m engine build-moves --to 2026-10-01   # signal_moves and random_baselines to that day
+    python -m engine backtest         # Gate 0 v1: engine/reports/backtest-v1.json and .md
+    python -m engine backtest --rebuild   # the same files again from saved data; checks the hash
 
 Settings are `ENGINE_*` variables; see `engine/settings.py`. New database connections
 give up after 10 s per address the host resolves to; a `connect_timeout` in the URL wins.
@@ -130,16 +133,17 @@ the trading calendar, and bar storage. Nothing here scores, grades or sends.
   over without a whole fetch. One instrument's failure (Alpaca or the database) doesn't
   stop the others; the run exits 1. A failed call is tried 5 times, 2, 4, 8 and 16 seconds
   apart, so with Alpaca unreachable the run takes at least half a minute per instrument.
-- **Minute bars** (`MinuteCache`): cached per window as JSON files under
+- **Minute bars** (`MinuteCache`): cached per window as compressed numpy files under
   `ENGINE_BARS_CACHE_DIR` (default `~/.cache/shitpost-engine/bars`, outside the repo), so a
-  rerun makes no calls. Files are kept per slug (a reused ticker never shares an old
-  company's) and windows are whole minutes. Only windows that ended at least 16 minutes
-  ago are kept, written to disk before they take their name. A file fetched before its
-  instrument's `rebased_at` is fetched again, so a return that enters on a minute bar and
-  exits on a daily close stays on one adjustment basis (read the instrument after the
-  latest backfill); so is a file that can't be read. PR 5 is the first user (it builds the
-  cache on `ENGINE_BARS_CACHE_DIR`). Minute bars go into the database only for alert
-  windows, from PR 7.
+  rerun makes no calls: each bar's start, open and close only (float32), and for a
+  company only its regular-session bars. Files are kept per slug (a reused ticker never
+  shares an old company's) and windows are whole minutes. Only windows that ended at least
+  16 minutes ago are kept, written to disk before they take their name. A file fetched
+  before its instrument's `rebased_at` is fetched again, so a return that enters on a
+  minute bar and exits on a daily close stays on one adjustment basis (read the
+  instrument after the latest backfill); so is a file that can't be read. Without an
+  Alpaca client the cache only reads, and a missing window is an error (`CacheMiss`).
+  Minute bars go into the database only for alert windows, from PR 7.
 - **Cross-check** (`scripts/crosscheck_yfinance.py`, run by hand with
   `pip install -e ".[crosscheck]"`; it needs the Alpaca keys and no database): Alpaca's
   adjusted daily closes against Yahoo's since 2022-02-01 for SPY, QQQ, BTC, ETH, AAPL,
@@ -217,6 +221,42 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
 Labels and samples for measuring the pickers are in `precision/`
 (`scripts/precision.py` scores them; `scripts/history_report.py` sums the rules over all
 history).
+
+## Backtest
+
+`engine/backtest/` runs Gate 0, version 1: the rules in `reports/gate0-v1.md`, committed
+before any run on real data and never edited after one (a change is a new version).
+
+- **Moves** (`moves.py`): the alert is the post plus 2 minutes (20 for the mirrors-only
+  view). A stock enters on the first regular-session minute bar at or after it (the next
+  open while the market is shut); its windows are 5, 15 and 60 minutes (skipped past the
+  close), the close (the first at least 30 minutes after entry, a half day's at 13:00)
+  and 1, 3 and 5 trading days on official closes. A coin enters within 5 minutes of the
+  alert or is skipped; its windows run to 7 days. A company is judged net of beta (120
+  prior sessions) times SPY, ETH net of BTC; SPY, QQQ, BTC and XLE on their raw move. A
+  window that ends after the sample's last day is "not yet", never a skip.
+- **Random times** (`randomtimes.py`): 100 per post, in its New York weekday and hour,
+  seeded from the post's key alone. Their medians per instrument, entry rule, window,
+  weekday and hour are the send rule's baselines (`engine.random_baselines`).
+- **Calls** (`evaluate.py`): matches from PR 4's similarity and match rule v1, from posts
+  whose window had closed by the alert; the call is the majority direction; then send
+  rule v1's rules 1, 3, 4 and 6. Statistics count New York days; the p-value replaces
+  each call's move with its own post's random-time moves 10,000 times
+  (`stats.py`); Benjamini-Hochberg runs across the 22 gate tests.
+- **`build-moves --to DAY`** (`build.py`): adds XLE, backfills the daily bars and fills
+  the minute cache for SPY, QQQ, BTC, ETH, XLE and every company a picker counted (from
+  2022-02-01), then writes `engine.signal_moves` (every text post's % moves per
+  instrument and entry rule, no prices) and `engine.random_baselines`, one instrument
+  per transaction: rerun it to resume, and a second run changes nothing. PR 6 reads both
+  tables; PR 7 runs it on Railway, since nothing travels from the sandbox. `DAY` must be
+  a New York day that has ended.
+- **`backtest`** (`run.py`, `report.py`): reads the stored answers, the vectors, the
+  cache (no Alpaca client at all) and the baselines, writes `reports/backtest-v1.json`
+  (numbers, keys sorted, floats rounded) and `.md` (made from the JSON), and records the
+  run in `engine.backtest_runs` and `engine.backtest_summary`. `--rebuild` writes both
+  again and exits 1 unless the JSON's SHA-256 matches the last run. Neither file holds a
+  price or another site's link (`report.check_publishable`). `--divergent-days FILE`
+  (PR 3's cross-check output) also prints BTC without those days, for the sandbox only.
 
 ## Database
 
