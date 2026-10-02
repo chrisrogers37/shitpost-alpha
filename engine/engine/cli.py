@@ -8,14 +8,13 @@ from collections.abc import Sequence
 
 from pydantic import ValidationError
 from sqlalchemy import select
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import OperationalError, ProgrammingError
 
 from engine.db import db_now, make_engine
 from engine.feeds.history import run_import
 from engine.feeds.status import status_lines
 from engine.lease import LEASE_NAME
 from engine.logs import configure_logging
-from engine.market.bars import run_backfill
 from engine.migrate import migrate
 from engine.registry import Registry, build_registry
 from engine.runtime import run_engine
@@ -52,18 +51,26 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
         print(f"invalid engine settings: {problems}", file=sys.stderr)
         return 2
 
-    if args.command == "migrate":
-        migrate(settings.db_url, settings.web_role)
-        return 0
-    if args.command == "run":
+    if args.command == "run":  # it retries database errors itself
         asyncio.run(_run(settings, registry or build_registry()))
         return 0
-    if args.command == "import-history":
-        asyncio.run(run_import(settings))
-        return 0
-    if args.command == "backfill-bars":
-        return asyncio.run(run_backfill(settings))
-    return asyncio.run(_status(settings))
+    try:
+        if args.command == "migrate":
+            migrate(settings.db_url, settings.web_role)
+            return 0
+        if args.command == "import-history":
+            asyncio.run(run_import(settings))
+            return 0
+        if args.command == "backfill-bars":
+            from engine.market.bars import run_backfill  # pandas loads only for this command
+
+            return asyncio.run(run_backfill(settings))
+        return asyncio.run(_status(settings))
+    except OperationalError as exc:
+        # The driver's first line names the host and user, never the password.
+        reason = str(exc.orig or exc).splitlines()[0]
+        print(f"could not reach the engine database: {reason}", file=sys.stderr)
+        return 1
 
 
 async def _run(settings: Settings, registry: Registry) -> None:

@@ -1,5 +1,6 @@
 """Engine settings, read from ENGINE_* environment variables."""
 
+import re
 from pathlib import Path
 from typing import Annotated, Self
 
@@ -8,12 +9,18 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 FEED_NAMES = ("direct", "trumpstruth", "cnn", "scrapecreators")
 """The live feeds of Trump's posts, in the order status lists them."""
+KEY_TEXT = re.compile(r"[\x21-\x7e]+")
+"""What an API key may hold: printable ASCII, no spaces. HTTP libraries refuse other
+header values, and some quote the whole value in their error."""
 
 
 class Settings(BaseSettings):
     """All engine configuration. Timings are settings so tests can shrink them."""
 
-    model_config = SettingsConfigDict(env_prefix="ENGINE_", frozen=True, populate_by_name=True)
+    model_config = SettingsConfigDict(
+        env_prefix="ENGINE_", frozen=True, populate_by_name=True, hide_input_in_errors=True
+    )
+    """hide_input_in_errors: a rejected value (a key, the database URL) never prints."""
 
     database_url: SecretStr = Field(min_length=1)
     """Engine database. Never the old system's DATABASE_URL. Secret, so it never prints."""
@@ -72,7 +79,7 @@ class Settings(BaseSettings):
     alpaca_secret_key: SecretStr | None = Field(
         default=None, validation_alias="ALPACA_API_SECRET_KEY"
     )
-    """Alpaca market data keys (ALPACA_API_KEY_ID, ALPACA_API_SECRET_KEY; no ENGINE_ prefix).
+    """Alpaca market data keys (ALPACA_API_KEY_ID, ALPACA_API_SECRET_KEY, Alpaca's own names).
     Stock bars need them; coin bars don't."""
     alpaca_calls_per_minute: float = Field(default=150.0, gt=0, le=200)
     """Client-side cap on Alpaca calls, under the free plan's 200 a minute."""
@@ -83,8 +90,17 @@ class Settings(BaseSettings):
 
     @field_validator("scrapecreators_key", "alpaca_key_id", "alpaca_secret_key", mode="before")
     @classmethod
-    def _empty_key_is_no_key(cls, value: object) -> object:
-        return None if value == "" else value
+    def _clean_key(cls, value: object) -> object:
+        """Surrounding spaces and line breaks (a pasted key) are dropped; an empty key is no
+        key. Anything else that isn't printable ASCII is refused, without echoing it."""
+        if not isinstance(value, str):
+            return value
+        value = value.strip()
+        if not value:
+            return None
+        if not KEY_TEXT.fullmatch(value):
+            raise ValueError("a key must be printable ASCII with no spaces inside")
+        return value
 
     @field_validator("sources_off", mode="before")
     @classmethod
@@ -121,4 +137,5 @@ class Settings(BaseSettings):
 
     @property
     def db_url(self) -> str:
+        """The database URL as plain text, for the driver. Never log or print it."""
         return self.database_url.get_secret_value()

@@ -6,6 +6,7 @@ from sqlalchemy import Column, Integer, MetaData, Row, Table, insert, select, up
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from engine.stages import DONE, ERROR, Stage, StageRunner, stage_columns
+from tests import helpers
 from tests.conftest import operator_notices
 
 items = Table(
@@ -142,3 +143,19 @@ async def test_items_at_an_unknown_stage_are_left_alone(
     assert (row.stage, row.attempts, row.error) == ("added_by_newer_release", 0, None)
     assert operator_notices(caplog, "item_failed") == []
     assert sum("unknown stage" in r.getMessage() for r in caplog.records) == 1
+
+
+async def test_cancelling_a_handler_is_not_counted_as_its_failure(
+    db: AsyncEngine, table: Table
+) -> None:
+    async def stalls(conn: AsyncConnection, item: Row[Any]) -> None:
+        await helpers.stall_then_fail_on_cancel()  # the driver turns the cancel into an error
+
+    stages = StageRunner(db, items, [Stage("first", stalls)], max_attempts=3)
+    runner = asyncio.create_task(stages.run_once())
+    await asyncio.sleep(0.2)
+    runner.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(runner, timeout=2.0)
+    row = await item(db)
+    assert (row.stage, row.attempts, row.error) == ("first", 1, None)  # resumes next pass

@@ -6,18 +6,28 @@ the clock and don't use this.
 """
 
 from datetime import UTC, date, datetime
-from functools import cache
+from functools import lru_cache
 from typing import Any
 
 import exchange_calendars
 import pandas as pd
 
 XNYS = "XNYS"
+FIRST_YEAR = 2015
+"""A year before price history starts, so the session before its first bar exists too."""
 
 
-@cache
 def _xnys() -> Any:
-    return exchange_calendars.get_calendar(XNYS)
+    return _calendar(datetime.now(UTC).year)
+
+
+@lru_cache(maxsize=1)
+def _calendar(year: int) -> Any:
+    """From 2015 to the end of next year. A process that runs into a new year builds the
+    calendar again, so it never runs off the end."""
+    return exchange_calendars.get_calendar(
+        XNYS, start=f"{FIRST_YEAR}-01-01", end=f"{year + 1}-12-31"
+    )
 
 
 def _minute(at: datetime) -> pd.Timestamp:
@@ -55,10 +65,12 @@ def is_open(at: datetime) -> bool:
 
 
 def session_open(session: date) -> datetime:
+    """When the session's regular hours start."""
     return _utc(_xnys().session_open(_session(session)))
 
 
 def session_close(session: date) -> datetime:
+    """When the session's regular hours end (13:00 New York on a half day)."""
     return _utc(_xnys().session_close(_session(session)))
 
 

@@ -12,6 +12,7 @@ from typing import IO
 import psycopg
 import pytest
 from pydantic import SecretStr
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from engine.settings import Settings
@@ -173,6 +174,14 @@ def test_bad_settings_are_a_clear_error_that_never_prints_the_url(settings: Sett
     result = cli(missing, "status")
     assert result.returncode == 2
     assert "ENGINE_DATABASE_URL: Field required" in result.stderr
+
+    unreachable = make_url(settings.db_url).set(port=1).render_as_string(hide_password=False)
+    for command in ("status", "migrate"):
+        result = cli(env(settings, ENGINE_DATABASE_URL=unreachable), command)
+        assert result.returncode == 1
+        assert result.stderr.startswith("could not reach the engine database: ")
+        assert len(result.stderr.splitlines()) == 1  # no traceback
+        assert f":{make_url(unreachable).password}@" not in result.stderr  # no URL
 
     result = cli(env(settings, ENGINE_LEASE_TTL_SECONDS="0.1"), "status")
     assert result.returncode == 2

@@ -26,7 +26,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.sql.dml import ReturningInsert
 
-from engine.db import db_now, make_engine
+from engine.db import TRANSIENT_ERRORS, db_now, error_text, make_engine, raise_if_cancelling
 from engine.logs import configure_logging
 from engine.notify import notify_operator
 from engine.registry import EngineContext, Job, JobContext, JobFunc
@@ -64,6 +64,7 @@ class Scheduler:
                 try:
                     await self.tick(jobs)
                 except (SQLAlchemyError, OSError) as exc:
+                    raise_if_cancelling()
                     log.warning("scheduler pass failed, retrying next tick: %s", exc)
                 await asyncio.sleep(self._ctx.settings.scheduler_tick_seconds)
 
@@ -92,7 +93,9 @@ class Scheduler:
             gave_up = await self._give_up_interrupted(conn, job, slot) if attempt is None else None
         if superseded:
             days = ", ".join(f"{s.astimezone(NEW_YORK):%Y-%m-%d}" for s in superseded)
-            await notify_operator("job_failed", f"job {job.name}: runs for {days} never finished")
+            await notify_operator(
+                "job_failed", f"job {job.name}: runs for {days} were unfinished at the next slot"
+            )
         if gave_up is not None:
             await notify_operator(
                 "job_failed", f"job {job.name} for {slot:%Y-%m-%d %H:%M %Z} interrupted {gave_up}x"
@@ -140,7 +143,9 @@ class Scheduler:
             .values(
                 status="failed",
                 finished_at=func.now(),
-                error=f"superseded by the run for {slot:%Y-%m-%d %H:%M %Z}",
+                error=func.concat_ws(
+                    "; ", job_runs.c.error, f"superseded by the run for {slot:%Y-%m-%d %H:%M %Z}"
+                ),
             )
             .returning(job_runs.c.scheduled_for)
         )
@@ -176,7 +181,8 @@ class Scheduler:
             else:
                 await job.func(JobContext(settings, self._ctx.db, slot))
         except Exception as exc:
-            error = f"{type(exc).__name__}: {exc}"
+            raise_if_cancelling()  # interrupted, not failed: the row stays "running"
+            error = error_text(exc)
             final = attempt >= settings.max_attempts
             log.warning("job %s attempt %d failed: %s", job.name, attempt, error)
             await self._record(job, slot, "failed" if final else "retry", error)
@@ -193,7 +199,11 @@ class Scheduler:
             self._running.discard(job.name)
 
     async def _record(self, job: Job, slot: datetime, status: str, error: str | None) -> None:
-        """Write the run's result, retrying through database errors: a lost result reruns it."""
+        """Write the run's result. Retries while the database is unreachable.
+
+        If the result can't be written for another reason, the row stays "running" and
+        the next pass treats the run as interrupted.
+        """
         while True:
             try:
                 async with self._ctx.db.begin() as conn:
@@ -203,9 +213,16 @@ class Scheduler:
                         .values(status=status, finished_at=func.now(), error=error)
                     )
                 return
-            except (SQLAlchemyError, OSError) as exc:
+            except TRANSIENT_ERRORS as exc:
+                raise_if_cancelling()
                 log.warning("could not record job %s result, retrying: %s", job.name, exc)
                 await asyncio.sleep(self._ctx.settings.scheduler_tick_seconds)
+            except SQLAlchemyError:
+                raise_if_cancelling()
+                log.exception(
+                    "could not record job %s result; it will count as interrupted", job.name
+                )
+                return
 
 
 class HeavyJobError(Exception):
@@ -245,7 +262,7 @@ def _child_main(
     try:
         asyncio.run(_child_run(job, settings, slot))
     except Exception as exc:
-        error = f"{type(exc).__name__}: {exc}"[:2000]  # small enough for the pipe buffer
+        error = error_text(exc)  # small enough for the pipe buffer
     with sender:
         sender.send(error)
 

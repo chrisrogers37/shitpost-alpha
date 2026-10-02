@@ -12,6 +12,7 @@ from engine.db import sqlalchemy_url
 from engine.lease import Lease, LeaseLost
 from engine.settings import Settings
 from engine.tables import engine_lease
+from tests import helpers
 
 TTL, RENEW = 1.0, 0.2
 
@@ -88,8 +89,40 @@ async def test_holder_steps_down_before_its_lease_expires(
     monkeypatch.setattr(a, "_take_or_renew", unreachable)
     with pytest.raises(LeaseLost):
         await asyncio.wait_for(a.keep(), timeout=TTL * 2)
-    assert loop.time() - acquired < TTL  # stopped while the row still says "a"
+    # Stopped one renew interval before the row expires, while it still says "a".
+    assert loop.time() - acquired < TTL - RENEW / 2
     assert not await b.acquire()
+
+
+async def test_a_stalled_renewal_steps_down_on_time_even_if_the_driver_is_slow_to_give_up(
+    db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    a = lease(db, "a")
+    assert await a.acquire()
+    loop = asyncio.get_running_loop()
+    acquired = loop.time()
+
+    async def stalled() -> bool:
+        # psycopg can take seconds to give up a cancelled query, then raise a database
+        # error instead of CancelledError.
+        await helpers.stall_then_fail_on_cancel(gives_up_after=TTL)
+
+    monkeypatch.setattr(a, "_take_or_renew", stalled)
+    with pytest.raises(LeaseLost):
+        await asyncio.wait_for(a.keep(), timeout=TTL * 2)
+    assert loop.time() - acquired < TTL - RENEW / 2
+    await asyncio.wait_for(a.release(), timeout=TTL * 2)  # the renewal ended: not retried
+    assert await lease_row(db) is None
+
+
+async def test_lease_statements_carry_a_lock_timeout(migrated: Settings, db: AsyncEngine) -> None:
+    a, b = lease(db, "a"), lease(db, "b")
+    assert await a.acquire()
+    with psycopg.connect(migrated.db_url) as stuck:  # a renewal frozen mid-transaction
+        stuck.execute("UPDATE engine.engine_lease SET expires_at = expires_at")
+        with pytest.raises(OperationalError, match=r"(lock|statement) timeout"):
+            await asyncio.wait_for(b._take_or_renew(), timeout=TTL * 5)  # the server gave up
+        stuck.rollback()
 
 
 async def test_a_late_answer_does_not_count_as_holding(

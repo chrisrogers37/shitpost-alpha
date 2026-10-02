@@ -1,10 +1,13 @@
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 
+import httpx
 import psycopg
 import pytest
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
+from engine.market.alpaca import Alpaca
 from engine.market.collisions import load_collisions, parse_collisions
 from engine.market.instruments import (
     DoesNotCount,
@@ -14,11 +17,13 @@ from engine.market.instruments import (
     all_instruments,
     change_symbol,
     instrument_by_slug,
+    last_settled_session,
     latest_session_with_data,
     resolve_alias,
 )
 from engine.migrate import migrate
 from engine.settings import Settings
+from engine.tables import instrument_aliases
 from tests.market_helpers import NOW, FakeAlpaca, daily_bar, market_settings, weekdays
 from tests.test_migrate import rows
 
@@ -88,6 +93,53 @@ async def test_a_symbol_change_keeps_the_slug_and_the_old_ticker_resolves_until_
         assert (newcomer.slug, newcomer.symbol) == ("fb-2", "FB")
 
 
+async def old_tickers(
+    conn: AsyncConnection, instrument_id: int
+) -> list[tuple[str, date | None, date]]:
+    a = instrument_aliases.c
+    found = await conn.execute(
+        select(a.alias, a.valid_from, a.valid_to)
+        .where(a.instrument_id == instrument_id, a.kind == "old_ticker")
+        .order_by(a.valid_to)
+    )
+    return [tuple(row) for row in found]
+
+
+async def test_a_symbol_change_is_checked_and_running_it_again_corrects_the_day(
+    db: AsyncEngine, migrated: Settings
+) -> None:
+    fake = FakeAlpaca()
+    stock_days(fake, "FB", [date(2021, 3, 1)])
+    async with fake.client(market_settings(migrated)) as alpaca, db.begin() as conn:
+        fb = await add_instrument(
+            conn, Listings(alpaca), "FB", "Meta", "stock", datetime(2021, 3, 1, 15, tzinfo=UTC)
+        )
+        await change_symbol(conn, fb.id, "META", date(2022, 6, 1))  # the wrong day
+        await change_symbol(conn, fb.id, "meta", date(2022, 6, 9))  # again, with the right one
+        assert await old_tickers(conn, fb.id) == [("fb", None, date(2022, 6, 8))]
+        assert await resolve_alias(conn, "fb", date(2022, 6, 5)) != []
+
+        with pytest.raises(ValueError, match="isn't a US ticker"):
+            await change_symbol(conn, fb.id, "meta inc", date(2023, 1, 1))
+        with pytest.raises(ValueError, match="already the symbol of spy"):
+            await change_symbol(conn, fb.id, "SPY", date(2023, 1, 1))
+        btc = await instrument_by_slug(conn, "btc")
+        assert btc is not None
+        with pytest.raises(ValueError, match="coin"):
+            await change_symbol(conn, btc.id, "XBT", date(2023, 1, 1))
+
+        # Back to FB, then on to MTA: each window of the old tickers is kept.
+        await change_symbol(conn, fb.id, "FB", date(2023, 1, 9))
+        await change_symbol(conn, fb.id, "MTA", date(2024, 1, 8))
+        assert await old_tickers(conn, fb.id) == [
+            ("fb", None, date(2022, 6, 8)),
+            ("meta", date(2022, 6, 9), date(2023, 1, 8)),
+            ("fb", date(2023, 1, 9), date(2024, 1, 7)),
+        ]
+        assert await resolve_alias(conn, "fb", date(2022, 12, 1)) == []
+        assert [i.symbol for i in await resolve_alias(conn, "fb", date(2023, 6, 1))] == ["MTA"]
+
+
 async def test_name_aliases_and_validity_windows(db: AsyncEngine, migrated: Settings) -> None:
     async with db.begin() as conn:
         spy = await instrument_by_slug(conn, "spy")
@@ -98,6 +150,10 @@ async def test_name_aliases_and_validity_windows(db: AsyncEngine, migrated: Sett
         assert await resolve_alias(conn, "S&P 500", date(2030, 1, 1)) == [spy]
         assert await resolve_alias(conn, "spiders", date(2020, 6, 1)) == [spy]
         assert await resolve_alias(conn, "spiders", date(2021, 1, 1)) == []
+        await add_alias(conn, spy.id, "spiders", "name", date(2020, 1, 1), date(2021, 6, 30))
+        assert await resolve_alias(conn, "spiders", date(2021, 1, 1)) == [spy]  # a new end
+        with pytest.raises(ValueError, match="before it starts"):
+            await add_alias(conn, spy.id, "x", "name", date(2021, 1, 2), date(2021, 1, 1))
     assert rows(migrated.db_url, "SELECT count(*) FROM engine.instrument_aliases") == [(2,)]
     backwards = (
         "INSERT INTO engine.instrument_aliases "
@@ -161,6 +217,11 @@ async def test_a_live_post_before_its_session_opens_uses_the_latest_session() ->
     thursday_premarket = datetime(2024, 7, 11, 12, tzinfo=UTC)
     assert latest_session_with_data(thursday_premarket) == date(2024, 7, 10)
     assert latest_session_with_data(datetime(2024, 7, 11, 13, 46, tzinfo=UTC)) == date(2024, 7, 11)
+    # A session is settled once its New York day has ended, 16 minutes ago.
+    assert last_settled_session(NOW) == date(2024, 7, 9)
+    assert last_settled_session(datetime(2024, 7, 11, 4, 15, tzinfo=UTC)) == date(2024, 7, 9)
+    assert last_settled_session(datetime(2024, 7, 11, 4, 16, tzinfo=UTC)) == date(2024, 7, 10)
+    assert last_settled_session(datetime(2024, 7, 13, 12, tzinfo=UTC)) == date(2024, 7, 12)
     fake = FakeAlpaca()
     stock_days(fake, "AAPL", weekdays(date(2024, 7, 1), date(2024, 7, 10)))
     async with fake.client(market_settings(), now=thursday_premarket) as alpaca:
@@ -168,6 +229,27 @@ async def test_a_live_post_before_its_session_opens_uses_the_latest_session() ->
     assert datetime.fromisoformat(fake.params()["end"]) == thursday_premarket - timedelta(
         minutes=16
     )
+
+
+async def test_a_stock_with_no_bar_yet_today_is_asked_again_and_yesterday_decides() -> None:
+    """IPOCO lists on Thursday 11 July 2024 and first trades at 11:30 New York. AAPL's
+    Thursday bar isn't served during the session (if Alpaca works that way)."""
+    fake = FakeAlpaca()
+    stock_days(fake, "AAPL", weekdays(date(2024, 7, 1), date(2024, 7, 10)))
+    stock_days(fake, "IPOCO", [])
+    clock = {"now": datetime(2024, 7, 11, 13, 50, tzinfo=UTC)}  # 09:50 New York
+    transport = httpx.MockTransport(fake.handle)
+    async with Alpaca(market_settings(), transport, clock=lambda: clock["now"]) as alpaca:
+        listings = Listings(alpaca)
+        assert not await listings.counts("IPOCO", "stock", clock["now"])
+        assert await listings.counts("AAPL", "stock", clock["now"])  # Wednesday's bar decides
+        stock_days(fake, "IPOCO", [date(2024, 7, 11)])  # its first trade
+        clock["now"] = datetime(2024, 7, 11, 17, tzinfo=UTC)  # 13:00 New York
+        assert await listings.counts("IPOCO", "stock", datetime(2024, 7, 11, 16, 55, tzinfo=UTC))
+        # A settled session is still answered from the one history call.
+        calls = len(fake.requests)
+        assert await listings.counts("AAPL", "stock", datetime(2024, 7, 2, 15, tzinfo=UTC))
+        assert len(fake.requests) == calls
 
 
 async def test_adding_an_instrument_checks_it_counts_first(

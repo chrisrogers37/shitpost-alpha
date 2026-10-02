@@ -7,8 +7,8 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from engine.market.alpaca import Alpaca
-from engine.market.instruments import Instrument
+from engine.market.alpaca import Alpaca, utc_text
+from engine.market.instruments import AssetClass, Instrument, alpaca_symbol
 from engine.settings import Settings
 
 NEW_YORK = ZoneInfo("America/New_York")
@@ -41,7 +41,7 @@ def daily_bar(day: date, close: float, *, coin: bool = False) -> dict[str, Any]:
         else datetime.combine(day, time(0), NEW_YORK).astimezone(UTC)
     )
     return {
-        "t": start.isoformat().replace("+00:00", "Z"),
+        "t": utc_text(start),
         "o": close,
         "h": close * 1.01,
         "l": close * 0.99,
@@ -53,7 +53,7 @@ def daily_bar(day: date, close: float, *, coin: bool = False) -> dict[str, Any]:
 
 
 def minute_bar(at: datetime, close: float) -> dict[str, Any]:
-    return daily_bar(at.date(), close) | {"t": at.isoformat().replace("+00:00", "Z")}
+    return daily_bar(at.date(), close) | {"t": utc_text(at)}
 
 
 def weekdays(start: date, end: date) -> list[date]:
@@ -96,18 +96,17 @@ class FakeAlpaca:
         return dict(self.requests[n].url.params)
 
 
-def instrument(slug: str, asset_class: str = "stock", id: int = 1) -> Instrument:
+def instrument(slug: str, asset_class: AssetClass = "stock", id: int = 1) -> Instrument:
     """An instrument without a database row (for tests that make no database calls)."""
     symbol = slug.upper()
-    coin = asset_class == "coin"
     return Instrument(
         id=id,
         slug=slug,
         symbol=symbol,
         name=symbol,
-        asset_class="coin" if coin else "etf" if asset_class == "etf" else "stock",
-        calendar="24/7" if coin else "XNYS",
-        alpaca_symbol=f"{symbol}/USD" if coin else symbol,
+        asset_class=asset_class,
+        calendar="24/7" if asset_class == "coin" else "XNYS",
+        alpaca_symbol=alpaca_symbol(symbol, asset_class),
         benchmark_id=None,
         rebased_at=None,
     )

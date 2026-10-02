@@ -7,7 +7,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from engine.market.alpaca import Bar, TooRecent
+from engine.market.alpaca import SIP_DELAY, Bar, TooRecent
+from engine.market.bars import is_final_day
 from engine.settings import Settings
 from tests.feeds_helpers import fixture_json
 from tests.market_helpers import FakeAlpaca, market_settings
@@ -83,6 +84,20 @@ def test_f_adjustment_all_takes_out_the_nvda_split() -> None:
     split = date(2024, 6, 10)
     assert all(ratio == pytest.approx(10, rel=0.01) for d, ratio in ratios.items() if d < split)
     assert all(ratio == pytest.approx(1, rel=0.01) for d, ratio in ratios.items() if d >= split)
+
+
+def test_g_a_session_in_progress_has_a_bar_that_is_not_final() -> None:
+    recorded = claim("g_spy_daily_during_a_session")
+    now = datetime.fromisoformat(recorded["recorded_at"])
+    today = bars(recorded["body"])[-1]
+    assert window(recorded)[1] == now - SIP_DELAY
+    assert today.start.astimezone(NEW_YORK).date() == now.astimezone(NEW_YORK).date()
+    assert not is_final_day(today, now)
+
+
+def test_h_fb_still_returns_facebook_s_bars() -> None:
+    fb = [bar.start.date() for bar in bars(claim("h_fb_january_2021")["body"])]
+    assert fb == [date(2021, 1, day) for day in (4, 5, 6, 7, 8)]
 
 
 def test_stock_days_start_at_midnight_new_york() -> None:
