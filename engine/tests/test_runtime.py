@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, time, timedelta
@@ -138,6 +139,7 @@ async def test_a_crash_looping_worker_sends_one_message(
     registry = Registry()
     registry.register_worker("delivery", broken)
     async with running(migrated, registry):
+        await wait_until(lambda: starts >= 1)  # counts from the first start, not the acquire
         await asyncio.sleep(1.0)
     assert 3 <= starts <= 6  # backoff 0.1, 0.2, 0.4 (the cap): it grows
     assert len(operator_notices(caplog, "worker_failed")) == 1
@@ -363,7 +365,10 @@ async def test_a_copy_stopped_while_the_database_never_answers_stops_at_once(
 
 
 async def test_cancelling_the_copy_works_when_its_work_turns_the_cancel_into_an_error(
-    migrated: Settings, db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+    migrated: Settings,
+    db: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     class Stalls(Scheduler):
         async def run(self) -> None:
@@ -377,3 +382,19 @@ async def test_cancelling_the_copy_works_when_its_work_turns_the_cancel_into_an_
     if not done:
         await helpers.cancel_wedged()
     assert done and engine.cancelled()
+    assert operator_notices(caplog, "engine_failed") == []  # a stop, not a failure
+
+
+async def test_a_cancelled_copy_cleans_up_even_if_its_release_fails(
+    migrated: Settings, db: AsyncEngine, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO)
+    engine = asyncio.create_task(run_engine(migrated, Registry(), asyncio.Event()))
+    await wait_for_holder(db)
+    async with await psycopg.AsyncConnection.connect(migrated.db_url) as locker:
+        await locker.execute("UPDATE engine.engine_lease SET expires_at = expires_at")
+        engine.cancel()  # the release meets the row lock and gives up
+        done, _ = await asyncio.wait({engine}, timeout=3.0)
+        await locker.rollback()
+    assert done and engine.cancelled()
+    assert any(r.getMessage().endswith(" stopped") for r in caplog.records)  # disposed

@@ -79,10 +79,12 @@ async def run_engine(settings: Settings, registry: Registry, stop: asyncio.Event
             else:
                 await _wait(stop, settings.lease_renew_seconds)
     finally:
-        await lease.release()
-        await db.dispose()
-        await lease_db.dispose()
-        log.info("engine copy %s stopped", lease.holder)
+        try:
+            await lease.release()  # re-raises a cancel the driver turned into an error
+        finally:
+            await db.dispose()
+            await lease_db.dispose()
+            log.info("engine copy %s stopped", lease.holder)
 
 
 async def _try_acquire(lease: Lease) -> bool:

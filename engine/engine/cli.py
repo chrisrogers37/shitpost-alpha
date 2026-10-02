@@ -64,11 +64,7 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
             return asyncio.run(run_backfill(settings))
         return asyncio.run(_status(settings))
     except OperationalError as exc:
-        # One line from the driver. It names the host and user; it shows part of the
-        # password only if the URL is malformed (an unescaped "@" in the password).
-        reason = (str(exc.orig or exc).splitlines() or [type(exc).__name__])[0]
-        what = "could not reach" if reason.startswith("connection") else "error from"
-        print(f"{what} the engine database: {reason}", file=sys.stderr)
+        print(database_error_line(exc), file=sys.stderr)
         return 1
 
 
@@ -77,6 +73,14 @@ def _variable(loc: tuple[int | str, ...]) -> str:
     name (ALPACA_API_SECRET_KEY) is located at that name, in capitals."""
     name = "_".join(map(str, loc))
     return name if name.isupper() else f"ENGINE_{name.upper() or 'SETTINGS'}"
+
+
+def database_error_line(exc: OperationalError) -> str:
+    """One line from the driver. It names the host and user; it shows part of the password
+    only if the URL is malformed (an unescaped "@" in the password)."""
+    reason = (str(exc.orig or exc).splitlines() or [type(exc).__name__])[0]
+    unreachable = reason.startswith(("connection", "failed to resolve host"))
+    return f"{'could not reach' if unreachable else 'error from'} the engine database: {reason}"
 
 
 async def _run(settings: Settings, registry: Registry) -> None:
