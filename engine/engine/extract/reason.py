@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 DIRECTION = re.compile(
     r"\b(?:buy\w*|sell\w*|short\w*|bull\w*|bear\w*|upside|downside|rise[sn]?|rising|rose|"
     r"fall\w*|fell|drop\w*|surg\w*|soar\w*|plung\w*|jump\w*|rall\w*|crash\w*|tank\w*|"
-    r"gain\w*|lose[sr]?|losing|loss\w*|climb\w*|sink\w*|sank|slump\w*|spik\w*|boost\w*|"
+    r"gain\w*|lose[sr]?|losing|loss\w*|climb\w*|sink\w*|sank|slump\w*|spik\w*|boost\w*|benefit\w*|harm\w*|"
     r"hurt\w*|lift\w*|weigh\w*|rebound\w*|outperform\w*|underperform\w*|target\w*|"
     r"recommend\w*|advi[cs]e\w*|should|opportunit\w*|positive|negative|"
     r"(?:stock|share)\s+prices?|price\s+target\w*)\b",

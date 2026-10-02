@@ -20,19 +20,21 @@ false when:
 
 ## instruments
 
+The list does not depend on market_link: give every qualifying company the post names, whatever part it plays in the post, even when market_link is false.
+
 List at most 8. For each give:
 - name: the company, fund or coin, as you would write it ("Nvidia", "Boeing", "Bitcoin");
 - ticker: its US ticker ("NVDA"), or null if you are not sure;
 - asset: "stock", "etf" or "coin";
 - link: "explicit" or "implied";
-- why: 100 characters or fewer on where the post names or implies it. Never a direction, a price or advice.
+- why: 100 characters or fewer on where the post names or implies it. Never a direction, a price or advice, and never whether it gains or loses (no "benefits", "hurts" or "beneficiary").
 
 explicit: the post names the company, one of its products or brands, or its ticker, even in an aside. A company's former name counts as the company (Facebook is Meta).
 
 implied: the post doesn't name it but is clearly about it:
 - through its chief executive or founder acting for the company (an executive announcing the company's factory);
 - through a description that fits only that company;
-- through a direct, first-order industry link: the post's action targets an industry, and you list at most the three largest US-listed companies whose business is mostly that industry (tariffs on foreign steel point to US steel makers). Never second-order links (steel tariffs do not imply automakers), and never whole sectors from a general remark about the economy.
+- through a direct, first-order industry link: the post's action targets an industry, and you list at most the three largest US-listed companies whose business is mostly that industry (tariffs on foreign steel point to US steel makers). Never second-order links (steel tariffs do not imply automakers), never whole sectors from a general remark about the economy, and never an industry that only appears in a list, a slogan, a campaign promise or a hypothetical ("if Canada becomes a state, its steel and energy would quadruple").
 
 Name only:
 - stocks and ETFs listed on a US exchange (NYSE, Nasdaq), including the US listings of foreign companies;

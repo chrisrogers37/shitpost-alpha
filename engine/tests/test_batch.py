@@ -191,6 +191,8 @@ async def test_review_list_shows_names_the_vote_counted_that_the_rules_missed(
         ("A $500 billion plan", "amount"),
         ("Tariffs of 25 percent on steel", "amount"),
         ("You should look at Apple", "direction"),
+        ("American Eagle benefits from its ad", "direction"),
+        ("Imports harming the auto industry", "direction"),
     ],
 )
 def test_the_reason_line_check(line: str, problem: str | None) -> None:
