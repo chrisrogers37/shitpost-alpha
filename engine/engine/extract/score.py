@@ -5,10 +5,11 @@ picker's answers and vote. Then the post moves to `done` (PR 6 adds the alert st
 History never goes through this stage: `python -m engine extract`, `embed` and `ai-pick`
 process it in batch.
 
-The model files and the names are checked when the worker starts. If the files are
-missing or `sync-names` hasn't run, the worker fails with a clear error (and the operator
-message every failed worker sends), and posts wait at `score` until a fixed deploy picks
-them up.
+The model files, the names and, with the AI on, its version are checked when the worker
+starts. If the files are missing, `sync-names` hasn't run or the AI picker's files no
+longer match its frozen version or its recorded answers, the worker fails with a clear
+error (and the operator message every failed worker sends), and posts wait at `score`
+until a fixed deploy picks them up.
 """
 
 import asyncio
@@ -38,7 +39,15 @@ from engine.extract.ai import (
 )
 from engine.extract.names import load_book
 from engine.extract.records import record, rules_extraction
-from engine.extract.rules import Listed, NameBook, Rules, RulesPick, current_rules, pick
+from engine.extract.rules import (
+    Listed,
+    NameBook,
+    Rules,
+    RulesFileChanged,
+    RulesPick,
+    current_rules,
+    pick,
+)
 from engine.extract.similarity import Embedded, Embedder, load_embedder, text_hash
 from engine.feeds.store import SCORE
 from engine.market.alpaca import Alpaca, AlpacaError
@@ -46,7 +55,7 @@ from engine.market.instruments import AssetClass, DoesNotCount, Listings, add_in
 from engine.registry import EngineContext, WorkerFunc
 from engine.settings import Settings
 from engine.stages import Stage, StageRunner
-from engine.tables import signal_embeddings, signals
+from engine.tables import extractions, signal_embeddings, signals
 from engine.text import normalize
 
 log = logging.getLogger(__name__)
@@ -180,9 +189,31 @@ class Scorer:
             self.observe(Scored(row.key, rules_pick, bool(words), ai_pick, seconds))
 
 
+async def other_files(conn: AsyncConnection, config: AiConfig) -> str | None:
+    """What's wrong if this version already has answers recorded with other files (a
+    prompt, schema or model changed without raising the version): every AI row records
+    the version's hash."""
+    found = await conn.execute(
+        select(extractions.c.id)
+        .where(
+            extractions.c.method.like("ai:%"),
+            extractions.c.version == config.version,
+            extractions.c.result["picker_hash"].astext.is_distinct_from(config.hash),
+        )
+        .limit(1)
+    )
+    if found.first() is None:
+        return None
+    return (
+        f"AI picker version {config.version} has answers recorded with other files; "
+        "raise the version in ai.json"
+    )
+
+
 def live_ai(settings: Settings, config: AiConfig | None = None) -> AiPicker | None:
     """The AI picker for the live stage: off unless ENGINE_AI_LIVE is on and the version
-    and both keys are ready."""
+    and both keys are ready. A frozen version whose files changed stops the worker
+    (RulesFileChanged), like answers recorded with other files (`other_files`)."""
     if not settings.ai_live:
         return None
     try:
@@ -203,9 +234,11 @@ def score_worker(
         settings = ctx.settings
         embedder = await asyncio.to_thread(embedder_loader, settings)  # ModelMissing: fail here
         rules = current_rules()
+        ai = ai_loader(settings)
         async with ctx.db.connect() as conn:
             await load_book(conn, rules)  # NamesNotSynced: fail here, not on every post
-        ai = ai_loader(settings)
+            if ai is not None and (problem := await other_files(conn, ai.config)):
+                raise RulesFileChanged(problem)
         async with AsyncExitStack() as stack:
             listings = None
             if ai is not None and settings.alpaca_keys is not None:

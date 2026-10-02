@@ -10,13 +10,13 @@ from typing import Any
 import numpy as np
 import pytest
 from pydantic import SecretStr
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from engine.extract.ai import AiPicker
 from engine.extract.names import load_book
 from engine.extract.records import Extraction, record, rules_extraction
-from engine.extract.rules import Mention, NamesNotSynced, current_rules, pick
+from engine.extract.rules import Mention, NamesNotSynced, RulesFileChanged, current_rules, pick
 from engine.extract.score import Scorer, live_ai, score_worker, store_embedding
 from engine.extract.similarity import Embedded, ModelMissing
 from engine.feeds.posts import Post
@@ -299,6 +299,33 @@ async def test_unsynced_names_stop_the_worker_and_posts_wait_at_score(
     assert await stage_of(db, post.key) == SCORE
     async with db.connect() as conn:
         assert (await conn.execute(select(func.count()).select_from(extractions))).scalar() == 0
+
+
+async def test_ai_answers_recorded_with_other_files_stop_the_worker(
+    migrated: Settings, db: AsyncEngine
+) -> None:
+    await sync_names(db)
+    first, second = a_post(1, APPLE_POST), a_post(2, APPLE_POST + " again")
+    clients = {p: StubClient(p) for p in ("openai", "anthropic")}
+    config = ready_config()
+    loaders: dict[str, Any] = {
+        "embedder_loader": lambda s: StubEmbedder(),
+        "ai_loader": lambda s: AiPicker(config, clients),  # type: ignore[arg-type]
+    }
+    await store(db, first)
+    await run_worker_until_done(migrated, db, first.key, **loaders)
+    async with db.begin() as conn:  # only the models' rows are left, without the hash
+        await conn.execute(delete(extractions).where(extractions.c.method == "ai:vote"))
+        await conn.execute(
+            update(extractions)
+            .where(extractions.c.method.like("ai:%"))
+            .values(result=extractions.c.result.op("-")("picker_hash"))
+        )
+    await store(db, second)
+    with pytest.raises(RulesFileChanged, match="AI picker version 1 has answers recorded"):
+        async with asyncio.timeout(10):
+            await score_worker(**loaders)(EngineContext(migrated, db))
+    assert await stage_of(db, second.key) == SCORE
 
 
 # --- the replay harness ------------------------------------------------------------------------

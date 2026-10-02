@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "about": "The AI picker's version: the files below, each pinned by its SHA-256 (the config holds the schema, models, settings, prices and window start; the prompts are the picker's and the reason line's). Every AI extraction records the version, and the vote records the version's hash. Version 1 was frozen in PR 4 on 2026-10-02: gpt-4.1-2025-04-14 and claude-haiku-4-5-20251001, both must agree, window from 2025-11-01.",
+  "frozen": "750126437c71c40cf07dcd9f870fb2742b9a81c4e173c2ff9989344ecce250b1",
+  "about": "The AI picker's version: the files below, each pinned by its SHA-256 (the config holds the schema, the models, their settings and the window start; the prompt is the picker's). Every AI extraction records the version and the version's hash. Version 1 was frozen in PR 4 on 2026-10-02 (gpt-4.1-2025-04-14 and claude-haiku-4-5-20251001, both must agree, window from 2025-11-01): 'frozen' is its hash, and the engine refuses its files if they change. The models' prices (ai_models.json) and the reason line (reason.json) sit outside it.",
   "config": "extract/ai_picker.json",
   "prompt": "extract/prompts/picker.md",
   "files": {
-    "extract/ai_picker.json": "9af569cab69f53c38c99f78cdc3e5d9d9a00240a5809b49ca38b9b45db1d0892",
-    "extract/prompts/picker.md": "f4950178c56fd59782834d2a8abc710f6d9e7a2c710b294f10feefca0619335c",
-    "extract/prompts/reason.md": "64b7fe9fb617416e57f33c42bb535218454a3fd0dc3b89fba4612daf79bfd2d2"
+    "extract/ai_picker.json": "166b466c10ef6804118d4be2ab91af0a9af57e2a652136b449b9621e6906d28b",
+    "extract/prompts/picker.md": "f4950178c56fd59782834d2a8abc710f6d9e7a2c710b294f10feefca0619335c"
   }
 }

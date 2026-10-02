@@ -2,9 +2,11 @@
 link and which instruments it names or implies; a link or an instrument counts only when
 both make it.
 
-Its version is ai.json: the prompt, the schema, the model ids, the settings, the price
-table and the window start, pinned by hash like the rules. Every client is built with its
-key passed from the ENGINE_ settings, never from the old system's variables, and none is
+Its version is ai.json: the prompt, the schema, the model ids, the settings and the window
+start, pinned by hash like the rules, and frozen once its answers count. What can change
+without changing an answer sits outside it: the models' prices (ai_models.json) and the
+reason line, which has its own version (reason.json). Every client is built with its key
+passed from the ENGINE_ settings, never from the old system's variables, and none is
 built without its key.
 
 Each call has a deadline (15 s). A model that errs, answers invalid JSON or misses the
@@ -21,7 +23,7 @@ import logging
 import os
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
 from decimal import Decimal
 from functools import cache
 from pathlib import Path
@@ -43,12 +45,20 @@ from engine.extract.rules import (
     post_date,
     unique_names,
 )
-from engine.market.instruments import COINS, STOCK_SYMBOL, AssetClass, normalize_alias
+from engine.market.instruments import (
+    COINS,
+    NEW_YORK,
+    STOCK_SYMBOL,
+    AssetClass,
+    normalize_alias,
+)
 from engine.settings import Settings
 
 log = logging.getLogger(__name__)
 
 MANIFEST = Path(__file__).with_name("ai.json")
+MODEL_FACTS = Path(__file__).with_name("ai_models.json")
+REASON_MANIFEST = Path(__file__).with_name("reason.json")
 Provider = Literal["openai", "anthropic"]
 PROVIDERS: tuple[Provider, ...] = ("openai", "anthropic")
 BASE_URLS: dict[Provider, str] = {
@@ -114,8 +124,9 @@ class Price:
 @dataclass(frozen=True)
 class ModelSpec:
     model: str | None
-    """A dated snapshot, never an alias. None until chosen (B2)."""
+    """A dated snapshot, never an alias. None while unpinned."""
     price: Price | None
+    """From ai_models.json, outside the version: None until checked."""
     temperature: float | None
     """0, or None where the provider takes no temperature."""
 
@@ -142,10 +153,12 @@ class AiConfig:
     max_instruments: int
     why_max_chars: int
     window_start: datetime | None
+    """New York midnight on the window's first day."""
     reason: ReasonSpec
+    """The reason line's own version (reason.json), outside this version's hash."""
 
     def problems(self) -> list[str]:
-        """What stops real calls: unpinned models, prices not checked."""
+        """What stops real calls: unpinned models, prices not checked, no window start."""
         found = []
         for name in PROVIDERS:
             spec = self.models[name]
@@ -153,6 +166,8 @@ class AiConfig:
                 found.append(f"{name}: no model pinned")
             if spec.price is None or spec.price.checked is None:
                 found.append(f"{name}: price not checked")
+        if self.window_start is None:
+            found.append("no window start")
         return found
 
 
@@ -168,8 +183,9 @@ def _price(data: Mapping[str, Any] | None) -> Price | None:
     )
 
 
-def load_ai_config(manifest: Path = MANIFEST) -> AiConfig:
-    """The AI picker version in `manifest`, after checking every file's hash."""
+def _pinned(manifest: Path) -> tuple[dict[str, Any], dict[str, str], str]:
+    """`manifest`, its files' texts and its hash (the SHA-256 over its files' hashes),
+    after checking every file's hash and, once the version is frozen, its hash."""
     data = json.loads(manifest.read_text("utf-8"))
     hashes: dict[str, str] = {}
     texts: dict[str, str] = {}
@@ -180,31 +196,58 @@ def load_ai_config(manifest: Path = MANIFEST) -> AiConfig:
                 f"{name} changed: put its new SHA-256 in {manifest.name} and raise the version"
             )
         hashes[name], texts[name] = digest, raw.decode("utf-8")
+    pinned = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()
+    if data.get("frozen", pinned) != pinned:
+        raise RulesFileChanged(
+            f"version {data['version']} in {manifest.name} is frozen and its files changed: "
+            "a frozen version never changes, so raise the version"
+        )
+    return data, texts, pinned
+
+
+def load_reason(manifest: Path = REASON_MANIFEST) -> ReasonSpec:
+    """The reason line's version in `manifest`, after checking its files' hashes."""
+    data, texts, _ = _pinned(manifest)
+    return ReasonSpec(
+        version=int(data["version"]),
+        instructions=texts[data["prompt"]].strip(),
+        provider=data["provider"],
+        max_output_tokens=int(data["max_output_tokens"]),
+        max_chars=int(data["max_chars"]),
+    )
+
+
+def load_ai_config(
+    manifest: Path = MANIFEST,
+    model_facts: Path = MODEL_FACTS,
+    reason_manifest: Path = REASON_MANIFEST,
+) -> AiConfig:
+    """The AI picker version in `manifest`, after checking its files' hashes, with its
+    models' prices from `model_facts` and the reason line from `reason_manifest`."""
+    data, texts, pinned = _pinned(manifest)
     config = json.loads(texts[data["config"]])
+    facts = json.loads(model_facts.read_text("utf-8"))
     settings = config["settings"]
-    reason = config["reason"]
     window = config.get("window_start")
+    models: dict[str, ModelSpec] = {}
+    for name in PROVIDERS:
+        spec = config["models"][name]
+        prices = facts.get(spec["model"], {}).get("prices") if spec["model"] else None
+        models[name] = ModelSpec(spec["model"], _price(prices), spec["temperature"])
     return AiConfig(
         version=int(data["version"]),
-        hash=hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest(),
+        hash=pinned,
         instructions=texts[data["prompt"]].strip(),
         schema=config["schema"],
-        models={
-            name: ModelSpec(spec["model"], _price(spec.get("prices")), spec["temperature"])
-            for name, spec in ((name, config["models"][name]) for name in PROVIDERS)
-        },
+        models=models,
         max_output_tokens=int(settings["max_output_tokens"]),
         timeout_seconds=float(settings["timeout_seconds"]),
         max_instruments=int(settings["max_instruments"]),
         why_max_chars=int(settings["why_max_chars"]),
-        window_start=datetime.fromisoformat(window) if window else None,
-        reason=ReasonSpec(
-            version=int(reason["version"]),
-            instructions=texts[reason["prompt"]].strip(),
-            provider=reason["provider"],
-            max_output_tokens=int(reason["max_output_tokens"]),
-            max_chars=int(reason["max_chars"]),
+        window_start=(
+            datetime.combine(date.fromisoformat(window), time(), NEW_YORK) if window else None
         ),
+        reason=load_reason(reason_manifest),
     )
 
 
@@ -336,6 +379,8 @@ class AnthropicMessages:
         # This SDK version has no temperature parameter, so it goes in the body (the API
         # takes it for claude-haiku-4-5-20251001, checked 2026-10-02).
         extra = {} if self.temperature is None else {"temperature": self.temperature}
+        # No cache_control: a picker call is about 1,500 tokens, under Haiku 4.5's
+        # 4,096-token minimum for a cached prefix, so a cache mark would cache nothing.
         response = await self.client.messages.create(
             model=self.model,
             max_tokens=max_tokens,
@@ -752,13 +797,11 @@ class AiPick:
                 finished_at=a.finished_at,
                 response=a.reply.body if a.reply else None,
                 result=(
-                    None
-                    if not a.ok
-                    else {
-                        "market_link": a.market_link,
-                        "instruments": [vars(item) for item in a.items],
-                    }
-                ),
+                    {"market_link": a.market_link, "instruments": [vars(i) for i in a.items]}
+                    if a.ok
+                    else {}
+                )
+                | {"picker_hash": config.hash},
                 market_link=a.market_link,
                 input_tokens=a.reply.input_tokens if a.reply else None,
                 cached_input_tokens=a.reply.cached_input_tokens if a.reply else None,
