@@ -1,5 +1,6 @@
 """Each test gets a throwaway database on DEV_DATABASE_URL's server, dropped afterwards."""
 
+import gc
 import os
 import secrets
 from collections.abc import AsyncIterator, Callable, Iterator
@@ -33,6 +34,7 @@ def database_url() -> Iterator[str]:
     name = f"engine_test_{secrets.token_hex(4)}"
     admin(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
     yield server_url(name)
+    gc.collect()  # closes connections left in reference cycles, which DROP would wait out
     admin(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name)))
 
 

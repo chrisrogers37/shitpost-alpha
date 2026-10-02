@@ -60,9 +60,11 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
             return 0
         return asyncio.run(_status(settings))
     except OperationalError as exc:
-        # The driver's first line names the host and user, never the password.
-        reason = str(exc.orig or exc).splitlines()[0]
-        print(f"could not reach the engine database: {reason}", file=sys.stderr)
+        # One line from the driver. It names the host and user; it shows part of the
+        # password only if the URL is malformed (an unescaped "@" in the password).
+        reason = (str(exc.orig or exc).splitlines() or [type(exc).__name__])[0]
+        what = "could not reach" if reason.startswith("connection") else "error from"
+        print(f"{what} the engine database: {reason}", file=sys.stderr)
         return 1
 
 

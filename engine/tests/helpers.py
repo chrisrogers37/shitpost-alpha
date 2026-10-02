@@ -2,8 +2,9 @@
 
 import asyncio
 import os
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+import socket
+from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager, contextmanager
 from typing import Any, NoReturn
 
 from sqlalchemy import Column, Integer, MetaData, Table
@@ -94,3 +95,13 @@ async def cancel_wedged() -> None:
         await asyncio.wait(others, timeout=5)
     finally:
         _Stalls.convert_cancels = True
+
+
+@contextmanager
+def silent_port() -> Iterator[int]:
+    """A local port that accepts connections and never answers, like a stalled proxy: the
+    kernel completes each handshake, and nothing ever reads or replies."""
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        sock.listen(16)
+        yield sock.getsockname()[1]
