@@ -204,6 +204,7 @@ instruments = Table(
     Column("calendar", Text, nullable=False),
     Column("alpaca_symbol", Text, nullable=False, unique=True),
     Column("benchmark_id", Integer, ForeignKey("engine.instruments.id")),
+    Column("rebased_at", DateTime(timezone=True)),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     CheckConstraint(_one_of("asset_class", ASSET_CLASSES), name="instruments_asset_class_check"),
     CheckConstraint(_one_of("calendar", CALENDARS), name="instruments_calendar_check"),
@@ -215,7 +216,9 @@ instruments = Table(
 """What prices are kept for. slug: the lowercase symbol at creation, never changed (pages
 link to it). symbol: the current ticker; a ticker change updates it and adds an old_ticker
 alias. alpaca_symbol: what Alpaca calls it (BTC/USD for coins). benchmark: SPY for stocks
-and ETFs, BTC for coins, none for SPY and BTC."""
+and ETFs, BTC for coins, none for SPY and BTC. rebased_at: when the backfill last fetched
+its whole daily history (the first time, or after a split or dividend moved stored
+prices); cached minute bars fetched before then are on an older basis and are refetched."""
 
 instrument_aliases = Table(
     "instrument_aliases",

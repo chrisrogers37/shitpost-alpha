@@ -3,10 +3,13 @@
 Prices are adjusted for splits and dividends ('all'), so every earlier bar changes when a
 split or dividend lands. The backfill refetches the last 14 days each run, and if any of
 those differs from what is stored, it refetches the instrument's whole history: the table
-never mixes two adjustment bases.
+never mixes two adjustment bases. Each whole fetch sets the instrument's rebased_at.
 
 Minute bars are cached per window as files under ENGINE_BARS_CACHE_DIR, so a rerun makes
-no calls. They go into the database only for alert windows (PR 7).
+no calls. A file fetched before its instrument's rebased_at is on an older basis than the
+daily bars, so it is fetched again: a return that enters on a minute bar and exits on a
+daily close stays on one basis. Minute bars go into the database only for alert windows
+(PR 7).
 """
 
 import asyncio
@@ -18,9 +21,10 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import httpx
-from sqlalchemy import ColumnElement, func, select, tuple_
+from sqlalchemy import ColumnElement, func, select, tuple_, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
@@ -28,7 +32,7 @@ from engine.db import make_engine
 from engine.market.alpaca import SIP_DELAY, Alpaca, AlpacaError, Bar, Timeframe
 from engine.market.instruments import HISTORY_START, Instrument, all_instruments
 from engine.settings import Settings
-from engine.tables import market_bars
+from engine.tables import instruments, market_bars
 
 log = logging.getLogger(__name__)
 
@@ -128,16 +132,20 @@ async def backfill_daily(db: AsyncEngine, alpaca: Alpaca, instrument: Instrument
         last = await _last_daily(conn, instrument)
     start = HISTORY_START if last is None else last - OVERLAP
     bars = await _final_daily(alpaca, instrument, start, now)
-    refetched = False
+    whole, refetched = last is None, False
     if last is not None:
         async with db.connect() as conn:
             stored = await _daily_closes(conn, instrument, start)
         if any(_moved(stored.get(bar.start), bar.close) for bar in bars):
             log.info("%s: stored bars changed (a split or dividend); fetching all", instrument.slug)
             bars = await _final_daily(alpaca, instrument, HISTORY_START, now)
-            refetched = True
+            whole = refetched = True
     async with db.begin() as conn:
         written = await upsert_bars(conn, instrument, "1Day", bars)
+        if whole:  # the host clock, as the minute cache's fetch times use
+            await conn.execute(
+                update(instruments).where(instruments.c.id == instrument.id).values(rebased_at=now)
+            )
         start_col = market_bars.c.bar_start
         count, first, newest = (
             await conn.execute(
@@ -217,8 +225,10 @@ async def run_backfill(
 
 
 class MinuteCache:
-    """Minute bars per window, one JSON file each, in Alpaca's own bar format. Only windows
-    that ended at least 16 minutes ago are kept: a later answer could still change."""
+    """Minute bars per window, one JSON file each: when they were fetched, and the bars in
+    Alpaca's own format. Only windows that ended at least 16 minutes ago are kept (a later
+    answer could still change), and a file fetched before the instrument's rebased_at is
+    fetched again. Pass an Instrument read after the latest backfill."""
 
     def __init__(self, root: Path) -> None:
         self.root = root
@@ -233,25 +243,32 @@ class MinuteCache:
     ) -> list[Bar]:
         path = self.path(instrument, start, end)
         cached = await asyncio.to_thread(_read, path)
-        if cached is not None:
-            return [Bar.parse(item) for item in cached]
+        if cached is not None and not _stale(cached, instrument):
+            return [Bar.parse(item) for item in cached["bars"]]
+        fetched_at = alpaca.clock()
         bars = await fetch_bars(alpaca, instrument, "1Min", start, end)
-        if end <= alpaca.clock() - SIP_DELAY:
-            await asyncio.to_thread(_write, path, [bar.to_json() for bar in bars])
+        if end <= fetched_at - SIP_DELAY:
+            content = {"fetched_at": fetched_at.isoformat(), "bars": [b.to_json() for b in bars]}
+            await asyncio.to_thread(_write, path, content)
         return bars
 
 
-def _read(path: Path) -> list[dict[str, object]] | None:
+def _stale(cached: dict[str, Any], instrument: Instrument) -> bool:
+    rebased = instrument.rebased_at
+    return rebased is not None and datetime.fromisoformat(cached["fetched_at"]) < rebased
+
+
+def _read(path: Path) -> dict[str, Any] | None:
     try:
-        items: list[dict[str, object]] = json.loads(path.read_text("utf-8"))
+        content: dict[str, Any] = json.loads(path.read_text("utf-8"))
     except FileNotFoundError:
         return None
-    return items
+    return content
 
 
-def _write(path: Path, items: list[dict[str, object]]) -> None:
+def _write(path: Path, content: dict[str, Any]) -> None:
     """Write whole or not at all: a crash mid-write leaves no half file to read later."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", dir=path.parent, suffix=".part", delete=False) as out:
-        json.dump(items, out)
+        json.dump(content, out)
     Path(out.name).replace(path)

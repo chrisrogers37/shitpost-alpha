@@ -46,6 +46,8 @@ class Instrument:
     calendar: str
     alpaca_symbol: str
     benchmark_id: int | None
+    rebased_at: datetime | None
+    """When the daily bars were last fetched whole (see engine.instruments)."""
 
     @classmethod
     def from_row(cls, row: Row[Any]) -> "Instrument":
@@ -58,6 +60,7 @@ class Instrument:
             calendar=row.calendar,
             alpaca_symbol=row.alpaca_symbol,
             benchmark_id=row.benchmark_id,
+            rebased_at=row.rebased_at,
         )
 
     @property

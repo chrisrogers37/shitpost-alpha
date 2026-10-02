@@ -62,11 +62,15 @@ def weekdays(start: date, end: date) -> list[date]:
 
 
 class FakeAlpaca:
-    """Serves each symbol's bars between a request's start and end, in one page."""
+    """Serves each symbol's bars of the asked timeframe between a request's start and end,
+    in one page."""
 
     def __init__(self) -> None:
         self.requests: list[httpx.Request] = []
         self.series: dict[str, list[dict[str, Any]]] = {}
+        """Daily bars by symbol."""
+        self.minutes: dict[str, list[dict[str, Any]]] = {}
+        """Minute bars by symbol."""
         self.route: Route | None = None
         """Answers every request instead of the series, when set."""
 
@@ -77,9 +81,10 @@ class FakeAlpaca:
         symbol = request.url.params["symbols"]
         start = datetime.fromisoformat(request.url.params["start"])
         end = datetime.fromisoformat(request.url.params["end"])
+        series = self.minutes if request.url.params["timeframe"] == "1Min" else self.series
         bars = [
             bar
-            for bar in self.series.get(symbol, [])
+            for bar in series.get(symbol, [])
             if start <= datetime.fromisoformat(bar["t"]) <= end
         ]
         return httpx.Response(200, json={"bars": {symbol: bars}, "next_page_token": None})
@@ -104,4 +109,5 @@ def instrument(slug: str, asset_class: str = "stock", id: int = 1) -> Instrument
         calendar="24/7" if coin else "XNYS",
         alpaca_symbol=f"{symbol}/USD" if coin else symbol,
         benchmark_id=None,
+        rebased_at=None,
     )

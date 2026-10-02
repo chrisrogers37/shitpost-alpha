@@ -27,6 +27,7 @@ def upgrade() -> None:
         sa.Column("calendar", sa.Text, nullable=False),
         sa.Column("alpaca_symbol", sa.Text, nullable=False, unique=True),
         sa.Column("benchmark_id", sa.Integer, sa.ForeignKey("engine.instruments.id")),
+        sa.Column("rebased_at", sa.DateTime(timezone=True)),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
         ),

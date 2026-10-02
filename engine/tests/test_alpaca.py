@@ -199,7 +199,7 @@ async def test_a_cached_minute_window_makes_no_second_call(tmp_path: Path) -> No
     spy = instrument("spy", "etf")
     start = datetime(2024, 7, 9, 14, 0, tzinfo=UTC)
     fake = FakeAlpaca()
-    fake.series["SPY"] = [minute_bar(start + timedelta(minutes=m), 550 + m) for m in range(30)]
+    fake.minutes["SPY"] = [minute_bar(start + timedelta(minutes=m), 550 + m) for m in range(30)]
     cache = MinuteCache(tmp_path)
     async with fake.client(market_settings()) as alpaca:
         first = await cache.bars(alpaca, spy, start, start + timedelta(minutes=29))
@@ -213,7 +213,7 @@ async def test_a_minute_window_that_may_still_change_is_not_cached(tmp_path: Pat
     btc = instrument("btc", "coin")
     start = NOW - timedelta(minutes=30)
     fake = FakeAlpaca()
-    fake.series["BTC/USD"] = [minute_bar(start, 58_000.0)]
+    fake.minutes["BTC/USD"] = [minute_bar(start, 58_000.0)]
     cache = MinuteCache(tmp_path)
     async with fake.client(market_settings()) as alpaca:
         await cache.bars(alpaca, btc, start, NOW - timedelta(minutes=5))

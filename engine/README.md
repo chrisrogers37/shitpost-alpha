@@ -91,11 +91,15 @@ the trading calendar, and bar storage. Nothing here scores, grades or sends.
   daily bar is final once its day has passed), only what's missing. Adjusted prices change
   whenever a split or dividend lands, so each run refetches the last 14 days, and if any
   stored close moved it refetches the instrument's whole history: the table never mixes
-  adjustment bases.
+  adjustment bases. Every whole fetch (the first, or after a move) sets the instrument's
+  `rebased_at`.
 - **Minute bars** (`MinuteCache`): cached per window as JSON files under
   `ENGINE_BARS_CACHE_DIR` (default `~/.cache/shitpost-engine/bars`, outside the repo), so a
-  rerun makes no calls. Only windows that ended at least 16 minutes ago are kept. They go
-  into the database only for alert windows, from PR 7.
+  rerun makes no calls. Only windows that ended at least 16 minutes ago are kept. A file
+  fetched before its instrument's `rebased_at` is fetched again, so a return that enters
+  on a minute bar and exits on a daily close stays on one adjustment basis (read the
+  instrument after the latest backfill). Minute bars go into the database only for alert
+  windows, from PR 7.
 - **Cross-check** (`scripts/crosscheck_yfinance.py`, run by hand with
   `pip install -e ".[crosscheck]"`): Alpaca's adjusted daily closes against Yahoo's since
   2022-02-01 for SPY, QQQ, BTC, ETH, AAPL, NVDA and META; lists days more than 0.5% apart.
