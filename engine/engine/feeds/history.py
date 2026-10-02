@@ -86,12 +86,17 @@ async def run_import(settings: Settings, say: Callable[[str], None] = print) -> 
     async with make_client(settings) as client:
         cnn = await download_archive(client, settings)
     cutoff = datetime.now(UTC) - LEFT_TO_LIVE
-    settled = [item for item in cnn if status_time(parse_status_id(item["id"])) <= cutoff]
+
+    def settled(items: list[Any]) -> list[Any]:
+        return [item for item in items if status_time(parse_status_id(item["id"])) <= cutoff]
+
     db = make_engine(settings.db_url)
     try:
         parts = [
-            await import_part(db, f"cc0 archive ({CC0_REPO} at {commit}, CC0)", "cc0_archive", cc0),
-            await import_part(db, "cnn file (ix.cnn.io)", "cnn_archive", settled),
+            await import_part(
+                db, f"cc0 archive ({CC0_REPO} at {commit}, CC0)", "cc0_archive", settled(cc0)
+            ),
+            await import_part(db, "cnn file (ix.cnn.io)", "cnn_archive", settled(cnn)),
         ]
         async with db.connect() as conn:
             times = await imported_text_post_times(conn)
@@ -99,7 +104,7 @@ async def run_import(settings: Settings, say: Callable[[str], None] = print) -> 
         await db.dispose()
     for part in parts:
         say(part.line())
-    if recent := len(cnn) - len(settled):
+    if recent := len(cc0) + len(cnn) - sum(part.read for part in parts):
         say(f"left {recent:,} posts under {LEFT_TO_LIVE} old to the live feeds")
     say(Part("total", sum(p.read for p in parts), sum(p.added for p in parts)).line())
     say(measure_bursts(times).report())

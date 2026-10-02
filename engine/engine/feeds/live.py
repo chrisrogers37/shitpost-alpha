@@ -20,7 +20,7 @@ import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from sqlalchemy import Row, func, select, update
@@ -76,6 +76,9 @@ class Polled:
     """False while a catch-up is owed: the mark stays and the ETag isn't kept, so the
     next poll after the catch-up's wait tries again."""
     error: str | None = None
+    """Why a catch-up is owed, for the status row."""
+    failed: Literal["errors", "blocks"] | None = None
+    """This poll's catch-up failed: the counter it adds to."""
 
 
 class FeedPoller:
@@ -95,6 +98,7 @@ class FeedPoller:
         self.catch_up_wait = 0.0
         """Seconds a failed catch-up waits before its next try; doubles like the back-off."""
         self.catch_up_after = 0.0
+        self.catch_up_error: str | None = None
         self._last_keys: frozenset[str] = frozenset()
 
     @property
@@ -105,13 +109,22 @@ class FeedPoller:
         """Carry on from the feed's status row. `newest`: the newest stored post when this
         copy started; `now`: the database time."""
         if row is None or row.state == "off":
-            self.caught_up_to = newest  # no reading back over the time a feed was off
+            # No reading back over the time a feed was off: a gap the other feeds logged as
+            # unfillable then stays empty. Deliberate: rerunning import-history fills it.
+            self.caught_up_to = newest
             return
         self.caught_up_to = row.caught_up_to or newest
         self.last_poll = time.monotonic() - (now - row.updated_at).total_seconds()
         if row.state == "blocked":
             self.state, self.blocked_since = "blocked", row.blocked_since
-            self.backoff = row.backoff_seconds or self.live.settings.feed_backoff_min_seconds
+            self.backoff = row.backoff_seconds or self._doubled(0)
+
+    def _doubled(self, wait: float) -> float:
+        """The next back-off: from 1 minute, doubling up to 30."""
+        settings = self.live.settings
+        return min(
+            max(2 * wait, settings.feed_backoff_min_seconds), settings.feed_backoff_max_seconds
+        )
 
     def due_in(self, now: float) -> float:
         """Seconds until the next poll (0 or less: due now)."""
@@ -147,38 +160,41 @@ class FeedPoller:
         if self.live.only_checking(self.name):
             return Polled(posts, newest)  # direct is healthy: no paid catch-up
         if time.monotonic() < self.catch_up_after:
-            return Polled(posts, mark, complete=False)
+            return Polled(posts, mark, complete=False, error=self.catch_up_error)
         log.info("%s: catching up to %s", self.name, mark)
         try:
             back = await self.feed.read_back(posts, mark)
+        except FeedBlocked as exc:
+            return self._catch_up_failed(posts, mark, str(exc), "blocks")
         except FeedFailed as exc:
-            settings = self.live.settings
-            self.catch_up_wait = min(
-                max(2 * self.catch_up_wait, settings.feed_backoff_min_seconds),
-                settings.feed_backoff_max_seconds,
-            )
-            self.catch_up_after = time.monotonic() + self.catch_up_wait
-            log.warning(
-                "%s: catch-up to %s failed (%s); storing this read, trying again in %s",
-                self.name,
-                mark,
-                exc,
-                _minutes(self.catch_up_wait),
-            )
-            return Polled(posts, mark, complete=False, error=f"catch-up failed: {exc}")
-        self.catch_up_wait = 0.0
+            return self._catch_up_failed(posts, mark, str(exc), "errors")
+        except Exception as exc:
+            log.exception("%s: unexpected error catching up", self.name)
+            return self._catch_up_failed(posts, mark, f"unexpected error: {exc!r}", "errors")
+        self.catch_up_wait, self.catch_up_error = 0.0, None
         if not back.reached:
             log.warning("%s could not read back to %s; other feeds may fill it", self.name, mark)
         return Polled(unique([*posts, *back.posts]), newest)
 
+    def _catch_up_failed(
+        self, posts: list[Post], mark: datetime, reason: str, failed: Literal["errors", "blocks"]
+    ) -> Polled:
+        """The newest read answered, so the feed stays up: store it, keep the mark, and
+        try the catch-up again after a back-off."""
+        self.catch_up_wait = self._doubled(self.catch_up_wait)
+        self.catch_up_after = time.monotonic() + self.catch_up_wait
+        self.catch_up_error = f"catch-up to {mark} failed: {reason}"
+        log.warning(
+            "%s: %s; storing this read, trying again in %s",
+            self.name,
+            self.catch_up_error,
+            _minutes(self.catch_up_wait),
+        )
+        return Polled(posts, mark, complete=False, error=self.catch_up_error, failed=failed)
+
     async def _answered(self, read: Read, polled: Polled) -> None:
         live = self.live
         fresh = unique(post for post in polled.posts if post.key not in self._last_keys)
-        if self.state == "blocked":
-            await notify_operator(
-                "feed_recovered", f"{self.name} answers again (blocked since {self.blocked_since})"
-            )
-        self.state, self.failures, self.backoff, self.blocked_since = "up", 0, 0.0, None
         async with live.db.begin() as conn:
             stored = await store_posts(conn, live.source_id, self.name, fresh)
             await count(
@@ -186,7 +202,8 @@ class FeedPoller:
                 self.name,
                 polls=1,
                 not_modified=int(read.not_modified),
-                errors=int(polled.error is not None),
+                errors=int(polled.failed == "errors"),
+                blocks=int(polled.failed == "blocks"),
                 posts_seen=stored.seen,
                 posts_first=stored.first,
             )
@@ -194,6 +211,11 @@ class FeedPoller:
                 conn, self.name, "up", ok=True, caught_up_to=polled.caught_up_to, error=polled.error
             )
         # Stored: the next poll goes on from this one.
+        if self.state == "blocked":
+            await notify_operator(
+                "feed_recovered", f"{self.name} answers again (blocked since {self.blocked_since})"
+            )
+        self.state, self.failures, self.backoff, self.blocked_since = "up", 0, 0.0, None
         self.caught_up_to = polled.caught_up_to
         if polled.complete and not read.not_modified:
             self.feed.etag = read.etag
@@ -211,9 +233,9 @@ class FeedPoller:
         )
         log.warning("%s poll failed (%d in a row): %s", self.name, self.failures, reason)
         if self.state == "blocked":
-            self.backoff = min(self.backoff * 2, settings.feed_backoff_max_seconds)
+            self.backoff = self._doubled(self.backoff)
         elif entering:
-            self.state, self.backoff = "blocked", settings.feed_backoff_min_seconds
+            self.state, self.backoff = "blocked", self._doubled(0)
             self.blocked_since = datetime.now(UTC)  # the database's time replaces it below
             await notify_operator(
                 "feed_blocked",

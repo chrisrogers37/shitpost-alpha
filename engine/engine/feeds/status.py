@@ -18,8 +18,8 @@ async def status_lines(conn: AsyncConnection) -> list[str]:
         state = row.state
         if row.state == "blocked":
             state = f"blocked since {row.blocked_since} ({row.last_error})"
-        elif row.state == "off":
-            state = f"off ({row.last_error})"
+        elif row.state == "off" or row.last_error:
+            state = f"{row.state} ({row.last_error})"
         lines.append(f"feed {name}: {state}; last good read: {row.last_ok_at or 'never'}")
     dark = (await conn.execute(select(engine_meta.c.feeds_dark_since))).scalar_one_or_none()
     lines.append(f"feeds: dark since {dark}" if dark else "feeds: not dark")

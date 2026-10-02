@@ -15,6 +15,21 @@ def test_lease_and_attempt_defaults() -> None:
     assert "postgresql://x" not in repr(s)
 
 
+def test_feed_timing_defaults() -> None:
+    s = Settings(database_url="postgresql://x")
+    intervals = (
+        s.direct_interval_seconds,
+        s.trumpstruth_interval_seconds,
+        s.cnn_interval_seconds,
+        s.scrapecreators_fallback_seconds,
+        s.scrapecreators_check_seconds,
+    )
+    assert intervals == (60, 60, 15, 120, 3600)
+    assert s.feed_failures_to_block == 5
+    assert (s.feed_backoff_min_seconds, s.feed_backoff_max_seconds) == (60, 1800)
+    assert s.feeds_dark_after_seconds == 600
+
+
 @pytest.mark.parametrize(
     "bad",
     [

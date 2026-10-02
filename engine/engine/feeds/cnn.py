@@ -97,4 +97,5 @@ class CnnFeed(Feed):
         """The whole file: every post newer than `until` (the file goes back to 2022)."""
         items = await download_archive(self.client, self.settings)
         newer = [item for item in items if _posted_after(item, until)]
-        return CaughtUp(self.map_items(newer, cnn_post), reached=len(newer) < len(items))
+        posts = self.map_items(newer, cnn_post, part="catch-up")
+        return CaughtUp(posts, reached=len(newer) < len(items))

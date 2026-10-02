@@ -38,8 +38,10 @@ wins (`engine.signals`), and every feed's first sighting is kept (`engine.signal
 - Each feed has a catch-up mark (the newest post it has read without a gap). A read that
   doesn't reach back to it catches up first: CNN reads its whole file, direct and
   ScrapeCreators page back (ScrapeCreators only while it stands in for direct).
-  trumpstruth can't page back. A failed catch-up keeps the new posts and tries again
-  after a back-off.
+  trumpstruth can't page back. A failed catch-up keeps the new posts, leaves the feed up
+  (a refusal counts as a block in its stats) and tries again after a back-off; status
+  shows why it is owed. A feed switched back on starts from the newest stored post, so it
+  doesn't fill a gap left while it was off.
 - `engine.feed_status` keeps each feed's state, back-off, last poll and mark, so the next
   copy (a deploy, a restart) carries on without re-polling a blocked host.
 - If no feed answers for 10 minutes, one operator message, and status shows "dark since".

@@ -1,5 +1,6 @@
 """Each feed maps its fixtures; what counts as blocked or failed. No database, no network."""
 
+import asyncio
 from collections.abc import AsyncIterator
 from datetime import datetime
 from email.utils import parsedate_to_datetime
@@ -161,6 +162,20 @@ async def test_one_odd_status_is_skipped_and_the_rest_kept(
     assert len(skipped) == 1  # logged once, not every poll
 
 
+async def test_the_same_odd_item_is_logged_once_as_new_posts_arrive(
+    web: FakeWeb, offline_settings: Settings, caplog: pytest.LogCaptureFixture
+) -> None:
+    statuses = fixture_json("direct_statuses.unverified.json")
+    feed_now: list[object] = [None, *statuses[1:]]
+    web.routes[DIRECT_HOST] = lambda request: json_response(feed_now)
+    async with web.client(offline_settings) as client:
+        feed = DirectFeed(client, offline_settings)
+        await feed.read()
+        feed_now.insert(1, statuses[0])  # a new post arrives; the odd item is still there
+        await feed.read()
+    assert caplog.text.count("items that don't map") == 1
+
+
 async def test_direct_sends_if_none_match_and_reads_304_as_not_modified(
     web: FakeWeb, offline_settings: Settings
 ) -> None:
@@ -299,6 +314,44 @@ async def test_cnn_reads_at_most_32_kb_and_fails_when_the_range_is_ignored(
         with pytest.raises(FeedFailed, match="HTTP 200 to a range request"):
             await CnnFeed(client, offline_settings).read()
     assert len(whole_file) <= 1
+
+
+async def test_cnn_range_reads_reuse_one_connection(offline_settings: Settings) -> None:
+    """A 206 of exactly 32 KB is read to its end, so the connection goes back to the pool
+    (a new TLS handshake every 15 s otherwise)."""
+    body = fixture_bytes("cnn_head.json").ljust(HEAD_BYTES, b" ")
+    connections = 0
+
+    async def serve(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        nonlocal connections
+        connections += 1
+        try:
+            while True:
+                await reader.readuntil(b"\r\n\r\n")
+                writer.write(
+                    b"HTTP/1.1 206 Partial Content\r\ncontent-type: application/json\r\n"
+                    + f"content-length: {len(body)}\r\n\r\n".encode()
+                    + body
+                )
+                await writer.drain()
+        except (asyncio.IncompleteReadError, ConnectionResetError):
+            pass
+        finally:
+            writer.close()
+
+    server = await asyncio.start_server(serve, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    try:
+        async with httpx.AsyncClient(trust_env=False) as client:
+            feed = CnnFeed(client, offline_settings)
+            feed_url = f"http://127.0.0.1:{port}/truth_archive.json"
+            for _ in range(5):
+                answer = await feed.get(feed_url, range_bytes=HEAD_BYTES)
+                assert answer is not None and len(answer.body) == HEAD_BYTES
+    finally:
+        server.close()
+        await server.wait_closed()
+    assert connections == 1
 
 
 async def test_cnn_304_only_for_the_etag_it_sent(web: FakeWeb, offline_settings: Settings) -> None:

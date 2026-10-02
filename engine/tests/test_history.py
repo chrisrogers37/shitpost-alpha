@@ -74,23 +74,27 @@ async def test_run_import_prints_counts_that_add_up(
     migrated: Settings, db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     fresh = {"id": status_id_at(datetime.now(UTC) - timedelta(minutes=5)), "content": "new"}
+    fresh_cc0 = {"id": status_id_at(datetime.now(UTC) - timedelta(minutes=50)), "content": "new"}
 
     async def fake_download(client: object, settings: Settings) -> list[dict[str, Any]]:
         result: list[dict[str, Any]] = fixture_json("archive_cnn_slice.json")
         return [fresh, *result]
 
     monkeypatch.setattr(
-        history, "clone_cc0", lambda into: (fixture_json("archive_cc0_slice.json"), "abc1234")
+        history,
+        "clone_cc0",
+        lambda into: ([fresh_cc0, *fixture_json("archive_cc0_slice.json")], "abc1234"),
     )
     monkeypatch.setattr(history, "download_archive", fake_download)
     lines: list[str] = []
     await run_import(migrated, lines.append)
     assert lines[0].startswith("cc0 archive (") and "at abc1234, CC0): 6 read, 6 added" in lines[0]
     assert lines[1] == "cnn file (ix.cnn.io): 6 read, 4 added, 2 already stored"
-    assert lines[2] == "left 1 posts under 1:00:00 old to the live feeds"
+    assert lines[2] == "left 2 posts under 1:00:00 old to the live feeds"
     assert lines[3] == "total: 12 read, 10 added, 2 already stored"
     assert lines[4].startswith("bursts over 4 imported text posts")
-    assert fresh["id"] not in await all_signals(db)
+    stored = await all_signals(db)
+    assert fresh["id"] not in stored and fresh_cc0["id"] not in stored
 
 
 def make_repo(path: Path, license_text: str) -> Path:
