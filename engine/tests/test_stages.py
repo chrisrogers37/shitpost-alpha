@@ -127,3 +127,18 @@ async def test_item_that_keeps_crashing_the_process_ends_in_error(
     row = await item(db)
     assert (row.stage, row.error) == (ERROR, "first: interrupted during attempt 3")
     assert len(operator_notices(caplog, "item_failed")) == 1
+
+
+async def test_items_at_an_unknown_stage_are_left_alone(
+    db: AsyncEngine, table: Table, caplog: pytest.LogCaptureFixture
+) -> None:
+    async with db.begin() as conn:  # e.g. a stage a newer release added
+        await conn.execute(update(items).values(stage="added_by_newer_release"))
+    recorder = Recorder()
+    stages = runner(db, recorder)
+    for _ in range(3):
+        assert await stages.run_once() == 0
+    row = await item(db)
+    assert (row.stage, row.attempts, row.error) == ("added_by_newer_release", 0, None)
+    assert operator_notices(caplog, "item_failed") == []
+    assert sum("unknown stage" in r.getMessage() for r in caplog.records) == 1

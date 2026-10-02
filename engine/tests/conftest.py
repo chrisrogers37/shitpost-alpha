@@ -63,19 +63,21 @@ def settings(database_url: str) -> Settings:
         lease_renew_seconds=0.2,
         lease_ttl_seconds=1.0,
         scheduler_tick_seconds=0.1,
-        worker_restart_seconds=0.1,
+        job_retry_seconds=0,
+        restart_backoff_seconds=0.1,
+        restart_backoff_max_seconds=0.4,
     )
 
 
 @pytest.fixture
 def migrated(settings: Settings) -> Settings:
-    migrate(settings.database_url, settings.web_role)
+    migrate(settings.db_url, settings.web_role)
     return settings
 
 
 @pytest.fixture
 async def db(migrated: Settings) -> AsyncIterator[AsyncEngine]:
-    engine = make_engine(migrated.database_url)
+    engine = make_engine(migrated.db_url)
     yield engine
     await engine.dispose()
 

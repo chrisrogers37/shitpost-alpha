@@ -4,6 +4,9 @@ Each item row carries its own stage, attempt count and last error (stage_columns
 resumes where it stopped after a restart. A stage's handler runs in one transaction with
 the stage advance: its writes and the advance commit together or not at all.
 
+Items at a stage this release doesn't know (added by a newer release, during a deploy
+overlap or a rollback) are left alone for a copy that knows it.
+
 An attempt is counted before the handler runs, so a crash or kill mid-handler still
 counts and an item that keeps crashing the process reaches the error state instead of
 crash-looping. After `max_attempts` attempts the item moves to the final error state with
@@ -25,6 +28,7 @@ log = logging.getLogger(__name__)
 DONE = "done"
 ERROR = "error"
 FINAL = (DONE, ERROR)
+BATCH_SIZE = 100
 
 StageHandler = Callable[[AsyncConnection, Row[Any]], Awaitable[None]]
 
@@ -45,14 +49,10 @@ class Stage:
 
 
 class StageRunner:
+    """Moves the rows of one table through named stages, one stage per handler."""
+
     def __init__(
-        self,
-        db: AsyncEngine,
-        table: Table,
-        stages: Sequence[Stage],
-        *,
-        max_attempts: int,
-        batch_size: int = 100,
+        self, db: AsyncEngine, table: Table, stages: Sequence[Stage], *, max_attempts: int
     ) -> None:
         names = [stage.name for stage in stages]
         if not names or len(set(names)) != len(names) or set(names) & set(FINAL):
@@ -63,21 +63,36 @@ class StageRunner:
         self._handlers = {stage.name: stage.handler for stage in stages}
         self._next = dict(zip(names, [*names[1:], DONE], strict=True))
         self._max_attempts = max_attempts
-        self._batch_size = batch_size
+        self._unknown_seen: set[str] = set()
 
     async def run_once(self) -> int:
         """Take each unfinished item as far as it goes. Returns how many stages completed."""
         stage = self._table.c.stage
         async with self._db.connect() as conn:
-            ids = (
-                await conn.execute(
-                    select(self._pk)
-                    .where(stage.not_in(FINAL))
-                    .order_by(self._pk)
-                    .limit(self._batch_size)
+            pending = (
+                (
+                    await conn.execute(
+                        select(self._pk)
+                        .where(stage.in_(self._handlers))
+                        .order_by(self._pk)
+                        .limit(BATCH_SIZE)
+                    )
                 )
-            ).scalars()
-            pending = list(ids)
+                .scalars()
+                .all()
+            )
+            unknown = (
+                (
+                    await conn.execute(
+                        select(stage).distinct().where(stage.not_in([*FINAL, *self._handlers]))
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        for name in set(unknown) - self._unknown_seen:
+            self._unknown_seen.add(name)
+            log.warning("%s has items at unknown stage %r; leaving them", self._table, name)
         completed = 0
         for item_id in pending:
             while await self._step(item_id):
@@ -90,7 +105,8 @@ class StageRunner:
         async with self._db.begin() as conn:
             item = (await conn.execute(select(table).where(where))).one()
             stage: str = item.stage
-            if stage in FINAL:
+            handler = self._handlers.get(stage)
+            if handler is None:  # finished, or a stage this release doesn't know
                 return False
             if item.attempts >= self._max_attempts:
                 last = f"; last error: {item.error}" if item.error else ""
@@ -106,7 +122,7 @@ class StageRunner:
         try:
             async with self._db.begin() as conn:
                 current = (await conn.execute(select(table).where(where))).one()
-                await self._handlers.get(stage, _unknown_stage)(conn, current)
+                await handler(conn, current)
                 await conn.execute(
                     update(table)
                     .where(where, table.c.stage == stage)
@@ -137,7 +153,3 @@ class StageRunner:
             ).first()
         if moved is not None:
             await notify_operator("item_failed", f"{table.fullname} {item_id}: {reason}")
-
-
-async def _unknown_stage(conn: AsyncConnection, item: Row[Any]) -> None:
-    raise ValueError(f"unknown stage {item.stage!r}")

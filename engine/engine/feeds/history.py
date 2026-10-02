@@ -81,7 +81,7 @@ async def run_import(settings: Settings, say: Callable[[str], None] = print) -> 
         cc0, commit = await asyncio.to_thread(clone_cc0, Path(tmp) / "cc0")
     async with make_client(settings) as client:
         cnn = await download_archive(client, settings)
-    db = make_engine(settings.database_url)
+    db = make_engine(settings.db_url)
     try:
         parts = [
             await import_part(db, f"cc0 archive ({CC0_REPO} at {commit}, CC0)", "cc0_archive", cc0),

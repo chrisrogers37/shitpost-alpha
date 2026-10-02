@@ -14,8 +14,8 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="ENGINE_", frozen=True, populate_by_name=True)
 
-    database_url: str = Field(min_length=1)
-    """Engine database. Never the old system's DATABASE_URL."""
+    database_url: SecretStr = Field(min_length=1)
+    """Engine database. Never the old system's DATABASE_URL. Secret, so it never prints."""
 
     web_role: str = "web"
     """Role the web app connects as. Granted access only if it exists."""
@@ -25,11 +25,16 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ENGINE_CODE_VERSION", "RAILWAY_GIT_COMMIT_SHA"),
     )
 
-    lease_renew_seconds: float = 10.0
-    lease_ttl_seconds: float = 30.0
-    scheduler_tick_seconds: float = 15.0
-    worker_restart_seconds: float = 30.0
-    max_attempts: int = 3
+    lease_renew_seconds: float = Field(default=10.0, gt=0)
+    lease_ttl_seconds: float = Field(default=30.0, gt=0)
+    scheduler_tick_seconds: float = Field(default=15.0, gt=0)
+    job_retry_seconds: float = Field(default=300.0, ge=0)
+    """A failed job run waits this long times its attempt count before its next try."""
+    restart_backoff_seconds: float = Field(default=30.0, gt=0)
+    """First wait before restarting a failed worker or the holder's work; doubles each time."""
+    restart_backoff_max_seconds: float = Field(default=900.0, gt=0)
+    """Longest wait. Running this long without failing ends a failure streak."""
+    max_attempts: int = Field(default=3, ge=1)
     """Attempts per stage item and per scheduled job run before the final error state."""
 
     sources_off: Annotated[frozenset[str], NoDecode] = frozenset()
@@ -39,27 +44,27 @@ class Settings(BaseSettings):
     scrapecreators_key: SecretStr | None = None
     """ScrapeCreators API key. Without it the scrapecreators feed is off."""
 
-    direct_interval_seconds: float = 60.0
-    trumpstruth_interval_seconds: float = 60.0
-    cnn_interval_seconds: float = 15.0
-    scrapecreators_fallback_seconds: float = 120.0
+    direct_interval_seconds: float = Field(default=60.0, gt=0)
+    trumpstruth_interval_seconds: float = Field(default=60.0, gt=0)
+    cnn_interval_seconds: float = Field(default=15.0, gt=0)
+    scrapecreators_fallback_seconds: float = Field(default=120.0, gt=0)
     """ScrapeCreators interval while direct is blocked or off."""
-    scrapecreators_check_seconds: float = 3600.0
+    scrapecreators_check_seconds: float = Field(default=3600.0, gt=0)
     """ScrapeCreators interval while direct is healthy: one check call, so a broken key
     shows up before it is needed."""
 
-    feed_failures_to_block: int = 5
+    feed_failures_to_block: int = Field(default=5, ge=1)
     """Failures in a row that count as a block."""
-    feed_backoff_min_seconds: float = 60.0
-    feed_backoff_max_seconds: float = 1800.0
-    feeds_dark_after_seconds: float = 600.0
+    feed_backoff_min_seconds: float = Field(default=60.0, gt=0)
+    feed_backoff_max_seconds: float = Field(default=1800.0, gt=0)
+    feeds_dark_after_seconds: float = Field(default=600.0, gt=0)
     """No feed has answered for this long: one operator message, and "dark since" in status."""
-    feed_tick_seconds: float = 1.0
+    feed_tick_seconds: float = Field(default=1.0, gt=0)
     """How often each feed checks whether it is due."""
-    http_timeout_seconds: float = 20.0
-    cnn_download_timeout_seconds: float = 180.0
+    http_timeout_seconds: float = Field(default=20.0, gt=0)
+    cnn_download_timeout_seconds: float = Field(default=180.0, gt=0)
     """The full CNN file (about 4 MB gzipped), read on catch-up and by the history import."""
-    catchup_max_pages: int = 25
+    catchup_max_pages: int = Field(default=25, ge=1)
     """Pages a paged feed (direct, scrapecreators) reads back to fill one gap."""
 
     @field_validator("scrapecreators_key", mode="before")
@@ -75,11 +80,15 @@ class Settings(BaseSettings):
         return value
 
     @model_validator(mode="after")
-    def _check_lease_timings(self) -> Self:
+    def _check_timings(self) -> Self:
         # The holder steps down ttl - renew after its last renewal (see lease.py), which
         # leaves at least one renew interval for retries before it does.
         if self.lease_ttl_seconds < 3 * self.lease_renew_seconds:
             raise ValueError("lease_ttl_seconds must be at least 3 x lease_renew_seconds")
+        if self.restart_backoff_max_seconds < self.restart_backoff_seconds:
+            raise ValueError("restart_backoff_max_seconds must be >= restart_backoff_seconds")
+        if self.feed_backoff_max_seconds < self.feed_backoff_min_seconds:
+            raise ValueError("feed_backoff_max_seconds must be >= feed_backoff_min_seconds")
         return self
 
     @model_validator(mode="after")
@@ -88,3 +97,7 @@ class Settings(BaseSettings):
         if unknown:
             raise ValueError(f"unknown feeds {sorted(unknown)}; feeds are {', '.join(FEED_NAMES)}")
         return self
+
+    @property
+    def db_url(self) -> str:
+        return self.database_url.get_secret_value()

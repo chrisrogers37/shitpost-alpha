@@ -1,6 +1,7 @@
 """Database engine construction and the database clock."""
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import Engine, create_engine, func, select
 from sqlalchemy.engine import make_url
@@ -15,11 +16,13 @@ def sqlalchemy_url(url: str) -> str:
     return parsed.render_as_string(hide_password=False)
 
 
-def make_engine(url: str) -> AsyncEngine:
-    return create_async_engine(sqlalchemy_url(url), pool_pre_ping=True, pool_size=5)
+def make_engine(url: str, **pool: Any) -> AsyncEngine:
+    """Async engine (psycopg 3) for the engine database. `pool` sets pool options."""
+    return create_async_engine(sqlalchemy_url(url), pool_pre_ping=True, **pool)
 
 
 def make_sync_engine(url: str) -> Engine:
+    """Sync engine, for migrations."""
     return create_engine(sqlalchemy_url(url), pool_pre_ping=True)
 
 

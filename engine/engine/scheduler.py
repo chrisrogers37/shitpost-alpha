@@ -3,7 +3,8 @@
 Only the lease holder runs a Scheduler. Each pass looks at the latest slot of each job
 (today's time if it has passed, else yesterday's), so a copy that was down for days
 catches up once, not once per missed day. The unique (job, scheduled_for) row makes each
-slot run once. A failed or interrupted run is retried on a later pass until it has had
+slot run once. A failed run is retried after `job_retry_seconds` times its attempt count,
+and an interrupted one (a crash, a kill, a lost lease) on the next pass, until it has had
 `max_attempts` tries; then it is marked failed and one operator message goes out.
 """
 
@@ -13,14 +14,17 @@ import multiprocessing
 import os
 import threading
 import time as clock
-from collections.abc import Iterable
-from datetime import datetime, time, timedelta
+from collections.abc import Iterable, Sequence
+from datetime import UTC, datetime, time, timedelta
 from multiprocessing.connection import Connection
+from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import and_, func, update
+from sqlalchemy import Interval, and_, func, literal, or_, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy.sql.dml import ReturningInsert
 
 from engine.db import db_now, make_engine
 from engine.logs import configure_logging
@@ -38,12 +42,16 @@ def latest_slot(at: time, now: datetime) -> datetime:
     """The most recent New York `at` time at or before `now`."""
     local = now.astimezone(NEW_YORK)
     slot = datetime.combine(local.date(), at, tzinfo=NEW_YORK)
-    if slot > local:
+    # Compare instants in UTC: datetimes sharing a tzinfo compare by wall clock, which is
+    # wrong in the repeated and skipped hours of DST changes.
+    if slot.astimezone(UTC) > now.astimezone(UTC):
         slot = datetime.combine(local.date() - timedelta(days=1), at, tzinfo=NEW_YORK)
     return slot
 
 
 class Scheduler:
+    """Runs the registered daily jobs. Only the lease holder runs one."""
+
     def __init__(self, ctx: EngineContext, jobs: Iterable[Job]) -> None:
         self._ctx = ctx
         self._jobs = list(jobs)
@@ -76,14 +84,29 @@ class Scheduler:
 
     async def _claim(self, job: Job, slot: datetime) -> int | None:
         """Record the start of a run of `slot`. Returns the attempt number, or None to skip."""
-        max_attempts = self._ctx.settings.max_attempts
-        row = and_(job_runs.c.job == job.name, job_runs.c.scheduled_for == slot)
+        async with self._ctx.db.begin() as conn:
+            attempt: int | None = (
+                await conn.execute(self._start_run(job, slot))
+            ).scalar_one_or_none()
+            superseded = await self._supersede_older(conn, job, slot) if attempt == 1 else []
+            gave_up = await self._give_up_interrupted(conn, job, slot) if attempt is None else None
+        if superseded:
+            days = ", ".join(f"{s.astimezone(NEW_YORK):%Y-%m-%d}" for s in superseded)
+            await notify_operator("job_failed", f"job {job.name}: runs for {days} never finished")
+        if gave_up is not None:
+            await notify_operator(
+                "job_failed", f"job {job.name} for {slot:%Y-%m-%d %H:%M %Z} interrupted {gave_up}x"
+            )
+        return attempt
+
+    def _start_run(self, job: Job, slot: datetime) -> ReturningInsert[Any]:
+        """Insert the slot's run, or restart it if it may be retried; returns its attempt."""
+        settings = self._ctx.settings
         start = insert(job_runs).values(
             job=job.name, scheduled_for=slot, started_at=func.now(), status="running", attempts=1
         )
-        # A "running" row here is stale: this copy is not running the job, so the run that
-        # wrote it was interrupted (a crash, a kill, or a lost lease).
-        stmt = start.on_conflict_do_update(
+        retry_wait = literal(timedelta(seconds=settings.job_retry_seconds), Interval)
+        return start.on_conflict_do_update(
             constraint="job_runs_job_scheduled_for_key",
             set_={
                 "started_at": func.now(),
@@ -91,30 +114,59 @@ class Scheduler:
                 "attempts": job_runs.c.attempts + 1,
             },
             where=and_(
-                job_runs.c.status.in_(("running", "retry")), job_runs.c.attempts < max_attempts
+                job_runs.c.attempts < settings.max_attempts,
+                or_(
+                    # Stale: this copy is not running the job, so that run was interrupted.
+                    job_runs.c.status == "running",
+                    and_(
+                        job_runs.c.status == "retry",
+                        job_runs.c.finished_at <= func.now() - job_runs.c.attempts * retry_wait,
+                    ),
+                ),
             ),
         ).returning(job_runs.c.attempts)
-        async with self._ctx.db.begin() as conn:
-            attempt: int | None = (await conn.execute(stmt)).scalar_one_or_none()
-            if attempt is not None:
-                return attempt
-            gave_up = (
-                await conn.execute(
-                    update(job_runs)
-                    .where(row, job_runs.c.status == "running")
-                    .values(
-                        status="failed",
-                        finished_at=func.now(),
-                        error=func.concat("interrupted during attempt ", job_runs.c.attempts),
-                    )
-                    .returning(job_runs.c.attempts)
-                )
-            ).scalar_one_or_none()
-        if gave_up is not None:
-            await notify_operator(
-                "job_failed", f"job {job.name} for {slot:%Y-%m-%d %H:%M %Z} interrupted {gave_up}x"
+
+    async def _supersede_older(
+        self, conn: AsyncConnection, job: Job, slot: datetime
+    ) -> Sequence[datetime]:
+        """Close earlier runs of the job that never finished. Returns their slots."""
+        result = await conn.execute(
+            update(job_runs)
+            .where(
+                job_runs.c.job == job.name,
+                job_runs.c.scheduled_for < slot,
+                job_runs.c.status.in_(("running", "retry")),
             )
-        return None
+            .values(
+                status="failed",
+                finished_at=func.now(),
+                error=f"superseded by the run for {slot:%Y-%m-%d %H:%M %Z}",
+            )
+            .returning(job_runs.c.scheduled_for)
+        )
+        slots: Sequence[datetime] = result.scalars().all()
+        return slots
+
+    async def _give_up_interrupted(
+        self, conn: AsyncConnection, job: Job, slot: datetime
+    ) -> int | None:
+        """Fail a stale run that has used its attempts. Returns the attempt count if it did."""
+        result = await conn.execute(
+            update(job_runs)
+            .where(
+                job_runs.c.job == job.name,
+                job_runs.c.scheduled_for == slot,
+                job_runs.c.status == "running",
+            )
+            .values(
+                status="failed",
+                finished_at=func.now(),
+                error=func.concat("interrupted during attempt ", job_runs.c.attempts),
+            )
+            .returning(job_runs.c.attempts)
+        )
+        attempts: int | None = result.scalar_one_or_none()
+        return attempts
 
     async def _execute(self, job: Job, slot: datetime, attempt: int) -> None:
         settings = self._ctx.settings
@@ -127,7 +179,7 @@ class Scheduler:
             error = f"{type(exc).__name__}: {exc}"
             final = attempt >= settings.max_attempts
             log.warning("job %s attempt %d failed: %s", job.name, attempt, error)
-            await self._finish(job, slot, "failed" if final else "retry", error)
+            await self._record(job, slot, "failed" if final else "retry", error)
             if final:
                 await notify_operator(
                     "job_failed",
@@ -135,18 +187,25 @@ class Scheduler:
                     f"{attempt} attempts: {error}",
                 )
         else:
-            await self._finish(job, slot, "succeeded", None)
+            await self._record(job, slot, "succeeded", None)
             log.info("job %s for %s succeeded", job.name, slot.isoformat())
         finally:
             self._running.discard(job.name)
 
-    async def _finish(self, job: Job, slot: datetime, status: str, error: str | None) -> None:
-        async with self._ctx.db.begin() as conn:
-            await conn.execute(
-                update(job_runs)
-                .where(job_runs.c.job == job.name, job_runs.c.scheduled_for == slot)
-                .values(status=status, finished_at=func.now(), error=error)
-            )
+    async def _record(self, job: Job, slot: datetime, status: str, error: str | None) -> None:
+        """Write the run's result, retrying through database errors: a lost result reruns it."""
+        while True:
+            try:
+                async with self._ctx.db.begin() as conn:
+                    await conn.execute(
+                        update(job_runs)
+                        .where(job_runs.c.job == job.name, job_runs.c.scheduled_for == slot)
+                        .values(status=status, finished_at=func.now(), error=error)
+                    )
+                return
+            except (SQLAlchemyError, OSError) as exc:
+                log.warning("could not record job %s result, retrying: %s", job.name, exc)
+                await asyncio.sleep(self._ctx.settings.scheduler_tick_seconds)
 
 
 class HeavyJobError(Exception):
@@ -169,7 +228,10 @@ async def run_in_process(job: JobFunc, settings: Settings, slot: datetime) -> No
         process.join()
         raise
     with receiver:
-        error = receiver.recv() if receiver.poll() else f"exited with code {process.exitcode}"
+        try:
+            error = receiver.recv()
+        except EOFError:  # died without reporting, e.g. killed for memory
+            error = f"exited with code {process.exitcode}"
     if error is not None:
         raise HeavyJobError(error)
 
@@ -189,7 +251,7 @@ def _child_main(
 
 
 async def _child_run(job: JobFunc, settings: Settings, slot: datetime) -> None:
-    db = make_engine(settings.database_url)
+    db = make_engine(settings.db_url)
     try:
         await job(JobContext(settings, db, slot))
     finally:

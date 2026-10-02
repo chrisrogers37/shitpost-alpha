@@ -4,6 +4,7 @@ Other plans add theirs in build_registry(): delivery workers (notification plan)
 live loop (PR 2), daily jobs.
 """
 
+import pickle
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, time
@@ -15,6 +16,8 @@ from engine.settings import Settings
 
 @dataclass(frozen=True)
 class EngineContext:
+    """What workers and jobs get: the settings and the shared database engine."""
+
     settings: Settings
     db: AsyncEngine
 
@@ -40,6 +43,8 @@ class Job:
 
 @dataclass
 class Registry:
+    """The jobs and workers one engine process runs."""
+
     jobs: dict[str, Job] = field(default_factory=dict)
     workers: dict[str, WorkerFunc] = field(default_factory=dict)
 
@@ -49,8 +54,11 @@ class Registry:
             raise ValueError(f"job {name!r} is already registered")
         if at.tzinfo is not None:
             raise ValueError("give `at` as a New York wall-clock time without tzinfo")
-        if heavy and "<locals>" in getattr(func, "__qualname__", "<locals>"):
-            raise ValueError("a heavy job must be a module-level function (it is pickled)")
+        if heavy:
+            try:
+                pickle.dumps(func)  # it is sent to a fresh process
+            except Exception as exc:
+                raise ValueError(f"heavy job {name!r} must be picklable: {exc}") from exc
         self.jobs[name] = Job(name, at, func, heavy)
 
     def register_worker(self, name: str, func: WorkerFunc) -> None:

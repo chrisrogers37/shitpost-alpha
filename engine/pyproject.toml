@@ -18,10 +18,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "mypy>=1.11",
+    "mypy>=2.4,<2.5",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
-    "ruff>=0.6",
+    "ruff>=0.16,<0.17",
 ]
 
 [tool.setuptools.packages.find]

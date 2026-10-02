@@ -13,7 +13,9 @@ Run from this directory, with `ENGINE_DATABASE_URL` set (never the old `DATABASE
     python -m engine status    # the status row, the lease, each feed's state, signals by stage
     python -m engine import-history   # past posts: CC0 archive copy, then CNN's live file
 
-Settings are `ENGINE_*` variables; see `engine/settings.py`.
+Settings are `ENGINE_*` variables; see `engine/settings.py`. In `engine.engine_meta`,
+`last_heartbeat_at` shows whether a copy is working; `lease_holder` names the last holder
+and is not cleared when it stops.
 
 ## Feeds
 
@@ -45,7 +47,9 @@ Three schemas: `engine` (the web role may read it), `prices` (engine only) and `
 `engine/migrate.py`: a PR that adds a table the web app needs adds a line there. Grants
 run on every migrate and only if the role in `ENGINE_WEB_ROLE` (default `web`) exists.
 
-Migrations add first and remove later: old and new copies overlap during a deploy, so a
+Migrations name the schema of every table. Migrations run with `search_path` pinned to
+`public`, so a table that forgets its schema lands in `public`, never in `engine` where the
+web role could read it. Migrations add first and remove later: old and new copies overlap during a deploy, so a
 migration must keep the previous release working. New revision:
 `alembic revision -m "..."` (writes into `engine/migrations/versions/`).
 
@@ -54,14 +58,18 @@ migration must keep the previous release working. New revision:
 In `engine/registry.py`, `build_registry()`:
 
 - `register_job(name, at, func, heavy=False)`: a daily job at New York time `at`, logged
-  in `engine.job_runs`. `heavy=True` runs it in a separate process.
+  in `engine.job_runs`. A failed or interrupted run is retried up to `ENGINE_MAX_ATTEMPTS`
+  times, then marked failed with one operator message. `heavy=True` runs it in a
+  separate process.
 - `register_worker(name, func)`: a long-running task (delivery workers, the live loop),
-  run only while this copy holds the lease and restarted if it raises.
+  run only while this copy holds the lease and restarted with backoff if it raises (one
+  operator message per failure streak).
 
 `engine.notify.notify_operator(kind, text)` only logs for now.
 
 `engine.stages.StageRunner` moves rows of a table with `stage_columns()` through named
-stages, with three attempts per stage before the final `error` state.
+stages, with `ENGINE_MAX_ATTEMPTS` attempts per stage before the final `error` state.
+Rows at a stage this copy doesn't know are left alone (a newer copy may know it).
 
 ## Tests
 
