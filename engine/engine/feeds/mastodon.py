@@ -44,10 +44,12 @@ class PagedFeed(Feed):
     async def page(self, max_id: str | None) -> Read:
         """One page, newest first. Only the newest page (no `max_id`) is conditional."""
 
-    def statuses(self, statuses: object) -> list[Post]:
+    def statuses(self, statuses: object, max_id: str | None) -> list[Post]:
+        """A page's posts; a page back (`max_id`) logs its odd items apart from the newest
+        page's, so a catch-up doesn't repeat the newest page's warning."""
         if not isinstance(statuses, list):
             raise FeedFailed(f"expected a list of statuses, got {type(statuses).__name__}")
-        return self.map_items(statuses, mastodon_post)
+        return self.map_items(statuses, mastodon_post, part="catch-up" if max_id else "read")
 
     async def read(self) -> Read:
         return await self.page(None)
@@ -85,7 +87,7 @@ class DirectFeed(PagedFeed):
             return Read([], not_modified=True)
         with unexpected_answer():
             statuses = json.loads(answer.body)
-        return Read(self.statuses(statuses), etag=answer.headers.get("etag"))
+        return Read(self.statuses(statuses, max_id), etag=answer.headers.get("etag"))
 
 
 class ScrapeCreatorsFeed(PagedFeed):
@@ -110,4 +112,4 @@ class ScrapeCreatorsFeed(PagedFeed):
             if body.get("success") is not True:
                 raise FeedFailed(f"ScrapeCreators answered success={body.get('success')!r}")
             statuses = body.get("posts")
-        return Read(self.statuses(statuses))
+        return Read(self.statuses(statuses, max_id))

@@ -26,8 +26,8 @@ import httpx
 from sqlalchemy import Row, func, select, update
 from sqlalchemy.exc import SQLAlchemyError
 
-from engine.db import TRANSIENT_ERRORS, db_now, raise_if_cancelling
-from engine.feeds.base import Feed, FeedBlocked, FeedFailed, Read, make_client
+from engine.db import TRANSIENT_ERRORS, db_now, error_text, raise_if_cancelling
+from engine.feeds.base import Feed, FeedBlocked, FeedFailed, Read
 from engine.feeds.cnn import CnnFeed
 from engine.feeds.mastodon import DirectFeed, ScrapeCreatorsFeed
 from engine.feeds.posts import Post
@@ -39,6 +39,7 @@ from engine.feeds.store import (
     trump_source_id,
 )
 from engine.feeds.trumpstruth import TrumpstruthFeed
+from engine.http_client import make_client
 from engine.notify import notify_operator
 from engine.registry import EngineContext, WorkerFunc
 from engine.tables import engine_meta, feed_status
@@ -163,6 +164,10 @@ class FeedPoller:
         if time.monotonic() < self.catch_up_after:
             return Polled(posts, mark, complete=False, error=self.catch_up_error)
         log.info("%s: catching up to %s", self.name, mark)
+        # The next try waits even if this one reads fine and the store fails: never a full
+        # read back at the poll rate. A stored answer with no catch-up owed resets it.
+        self.catch_up_wait = self._doubled(self.catch_up_wait)
+        self.catch_up_after = time.monotonic() + self.catch_up_wait
         try:
             back = await self.feed.read_back(posts, mark)
         except FeedBlocked as exc:
@@ -173,7 +178,6 @@ class FeedPoller:
             raise_if_cancelling()
             log.exception("%s: unexpected error catching up", self.name)
             return self._catch_up_failed(posts, mark, f"unexpected error: {exc!r}", "errors")
-        self.catch_up_wait, self.catch_up_error = 0.0, None
         if not back.reached:
             log.warning("%s could not read back to %s; other feeds may fill it", self.name, mark)
         return Polled(unique([*posts, *back.posts]), newest)
@@ -182,9 +186,7 @@ class FeedPoller:
         self, posts: list[Post], mark: datetime, reason: str, failed: Literal["errors", "blocks"]
     ) -> Polled:
         """The newest read answered, so the feed stays up: store it, keep the mark, and
-        try the catch-up again after a back-off."""
-        self.catch_up_wait = self._doubled(self.catch_up_wait)
-        self.catch_up_after = time.monotonic() + self.catch_up_wait
+        try the catch-up again after its back-off."""
         self.catch_up_error = f"catch-up to {mark} failed: {reason}"
         log.warning(
             "%s: %s; storing this read, trying again in %s",
@@ -219,6 +221,8 @@ class FeedPoller:
             )
         self.state, self.failures, self.backoff, self.blocked_since = "up", 0, 0.0, None
         self.caught_up_to = polled.caught_up_to
+        if polled.complete and polled.posts:  # reached the mark: a new gap backs off from 1 min
+            self.catch_up_wait, self.catch_up_after, self.catch_up_error = 0.0, 0.0, None
         if polled.complete and not read.not_modified:
             self.feed.etag = read.etag
         if polled.posts:
@@ -339,6 +343,25 @@ class Live:
                     log.warning("%s: database write failed, trying again: %s", poller.name, exc)
                 else:
                     log.exception("%s: poll failed; trying again next poll", poller.name)
+                    await self._record_failure(poller, exc)
+
+    async def _record_failure(self, poller: FeedPoller, exc: Exception) -> None:
+        """A poll that failed past the feed's own handling (a post the database refuses, a
+        bug): counted and shown in status, so a stuck feed doesn't read as healthy."""
+        try:
+            async with self.db.begin() as conn:
+                await count(conn, poller.name, polls=1, errors=1)
+                await set_feed_status(
+                    conn,
+                    poller.name,
+                    poller.state,
+                    blocked_since=poller.blocked_since,
+                    backoff=poller.backoff or None,
+                    error=error_text(exc).splitlines()[0],
+                )
+        except Exception:
+            raise_if_cancelling()
+            log.warning("%s: could not record the failed poll", poller.name, exc_info=True)
 
     async def answered(self) -> None:
         """A feed answered: the feeds are not dark."""

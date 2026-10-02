@@ -23,10 +23,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from engine.db import make_engine
-from engine.feeds.base import make_client
 from engine.feeds.cnn import cnn_post, download_archive
 from engine.feeds.posts import parse_status_id, status_time
 from engine.feeds.store import insert_signals, trump_source_id
+from engine.http_client import make_client
 from engine.settings import Settings
 from engine.tables import signals
 
@@ -81,17 +81,19 @@ async def import_part(db: AsyncEngine, name: str, via: str, items: list[Any]) ->
 
 
 async def run_import(settings: Settings, say: Callable[[str], None] = print) -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        cc0, commit = await asyncio.to_thread(clone_cc0, Path(tmp) / "cc0")
-    async with make_client(settings) as client:
-        cnn = await download_archive(client, settings)
-    cutoff = datetime.now(UTC) - LEFT_TO_LIVE
-
-    def settled(items: list[Any]) -> list[Any]:
-        return [item for item in items if status_time(parse_status_id(item["id"])) <= cutoff]
-
     db = make_engine(settings.db_url)
     try:
+        async with db.connect() as conn:  # no database, or not migrated: fail before downloading
+            await trump_source_id(conn)
+        with tempfile.TemporaryDirectory() as tmp:
+            cc0, commit = await asyncio.to_thread(clone_cc0, Path(tmp) / "cc0")
+        async with make_client(settings) as client:
+            cnn = await download_archive(client, settings)
+        cutoff = datetime.now(UTC) - LEFT_TO_LIVE
+
+        def settled(items: list[Any]) -> list[Any]:
+            return [item for item in items if status_time(parse_status_id(item["id"])) <= cutoff]
+
         parts = [
             await import_part(
                 db, f"cc0 archive ({CC0_REPO} at {commit}, CC0)", "cc0_archive", settled(cc0)

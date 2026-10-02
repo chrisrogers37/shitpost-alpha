@@ -69,8 +69,20 @@ class Settings(BaseSettings):
 
     @field_validator("scrapecreators_key", mode="before")
     @classmethod
-    def _empty_key_is_no_key(cls, value: object) -> object:
-        return None if value == "" else value
+    def _clean_keys(cls, value: object) -> object:
+        """An API key as it goes in a request header: a pasted space or newline is
+        stripped, blank means no key, and anything but printable ASCII is refused. The
+        message names the variable, never the value."""
+        if isinstance(value, SecretStr):
+            value = value.get_secret_value()
+        if not isinstance(value, str):
+            return value
+        key = value.strip()
+        if not key:
+            return None
+        if not all("!" <= char <= "~" for char in key):
+            raise ValueError("must be printable ASCII with no spaces (value not shown)")
+        return key
 
     @field_validator("sources_off", mode="before")
     @classmethod

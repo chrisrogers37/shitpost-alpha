@@ -5,7 +5,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import SecretStr
 from sqlalchemy import func, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from engine.feeds import history
@@ -95,6 +97,17 @@ async def test_run_import_prints_counts_that_add_up(
     assert lines[4].startswith("bursts over 4 imported text posts")
     stored = await all_signals(db)
     assert fresh["id"] not in stored and fresh_cc0["id"] not in stored
+
+
+async def test_an_unreachable_database_fails_before_any_download(
+    migrated: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clones: list[Path] = []
+    monkeypatch.setattr(history, "clone_cc0", clones.append)
+    nowhere = SecretStr("postgresql://engine:unused@127.0.0.1:1/engine")
+    with pytest.raises(OperationalError):
+        await run_import(migrated.model_copy(update={"database_url": nowhere}))
+    assert clones == []
 
 
 def make_repo(path: Path, license_text: str) -> Path:

@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from engine.feeds.base import make_client
+from engine.http_client import make_client
 from engine.settings import Settings
 
 FIXTURES = Path(__file__).parent / "fixtures"
