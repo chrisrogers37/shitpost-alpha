@@ -883,7 +883,10 @@ async def test_all_dark_sends_one_message_and_clears_when_a_feed_answers(
     await asyncio.sleep(0.3)
     assert len(operator_notices(caplog, "feeds_dark")) == 1
     web.routes[CNN_HOST] = cnn_ok
-    await asyncio.sleep(0.3)
+    for _ in range(250):  # until CNN's answer is stored: up to 5s on a slow runner
+        if operator_notices(caplog, "feeds_back"):
+            break
+        await asyncio.sleep(0.02)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
