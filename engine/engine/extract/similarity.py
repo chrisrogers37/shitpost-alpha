@@ -23,10 +23,14 @@ from urllib.parse import urlsplit
 import httpx
 import numpy as np
 import numpy.typing as npt
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from engine.settings import Settings
+from engine.tables import signal_embeddings, signals
 
 PIN_FILE = Path(__file__).with_name("model.json")
+MATCH_RULE_FILE = Path(__file__).with_name("match_rule.json")
 Vector = npt.NDArray[np.float32]
 
 
@@ -248,3 +252,49 @@ class Similarity:
             candidates = candidates[top]
         ordered = candidates[np.argsort(-scores[candidates], kind="stable")]
         return [Match(str(self.keys[i]), float(scores[i])) for i in ordered]
+
+
+async def load_similarity(conn: AsyncConnection, model_version: str) -> Similarity:
+    """Every stored vector for `model_version`, with its post's time."""
+    rows = (
+        await conn.execute(
+            select(signal_embeddings.c.signal_key, signals.c.posted_at, signal_embeddings.c.vector)
+            .join(signals, signals.c.key == signal_embeddings.c.signal_key)
+            .where(signal_embeddings.c.model_version == model_version)
+            .order_by(signals.c.posted_at)
+        )
+    ).all()
+    vectors = np.array([np.frombuffer(row.vector, dtype="<f4") for row in rows], dtype=np.float32)
+    return Similarity([r.signal_key for r in rows], [r.posted_at for r in rows], vectors)
+
+
+# --- the match rule ----------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MatchRule:
+    """How similar a past post must be to count as a match: set by reading pairs of posts
+    (match_rule.json says how), for one model version."""
+
+    version: int
+    model_version: str
+    threshold: float
+    max_matches: int
+
+
+def load_match_rule(path: Path = MATCH_RULE_FILE, pin: ModelPin | None = None) -> MatchRule:
+    """The match rule, refused if it was set for another model version than the pinned one."""
+    data = json.loads(path.read_text("utf-8"))
+    rule = MatchRule(
+        version=int(data["version"]),
+        model_version=data["model_version"],
+        threshold=float(data["threshold"]),
+        max_matches=int(data["max_matches"]),
+    )
+    pinned = (pin or load_pin()).version
+    if rule.model_version != pinned:
+        raise ModelMissing(
+            f"match rule v{rule.version} was set for {rule.model_version}, not the pinned "
+            f"{pinned}: read the pairs again for the new model"
+        )
+    return rule

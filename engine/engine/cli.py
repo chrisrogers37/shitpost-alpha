@@ -10,6 +10,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
+import httpx
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError, ProgrammingError
@@ -127,6 +128,9 @@ def _extract_command(args: argparse.Namespace, settings: Settings) -> int:
             return asyncio.run(batch.run_embed(settings))
     except similarity.ModelMissing as exc:
         print(exc, file=sys.stderr)
+        return 1
+    except httpx.HTTPError as exc:  # the download: a refused host, a 404, a dropped line
+        print(f"model download failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
     if args.command == "review-list":
         return asyncio.run(batch.run_review_list(settings))

@@ -2,6 +2,7 @@
 matching."""
 
 import hashlib
+import json
 import os
 import time
 from datetime import UTC, datetime, timedelta
@@ -10,6 +11,7 @@ from pathlib import Path
 import httpx
 import numpy as np
 import pytest
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from engine.extract.similarity import (
     ModelMissing,
@@ -18,7 +20,9 @@ from engine.extract.similarity import (
     Similarity,
     fetch_model,
     load_embedder,
+    load_match_rule,
     load_pin,
+    load_similarity,
     normalized,
 )
 from engine.settings import Settings
@@ -192,3 +196,42 @@ def test_the_real_model_is_deterministic_normalised_and_ranks_a_paraphrase_first
     assert post.vector @ paraphrase.vector > post.vector @ unrelated.vector
     (long,) = model.embed(["tariffs " * 1000])
     assert long.truncated and not post.truncated
+
+
+# --- the match rule and the stored index ------------------------------------------------------
+
+
+def test_a_match_rule_set_for_another_model_is_refused(tmp_path: Path) -> None:
+    rule = {"version": 1, "model_version": "other@0", "threshold": 0.8, "max_matches": 50}
+    path = tmp_path / "match_rule.json"
+    path.write_text(json.dumps(rule))
+    with pytest.raises(ModelMissing, match="read the pairs again"):
+        load_match_rule(path)
+    path.write_text(json.dumps(rule | {"model_version": REAL.version}))
+    assert load_match_rule(path).threshold == 0.8
+
+
+async def test_the_index_loads_every_stored_vector_with_its_post_time(db: AsyncEngine) -> None:
+    from engine.extract.score import store_embedding
+    from engine.feeds.posts import Post
+    from engine.feeds.store import store_posts, trump_source_id
+    from tests.feeds_helpers import status_id_at
+
+    texts = ["Tariffs on China", "Tariffs on Chinese steel", "Happy Easter"]
+    posts = [
+        Post(status_id_at(T0 + timedelta(hours=n), n), "post", None, words, False, {})
+        for n, words in enumerate(texts, 1)
+    ]
+    embedder = StubEmbedder()
+    async with db.begin() as conn:
+        await store_posts(conn, await trump_source_id(conn), "trumpstruth", posts)
+        for post, embedded in zip(posts, embedder.embed(texts), strict=True):
+            await store_embedding(conn, post.key, embedder.version, post.text, embedded)
+    async with db.connect() as conn:
+        index = await load_similarity(conn, embedder.version)
+        assert len((await load_similarity(conn, "other@0")).keys) == 0
+    last = posts[-1]
+    found = index.similar(
+        last.key, embedder.embed([last.text])[0].vector, last.posted_at, min_score=-1
+    )
+    assert {m.key for m in found} == {posts[0].key, posts[1].key}
