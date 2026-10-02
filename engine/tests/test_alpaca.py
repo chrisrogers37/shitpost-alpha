@@ -36,9 +36,7 @@ END = datetime(2024, 1, 5, tzinfo=UTC)
 
 def pages(request: httpx.Request) -> httpx.Response:
     page = 2 if "page_token" in request.url.params else 1
-    return httpx.Response(
-        200, content=fixture_bytes(f"alpaca_stock_bars_page{page}.unverified.json")
-    )
+    return httpx.Response(200, content=fixture_bytes(f"alpaca_stock_bars_page{page}.json"))
 
 
 async def test_stock_bars_read_every_page() -> None:
@@ -47,9 +45,9 @@ async def test_stock_bars_read_every_page() -> None:
     async with fake.client(market_settings()) as alpaca:
         bars = await alpaca.stock_bars("SPY", "1Day", START, END)
 
-    assert [bar.close for bar in bars] == [465.43, 461.6, 460.14]
+    assert [bar.close for bar in bars] == [100.5, 101.5, 102.5]
     assert bars[0].start == datetime(2024, 1, 2, 5, tzinfo=UTC)
-    assert (bars[0].trades, bars[0].vwap, bars[0].volume) == (954721, 465.62, 123623681.0)
+    assert (bars[0].trades, bars[0].vwap, bars[0].volume) == (10, 100.25, 1000.0)
     first, second = (dict(request.url.params) for request in fake.requests)
     assert str(fake.requests[0].url).startswith(DATA_URL + STOCK_BARS)
     assert first == {
@@ -61,14 +59,14 @@ async def test_stock_bars_read_every_page() -> None:
         "feed": "sip",
         "adjustment": "all",
     }
-    token = fixture_json("alpaca_stock_bars_page1.unverified.json")["next_page_token"]
+    token = fixture_json("alpaca_stock_bars_page1.json")["next_page_token"]
     assert second == first | {"page_token": token}
 
 
 async def test_a_repeated_page_token_fails() -> None:
     fake = FakeAlpaca()
     fake.route = lambda request: httpx.Response(
-        200, content=fixture_bytes("alpaca_stock_bars_page1.unverified.json")
+        200, content=fixture_bytes("alpaca_stock_bars_page1.json")
     )
     async with fake.client(market_settings()) as alpaca:
         with pytest.raises(AlpacaError, match="repeated a page token"):
@@ -115,8 +113,7 @@ async def test_keys_are_sent_but_never_logged(caplog: pytest.LogCaptureFixture) 
     fake = FakeAlpaca()
     answers = iter([httpx.Response(429)])
     fake.route = lambda request: (
-        next(answers, None)
-        or httpx.Response(403, content=fixture_bytes("alpaca_error.unverified.json"))
+        next(answers, None) or httpx.Response(403, content=fixture_bytes("alpaca_error.json"))
     )
     async with fake.client(settings) as alpaca:
         with pytest.raises(AlpacaError) as failed:
@@ -137,12 +134,10 @@ async def test_coin_symbols_map_to_dollar_pairs() -> None:
     assert alpaca_symbol("BTC", "coin") == "BTC/USD"
     assert alpaca_symbol("AAPL", "stock") == "AAPL"
     fake = FakeAlpaca()
-    fake.route = lambda request: httpx.Response(
-        200, content=fixture_bytes("alpaca_coin_bars.unverified.json")
-    )
+    fake.route = lambda request: httpx.Response(200, content=fixture_bytes("alpaca_coin_bars.json"))
     async with fake.client(market_settings()) as alpaca:
         bars = await fetch_bars(alpaca, instrument("btc", "coin"), "1Day", START, END)
-    assert [bar.close for bar in bars] == [44967.1]
+    assert [bar.close for bar in bars] == [100.5, 101.5]
     assert fake.requests[0].url.path == COIN_BARS
     assert fake.params()["symbols"] == "BTC/USD"
     assert "feed" not in fake.params() and "adjustment" not in fake.params()
@@ -150,15 +145,13 @@ async def test_coin_symbols_map_to_dollar_pairs() -> None:
 
 async def test_without_keys_stock_calls_fail_clearly_and_coin_calls_work() -> None:
     fake = FakeAlpaca()
-    fake.route = lambda request: httpx.Response(
-        200, content=fixture_bytes("alpaca_coin_bars.unverified.json")
-    )
+    fake.route = lambda request: httpx.Response(200, content=fixture_bytes("alpaca_coin_bars.json"))
     settings = market_settings(alpaca_key_id=None, alpaca_secret_key=None)
     async with fake.client(settings) as alpaca:
         with pytest.raises(AlpacaKeysMissing, match="ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY"):
             await alpaca.stock_bars("SPY", "1Day", START, END)
         assert fake.requests == []
-        assert len(await alpaca.coin_bars("BTC/USD", "1Day", START, END)) == 1
+        assert len(await alpaca.coin_bars("BTC/USD", "1Day", START, END)) == 2
     assert "APCA-API-KEY-ID" not in fake.requests[0].headers
 
 

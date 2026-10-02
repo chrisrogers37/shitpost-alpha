@@ -61,7 +61,7 @@ async def fetch_bars(
 
 def is_final_day(bar: Bar, now: datetime) -> bool:
     """A daily bar is final once its day has passed (it starts at midnight New York time
-    for stocks; extended hours end at 20:00)."""
+    for stocks, whose extended hours end at 20:00, and at midnight UTC for coins)."""
     return bar.start + timedelta(days=1) <= now
 
 

@@ -108,20 +108,22 @@ the trading calendar, and bar storage. Nothing here scores, grades or sends.
 
 ### Alpaca claims
 
-Each claim gets one recorded call, saved as a trimmed fixture. Until then the client is
-built on Alpaca's documented formats, with hand-made `tests/fixtures/alpaca_*.unverified.json`.
+Checked on 2 Oct 2026 with one recorded call each, saved trimmed in
+`tests/fixtures/alpaca_claims/` and asserted by `tests/test_alpaca_claims.py`. The repo is
+public and Alpaca's data stays private, so the numbers in recorded bars are stand-ins;
+everything else is Alpaca's answer.
 
 | Claim | Status |
 | --- | --- |
-| a. SPY minute bars on 2016-01-04 (minute history back to 2016) | not checked yet |
-| b. A SIP request ending 16 minutes ago succeeds; one ending 5 minutes ago is refused | not checked yet (the client refuses it before sending) |
-| c. The rate-limit headers show 200 calls a minute | not checked yet |
-| d. BTC/USD and ETH/USD minute bars on 2022-02-01, and each coin's first daily bar | not checked yet |
-| e. Which symbol returns META's bars from before 9 June 2022, when it traded as FB | not checked yet (assumed: `META`, Alpaca's default symbol mapping) |
-| f. NVDA daily bars around the 10-for-1 split on 10 June 2024, `adjustment=all` vs `raw` | not checked yet |
+| a. SPY minute bars on 2016-01-04 (minute history back to 2016) | Confirmed: 825 bars, 04:00 to 19:00 New York (extended hours included) |
+| b. A SIP request ending 16 minutes ago succeeds; one ending 5 minutes ago is refused | Confirmed: 200 with bars; 403 "subscription does not permit querying recent SIP data". The client refuses the second before sending it |
+| c. The rate-limit headers show 200 calls a minute | Confirmed: `X-RateLimit-Limit: 200`, and `X-RateLimit-Reset` is in epoch seconds, as the 429 retry reads it |
+| d. BTC/USD and ETH/USD minute bars on 2022-02-01, and each coin's first daily bar | Confirmed: 1,439 and 1,437 minute bars; both coins' daily bars start on 2021-01-01, a year before the backtest |
+| e. Which symbol returns META's bars from before 9 June 2022, when it traded as FB | `META` (Alpaca's default symbol mapping). `FB` stops at 2022-06-08 and its adjusted prices differ from `META`'s, so bars are always fetched by the current symbol |
+| f. NVDA daily bars around the 10-for-1 split on 10 June 2024, `adjustment=all` vs `raw` | Confirmed: `raw` closes are 10.03 times the `all` closes before 10 June and 1.00 times after, so `all` takes the split out |
 
-Also to confirm with the first real answers: stock daily bars start at midnight New York
-time, and when coin daily bars start (the cross-check dates coins by UTC day).
+The same answers show that stock daily bars start at midnight New York time, coin daily
+bars at midnight UTC, and that a bar starting exactly at a request's `end` is included.
 
 ## Database
 

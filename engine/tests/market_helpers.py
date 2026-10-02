@@ -33,10 +33,10 @@ def market_settings(settings: Settings | None = None, **overrides: object) -> Se
 
 
 def daily_bar(day: date, close: float, *, coin: bool = False) -> dict[str, Any]:
-    """A daily bar as Alpaca writes one: midnight New York for stocks (unverified for
-    coins: 06:00 UTC here)."""
+    """A daily bar as Alpaca writes one: it starts at midnight New York time for stocks
+    and at midnight UTC for coins."""
     start = (
-        datetime.combine(day, time(6), UTC)
+        datetime.combine(day, time(0), UTC)
         if coin
         else datetime.combine(day, time(0), NEW_YORK).astimezone(UTC)
     )
