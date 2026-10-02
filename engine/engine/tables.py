@@ -10,7 +10,9 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
+    Date,
     DateTime,
+    Double,
     Float,
     ForeignKey,
     Identity,
@@ -185,3 +187,83 @@ feed_status = Table(
 pick up from. backoff_seconds: the wait before the next try while blocked (counted from
 updated_at, the last poll). caught_up_to: the newest post time this feed has read back to
 without a gap; a read that doesn't reach back to it starts a catch-up."""
+
+ASSET_CLASSES = ("stock", "etf", "coin")
+CALENDARS = ("XNYS", "24/7")
+ALIAS_KINDS = ("name", "old_ticker")
+TIMEFRAMES = ("1Min", "1Day")
+
+instruments = Table(
+    "instruments",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("slug", Text, nullable=False, unique=True),
+    Column("symbol", Text, nullable=False, unique=True),
+    Column("name", Text, nullable=False),
+    Column("asset_class", Text, nullable=False),
+    Column("calendar", Text, nullable=False),
+    Column("alpaca_symbol", Text, nullable=False, unique=True),
+    Column("benchmark_id", Integer, ForeignKey("engine.instruments.id")),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    CheckConstraint(_one_of("asset_class", ASSET_CLASSES), name="instruments_asset_class_check"),
+    CheckConstraint(_one_of("calendar", CALENDARS), name="instruments_calendar_check"),
+    CheckConstraint(
+        "(asset_class = 'coin') = (calendar = '24/7')", name="instruments_coin_calendar_check"
+    ),
+    schema="engine",
+)
+"""What prices are kept for. slug: the lowercase symbol at creation, never changed (pages
+link to it). symbol: the current ticker; a ticker change updates it and adds an old_ticker
+alias. alpaca_symbol: what Alpaca calls it (BTC/USD for coins). benchmark: SPY for stocks
+and ETFs, BTC for coins, none for SPY and BTC."""
+
+instrument_aliases = Table(
+    "instrument_aliases",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("alias", Text, nullable=False),
+    Column("instrument_id", Integer, ForeignKey("engine.instruments.id"), nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("valid_from", Date),
+    Column("valid_to", Date),
+    UniqueConstraint(
+        "alias",
+        "instrument_id",
+        "kind",
+        "valid_from",
+        name="instrument_aliases_key",
+        postgresql_nulls_not_distinct=True,
+    ),
+    CheckConstraint(_one_of("kind", ALIAS_KINDS), name="instrument_aliases_kind_check"),
+    CheckConstraint("alias = lower(alias)", name="instrument_aliases_lowercase_check"),
+    CheckConstraint("valid_from <= valid_to", name="instrument_aliases_valid_check"),
+    schema="engine",
+)
+"""Other ways posts name an instrument: company names (PR 4) and old tickers (fb is META
+up to 2022-06-08). valid_from/valid_to: the dates the alias held, both inclusive; NULL is
+open-ended."""
+
+market_bars = Table(
+    "market_bars",
+    metadata,
+    Column("instrument_id", Integer, ForeignKey("engine.instruments.id"), nullable=False),
+    Column("timeframe", Text, nullable=False),
+    Column("bar_start", DateTime(timezone=True), nullable=False),
+    Column("open", Double, nullable=False),
+    Column("high", Double, nullable=False),
+    Column("low", Double, nullable=False),
+    Column("close", Double, nullable=False),
+    Column("volume", Double, nullable=False),
+    Column("vwap", Double),
+    Column("trades", Integer),
+    Column("feed", Text, nullable=False),
+    Column("adjustment", Text, nullable=False),
+    Column("fetched_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    PrimaryKeyConstraint("instrument_id", "timeframe", "bar_start", name="market_bars_pkey"),
+    CheckConstraint(_one_of("timeframe", TIMEFRAMES), name="market_bars_timeframe_check"),
+    schema="prices",
+)
+"""Raw prices, engine only: the web role can't read the prices schema. Daily bars from the
+backfill; minute bars only for alert windows (PR 7). Prices are Alpaca's, adjusted for
+splits and dividends (adjustment 'all'; coins have nothing to adjust, 'raw'). feed: 'sip'
+for stocks and ETFs, 'crypto_us' for coins. fetched_at: when these values were fetched."""

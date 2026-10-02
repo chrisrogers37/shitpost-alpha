@@ -1,4 +1,4 @@
-"""Command line: `python -m engine migrate | run | status | import-history`."""
+"""Command line: `python -m engine migrate | run | status | import-history | backfill-bars`."""
 
 import argparse
 import asyncio
@@ -15,6 +15,7 @@ from engine.feeds.history import run_import
 from engine.feeds.status import status_lines
 from engine.lease import LEASE_NAME
 from engine.logs import configure_logging
+from engine.market.bars import run_backfill
 from engine.migrate import migrate
 from engine.registry import Registry, build_registry
 from engine.runtime import run_engine
@@ -33,6 +34,9 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
     commands.add_parser("status", help="print the engine status row")
     commands.add_parser(
         "import-history", help="import Trump's past posts (CC0 archive, then CNN's live file)"
+    )
+    commands.add_parser(
+        "backfill-bars", help="fetch every instrument's missing daily bars from Alpaca"
     )
     args = parser.parse_args(argv)
 
@@ -57,6 +61,8 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
     if args.command == "import-history":
         asyncio.run(run_import(settings))
         return 0
+    if args.command == "backfill-bars":
+        return asyncio.run(run_backfill(settings))
     return asyncio.run(_status(settings))
 
 

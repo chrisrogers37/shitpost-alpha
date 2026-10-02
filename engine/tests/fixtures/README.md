@@ -22,3 +22,11 @@ calls Truth Social or ScrapeCreators):
 - `scrapecreators_posts.unverified.json`: ScrapeCreators' `{"success": true, "posts": [...]}`
   around the same five statuses.
 - `challenge.unverified.html`: a Cloudflare challenge page.
+
+Hand-built from Alpaca's documented formats, **unverified until a session with the Alpaca
+keys records the real answers** (engine/README.md, "Alpaca claims"):
+
+- `alpaca_stock_bars_page1.unverified.json`, `alpaca_stock_bars_page2.unverified.json`: two
+  pages of SPY daily bars joined by `next_page_token`.
+- `alpaca_coin_bars.unverified.json`: one BTC/USD daily bar.
+- `alpaca_error.unverified.json`: an error body.
