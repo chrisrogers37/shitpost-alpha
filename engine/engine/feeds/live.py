@@ -26,7 +26,7 @@ import httpx
 from sqlalchemy import Row, func, select, update
 from sqlalchemy.exc import SQLAlchemyError
 
-from engine.db import db_now
+from engine.db import TRANSIENT_ERRORS, db_now, raise_if_cancelling
 from engine.feeds.base import Feed, FeedBlocked, FeedFailed, Read, make_client
 from engine.feeds.cnn import CnnFeed
 from engine.feeds.mastodon import DirectFeed, ScrapeCreatorsFeed
@@ -144,6 +144,7 @@ class FeedPoller:
         except FeedFailed as exc:
             await self._failed(str(exc), blocked=False)
         except Exception as exc:  # a bug, or an answer nothing expected: never a crash
+            raise_if_cancelling()
             log.exception("%s: unexpected error reading the feed", self.name)
             await self._failed(f"unexpected error: {exc!r}", blocked=False)
         else:
@@ -169,6 +170,7 @@ class FeedPoller:
         except FeedFailed as exc:
             return self._catch_up_failed(posts, mark, str(exc), "errors")
         except Exception as exc:
+            raise_if_cancelling()
             log.exception("%s: unexpected error catching up", self.name)
             return self._catch_up_failed(posts, mark, f"unexpected error: {exc!r}", "errors")
         self.catch_up_wait, self.catch_up_error = 0.0, None
@@ -331,10 +333,12 @@ class Live:
                 continue
             try:
                 await poller.poll()
-            except (SQLAlchemyError, OSError) as exc:
-                log.warning("%s: database write failed, retrying next poll: %s", poller.name, exc)
-            except Exception:  # never let one feed's bug stop the others
-                log.exception("%s: poll failed; trying again next poll", poller.name)
+            except Exception as exc:  # never let one feed's bug or a lost connection stop the rest
+                raise_if_cancelling()
+                if isinstance(exc, TRANSIENT_ERRORS):
+                    log.warning("%s: database write failed, trying again: %s", poller.name, exc)
+                else:
+                    log.exception("%s: poll failed; trying again next poll", poller.name)
 
     async def answered(self) -> None:
         """A feed answered: the feeds are not dark."""
@@ -370,6 +374,7 @@ class Live:
                         )
                     ).scalar_one()
             except (SQLAlchemyError, OSError) as exc:
+                raise_if_cancelling()
                 log.warning("could not record dark feeds in the status row: %s", exc)
                 since = datetime.now(UTC) - timedelta(seconds=silent)
             self.dark_since = since

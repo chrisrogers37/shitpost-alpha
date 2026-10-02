@@ -5,7 +5,7 @@ import asyncio
 import time
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 
 import httpx
 import pytest
@@ -34,6 +34,7 @@ from engine.tables import (
     signals,
     source_stats,
 )
+from tests import helpers
 from tests.conftest import operator_notices
 from tests.feeds_helpers import (
     CNN_HOST,
@@ -729,6 +730,42 @@ async def test_two_feeds_answering_together_send_one_back_message(
     live.dark_since = datetime(2026, 10, 1, tzinfo=UTC)
     await asyncio.gather(live.answered(), live.answered())
     assert len(operator_notices(caplog, "feeds_back")) == 1
+
+
+async def stall(*args: object, **kwargs: object) -> NoReturn:
+    await helpers.stall_then_fail_on_cancel()
+
+
+@pytest.mark.parametrize("where", ["read", "catch-up", "store", "dark"])
+async def test_the_feeds_stop_when_the_driver_turns_a_cancellation_into_an_error(
+    where: str,
+    make_live: MakeLive,
+    web: FakeWeb,
+    db: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """psycopg can raise OperationalError for a cancellation (a lost lease, a shutdown): no
+    feed loop may take it for a failed poll and carry on."""
+    if where == "catch-up":
+        await store_imported(db, GAP_START)
+        web.routes[CNN_HOST] = cnn_after_outage([])
+    off = frozenset(FEED_NAMES) if where == "dark" else ONLY_CNN
+    live = await started(make_live(sources_off=off, feeds_dark_after_seconds=1.0))
+    if where == "dark":
+        live.db = cast(AsyncEngine, helpers.StalledDb(db))
+        live.last_answer = time.monotonic() - 5
+    elif where == "store":
+        monkeypatch.setattr(live_module, "store_posts", stall)
+    else:
+        feed = live.pollers["cnn"].feed
+        monkeypatch.setattr(feed, "read" if where == "read" else "read_back", stall)
+    task = asyncio.create_task(live._watch_dark() if where == "dark" else live.run())
+    await asyncio.sleep(0.3)  # stalled
+    task.cancel()
+    done, _ = await asyncio.wait({task}, timeout=2.0)
+    if not done:
+        await helpers.cancel_wedged()
+    assert done and task.cancelled()
 
 
 async def test_store_writes_in_batches(db: AsyncEngine, monkeypatch: pytest.MonkeyPatch) -> None:
