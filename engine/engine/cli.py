@@ -108,12 +108,16 @@ def _extract_command(args: argparse.Namespace, settings: Settings) -> int:
         return asyncio.run(names.run_sync_names(settings))
     if args.command == "extract":
         return asyncio.run(batch.run_extract(settings))
-    if args.command == "fetch-model":
-        hosts = similarity.fetch_model(settings)
-        print(f"downloaded through: {', '.join(sorted(hosts)) or 'nothing new'}")
-        return 0
-    if args.command == "embed":
-        return asyncio.run(batch.run_embed(settings))
+    try:
+        if args.command == "fetch-model":
+            hosts = similarity.fetch_model(settings)
+            print(f"downloaded through: {', '.join(sorted(hosts)) or 'nothing new'}")
+            return 0
+        if args.command == "embed":
+            return asyncio.run(batch.run_embed(settings))
+    except similarity.ModelMissing as exc:
+        print(exc, file=sys.stderr)
+        return 1
     if args.command == "review-list":
         return asyncio.run(batch.run_review_list(settings))
     keys = None

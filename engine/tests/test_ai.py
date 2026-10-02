@@ -89,7 +89,8 @@ def test_an_answer_is_checked_field_by_field() -> None:
 # --- the providers, through their SDKs with hand-made answers -------------------------
 
 
-async def test_openai_answer_through_the_sdk() -> None:
+async def test_openai_answer_through_the_sdk(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://elsewhere.example/v1")
     sent: list[httpx.Request] = []
 
     def route(request: httpx.Request) -> httpx.Response:
@@ -126,7 +127,8 @@ async def test_xai_goes_through_the_openai_sdk_at_its_own_host() -> None:
     assert result.ok and hosts == ["api.x.ai"]
 
 
-async def test_anthropic_answer_through_the_sdk() -> None:
+async def test_anthropic_answer_through_the_sdk(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://elsewhere.example")
     sent: list[httpx2.Request] = []
 
     def route(request: httpx2.Request) -> httpx2.Response:
@@ -139,6 +141,7 @@ async def test_anthropic_answer_through_the_sdk() -> None:
         )
         result = await ask_model(client, CONFIG, "Post:\nNvidia")
     assert result.ok and [i.name for i in result.items] == ["Nvidia"]
+    assert sent[0].url.host == "api.anthropic.com"  # never a base URL from the environment
     body = json.loads(sent[0].content)
     assert body["temperature"] == 0
     assert body["output_config"]["format"]["type"] == "json_schema"

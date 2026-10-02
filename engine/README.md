@@ -13,6 +13,12 @@ Run from this directory, with `ENGINE_DATABASE_URL` set (never the old `DATABASE
     python -m engine status    # the status row, the lease, each feed's state, signals by stage
     python -m engine import-history   # past posts: CC0 archive copy, then CNN's live file
     python -m engine backfill-bars    # every instrument's missing daily bars from Alpaca
+    python -m engine sync-names       # aliases.json's instruments and names into the database
+    python -m engine extract          # the rules picker over every text post (per rules version)
+    python -m engine fetch-model      # download the pinned similarity model files
+    python -m engine embed            # a similarity vector for every text post (per model version)
+    python -m engine ai-pick --from 2025-11-01 --to 2025-11-30 --max-usd 5   # or --keys FILE
+    python -m engine review-list      # names the AI vote counted that the rules missed
 
 Settings are `ENGINE_*` variables; see `engine/settings.py`. In `engine.engine_meta`,
 `last_heartbeat_at` shows whether a copy is working; `lease_holder` names the last holder
@@ -154,6 +160,43 @@ everything else is Alpaca's answer.
 
 The same answers show that stock daily bars start at midnight New York time, coin daily
 bars at midnight UTC, and that a bar starting exactly at a request's `end` is included.
+
+## Extraction and similarity
+
+Each text post gets a topic, a market link (yes or no) and the instruments it names, from
+two pickers, and a similarity vector. Everything is recorded in `engine.extractions` (one
+row per post, method, version and run; never overwritten), `engine.signal_mentions` (the
+names, mapped to instruments or kept with why not) and `engine.signal_embeddings`.
+
+- **Rules picker** (`engine/extract/rules.py`): cashtags, bare tickers, company names and
+  topic words. Its files (`extract/topics.json`, `extract/aliases.json`,
+  `market/collisions.json`) are pinned by SHA-256 in `extract/rules.json` with one version
+  number; changing any of them means bumping the version and the hashes, or loading
+  refuses. Collision tickers (`BA`, `SPY`, ...) count only as a cashtag or through a name.
+  Name and old-ticker dates come from the database, so run `sync-names` after changing
+  aliases.json. A post's date is its New York date.
+- **AI picker** (`engine/extract/ai.py`): the same post to three pinned models (OpenAI,
+  xAI, Anthropic) side by side; a name or a market link counts when two agree, and with
+  fewer than two answers the rules stand in (`ai_fallback`). Its prompt, schema and
+  models are pinned the same way in `extract/ai.json`. Keys only from
+  `ENGINE_OPENAI_KEY`, `ENGINE_XAI_KEY` and `ENGINE_ANTHROPIC_KEY`: no key, no client.
+  Live posts go to it only with `ENGINE_AI_LIVE=true`. `ai-pick` prints the projected
+  cost first, refuses a run over `--max-usd` and stops once a run has cost more.
+- **Reason line** (`engine/extract/reason.py`): one line of at most 120 characters on why
+  a post may matter, checked so it states no direction, price, target or advice. PR 6
+  calls it.
+- **Similarity** (`engine/extract/similarity.py`): BAAI/bge-small-en-v1.5 from its ONNX
+  file on the CPU (onnxruntime and tokenizers, no torch), pinned in `extract/model.json`
+  and downloaded with `fetch-model` into `ENGINE_MODEL_DIR`. Matching keeps all vectors in
+  one numpy matrix.
+- **Live stage**: the `score` worker gives each new text post its rules answer, mentions,
+  vector and, with the AI on, the three answers and the vote, then moves it to `done`.
+  It loads the model when it starts and fails clearly (posts wait at `score`) if the
+  files aren't there. History never goes through this stage.
+
+Labels and samples for measuring the pickers are in `precision/`
+(`scripts/precision.py` scores them; `scripts/history_report.py` sums the rules over all
+history).
 
 ## Database
 

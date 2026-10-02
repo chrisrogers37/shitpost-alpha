@@ -49,7 +49,13 @@ log = logging.getLogger(__name__)
 MANIFEST = Path(__file__).with_name("ai.json")
 Provider = Literal["openai", "xai", "anthropic"]
 PROVIDERS: tuple[Provider, ...] = ("openai", "xai", "anthropic")
-XAI_BASE_URL = "https://api.x.ai/v1"
+BASE_URLS: dict[Provider, str] = {
+    "openai": "https://api.openai.com/v1",
+    "xai": "https://api.x.ai/v1",
+    "anthropic": "https://api.anthropic.com",
+}
+"""Passed to every SDK client, so an OPENAI_BASE_URL or ANTHROPIC_BASE_URL left in the
+environment can never send an engine key elsewhere."""
 INDEX_FUNDS = frozenset({"SPY", "QQQ", "DIA", "IWM", "VOO", "IVV", "VTI", "RSP"})
 """Broad index funds: never a named instrument (SPY and QQQ come from the market link)."""
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504, 529})
@@ -215,7 +221,7 @@ class Client(Protocol):
 
 
 class OpenAIChat:
-    """OpenAI, and xAI through the same SDK at XAI_BASE_URL: chat completions with a
+    """OpenAI, and xAI through the same SDK at its own host: chat completions with a
     strict JSON schema."""
 
     def __init__(
@@ -233,7 +239,7 @@ class OpenAIChat:
         self.temperature = temperature
         self.client = openai.AsyncOpenAI(
             api_key=key,
-            base_url=XAI_BASE_URL if provider == "xai" else None,
+            base_url=BASE_URLS[provider],
             timeout=timeout,
             max_retries=0,
             http_client=http_client,
@@ -297,7 +303,11 @@ class AnthropicMessages:
         self.model = model
         self.temperature = temperature
         self.client = anthropic.AsyncAnthropic(
-            api_key=key, timeout=timeout, max_retries=0, http_client=http_client
+            api_key=key,
+            base_url=BASE_URLS["anthropic"],
+            timeout=timeout,
+            max_retries=0,
+            http_client=http_client,
         )
 
     async def ask(
