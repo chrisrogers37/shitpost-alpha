@@ -5,7 +5,7 @@ import asyncio
 import time
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, NoReturn
 
 import httpx
 import pytest
@@ -21,7 +21,7 @@ from engine.feeds.live import Live, feeds_worker
 from engine.feeds.mastodon import DirectFeed
 from engine.feeds.posts import ACCOUNT_ID, mirror_post
 from engine.feeds.status import status_lines
-from engine.feeds.store import insert_signals, store_posts, trump_source_id
+from engine.feeds.store import insert_signals, set_feed_status, store_posts, trump_source_id
 from engine.lease import LEASE_NAME
 from engine.registry import EngineContext, Registry
 from engine.runtime import run_engine
@@ -381,19 +381,21 @@ async def test_cnn_catch_up_reads_the_whole_file(
     head = leading_items(fixture_bytes("cnn_head.json"))  # what the range read shows
     gap = [cnn_item(status_id_at(datetime(2026, 9, d, tzinfo=UTC))) for d in (20, 5)]
     older = cnn_item(status_id_at(datetime(2026, 8, 1, tzinfo=UTC)))
+    odd_and_old = {"id": status_id_at(datetime(2026, 7, 1, tzinfo=UTC)), "content": 5}
     downloads = []
 
     def archive(request: httpx.Request) -> httpx.Response:
         if "range" in request.headers:
             return cnn_ok(request)
         downloads.append(request)
-        return json_response([*head, *gap, cnn_item(newest_stored), older])
+        return json_response([*head, *gap, cnn_item(newest_stored), older, odd_and_old])
 
     web.routes[CNN_HOST] = archive
     live = await started(make_live(sources_off=ONLY_CNN))
     await live.pollers["cnn"].poll()
     assert len(downloads) == 1
     assert "could not read back" not in caplog.text
+    assert "skipped" not in caplog.text  # only posts newer than the mark are mapped
 
     keys = await scalars(db, select(signals.c.key))
     # The head, the gap and the stored post; nothing older than the stored post.
@@ -472,6 +474,63 @@ async def test_a_failed_catch_up_keeps_the_new_posts_and_is_tried_again_later(
     assert web.requests[-1].headers["if-none-match"] == '"v1"'
 
 
+def refused(request: httpx.Request) -> httpx.Response:
+    return httpx.Response(429)
+
+
+async def test_a_block_during_cnn_catch_up_keeps_the_new_posts_and_the_feed_up(
+    make_live: MakeLive, web: FakeWeb, db: AsyncEngine
+) -> None:
+    await store_imported(db, GAP_START)
+    downloads: list[httpx.Request] = []
+    web.routes[CNN_HOST] = cnn_after_outage(downloads, refused)  # the whole file: 429
+    live = await started(make_live(sources_off=ONLY_CNN))
+    cnn = live.pollers["cnn"]
+    await cnn.poll()
+    assert cnn.state == "up" and set(HEAD) <= await stored_ids(db)
+    await cnn.poll()  # the catch-up waits its back-off; the error stays visible meanwhile
+    assert len(downloads) == 1
+    row = await one(db, select(source_stats).where(source_stats.c.feed == "cnn"))
+    assert (row.polls, row.errors, row.blocks) == (2, 0, 1)
+    async with db.connect() as conn:
+        (line,) = [line for line in await status_lines(conn) if line.startswith("feed cnn")]
+    assert line.startswith(f"feed cnn: up (catch-up to {cnn.caught_up_to} failed: HTTP 429)")
+
+
+async def test_a_block_while_direct_pages_back_keeps_direct_up(
+    make_live: MakeLive, web: FakeWeb, db: AsyncEngine
+) -> None:
+    await store_imported(db, GAP_START)
+    page_one = [status_json(i) for i in HEAD]
+    web.routes[DIRECT_HOST] = lambda request: (
+        refused(request) if "max_id" in request.url.params else json_response(page_one)
+    )
+    live = await started(
+        make_live(sources_off=frozenset({"trumpstruth", "cnn"}), scrapecreators_key=SecretStr("k"))
+    )
+    direct = live.pollers["direct"]
+    await direct.poll()
+    assert direct.state == "up" and set(HEAD) <= await stored_ids(db)
+    assert live.interval("scrapecreators") == 3600  # no paid fallback for a catch-up
+
+
+async def test_a_bug_while_catching_up_keeps_the_new_posts_and_the_feed_up(
+    make_live: MakeLive, web: FakeWeb, db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await store_imported(db, GAP_START)
+    web.routes[CNN_HOST] = cnn_after_outage([])
+    live = await started(make_live(sources_off=ONLY_CNN))
+    cnn = live.pollers["cnn"]
+
+    async def broken(newest: object, until: object) -> NoReturn:
+        raise RuntimeError("a bug")
+
+    monkeypatch.setattr(cnn.feed, "read_back", broken)
+    await cnn.poll()
+    assert cnn.state == "up" and set(HEAD) <= await stored_ids(db)
+    assert cnn.catch_up_wait == 60
+
+
 async def test_a_gap_left_open_is_still_filled_after_a_restart(
     make_live: MakeLive, web: FakeWeb, db: AsyncEngine
 ) -> None:
@@ -544,6 +603,75 @@ async def test_a_new_copy_keeps_a_block_and_its_back_off(
     assert recovered.endswith(f"direct answers again (blocked since {since})")
 
 
+async def test_a_restored_block_that_fails_again_backs_off_further_without_a_message(
+    make_live: MakeLive, web: FakeWeb, db: AsyncEngine, caplog: pytest.LogCaptureFixture
+) -> None:
+    web.routes[DIRECT_HOST] = status(403)
+    first = await started(make_live(sources_off=ONLY_DIRECT))
+    for _ in range(3):
+        await first.pollers["direct"].poll()
+    since = first.pollers["direct"].blocked_since
+    direct = (await started(make_live(sources_off=ONLY_DIRECT))).pollers["direct"]
+    await direct.poll()
+    row = await one(db, select(feed_status).where(feed_status.c.feed == "direct"))
+    assert (direct.backoff, row.backoff_seconds, row.blocked_since) == (480, 480, since)
+    assert len(operator_notices(caplog, "feed_blocked")) == 1
+
+
+async def test_a_block_whose_status_write_fails_still_knows_when_it_began(
+    make_live: MakeLive,
+    web: FakeWeb,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    web.routes[DIRECT_HOST] = status(403)
+    direct = (await started(make_live(sources_off=ONLY_DIRECT))).pollers["direct"]
+    calls = 0
+
+    async def flaky(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OperationalError("UPDATE", {}, Exception("server closed the connection"))
+        return await set_feed_status(*args, **kwargs)
+
+    monkeypatch.setattr(live_module, "set_feed_status", flaky)
+    with pytest.raises(OperationalError):
+        await direct.poll()
+    assert direct.blocked_since is not None
+    web.routes[DIRECT_HOST] = direct_ok
+    await direct.poll()
+    (recovered,) = operator_notices(caplog, "feed_recovered")
+    assert "since None" not in recovered
+
+
+async def test_recovery_is_announced_once_the_answer_is_stored(
+    make_live: MakeLive,
+    web: FakeWeb,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    web.routes[DIRECT_HOST] = status(403)
+    direct = (await started(make_live(sources_off=ONLY_DIRECT))).pollers["direct"]
+    await direct.poll()
+    web.routes[DIRECT_HOST] = direct_ok
+    calls = 0
+
+    async def flaky(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OperationalError("INSERT", {}, Exception("server closed the connection"))
+        return await store_posts(*args, **kwargs)
+
+    monkeypatch.setattr(live_module, "store_posts", flaky)
+    with pytest.raises(OperationalError):
+        await direct.poll()
+    assert direct.state == "blocked" and operator_notices(caplog, "feed_recovered") == []
+    await direct.poll()
+    assert direct.state == "up" and len(operator_notices(caplog, "feed_recovered")) == 1
+
+
 async def test_scrapecreators_check_is_not_repeated_by_a_new_copy(
     make_live: MakeLive, web: FakeWeb
 ) -> None:
@@ -583,6 +711,15 @@ async def test_all_dark_sends_one_message_and_clears_when_a_feed_answers(
     assert len(operator_notices(caplog, "feeds_dark")) == 1
     assert len(operator_notices(caplog, "feeds_back")) == 1
     assert await scalar(db, select(engine_meta.c.feeds_dark_since)) is None
+
+
+async def test_going_dark_twice_at_once_sends_one_message(
+    make_live: MakeLive, caplog: pytest.LogCaptureFixture
+) -> None:
+    live = await started(make_live(feeds_dark_after_seconds=1.0))
+    live.last_answer = time.monotonic() - 5
+    await asyncio.gather(live._go_dark(), live._go_dark())
+    assert len(operator_notices(caplog, "feeds_dark")) == 1
 
 
 async def test_two_feeds_answering_together_send_one_back_message(

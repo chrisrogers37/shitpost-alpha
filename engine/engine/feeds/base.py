@@ -97,7 +97,7 @@ class Feed(ABC):
         self.settings = settings
         self.etag: str | None = None
         """ETag of the last read whose posts were stored, sent as If-None-Match."""
-        self._skipped = ""
+        self._skipped: dict[str, frozenset[str]] = {}
 
     @abstractmethod
     async def read(self) -> Read:
@@ -153,9 +153,11 @@ class Feed(ABC):
         if "html" in content_type:
             raise FeedBlocked(f"challenge page ({content_type})")
 
-    def map_items[T](self, items: Iterable[T], mapper: Callable[[T], Post | None]) -> list[Post]:
+    def map_items[T](
+        self, items: Iterable[T], mapper: Callable[[T], Post | None], *, part: str = "read"
+    ) -> list[Post]:
         """Map each item, skipping (and logging) one that doesn't map; the read fails only
-        when no item maps."""
+        when no item maps. The same odd items are logged once per `part`, not every poll."""
         posts: list[Post] = []
         skipped: list[str] = []
         total = 0
@@ -170,10 +172,11 @@ class Feed(ABC):
                 posts.append(post)
         if skipped and len(skipped) == total:
             raise FeedFailed(f"none of the {total} items map: {skipped[0]}")
-        report = f"skipped {len(skipped)} of {total} items that don't map: {skipped}"[:500]
-        if skipped and report != self._skipped:  # once, not every poll
-            log.warning("%s: %s", self.name, report)
-        self._skipped = report if skipped else ""
+        reasons = frozenset(skipped)
+        if reasons and reasons != self._skipped.get(part):
+            report = f"skipped {len(skipped)} of {total} items that don't map: {skipped}"
+            log.warning("%s %s: %s", self.name, part, report[:500])
+        self._skipped[part] = reasons
         return posts
 
 
@@ -183,6 +186,6 @@ async def _read_body(response: httpx.Response, limit: int | None) -> bytes:
     body = bytearray()
     async for chunk in response.aiter_bytes():
         body += chunk
-        if len(body) >= limit:
+        if len(body) > limit:  # past the range: stop. Reading to the end keeps the connection
             break
     return bytes(body[:limit])
