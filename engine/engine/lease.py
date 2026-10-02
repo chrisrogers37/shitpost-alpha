@@ -6,7 +6,9 @@ the last renewal. All lease times come from the database clock.
 
 The holder steps down `ttl - renew` seconds after the start of its last successful
 renewal, by its own monotonic clock, so it has stopped working before any other copy can
-take the row. An answer that arrives too late to leave a full renew interval before that
+take the row. It steps down on time even if the driver is slow to give up a stalled
+query: each renewal runs as its own task, which is cancelled without waiting. An answer
+to acquire() that arrives too late to leave a full renew interval before the step-down
 point counts as not held. Lease statements carry lock and statement timeouts, so a stuck
 transaction elsewhere can't hold a copy up past those points.
 """
@@ -21,6 +23,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from engine.db import raise_if_cancelling
 from engine.tables import engine_lease
 
 log = logging.getLogger(__name__)
@@ -41,7 +44,9 @@ class Lease:
         self._ttl = ttl
         self._renew = renew
         self._answer_within = ttl - 2 * renew  # leaves one renew interval before stepping down
-        self._deadline = 0.0
+        self._renewed_at = 0.0  # start of the last successful renewal, by the loop clock
+        self._deadline = 0.0  # the step-down point
+        self._renewal: asyncio.Task[bool] | None = None
 
     async def acquire(self) -> bool:
         """Take the lease if it is free, expired or already ours. Returns whether we hold it."""
@@ -54,18 +59,24 @@ class Lease:
 
     async def keep(self) -> NoReturn:
         """Renew every `renew` seconds; raise LeaseLost at the step-down point or on loss."""
-        while True:
-            try:
-                async with asyncio.timeout_at(self._deadline):
-                    await asyncio.sleep(self._renew)
-                    held = await self._renew_until_answered()
-            except TimeoutError:
-                raise LeaseLost("could not renew the lease in time") from None
-            if not held:
-                raise LeaseLost("another copy holds the lease")
+        loop = asyncio.get_running_loop()
+        try:
+            while True:
+                await asyncio.sleep(max(0.0, self._renewed_at + self._renew - loop.time()))
+                self._renewal = asyncio.create_task(self._renew_until_answered())
+                await asyncio.wait({self._renewal}, timeout=self._deadline - loop.time())
+                if not self._renewal.done() or loop.time() >= self._deadline:
+                    raise LeaseLost("could not renew the lease in time")
+                if not self._renewal.result():
+                    raise LeaseLost("another copy holds the lease")
+        finally:
+            if self._renewal is not None:
+                self._renewal.cancel()  # without waiting: the driver can take 10 s to give up
 
     async def release(self) -> None:
         """Give the lease up, so the next copy can take it at once."""
+        if self._renewal is not None:
+            await asyncio.wait({self._renewal})  # a renewal cancelled at the step-down
         async with self._db.begin() as conn:
             await conn.execute(
                 delete(engine_lease).where(
@@ -78,6 +89,7 @@ class Lease:
             try:
                 return await self._take_or_renew()
             except (SQLAlchemyError, OSError) as exc:
+                raise_if_cancelling()
                 log.warning("lease renewal failed, retrying: %s", exc)
                 await asyncio.sleep(min(1.0, self._renew))
 
@@ -112,5 +124,6 @@ class Lease:
             )
             held = (await conn.execute(stmt)).first() is not None
         if held:
+            self._renewed_at = started
             self._deadline = started + self._ttl - self._renew
         return held

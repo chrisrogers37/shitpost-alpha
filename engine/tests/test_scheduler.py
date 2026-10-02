@@ -90,7 +90,9 @@ async def latest(db: AsyncEngine) -> datetime:
         return latest_slot(MIDNIGHT, await db_now(conn))
 
 
-async def seed_run(db: AsyncEngine, slot: datetime, status: str, attempts: int) -> None:
+async def seed_run(
+    db: AsyncEngine, slot: datetime, status: str, attempts: int, error: str | None = None
+) -> None:
     async with db.begin() as conn:
         await conn.execute(
             insert(job_runs).values(
@@ -100,6 +102,7 @@ async def seed_run(db: AsyncEngine, slot: datetime, status: str, attempts: int) 
                 finished_at=slot,
                 status=status,
                 attempts=attempts,
+                error=error,
             )
         )
 
@@ -182,12 +185,13 @@ async def test_a_new_slot_closes_older_runs_that_never_finished(
     migrated: Settings, db: AsyncEngine, caplog: pytest.LogCaptureFixture
 ) -> None:
     slot = await latest(db)
-    await seed_run(db, slot - timedelta(days=1), "retry", 1)
+    await seed_run(db, slot - timedelta(days=1), "retry", 1, error="RuntimeError: job broke")
     job = Calls()
     await one_pass(scheduler(migrated, db, daily(job)))
     assert job.slots == [slot]
     older, newer = await runs(db)
-    assert older[1] == "failed" and str(older[3]).startswith("superseded by the run for")
+    assert older[1] == "failed"
+    assert str(older[3]).startswith("RuntimeError: job broke; superseded by the run for")
     assert newer[1] == "succeeded"
     assert len(operator_notices(caplog, "job_failed")) == 1
 
@@ -258,3 +262,29 @@ async def test_cancelling_a_heavy_job_kills_its_process(
         await task
     with pytest.raises(ProcessLookupError):
         os.kill(pid, 0)
+
+
+async def test_an_error_text_with_a_nul_byte_is_still_recorded(
+    migrated: Settings, db: AsyncEngine
+) -> None:
+    async def nul(ctx: JobContext) -> None:
+        raise RuntimeError("upstream sent b\x00d data")
+
+    registry = Registry()
+    registry.register_job("daily", MIDNIGHT, nul)
+    await one_pass(scheduler(migrated, db, registry))
+    [(_, status, attempts, error)] = await runs(db)
+    assert (status, attempts, error) == ("retry", 1, "RuntimeError: upstream sent bd data")
+
+
+async def test_cancelling_the_scheduler_works_when_the_driver_turns_it_into_an_error(
+    migrated: Settings, db: AsyncEngine
+) -> None:
+    stalled = EngineContext(migrated, cast(AsyncEngine, helpers.StalledDb(db)))
+    runner = asyncio.create_task(Scheduler(stalled, daily(Calls()).jobs.values()).run())
+    await asyncio.sleep(0.2)  # stalled in its first pass
+    runner.cancel()
+    done, _ = await asyncio.wait({runner}, timeout=2.0)
+    if not done:
+        await helpers.cancel_wedged()
+    assert done and runner.cancelled()
