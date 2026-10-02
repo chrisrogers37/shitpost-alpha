@@ -13,7 +13,7 @@ from engine.market.bars import MinuteCache, backfill_daily, run_backfill, upsert
 from engine.market.instruments import Instrument, instrument_by_slug
 from engine.migrate import migrate
 from engine.settings import Settings
-from engine.tables import market_bars
+from engine.tables import instruments, market_bars
 from tests.market_helpers import (
     NOW,
     FakeAlpaca,
@@ -56,6 +56,15 @@ async def test_upserts_are_idempotent(db: AsyncEngine) -> None:
         row = (await conn.execute(select(market_bars).where(market_bars.c.close == 275.5))).one()
     assert (row.feed, row.adjustment, row.timeframe, row.trades) == ("sip", "all", "1Day", 10)
     assert await stored(db, spy) == {b.start: b.close for b in bars} | {bars[1].start: 275.5}
+
+
+async def test_a_missing_trade_count_or_vwap_is_stored_as_null(db: AsyncEngine) -> None:
+    spy = await seeded(db, "spy")
+    bare = Bar.parse(daily_bar(date(2024, 7, 9), 550.0) | {"n": None, "vw": None})
+    async with db.begin() as conn:
+        await upsert_bars(conn, spy, "1Day", [bare])
+        row = (await conn.execute(select(market_bars.c.trades, market_bars.c.vwap))).one()
+    assert (row.trades, row.vwap) == (None, None)
 
 
 def test_the_web_role_cannot_read_bars(settings: Settings, make_role: Callable[[], str]) -> None:
@@ -101,15 +110,46 @@ async def test_a_new_adjustment_refetches_the_whole_history(
         await backfill_daily(db, alpaca, spy)
     before = await stored(db, spy)
     days = spy_history(fake, scale=0.5)  # a 2-for-1 split: every earlier price halves
+    dropped = fake.series["SPY"].pop(0)  # and Alpaca no longer serves the first day
     async with fake.client(settings, now=NOW + timedelta(days=1)) as alpaca:
         done = await backfill_daily(db, alpaca, spy)
     after = await stored(db, spy)
-    assert done.refetched and done.stored == len(days)
+    assert done.refetched and done.removed == 1 and done.stored == len(days) - 1
+    assert "removed 1 days Alpaca no longer serves" in done.line()
     assert [r.url.params["start"] for r in fake.requests[-2:]] == [
         "2024-06-25T04:00:00Z",
         "2016-01-01T00:00:00Z",
     ]
-    assert all(after[start] == pytest.approx(close / 2) for start, close in before.items())
+    gone = Bar.parse(dropped).start
+    assert gone in before and gone not in after
+    assert all(
+        after[start] == pytest.approx(close / 2) for start, close in before.items() if start != gone
+    )
+
+
+async def test_coins_are_stored_raw_and_a_moved_coin_close_is_written_over(
+    db: AsyncEngine, migrated: Settings
+) -> None:
+    btc = await seeded(db, "btc")
+    fake = FakeAlpaca()
+    days = [date(2024, 7, 1) + timedelta(days=n) for n in range(9)]  # to Tuesday 9 July
+    fake.series["BTC/USD"] = [daily_bar(day, 60_000.0 + n, coin=True) for n, day in enumerate(days)]
+    settings = market_settings(migrated)
+    async with fake.client(settings) as alpaca:
+        assert (await backfill_daily(db, alpaca, btc)).stored == 9
+    fake.series["BTC/USD"][-2]["c"] = 59_000.0  # a correction, not an adjustment
+    async with fake.client(settings, now=NOW + timedelta(days=1)) as alpaca:
+        done = await backfill_daily(db, alpaca, btc)
+    assert (done.refetched, done.written, done.stored) == (False, 1, 9)
+    assert len(fake.requests) == 2  # no whole fetch
+    async with db.connect() as conn:
+        kinds = (await conn.execute(select(market_bars.c.feed, market_bars.c.adjustment))).all()
+        rebased = (
+            await conn.execute(select(instruments.c.rebased_at).where(instruments.c.id == btc.id))
+        ).scalar()
+    assert set(kinds) == {("crypto_us", "raw")}
+    assert rebased == NOW  # the first fill's; a correction doesn't re-base
+    assert (await stored(db, btc))[Bar.parse(fake.series["BTC/USD"][-2]).start] == 59_000.0
 
 
 async def test_backfill_without_keys_fills_coins_and_reports_stocks(migrated: Settings) -> None:
@@ -125,7 +165,7 @@ async def test_backfill_without_keys_fills_coins_and_reports_stocks(migrated: Se
     assert code == 1
     assert {r.url.params["symbols"] for r in fake.requests} == {"BTC/USD", "ETH/USD"}
     assert [line.split(":")[0] for line in lines[:4]] == ["spy", "btc", "qqq", "eth"]
-    assert "ALPACA_API_KEY_ID" in lines[0] and "failed" in lines[0]
+    assert "ALPACA_API_KEY_ID" in lines[0] and "failed: AlpacaKeysMissing" in lines[0]
     assert lines[1].startswith("btc: 5 daily bars")
     assert lines[-1] == "2 of 4 instruments backfilled"
 
