@@ -151,6 +151,9 @@ def test_migrate_and_status_commands(settings: Settings) -> None:
     (stream_id,) = query(settings.database_url, "SELECT stream_id::text FROM engine.engine_meta")[0]
     assert f"stream_id: {stream_id}" in status.stdout
     assert "lease: free" in status.stdout
+    assert "feed direct: not polled yet" in status.stdout
+    assert "feeds: not dark" in status.stdout
+    assert "signals by stage: none yet" in status.stdout
 
 
 def test_missing_database_url_is_a_clear_error(settings: Settings) -> None:

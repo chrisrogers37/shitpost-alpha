@@ -1,4 +1,4 @@
-"""Command line: `python -m engine migrate | run | status`."""
+"""Command line: `python -m engine migrate | run | status | import-history`."""
 
 import argparse
 import asyncio
@@ -11,6 +11,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import ProgrammingError
 
 from engine.db import db_now, make_engine
+from engine.feeds.history import run_import
+from engine.feeds.status import status_lines
 from engine.lease import LEASE_NAME
 from engine.logs import configure_logging
 from engine.migrate import migrate
@@ -28,6 +30,9 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
     commands.add_parser("migrate", help="upgrade the engine database to the latest schema")
     commands.add_parser("run", help="run the engine; one copy at a time holds the lease")
     commands.add_parser("status", help="print the engine status row")
+    commands.add_parser(
+        "import-history", help="import Trump's past posts (CC0 archive, then CNN's live file)"
+    )
     args = parser.parse_args(argv)
 
     configure_logging()
@@ -47,6 +52,9 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
         return 0
     if args.command == "run":
         asyncio.run(_run(settings, registry or build_registry()))
+        return 0
+    if args.command == "import-history":
+        asyncio.run(run_import(settings))
         return 0
     return asyncio.run(_status(settings))
 
@@ -68,6 +76,7 @@ async def _status(settings: Settings) -> int:
                 await conn.execute(select(engine_lease).where(engine_lease.c.name == LEASE_NAME))
             ).one_or_none()
             now = await db_now(conn)
+            feeds = await status_lines(conn)
     except ProgrammingError:
         meta = None
     finally:
@@ -82,4 +91,6 @@ async def _status(settings: Settings) -> int:
     else:
         left = (lease.expires_at - now).total_seconds()
         print(f"lease: held by {lease.holder}, expires in {left:.0f}s")
+    for line in feeds:
+        print(line)
     return 0

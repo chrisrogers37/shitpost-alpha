@@ -7,18 +7,27 @@ Schemas:
 """
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Column,
     DateTime,
+    ForeignKey,
     Identity,
+    Index,
     Integer,
     MetaData,
+    PrimaryKeyConstraint,
     SmallInteger,
     Table,
     Text,
     UniqueConstraint,
     Uuid,
+    func,
+    literal_column,
 )
+from sqlalchemy.dialects.postgresql import JSONB
+
+from engine.stages import stage_columns
 
 SCHEMAS = ("engine", "prices", "app")
 
@@ -33,6 +42,7 @@ engine_meta = Table(
     Column("last_heartbeat_at", DateTime(timezone=True)),
     Column("lease_holder", Text),
     Column("code_version", Text),
+    Column("feeds_dark_since", DateTime(timezone=True)),
     CheckConstraint("id = 1", name="engine_meta_single_row"),
     schema="engine",
 )
@@ -64,3 +74,102 @@ job_runs = Table(
     ),
     schema="engine",
 )
+
+sources = Table(
+    "sources",
+    metadata,
+    Column("id", SmallInteger, Identity(), primary_key=True),
+    Column("platform", Text, nullable=False),
+    Column("account_id", Text, nullable=False),
+    Column("handle", Text, nullable=False),
+    Column("display_name", Text, nullable=False),
+    Column("avatar_url", Text),
+    Column("profile_url", Text, nullable=False),
+    UniqueConstraint("platform", "account_id", name="sources_platform_account_id_key"),
+    schema="engine",
+)
+"""Who we follow (one row for Trump), not the feeds we read them through."""
+
+SIGNAL_KINDS = ("post", "reply", "quote", "repost")
+NOT_SCORED = ("repost", "no_text", "imported")
+
+signals = Table(
+    "signals",
+    metadata,
+    Column("key", Text, primary_key=True),
+    Column("source_id", SmallInteger, ForeignKey("engine.sources.id"), nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("points_to", Text),
+    Column("url", Text, nullable=False),
+    Column("text", Text, nullable=False),
+    Column("posted_at", DateTime(timezone=True), nullable=False),
+    Column("has_media", Boolean),
+    Column("raw", JSONB, nullable=False),
+    Column("raw_via", Text, nullable=False),
+    Column("first_seen_at", DateTime(timezone=True), nullable=False),
+    Column("first_seen_via", Text, nullable=False),
+    Column("not_scored", Text),
+    *stage_columns(),
+    CheckConstraint("kind IN ('post', 'reply', 'quote', 'repost')", name="signals_kind_check"),
+    CheckConstraint(
+        "not_scored IN ('repost', 'no_text', 'imported')", name="signals_not_scored_check"
+    ),
+    Index("signals_source_id_posted_at_idx", "source_id", "posted_at"),
+    Index(
+        "signals_text_search_idx",
+        func.to_tsvector(literal_column("'english'::regconfig"), literal_column("text")),
+        postgresql_using="gin",
+    ),
+    schema="engine",
+)
+"""One row per post, written once from the first copy any feed or import delivered.
+
+key: "<platform>:<id>", e.g. truth_social:117371353802794328. points_to: the key of the
+post a reply, quote or repost points to, when the feed says. has_media: NULL when the
+first copy's feed doesn't report media (trumpstruth). raw/raw_via: that first copy and
+the feed (or import part) it came from. first_seen_*: the earliest sighting. not_scored:
+why the post skips live scoring (it is saved at stage done); NULL for posts that go
+through the live stages, starting at "score".
+"""
+
+signal_sightings = Table(
+    "signal_sightings",
+    metadata,
+    Column("signal_key", Text, ForeignKey("engine.signals.key"), nullable=False),
+    Column("feed", Text, nullable=False),
+    Column("seen_at", DateTime(timezone=True), nullable=False),
+    PrimaryKeyConstraint("signal_key", "feed", name="signal_sightings_pkey"),
+    schema="engine",
+)
+"""When each live feed first showed each post (database clock)."""
+
+source_stats = Table(
+    "source_stats",
+    metadata,
+    Column("feed", Text, nullable=False),
+    Column("hour", DateTime(timezone=True), nullable=False),
+    Column("polls", Integer, nullable=False, server_default="0"),
+    Column("not_modified", Integer, nullable=False, server_default="0"),
+    Column("errors", Integer, nullable=False, server_default="0"),
+    Column("blocks", Integer, nullable=False, server_default="0"),
+    Column("posts_seen", Integer, nullable=False, server_default="0"),
+    Column("posts_first", Integer, nullable=False, server_default="0"),
+    PrimaryKeyConstraint("feed", "hour", name="source_stats_pkey"),
+    schema="engine",
+)
+"""Hourly counters per feed. posts_seen: posts the feed showed for the first time;
+posts_first: posts whose signal row came from this feed's copy."""
+
+feed_status = Table(
+    "feed_status",
+    metadata,
+    Column("feed", Text, primary_key=True),
+    Column("state", Text, nullable=False),
+    Column("last_ok_at", DateTime(timezone=True)),
+    Column("blocked_since", DateTime(timezone=True)),
+    Column("last_error", Text),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    CheckConstraint("state IN ('up', 'blocked', 'off')", name="feed_status_state_check"),
+    schema="engine",
+)
+"""Each feed's current state, for `python -m engine status`."""
