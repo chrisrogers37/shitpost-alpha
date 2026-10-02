@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Awaitable, Callable
 
 import pytest
 from sqlalchemy import text
@@ -46,14 +47,14 @@ async def test_new_connections_time_out(
 
     with helpers.silent_port() as port:
         url = silent_url(settings, port)
-        attempts = [
-            connect_async(url),
-            asyncio.to_thread(connect_sync, url),
-            asyncio.to_thread(migrate, url, settings.web_role),  # through migrations/env.py
+        attempts: list[Callable[[], Awaitable[None]]] = [
+            lambda: connect_async(url),
+            lambda: asyncio.to_thread(connect_sync, url),
+            lambda: asyncio.to_thread(migrate, url, settings.web_role),  # via migrations/env.py
         ]
         for attempt in attempts:
             with pytest.raises(OperationalError, match="timeout"):
-                await asyncio.wait_for(attempt, timeout=8)  # without one it would wait for ever
+                await asyncio.wait_for(attempt(), timeout=8)  # without one it would wait for ever
 
 
 def test_only_errors_no_retry_can_fix_are_permanent() -> None:

@@ -1,4 +1,8 @@
 import asyncio
+import contextlib
+import itertools
+import statistics
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
@@ -6,7 +10,7 @@ import psycopg
 import pytest
 from sqlalchemy import Row, select, update
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
 from engine.db import sqlalchemy_url
 from engine.lease import Lease, LeaseLost
@@ -57,6 +61,8 @@ async def test_lease_times_come_from_the_database_clock(migrated: Settings) -> N
         connect_args={"options": "-c search_path=skew,pg_catalog,public"},
     )
     try:
+        async with skewed.connect():  # a slow first connect must not count as a late answer
+            pass
         assert await lease(skewed, "a").acquire()
         row = await lease_row(skewed)
     finally:
@@ -142,6 +148,54 @@ async def test_a_late_answer_does_not_count_as_holding(
     assert await a.acquire()  # the next poll takes it again as ours, with a fresh deadline
 
 
+class AnswersAfterCommit:
+    """Stands in for an AsyncEngine whose commits reach the server but whose answers come
+    back late, as in a network blip."""
+
+    def __init__(self, real: AsyncEngine) -> None:
+        self.real = real
+
+    @contextlib.asynccontextmanager
+    async def begin(self) -> AsyncIterator[AsyncConnection]:
+        async with self.real.begin() as conn:
+            yield conn
+        await asyncio.sleep(TTL)
+
+
+async def test_release_frees_a_row_whose_take_answered_late(
+    db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    a, b = lease(db, "a"), lease(db, "b")
+    monkeypatch.setattr(a, "_db", AnswersAfterCommit(db))
+    assert not await a.acquire()  # counts as not held, but the row names this copy
+    monkeypatch.undo()
+    await a.release()
+    assert await b.acquire()  # at once, not after the row expires
+
+
+async def test_renewals_start_every_renew_seconds_even_when_answers_are_slow(
+    db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    a = lease(db, "a")
+    assert await a.acquire()
+    loop = asyncio.get_running_loop()
+    starts: list[float] = []
+    answer = a._take_or_renew
+
+    async def slow() -> bool:
+        starts.append(loop.time())
+        held = await answer()
+        await asyncio.sleep(RENEW / 2)
+        return held
+
+    monkeypatch.setattr(a, "_take_or_renew", slow)
+    with contextlib.suppress(TimeoutError):
+        await asyncio.wait_for(a.keep(), timeout=TTL * 1.6)
+    gaps = [later - earlier for earlier, later in itertools.pairwise(starts)]
+    # From the start of each renewal: RENEW apart. From each answer: RENEW * 1.5.
+    assert len(gaps) >= 3 and statistics.median(gaps) < RENEW * 1.25
+
+
 async def test_a_stuck_transaction_on_the_lease_row_cannot_block_a_copy(
     migrated: Settings, db: AsyncEngine
 ) -> None:
@@ -194,3 +248,16 @@ async def test_release_gives_up_in_time_if_the_database_stalls(
     assert await a.acquire()
     monkeypatch.setattr(a, "_db", helpers.StalledDb(db))
     await asyncio.wait_for(a.release(), timeout=TTL)  # doesn't raise
+
+
+async def test_release_reraises_a_cancel_the_driver_turned_into_an_error(
+    db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    a = lease(db, "a")
+    assert await a.acquire()
+    monkeypatch.setattr(a, "_db", helpers.StalledDb(db))
+    release = asyncio.create_task(a.release())
+    await asyncio.sleep(0.1)
+    release.cancel()
+    done, _ = await asyncio.wait({release}, timeout=TTL * 2)
+    assert done and release.cancelled()

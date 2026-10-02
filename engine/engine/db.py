@@ -25,8 +25,9 @@ def sqlalchemy_url(url: str) -> str:
 
 
 CONNECT_TIMEOUT_SECONDS = 10
-"""How long a new connection may take. libpq's default is to wait for ever, so a host that
-accepts and never answers would hang the caller. A URL's own `connect_timeout` wins."""
+"""How long a new connection may take, per address the host name resolves to. Without it,
+psycopg waits on a host that accepts and never answers for over two minutes (130 s
+measured). A URL's own `connect_timeout` wins; this one overrides PGCONNECT_TIMEOUT."""
 
 
 def make_engine(url: str, **pool: Any) -> AsyncEngine:
