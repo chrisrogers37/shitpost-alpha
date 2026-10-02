@@ -1,6 +1,5 @@
 """Engine settings, read from ENGINE_* environment variables."""
 
-import re
 from pathlib import Path
 from typing import Annotated, Self
 
@@ -9,9 +8,6 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 FEED_NAMES = ("direct", "trumpstruth", "cnn", "scrapecreators")
 """The live feeds of Trump's posts, in the order status lists them."""
-KEY_TEXT = re.compile(r"[\x21-\x7e]+")
-"""What an API key may hold: printable ASCII, no spaces. HTTP libraries refuse other
-header values, and some quote the whole value in their error."""
 
 
 class Settings(BaseSettings):
@@ -90,17 +86,20 @@ class Settings(BaseSettings):
 
     @field_validator("scrapecreators_key", "alpaca_key_id", "alpaca_secret_key", mode="before")
     @classmethod
-    def _clean_key(cls, value: object) -> object:
-        """Surrounding spaces and line breaks (a pasted key) are dropped; an empty key is no
-        key. Anything else that isn't printable ASCII is refused, without echoing it."""
+    def _clean_keys(cls, value: object) -> object:
+        """An API key as it goes in a request header: a pasted space or newline is
+        stripped, blank means no key, and anything but printable ASCII is refused. The
+        message names the variable, never the value."""
+        if isinstance(value, SecretStr):
+            value = value.get_secret_value()
         if not isinstance(value, str):
             return value
-        value = value.strip()
-        if not value:
+        key = value.strip()
+        if not key:
             return None
-        if not KEY_TEXT.fullmatch(value):
-            raise ValueError("a key must be printable ASCII with no spaces inside")
-        return value
+        if not all("!" <= char <= "~" for char in key):
+            raise ValueError("must be printable ASCII with no spaces (value not shown)")
+        return key
 
     @field_validator("sources_off", mode="before")
     @classmethod

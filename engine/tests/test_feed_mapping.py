@@ -15,6 +15,7 @@ from engine.feeds.live import FEEDS
 from engine.feeds.mastodon import DirectFeed, ScrapeCreatorsFeed
 from engine.feeds.posts import ACCOUNT_ID, Post
 from engine.feeds.trumpstruth import TrumpstruthFeed, feed_post, parse_items
+from engine.http_client import make_client
 from engine.registry import build_registry
 from engine.settings import FEED_NAMES, Settings
 from tests.feeds_helpers import (
@@ -317,8 +318,8 @@ async def test_cnn_reads_at_most_32_kb_and_fails_when_the_range_is_ignored(
 
 
 async def test_cnn_range_reads_reuse_one_connection(offline_settings: Settings) -> None:
-    """A 206 of exactly 32 KB is read to its end, so the connection goes back to the pool
-    (a new TLS handshake every 15 s otherwise)."""
+    """A 206 of exactly 32 KB and a 304 are read to their end, so the connection goes back
+    to the pool (a new TLS handshake every 15 s otherwise)."""
     body = fixture_bytes("cnn_head.json").ljust(HEAD_BYTES, b" ")
     connections = 0
 
@@ -327,12 +328,14 @@ async def test_cnn_range_reads_reuse_one_connection(offline_settings: Settings) 
         connections += 1
         try:
             while True:
-                await reader.readuntil(b"\r\n\r\n")
-                writer.write(
-                    b"HTTP/1.1 206 Partial Content\r\ncontent-type: application/json\r\n"
-                    + f"content-length: {len(body)}\r\n\r\n".encode()
-                    + body
-                )
+                if b"if-none-match" in (await reader.readuntil(b"\r\n\r\n")).lower():
+                    writer.write(b'HTTP/1.1 304 Not Modified\r\netag: "v1"\r\n\r\n')
+                else:
+                    writer.write(
+                        b"HTTP/1.1 206 Partial Content\r\ncontent-type: application/json\r\n"
+                        + f"content-length: {len(body)}\r\n\r\n".encode()
+                        + body
+                    )
                 await writer.drain()
         except (asyncio.IncompleteReadError, ConnectionResetError):
             pass
@@ -342,12 +345,14 @@ async def test_cnn_range_reads_reuse_one_connection(offline_settings: Settings) 
     server = await asyncio.start_server(serve, "127.0.0.1", 0)
     port = server.sockets[0].getsockname()[1]
     try:
-        async with httpx.AsyncClient(trust_env=False) as client:
+        async with make_client(offline_settings, httpx.AsyncHTTPTransport()) as client:
             feed = CnnFeed(client, offline_settings)
             feed_url = f"http://127.0.0.1:{port}/truth_archive.json"
-            for _ in range(5):
-                answer = await feed.get(feed_url, range_bytes=HEAD_BYTES)
-                assert answer is not None and len(answer.body) == HEAD_BYTES
+            for unchanged in (False, True, True, False, True):
+                feed.etag = '"v1"' if unchanged else None
+                answer = await feed.get(feed_url, conditional=True, range_bytes=HEAD_BYTES)
+                assert (answer is None) == unchanged
+                assert answer is None or len(answer.body) == HEAD_BYTES
     finally:
         server.close()
         await server.wait_closed()

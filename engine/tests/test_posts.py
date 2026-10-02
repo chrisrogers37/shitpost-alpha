@@ -97,3 +97,9 @@ def test_html_text_keeps_line_breaks_and_drops_tags() -> None:
     )
     assert html_text(html) == "First & best\n\nSecond\nline https://x.com"
     assert html_text("<p></p>") == ""
+
+
+def test_an_id_too_big_for_a_bigint_is_not_a_status_id() -> None:
+    assert parse_status_id(str(2**63 - 1)) == str(2**63 - 1)
+    with pytest.raises(ValueError):
+        parse_status_id("9" * 20)  # its time would be past the year 9999

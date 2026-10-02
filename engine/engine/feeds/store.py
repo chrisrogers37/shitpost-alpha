@@ -49,6 +49,18 @@ async def newest_posted_at(conn: AsyncConnection, source_id: int) -> datetime | 
     return newest
 
 
+def without_nuls(value: Any) -> Any:
+    """A feed's payload with NUL characters dropped from its strings: jsonb refuses them,
+    and one such post would fail every store of its batch."""
+    if isinstance(value, str):
+        return value.replace("\x00", "")
+    if isinstance(value, dict):
+        return {without_nuls(key): without_nuls(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [without_nuls(item) for item in value]
+    return value
+
+
 def signal_row(post: Post, source_id: int, via: str, *, imported: bool) -> dict[str, Any]:
     not_scored = post.not_scored or ("imported" if imported else None)
     return {
@@ -60,7 +72,7 @@ def signal_row(post: Post, source_id: int, via: str, *, imported: bool) -> dict[
         "text": post.text,
         "posted_at": post.posted_at,
         "has_media": post.has_media,
-        "raw": post.raw,
+        "raw": without_nuls(post.raw),
         "raw_via": via,
         "first_seen_at": func.now(),
         "first_seen_via": via,
