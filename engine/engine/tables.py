@@ -6,6 +6,8 @@ Schemas:
 - app: tables other plans add later.
 """
 
+from typing import Any
+
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -32,7 +34,7 @@ from sqlalchemy import (
     literal_column,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, REAL
 
 from engine.stages import stage_columns
 
@@ -366,3 +368,132 @@ signal_embeddings = Table(
 """One similarity vector per text post per model version. vector: dims little-endian
 float32, normalised to length 1. text_sha256: of the normalised text it was made from.
 truncated: the text was longer than the model's 512 tokens."""
+
+MOVE_WINDOWS = ("5m", "15m", "1h", "4h", "24h", "close", "1d", "3d", "5d", "7d")
+"""Every window a move is kept for. Stocks and ETFs use 5m, 15m, 1h, close, 1d, 3d and 5d
+(d: trading days, each ending at a regular close); coins use 5m, 15m, 1h, 4h, 24h, 3d and
+7d (d: 24 hours). The others are NULL."""
+ENTRY_RULES = ("main", "premarket", "mirrors")
+
+
+def _window_columns() -> list[Column[Any]]:
+    columns: list[Column[Any]] = []
+    for window in MOVE_WINDOWS:
+        columns += [
+            Column(f"move_{window}", REAL),
+            Column(f"adjusted_{window}", REAL),
+            Column(f"matured_{window}", DateTime(timezone=True)),
+        ]
+    return columns
+
+
+signal_moves = Table(
+    "signal_moves",
+    metadata,
+    Column("instrument_id", Integer, ForeignKey("engine.instruments.id"), nullable=False),
+    Column("entry", Text, nullable=False),
+    Column("signal_key", Text, ForeignKey("engine.signals.key"), nullable=False),
+    Column("entered_at", DateTime(timezone=True)),
+    *_window_columns(),
+    Column("adjustment", Text, nullable=False),
+    Column("basis_at", DateTime(timezone=True)),
+    Column("built_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    PrimaryKeyConstraint("instrument_id", "entry", "signal_key", name="signal_moves_pkey"),
+    CheckConstraint(_one_of("entry", ENTRY_RULES), name="signal_moves_entry_check"),
+    schema="engine",
+)
+"""Each text post's % move per instrument, entry rule and window (Gate 0 v1's rules; no
+prices). entry: main (post + 2 min), premarket (SPY and QQQ, alert 04:00-09:30 New York)
+or mirrors (post + 20 min). entered_at: the entry bar's time, NULL without an entry.
+move_*: exit over entry minus 1. adjusted_*: the move minus beta times the benchmark's
+(SPY for stocks and ETFs, BTC for ETH; NULL for SPY and BTC, or without a beta).
+matured_*: when the window ended; set with a NULL move when the window was skipped (no
+bar), NULL when it ends after the data the row was built from. adjustment: the price basis
+('all' for stocks and ETFs, 'raw' for coins); basis_at: the instrument's rebased_at when it
+was built. Written by `python -m engine build-moves`."""
+
+random_baselines = Table(
+    "random_baselines",
+    metadata,
+    Column("data_to", Date, nullable=False),
+    Column("instrument_id", Integer, ForeignKey("engine.instruments.id"), nullable=False),
+    Column("entry", Text, nullable=False),
+    Column("window", Text, nullable=False),
+    Column("weekday", SmallInteger, nullable=False),
+    Column("hour", SmallInteger, nullable=False),
+    Column("moves", Integer, nullable=False),
+    Column("median_move", REAL),
+    Column("adjusted", Integer, nullable=False),
+    Column("median_adjusted", REAL),
+    PrimaryKeyConstraint(
+        "data_to",
+        "instrument_id",
+        "entry",
+        "window",
+        "weekday",
+        "hour",
+        name="random_baselines_pkey",
+    ),
+    CheckConstraint(_one_of("entry", ENTRY_RULES), name="random_baselines_entry_check"),
+    CheckConstraint(_one_of('"window"', MOVE_WINDOWS), name="random_baselines_window_check"),
+    CheckConstraint("weekday BETWEEN 0 AND 6", name="random_baselines_weekday_check"),
+    CheckConstraint("hour BETWEEN 0 AND 23", name="random_baselines_hour_check"),
+    schema="engine",
+)
+"""The random-time medians the send rule's "better than random" test compares against:
+per instrument, entry rule and window, and New York weekday (0 is Monday) and hour, over
+the 100 random times of every post in that weekday and hour (Gate 0 v1). data_to: the
+sample's last day, which the backtest run records too. moves/median_move: the raw moves;
+adjusted/median_adjusted: the benchmark-adjusted ones."""
+
+backtest_runs = Table(
+    "backtest_runs",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("code_commit", Text, nullable=False),
+    Column("gate_sha256", Text, nullable=False),
+    Column("rules_sha256", Text, nullable=False),
+    Column("ai_picker_sha256", Text, nullable=False),
+    Column("match_rule_sha256", Text, nullable=False),
+    Column("model_version", Text, nullable=False),
+    Column("data_from", Date, nullable=False),
+    Column("data_to", Date, nullable=False),
+    Column("report_sha256", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    schema="engine",
+)
+"""One row per backtest: the code, the frozen inputs' hashes (Gate 0 file, rules.json,
+the AI picker version's hash, match_rule.json), the data range and the JSON report's
+SHA-256."""
+
+backtest_summary = Table(
+    "backtest_summary",
+    metadata,
+    Column("run_id", Integer, ForeignKey("engine.backtest_runs.id"), nullable=False),
+    Column("picker", Text, nullable=False),
+    Column("view", Text, nullable=False),
+    Column("pair", Text, nullable=False),
+    Column("calls", Integer, nullable=False),
+    Column("days", Integer, nullable=False),
+    Column("mean_5bp", Double),
+    Column("mean_20bp", Double),
+    Column("hit_rate", Double),
+    Column("hit_low", Double),
+    Column("hit_high", Double),
+    Column("p_value", Double),
+    Column("q_value", Double),
+    Column("last12_mean", Double),
+    Column("last12_days", Integer, nullable=False),
+    Column("enough_days", Boolean, nullable=False),
+    Column("entry_2min", Boolean, nullable=False),
+    Column("above_costs", Boolean, nullable=False),
+    Column("beats_random", Boolean, nullable=False),
+    Column("last12_holds", Boolean, nullable=False),
+    Column("passes", Boolean, nullable=False),
+    Column("counts", JSONB, nullable=False),
+    PrimaryKeyConstraint("run_id", "picker", "view", "pair", name="backtest_summary_pkey"),
+    schema="engine",
+)
+"""One row per run, picker, view and pair with Gate 0's numbers: moves are fractions
+(0.001 is 10 bp), days are New York dates with calls. q_value only for the 22 gate tests;
+passes is false outside them. counts: the calls each filter dropped and each skip."""
