@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -219,11 +220,14 @@ async def test_the_ai_is_off_unless_engine_ai_live_is_on(
     live = live_ai(keyed.model_copy(update={"ai_live": True}), ready)
     assert live is not None and set(live.clients) == {"openai", "xai", "anthropic"}
     one_short = migrated.model_copy(update={"ai_live": True, "openai_key": KEYS["openai_key"]})
+    unpriced = replace(
+        ready, models={**ready.models, "xai": replace(ready.models["xai"], price=None)}
+    )
     with caplog.at_level(logging.WARNING):
         assert live_ai(one_short, ready) is None
-        assert live_ai(keyed.model_copy(update={"ai_live": True})) is None  # B2 fills it
+        assert live_ai(keyed.model_copy(update={"ai_live": True}), unpriced) is None
     assert "not set: ENGINE_XAI_KEY, ENGINE_ANTHROPIC_KEY" in caplog.text
-    assert "isn't ready" in caplog.text
+    assert "isn't ready: xai: price not checked" in caplog.text
     scorer = Scorer(current_rules(), StubEmbedder(), live)
     for shown in (repr(live), repr(scorer), caplog.text):
         assert not any(key.get_secret_value() in shown for key in KEYS.values())

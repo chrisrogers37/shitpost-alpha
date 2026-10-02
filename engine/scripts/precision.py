@@ -12,8 +12,8 @@ precision/samples.csv:
   found the name (the rules' cashtags, tickers and names, and the AI's explicit links, are
   explicit; the AI's implied links are implied), recall by the label's kind.
 
---window-start splits the window group at a later start, a New York date like the rest of
-the engine's days (B2 may move it). --spot-check
+--window-start splits the window group at a later start, at New York midnight like the
+AI picker's window (B2 may move it). --spot-check
 writes each post's id, text, labels and the pickers' output for reading by hand; it holds
 post text, so it goes outside the repo.
 """

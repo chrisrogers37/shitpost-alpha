@@ -336,8 +336,8 @@ class AnthropicMessages:
     async def ask(
         self, instructions: str, user: str, schema: dict[str, Any] | None, max_tokens: int
     ) -> Reply:
-        # This SDK version has no temperature parameter, so it goes in the body (B2 checks
-        # the API takes it for the pinned model).
+        # This SDK version has no temperature parameter, so it goes in the body (the API
+        # takes it for claude-haiku-4-5-20251001, checked 2026-10-02).
         extra = {} if self.temperature is None else {"temperature": self.temperature}
         response = await self.client.messages.create(
             model=self.model,

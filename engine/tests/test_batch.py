@@ -390,6 +390,8 @@ POST = "Nvidia will build 4 chip plants in Arizona, a 500 billion dollar investm
         ("Investors may want to watch Boeing", "direction"),
         ("Apple at 200 after the tariff news", "number the post doesn't have: 200"),
         ("Nvidia's 5 new plants", "number the post doesn't have: 5"),
+        ("American Eagle benefits from its ad", "direction"),
+        ("Imports harming the auto industry", "direction"),
     ],
 )
 def test_the_reason_line_check(line: str, problem: str | None) -> None:

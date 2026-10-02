@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -65,13 +66,19 @@ def symbols(mentions: tuple[Mention, ...] | list[Mention]) -> set[str]:
 # --- the version and the answer -----------------------------------------------------
 
 
-def test_the_picker_version_loads_and_says_what_b2_must_fill() -> None:
+def test_the_picker_version_loads_with_dated_models_and_checked_prices() -> None:
     config = current_ai_config()
     assert config.version == 1
     assert len(config.hash) == 64
     assert "market_link" in config.instructions
     assert set(config.schema["required"]) == {"market_link", "instruments"}
-    assert not CONFIG.problems()
+    assert not config.problems()
+    for spec in config.models.values():
+        assert re.search(r"\d{4}", spec.model or "")  # a dated snapshot, not an alias
+    unpinned = replace(
+        config, models={**config.models, "xai": replace(config.models["xai"], model=None)}
+    )
+    assert unpinned.problems() == ["xai: no model pinned"]
 
 
 def test_cost_counts_cached_input_apart() -> None:
@@ -187,8 +194,11 @@ def test_no_picker_without_all_three_keys_or_a_ready_version(settings: Settings)
         AiPicker.from_settings(settings, CONFIG)
     with pytest.raises(NotReady, match=r"not set: ENGINE_XAI_KEY, ENGINE_ANTHROPIC_KEY$"):
         AiPicker.from_settings(with_keys(settings, openai_key=OPENAI_KEY), CONFIG)
-    with pytest.raises(NotReady, match=r"isn.t ready: .*xai: no model pinned"):
-        AiPicker.from_settings(with_keys(settings, **ALL_KEYS), current_ai_config())
+    unpinned = replace(
+        CONFIG, models={**CONFIG.models, "xai": replace(CONFIG.models["xai"], model=None)}
+    )
+    with pytest.raises(NotReady, match=r"isn.t ready: xai: no model pinned$"):
+        AiPicker.from_settings(with_keys(settings, **ALL_KEYS), unpinned)
 
 
 def test_ai_keys_must_be_safe_in_a_header(settings: Settings) -> None:
@@ -267,8 +277,10 @@ def test_clients_get_the_engine_keys_passed_in(settings: Settings) -> None:
         ANTHROPIC_KEY,
     ]
     assert OPENAI_KEY not in repr(keyed)
-    unpinned = build_clients(keyed, current_ai_config())  # xAI's model isn't chosen yet
-    assert "xai" not in unpinned
+    unpinned = replace(
+        CONFIG, models={**CONFIG.models, "xai": replace(CONFIG.models["xai"], model=None)}
+    )
+    assert "xai" not in build_clients(keyed, unpinned)
 
 
 # --- mapping --------------------------------------------------------------------------------
