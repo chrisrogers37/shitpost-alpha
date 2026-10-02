@@ -252,25 +252,27 @@ async def test_a_rebase_makes_cached_minute_windows_fetch_again(
     spy_history(fake)
     window = (datetime(2024, 7, 9, 14, tzinfo=UTC), datetime(2024, 7, 9, 14, 29, tzinfo=UTC))
     fake.minutes["SPY"] = [minute_bar(window[0] + timedelta(minutes=m), 550.0) for m in range(30)]
-    cache, settings = MinuteCache(tmp_path), market_settings(migrated)
+    settings = market_settings(migrated)
 
     async with fake.client(settings) as alpaca:
         await backfill_daily(db, alpaca, spy)  # the first fill sets rebased_at
     spy = await seeded(db, "spy")
     assert spy.rebased_at == NOW
     async with fake.client(settings, now=NOW + timedelta(hours=1)) as alpaca:
-        assert len(await cache.bars(alpaca, spy, *window)) == 30
-        await cache.bars(alpaca, spy, *window)
+        cache = MinuteCache(tmp_path, alpaca)
+        assert len(await cache.series(spy, *window)) == 30
+        await cache.series(spy, *window)
     assert len(fake.requests) == 2  # the backfill, then the window once
 
     spy_history(fake, scale=0.5)  # a split re-bases the daily table
     async with fake.client(settings, now=NOW + timedelta(days=1)) as alpaca:
         assert (await backfill_daily(db, alpaca, spy)).refetched
         calls = len(fake.requests)
-        await cache.bars(alpaca, spy, *window)  # the old instrument row: not seen yet
+        cache = MinuteCache(tmp_path, alpaca)
+        await cache.series(spy, *window)  # the old instrument row: not seen yet
         assert len(fake.requests) == calls
         spy = await seeded(db, "spy")
         assert spy.rebased_at == NOW + timedelta(days=1)
-        await cache.bars(alpaca, spy, *window)
-        await cache.bars(alpaca, spy, *window)
+        await cache.series(spy, *window)
+        await cache.series(spy, *window)
     assert len(fake.requests) == calls + 1

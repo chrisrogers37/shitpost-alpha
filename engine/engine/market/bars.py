@@ -9,26 +9,28 @@ nothing, so the next run tries again (later runs look back only 14 days, so days
 then would never come back). Each whole fetch sets the instrument's rebased_at. Coin prices
 are raw, so a coin close that moved is a correction, written over in place.
 
-Minute bars are cached per window as files under ENGINE_BARS_CACHE_DIR, so a rerun makes
-no calls. A file fetched before its instrument's rebased_at is on an older basis than the
-daily bars, so it is fetched again: a return that enters on a minute bar and exits on a
-daily close stays on one basis. Minute bars go into the database only for alert windows
-(PR 7).
+Minute bars are cached per window as compressed files under ENGINE_BARS_CACHE_DIR (each
+bar's start, open and close: what the backtest reads), so a rerun makes no calls. A file
+fetched before its instrument's rebased_at is on an older basis than the daily bars, so
+it is fetched again: a return that enters on a minute bar and exits on a daily close stays
+on one basis. Minute bars go into the database only for alert windows (PR 7).
 """
 
 import asyncio
-import json
 import logging
 import math
 import os
 import tempfile
+import zipfile
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Literal
 
 import httpx
+import numpy as np
+import numpy.typing as npt
 from sqlalchemy import ColumnElement, delete, func, select, tuple_, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
@@ -37,6 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from engine.db import error_text, make_engine, raise_if_cancelling
 from engine.feeds.base import UNEXPECTED
 from engine.market.alpaca import SIP_DELAY, Alpaca, AlpacaError, Bar, Timeframe
+from engine.market.calendar import schedule
 from engine.market.instruments import HISTORY_START, Instrument, all_instruments
 from engine.settings import Settings
 from engine.tables import instruments, market_bars
@@ -282,36 +285,114 @@ def _failure(exc: AlpacaError | SQLAlchemyError) -> str:
     return f"{type(exc).__name__}: {first}"
 
 
+@dataclass(frozen=True)
+class MinuteSeries:
+    """Minute bars as arrays, oldest first: each bar's start in minutes since the epoch,
+    its open and its close. Only what the backtest's windows read."""
+
+    minutes: npt.NDArray[np.int64]
+    opens: npt.NDArray[np.float64]
+    closes: npt.NDArray[np.float64]
+
+    @classmethod
+    def of(cls, bars: Sequence[Bar]) -> "MinuteSeries":
+        return cls(
+            np.array([int(b.start.timestamp()) // 60 for b in bars], dtype=np.int64),
+            np.array([b.open for b in bars], dtype=np.float64),
+            np.array([b.close for b in bars], dtype=np.float64),
+        )
+
+    @classmethod
+    def join(cls, parts: Sequence["MinuteSeries"]) -> "MinuteSeries":
+        """Consecutive windows' series as one."""
+        if not parts:
+            return cls.of([])
+        return cls(
+            np.concatenate([p.minutes for p in parts]),
+            np.concatenate([p.opens for p in parts]),
+            np.concatenate([p.closes for p in parts]),
+        )
+
+    def where(self, keep: npt.NDArray[np.bool_]) -> "MinuteSeries":
+        return MinuteSeries(self.minutes[keep], self.opens[keep], self.closes[keep])
+
+    def as_stored(self) -> "MinuteSeries":
+        """Prices as the cache keeps them (float32), so a fresh fetch and a cached read
+        give the same moves."""
+        return MinuteSeries(
+            self.minutes,
+            self.opens.astype(np.float32).astype(np.float64),
+            self.closes.astype(np.float32).astype(np.float64),
+        )
+
+    def __len__(self) -> int:
+        return len(self.minutes)
+
+
+Hours = Literal["regular", "all"]
+
+
+class CacheMiss(LookupError):
+    """A window isn't in the cache (or is stale) and the cache may not call Alpaca."""
+
+
 class MinuteCache:
-    """Minute bars per window, one JSON file each: when they were fetched, and the bars in
-    Alpaca's own format. Windows are whole minutes. Only windows that ended at least 16
+    """Minute bars per window, one compressed file each: when they were fetched, and each
+    bar's start, open and close (float32 is ample for a % move). Windows are whole minutes,
+    both ends included (as Alpaca's are). `hours="regular"` keeps only regular-session
+    bars, which is all a company's windows read. Only windows that ended at least 16
     minutes ago are kept (a later answer could still change), and a file fetched before
     the instrument's rebased_at, or one that can't be read, is fetched again. Pass an
-    Instrument read after the latest backfill. PR 5 builds one on ENGINE_BARS_CACHE_DIR."""
+    Instrument read after the latest backfill.
 
-    def __init__(self, root: Path) -> None:
+    Without an Alpaca client the cache only reads: a missing or stale window raises
+    CacheMiss, so a rebuild makes no calls."""
+
+    def __init__(self, root: Path, alpaca: Alpaca | None) -> None:
         self.root = root
+        self.alpaca = alpaca
 
-    def path(self, instrument: Instrument, start: datetime, end: datetime) -> Path:
+    def path(self, instrument: Instrument, start: datetime, end: datetime, hours: Hours) -> Path:
         """The window's file: by slug, so a reused ticker never shares an old company's."""
-        name = f"{start.astimezone(UTC):%Y%m%dT%H%M}-{end.astimezone(UTC):%Y%m%dT%H%M}"
-        return self.root / instrument.slug / adjustment_of(instrument) / f"{name}.json"
+        start, end = _minute(start), _minute(end)
+        name = f"{start:%Y%m%dT%H%M}-{end:%Y%m%dT%H%M}.npz"
+        return self.root / instrument.slug / adjustment_of(instrument) / hours / name
 
-    async def bars(
-        self, alpaca: Alpaca, instrument: Instrument, start: datetime, end: datetime
-    ) -> list[Bar]:
+    async def series(
+        self, instrument: Instrument, start: datetime, end: datetime, hours: Hours = "all"
+    ) -> MinuteSeries:
         """Minute bars from `start` to `end`, both rounded down to the minute."""
         start, end = _minute(start), _minute(end)
-        path = self.path(instrument, start, end)
+        path = self.path(instrument, start, end, hours)
         cached = await asyncio.to_thread(_read, path)
         if cached is not None and not _stale(cached[0], instrument):
             return cached[1]
-        fetched_at = alpaca.clock()
-        bars = await fetch_bars(alpaca, instrument, "1Min", start, end)
+        if self.alpaca is None:
+            why = "stale" if cached is not None else "missing"
+            raise CacheMiss(f"{path} is {why} and this run makes no Alpaca calls")
+        fetched_at = self.alpaca.clock()
+        series = MinuteSeries.of(await fetch_bars(self.alpaca, instrument, "1Min", start, end))
+        if hours == "regular":
+            series = series.where(regular_minutes(series.minutes))
+        series = series.as_stored()
         if end <= fetched_at - SIP_DELAY:
-            content = {"fetched_at": fetched_at.isoformat(), "bars": [b.to_json() for b in bars]}
-            await asyncio.to_thread(_write, path, content)
-        return bars
+            await asyncio.to_thread(_write, path, fetched_at, series)
+        return series
+
+
+def regular_minutes(minutes: npt.NDArray[np.int64]) -> npt.NDArray[np.bool_]:
+    """Which minutes fall in a regular session (its open included, its close not)."""
+    if not len(minutes):
+        return np.zeros(0, dtype=np.bool_)
+    first = datetime.fromtimestamp(int(minutes.min()) * 60, UTC).date() - timedelta(days=1)
+    last = datetime.fromtimestamp(int(minutes.max()) * 60, UTC).date() + timedelta(days=1)
+    sessions = schedule(first, last)
+    opens = np.array([int(o.timestamp()) // 60 for _, o, _ in sessions], dtype=np.int64)
+    closes = np.array([int(c.timestamp()) // 60 for _, _, c in sessions], dtype=np.int64)
+    at = np.searchsorted(closes, minutes, side="right")  # the first session closing after
+    inside = at < len(closes)
+    result: npt.NDArray[np.bool_] = inside & (opens[np.minimum(at, len(opens) - 1)] <= minutes)
+    return result
 
 
 def _minute(at: datetime) -> datetime:
@@ -324,31 +405,42 @@ def _stale(fetched_at: datetime, instrument: Instrument) -> bool:
     return instrument.rebased_at is not None and fetched_at < instrument.rebased_at
 
 
-def _read(path: Path) -> tuple[datetime, list[Bar]] | None:
+def _read(path: Path) -> tuple[datetime, MinuteSeries] | None:
     """A cached window: when it was fetched, and its bars. None if there is no file, or
     if the file can't be read (it is deleted, so the window is fetched again)."""
     try:
-        content = json.loads(path.read_text("utf-8"))
-        fetched_at = datetime.fromisoformat(content["fetched_at"])
-        if fetched_at.tzinfo is None:
-            raise ValueError("fetched_at has no timezone")
-        return fetched_at, [Bar.parse(item) for item in content["bars"]]
+        with np.load(path) as content:
+            fetched_at = datetime.fromtimestamp(int(content["fetched_at"]) / 1e6, UTC)
+            series = MinuteSeries(
+                content["minutes"].astype(np.int64),
+                content["opens"].astype(np.float64),
+                content["closes"].astype(np.float64),
+            )
+        if not len(series.minutes) == len(series.opens) == len(series.closes):
+            raise ValueError("arrays of different lengths")
+        return fetched_at, series
     except FileNotFoundError:
         return None
-    except UNEXPECTED as exc:  # JSON or text that won't decode is a ValueError
+    except (*UNEXPECTED, OSError, EOFError, zipfile.BadZipFile) as exc:
         log.warning("minute cache: %s can't be read (%r); fetching it again", path, exc)
         path.unlink(missing_ok=True)
         return None
 
 
-def _write(path: Path, content: dict[str, Any]) -> None:
+def _write(path: Path, fetched_at: datetime, series: MinuteSeries) -> None:
     """Write whole or not at all: the data is on disk before the file takes its name, and
     a failed write leaves no temporary file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
-        "w", dir=path.parent, suffix=".part", delete_on_close=False
+        "wb", dir=path.parent, suffix=".part", delete_on_close=False
     ) as out:
-        json.dump(content, out)
+        np.savez_compressed(
+            out,
+            fetched_at=np.int64(round(fetched_at.timestamp() * 1e6)),
+            minutes=series.minutes.astype(np.int32),
+            opens=series.opens.astype(np.float32),
+            closes=series.closes.astype(np.float32),
+        )
         out.flush()
         os.fsync(out.fileno())
         Path(out.name).replace(path)  # the temporary file is deleted on leaving unless renamed
