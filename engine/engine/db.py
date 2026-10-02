@@ -6,7 +6,13 @@ from typing import Any
 
 from sqlalchemy import Engine, create_engine, func, select
 from sqlalchemy.engine import make_url
-from sqlalchemy.exc import InterfaceError, OperationalError
+from sqlalchemy.exc import (
+    DataError,
+    DBAPIError,
+    IntegrityError,
+    ProgrammingError,
+    StatementError,
+)
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
 
@@ -18,14 +24,29 @@ def sqlalchemy_url(url: str) -> str:
     return parsed.render_as_string(hide_password=False)
 
 
+CONNECT_TIMEOUT_SECONDS = 10
+"""How long a new connection may take. libpq's default is to wait for ever, so a host that
+accepts and never answers would hang the caller. A URL's own `connect_timeout` wins."""
+
+
 def make_engine(url: str, **pool: Any) -> AsyncEngine:
     """Async engine (psycopg 3) for the engine database. `pool` sets pool options."""
-    return create_async_engine(sqlalchemy_url(url), pool_pre_ping=True, **pool)
+    return create_async_engine(
+        sqlalchemy_url(url), pool_pre_ping=True, connect_args=_connect_args(url), **pool
+    )
 
 
-def make_sync_engine(url: str) -> Engine:
-    """Sync engine, for migrations."""
-    return create_engine(sqlalchemy_url(url), pool_pre_ping=True)
+def make_sync_engine(url: str, **pool: Any) -> Engine:
+    """Sync engine, for migrations. `pool` sets pool options."""
+    return create_engine(
+        sqlalchemy_url(url), pool_pre_ping=True, connect_args=_connect_args(url), **pool
+    )
+
+
+def _connect_args(url: str) -> dict[str, Any]:
+    if "connect_timeout" in make_url(url).query:
+        return {}
+    return {"connect_timeout": CONNECT_TIMEOUT_SECONDS}
 
 
 async def db_now(conn: AsyncConnection) -> datetime:
@@ -34,9 +55,12 @@ async def db_now(conn: AsyncConnection) -> datetime:
     return now
 
 
-# Errors worth retrying: the database or the network is down or slow. Others (bad data, a
-# bug in a query) fail the same way every time.
-TRANSIENT_ERRORS = (OperationalError, InterfaceError, OSError)
+def is_permanent(exc: BaseException) -> bool:
+    """Whether retrying can't fix this database error: bad data, a broken statement or bad
+    parameters. Anything else (a lost connection, a pool or lock timeout) may pass."""
+    if isinstance(exc, DataError | IntegrityError | ProgrammingError):
+        return True
+    return isinstance(exc, StatementError) and not isinstance(exc, DBAPIError)
 
 
 def raise_if_cancelling() -> None:
@@ -53,5 +77,7 @@ def raise_if_cancelling() -> None:
 
 
 def error_text(exc: BaseException, limit: int = 2000) -> str:
-    """An exception as text a Postgres text column accepts: no NUL bytes, capped length."""
-    return f"{type(exc).__name__}: {exc}".replace("\x00", "")[:limit]
+    """An exception as text a Postgres text column accepts: no NUL bytes, no lone
+    surrogates (escaped instead), capped length."""
+    text = f"{type(exc).__name__}: {exc}".replace("\x00", "")
+    return text.encode("utf-8", "backslashreplace").decode()[:limit]

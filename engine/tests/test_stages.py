@@ -2,7 +2,7 @@ import asyncio
 from typing import Any
 
 import pytest
-from sqlalchemy import Column, Integer, MetaData, Row, Table, insert, select, update
+from sqlalchemy import Column, Integer, MetaData, Row, Table, event, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from engine.stages import DONE, ERROR, Stage, StageRunner, stage_columns
@@ -145,6 +145,23 @@ async def test_items_at_an_unknown_stage_are_left_alone(
     assert sum("unknown stage" in r.getMessage() for r in caplog.records) == 1
 
 
+async def test_only_the_first_pass_looks_for_unknown_stages(db: AsyncEngine, table: Table) -> None:
+    scans = 0
+
+    def count(conn: Any, cursor: Any, statement: str, *args: Any) -> None:
+        nonlocal scans
+        scans += "DISTINCT" in statement  # it scans the whole table
+
+    stages = runner(db, Recorder())
+    event.listen(db.sync_engine, "before_cursor_execute", count)
+    try:
+        for _ in range(3):
+            await stages.run_once()
+    finally:
+        event.remove(db.sync_engine, "before_cursor_execute", count)
+    assert scans == 1
+
+
 async def test_cancelling_a_handler_is_not_counted_as_its_failure(
     db: AsyncEngine, table: Table
 ) -> None:
@@ -159,3 +176,16 @@ async def test_cancelling_a_handler_is_not_counted_as_its_failure(
         await asyncio.wait_for(runner, timeout=2.0)
     row = await item(db)
     assert (row.stage, row.attempts, row.error) == ("first", 1, None)  # resumes next pass
+
+
+async def test_an_error_text_postgres_would_reject_is_still_recorded(
+    db: AsyncEngine, table: Table
+) -> None:
+    async def bad_text(conn: AsyncConnection, item: Row[Any]) -> None:
+        raise ValueError("half an emoji \ud83d and a \x00 from the feed")
+
+    stages = StageRunner(db, items, [Stage("first", bad_text)], max_attempts=3)
+    assert await stages.run_once() == 0
+    row = await item(db)
+    assert (row.stage, row.attempts) == ("first", 1)
+    assert row.error == "first: ValueError: half an emoji \\ud83d and a  from the feed"

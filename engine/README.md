@@ -12,7 +12,8 @@ Run from this directory, with `ENGINE_DATABASE_URL` set (never the old `DATABASE
     python -m engine run       # wait for the lease, then work while holding it
     python -m engine status    # print the status row and who holds the lease now
 
-Settings are `ENGINE_*` variables; see `engine/settings.py`. In `engine.engine_meta`,
+Settings are `ENGINE_*` variables; see `engine/settings.py`. New database connections
+give up after 10 s; a `connect_timeout` in the URL wins. In `engine.engine_meta`,
 `last_heartbeat_at` shows whether a copy is working; `lease_holder` names the last holder
 and is not cleared when it stops.
 

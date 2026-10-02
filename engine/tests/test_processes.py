@@ -157,13 +157,17 @@ def test_bad_settings_are_a_clear_error_that_never_prints_the_url(settings: Sett
     assert result.returncode == 2
     assert "ENGINE_DATABASE_URL: Field required" in result.stderr
 
-    unreachable = make_url(settings.db_url).set(port=1).render_as_string(hide_password=False)
-    for command in ("status", "migrate"):
-        result = cli(env(settings, ENGINE_DATABASE_URL=unreachable), command)
-        assert result.returncode == 1
-        assert result.stderr.startswith("could not reach the engine database: ")
-        assert len(result.stderr.splitlines()) == 1  # no traceback
-        assert f":{make_url(unreachable).password}@" not in result.stderr  # no URL
+    refused = make_url(settings.db_url).set(host="127.0.0.1", port=1)
+    with helpers.silent_port() as port:  # accepts and never answers
+        silent = refused.set(port=port).update_query_dict({"connect_timeout": "2"})
+        for url in (refused, silent):
+            for command in ("status", "migrate"):
+                plain = url.render_as_string(hide_password=False)
+                result = cli(env(settings, ENGINE_DATABASE_URL=plain), command)
+                assert result.returncode == 1
+                assert result.stderr.startswith("could not reach the engine database: ")
+                assert len(result.stderr.splitlines()) == 1  # no traceback
+                assert f":{url.password}@" not in result.stderr  # no URL
 
     result = cli(env(settings, ENGINE_LEASE_TTL_SECONDS="0.1"), "status")
     assert result.returncode == 2

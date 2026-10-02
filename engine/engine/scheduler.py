@@ -26,7 +26,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.sql.dml import ReturningInsert
 
-from engine.db import TRANSIENT_ERRORS, db_now, error_text, make_engine, raise_if_cancelling
+from engine.db import db_now, error_text, is_permanent, make_engine, raise_if_cancelling
 from engine.logs import configure_logging
 from engine.notify import notify_operator
 from engine.registry import EngineContext, Job, JobContext, JobFunc
@@ -199,10 +199,10 @@ class Scheduler:
             self._running.discard(job.name)
 
     async def _record(self, job: Job, slot: datetime, status: str, error: str | None) -> None:
-        """Write the run's result. Retries while the database is unreachable.
+        """Write the run's result, retrying until it is written: a lost result reruns the job.
 
-        If the result can't be written for another reason, the row stays "running" and
-        the next pass treats the run as interrupted.
+        Only an error no retry can fix gives up; the row then stays "running" and the next
+        pass treats the run as interrupted.
         """
         while True:
             try:
@@ -213,16 +213,15 @@ class Scheduler:
                         .values(status=status, finished_at=func.now(), error=error)
                     )
                 return
-            except TRANSIENT_ERRORS as exc:
+            except (SQLAlchemyError, OSError) as exc:
                 raise_if_cancelling()
+                if is_permanent(exc):
+                    log.exception(
+                        "could not record job %s result; it counts as interrupted", job.name
+                    )
+                    return
                 log.warning("could not record job %s result, retrying: %s", job.name, exc)
                 await asyncio.sleep(self._ctx.settings.scheduler_tick_seconds)
-            except SQLAlchemyError:
-                raise_if_cancelling()
-                log.exception(
-                    "could not record job %s result; it will count as interrupted", job.name
-                )
-                return
 
 
 class HeavyJobError(Exception):
