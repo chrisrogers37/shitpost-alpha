@@ -85,6 +85,8 @@ def test_a_bare_ticker_counts() -> None:
     assert {m.ticker: m.found_by for m in result.mentions} == {"NVDA": "ticker", "PLTR": "ticker"}
     assert picked("nvda is lower case") == {}
     assert picked("We are undergoing a DIS-inflationary boom") == {}  # joined to a word
+    # QQQ is migration 0003's, not aliases.json's: seeded tickers were read too.
+    assert {m.ticker for m in pick(BOOK, "QQQ is up big today", WHEN).mentions} == {"QQQ"}
 
 
 def test_a_collision_symbol_needs_a_cashtag_or_a_name() -> None:

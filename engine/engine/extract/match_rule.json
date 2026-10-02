@@ -1,7 +1,7 @@
 {
   "about": "Set 2026-10-02 by reading 274 pairs from the 30 posts of set `match` in precision/samples.csv (labels in precision/match-labels.csv): 0.90 and up 14/14 same subject, 0.85 to 0.90 26/32, 0.80 to 0.85 28/58. The threshold is the lowest band at 80% or more. A new model version needs the pairs read again.",
   "version": 1,
-  "model_version": "bge-small-en-v1.5@5c38ec7c405e",
+  "model_version": "bge-small-en-v1.5@5c38ec7c405e.eaa83ab2",
   "threshold": 0.85,
   "max_matches": 50,
   "normalisation": "engine.text.normalize: links removed and whitespace collapsed, no instruction prefix, cut at the model's 512 tokens"

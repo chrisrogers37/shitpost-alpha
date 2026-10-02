@@ -1,10 +1,10 @@
 """The reason line: one line of 120 characters or fewer saying why a post may matter for
-the instruments it names. One designated model writes it (ai.json's "reason"; by default
-the pinned Anthropic model). It decides nothing: the alert is already decided when it is
-asked. A rule check rejects a line that states a direction, a price, a target or advice,
-a number the post doesn't have, or that is too long. It fails closed: on a rejection, an
-error, a cut-off reply or a 15 s timeout there is no line and the alert goes out without
-one. PR 6 calls it."""
+the instruments it names. One of the AI picker's pinned models writes it (the Anthropic
+one). It has its own version, reason.json, so changing it needs no new picker version.
+It decides nothing: the alert is already decided when it is asked. A rule check rejects a
+line that states a direction, a price, a target or advice, a number the post doesn't
+have, or that is too long. It fails closed: on a rejection, an error, a cut-off reply or
+a 15 s timeout there is no line and the alert goes out without one. PR 6 calls it."""
 
 import asyncio
 import logging
@@ -21,8 +21,9 @@ DIRECTION = re.compile(
     r"gain\w*|lose[sr]?|losing|loss\w*|climb\w*|sink\w*|sank|slump\w*|spik\w*|boost\w*|"
     r"hurt\w*|lift\w*|weigh\w*|rebound\w*|outperform\w*|underperform\w*|target\w*|"
     r"recommend\w*|advi[cs]e\w*|should|opportunit\w*|positive|negative|"
-    r"up|down|higher|lower|increas\w*|decreas\w*|rais\w*|doubl\w*|halv\w*|benefit\w*|harm\w*|"
-    r"declin\w*|pressur\w*|headwind\w*|tailwind\w*|strengthen\w*|weaken\w*|outpac\w*|"
+    r"up|down|higher|lower|increas\w*|decreas\w*|rais\w*|doubl\w*|halv\w*|benefit\w*|"
+    r"harm(?:s|ed|ing|ful)?|declin\w*|pressur\w*|headwind\w*|tailwind\w*|strengthen\w*|"
+    r"weaken\w*|outpac\w*|"
     r"(?:good|bad|great|terrible)\s+(?:news\s+)?for|watch|investors?|"
     r"(?:stock|share)\s+prices?|price\s+target\w*)\b",
     re.IGNORECASE,

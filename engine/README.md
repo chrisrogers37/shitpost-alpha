@@ -193,8 +193,11 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
   side, OpenAI's `gpt-4.1-2025-04-14` and Anthropic's `claude-haiku-4-5-20251001`; a
   name or a market link counts only when both make it, and if either fails (an error, an
   invalid answer or more than 15 s) the rules stand in (`ai_fallback`). Its prompt,
-  schema, models, prices and window start (2025-11-01, three months after Haiku's July
-  2025 cutoff) are pinned the same way in `extract/ai.json` as version 1. Keys only from
+  schema, models and window start (2025-11-01, three months after Haiku's July 2025
+  cutoff) are pinned the same way in `extract/ai.json` as version 1, which is frozen:
+  the engine refuses its files if they change. The prices (`extract/ai_models.json`) and
+  the reason line (`extract/reason.json`, its own version) sit outside it, so either can
+  change without a new picker version. Keys only from
   `ENGINE_OPENAI_KEY` and `ENGINE_ANTHROPIC_KEY`, and it needs both. Clients never follow
   a redirect; `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID`, `OPENAI_CUSTOM_HEADERS` and
   `ANTHROPIC_CUSTOM_HEADERS` must not be set (the SDKs would add them to every
@@ -202,17 +205,26 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
   the post's day, so `ai-pick` without Alpaca keys leaves such names unmapped. Live posts
   go to it only with `ENGINE_AI_LIVE=true`. `ai-pick` prints the projected cost first,
   refuses a run over `--max-usd` (this run) or `--max-total-usd` (everything recorded so
-  far), stops once either is passed, stops with the post unrecorded on a bad key or an
-  unknown model, and runs one at a time.
+  far; no default, so pass what's left of the budget), stops once either is passed, and
+  stops with the post unrecorded on a bad key, an unknown model or an empty OpenAI
+  balance. One run at a time holds the `ai-pick` lease row (not an advisory lock, so
+  `ENGINE_DATABASE_URL` may be Neon's pooled endpoint); a killed run's hold lapses 10
+  minutes after its last post.
 - **Reason line** (`engine/extract/reason.py`): one line of at most 120 characters on why
   a post may matter, checked so it states no direction, price, target or advice and no
   number the post doesn't have. PR 6 calls it.
 - **Similarity** (`engine/extract/similarity.py`): BAAI/bge-small-en-v1.5 from its ONNX
   file on the CPU (onnxruntime and tokenizers, no torch), pinned in `extract/model.json`
   and downloaded with `fetch-model` into `ENGINE_MODEL_DIR` (from huggingface.co and
-  us.aws.cdn.hf.co). Matching keeps all vectors in one numpy matrix. Match rule v1
+  us.aws.cdn.hf.co). Each vector records the model version: the commit plus a digest of
+  the rest of the pin (files, pooling, token limit, size), so changing any of it means
+  embedding again. `embed` batches posts by length (at most 64, and at most about 64
+  posts of 128 tokens once padded), which keeps the history run near 1.2 GB.
+  Matching keeps all vectors in one numpy matrix. Match rule v1
   (`extract/match_rule.json`): a past post is similar at 0.85 or more, at most 50; it was
-  set by reading pairs (`scripts/match_rule.py`) and must be read again for a new model.
+  set by reading pairs (`scripts/match_rule.py`), a test ties 0.85 to the committed
+  labels, and it must be read again for a new model version. `python -m
+  scripts.match_rule coverage` prints how often it matches across the history.
 - **Live stage**: the `score` worker gives each new text post its rules answer, mentions,
   vector and, with the AI on, the two answers and the vote, then moves it to `done`.
   It loads the model and checks the names are synced when it starts, and fails clearly

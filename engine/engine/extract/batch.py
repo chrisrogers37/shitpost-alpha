@@ -28,12 +28,14 @@ from engine.extract.names import load_book
 from engine.extract.rules import Rules, current_rules
 from engine.extract.score import (
     new_ticker_adder,
+    other_files,
     quoted_words,
     record_ai,
     record_rules,
     store_embedding,
 )
 from engine.extract.similarity import Embedder, load_embedder
+from engine.lease import Lease, holder_id
 from engine.market.alpaca import Alpaca
 from engine.market.instruments import NEW_YORK, Listings
 from engine.settings import Settings
@@ -42,6 +44,10 @@ from engine.text import normalize
 
 CHUNK = 500
 EMBED_BATCH = 64
+EMBED_BATCH_CHARS = 32_768
+"""A batch pads every post to its longest, so it holds at most EMBED_BATCH posts and this
+many characters counting each post at the longest one's length (64 posts of about 128
+tokens). Long posts go in small batches; the vectors are the same either way."""
 Say = Callable[[str], None]
 
 TEXT_POSTS = or_(signals.c.not_scored.is_(None), signals.c.not_scored == "imported")
@@ -87,6 +93,19 @@ async def run_extract(settings: Settings, say: Say = print) -> int:
     return 0
 
 
+def embed_batches(todo: Sequence[tuple[str, str]]) -> list[list[tuple[str, str]]]:
+    """(key, words) shortest first, in batches within EMBED_BATCH and EMBED_BATCH_CHARS."""
+    batches: list[list[tuple[str, str]]] = []
+    batch: list[tuple[str, str]] = []
+    for item in sorted(todo, key=lambda item: len(item[1])):
+        padded = (len(batch) + 1) * len(item[1])  # the longest so far is this one
+        if batch and (len(batch) == EMBED_BATCH or padded > EMBED_BATCH_CHARS):
+            batches.append(batch)
+            batch = []
+        batch.append(item)
+    return [*batches, batch] if batch else batches
+
+
 async def run_embed(settings: Settings, say: Say = print, model: Embedder | None = None) -> int:
     """Vectors for every text post with words that has none for this model version.
     Each batch commits, so a stopped run resumes where it was."""
@@ -110,15 +129,14 @@ async def run_embed(settings: Settings, say: Say = print, model: Embedder | None
                 )
             ).all()
         todo = [(row.key, words) for row in rows if (words := normalize(row.text))]
-        for start in range(0, len(todo), EMBED_BATCH):
-            batch = todo[start : start + EMBED_BATCH]
+        for n, batch in enumerate(embed_batches(todo), 1):
             vectors = await asyncio.to_thread(embedder.embed, [words for _, words in batch])
             async with db.begin() as conn:
                 for (key, words), embedded in zip(batch, vectors, strict=True):
                     await store_embedding(conn, key, embedder.version, words, embedded)
                     truncated += embedded.truncated
             made += len(batch)
-            if made % (EMBED_BATCH * 50) < EMBED_BATCH or made == len(todo):
+            if n % 50 == 0 or made == len(todo):
                 say(f"{embedder.version}: {made:,} of {len(todo):,} posts")
     finally:
         await db.dispose()
@@ -223,24 +241,13 @@ async def select_posts(
     return (await conn.execute(query.order_by(signals.c.posted_at))).all()
 
 
-AI_PICK_LOCK = 4_042_001
-"""The Postgres advisory lock one `ai-pick` holds for its run: two at once would both pay
-for the same posts, and the second's answers would be dropped unrecorded."""
-
-
-async def other_prompt(conn: AsyncConnection, config: AiConfig) -> bool:
-    """Whether this version already has answers recorded with other files (a prompt,
-    schema or model changed without raising the version)."""
-    found = await conn.execute(
-        select(extractions.c.id)
-        .where(
-            extractions.c.method == "ai:vote",
-            extractions.c.version == config.version,
-            extractions.c.result["picker_hash"].astext != config.hash,
-        )
-        .limit(1)
-    )
-    return found.first() is not None
+AI_PICK_LEASE = "ai-pick"
+AI_PICK_LEASE_SECONDS = 600.0
+"""One `ai-pick` at a time holds this lease row: two at once would both pay for the same
+posts, and the second's answers would be dropped unrecorded. A row, not an advisory lock,
+so it holds behind a transaction-mode pooler. The run renews it before each post, which
+takes at most about 75 s (four 15 s attempts per model), so it lapses only after a run is
+killed."""
 
 
 async def run_ai_pick(
@@ -270,18 +277,23 @@ async def run_ai_pick(
             say(f"the AI picker is off: {exc}")
             return 2
     db = make_engine(settings.db_url)
+    lease = Lease(
+        db, holder_id(), ttl=AI_PICK_LEASE_SECONDS, renew=AI_PICK_LEASE_SECONDS / 10,
+        name=AI_PICK_LEASE,
+    )  # fmt: skip
     try:
-        async with db.connect() as lock:
-            held = (await lock.execute(select(func.pg_try_advisory_lock(AI_PICK_LOCK)))).scalar()
-            await lock.commit()
-            if not held:
-                say("another ai-pick is running; wait for it to finish")
-                return 1
-            limits = (max_usd, max_total_usd)
-            return await _ai_pick(
-                db, settings, chosen, picker, current_rules(), limits, run, say, listings
+        if not await lease.acquire():
+            say(
+                "another ai-pick is running; wait for it to finish (a killed run's hold "
+                f"lapses {AI_PICK_LEASE_SECONDS / 60:g} minutes after its last post)"
             )
+            return 1
+        limits = (max_usd, max_total_usd)
+        return await _ai_pick(
+            db, settings, chosen, picker, current_rules(), limits, run, say, listings, lease
+        )
     finally:
+        await lease.release()
         await db.dispose()
 
 
@@ -295,15 +307,13 @@ async def _ai_pick(
     run: int,
     say: Say,
     listings: Listings | None,
+    lease: Lease,
 ) -> int:
     config = picker.config
     max_usd, max_total_usd = limits
     async with db.connect() as conn:
-        if await other_prompt(conn, config):
-            say(
-                f"AI picker version {config.version} has answers recorded with other files; "
-                "raise the version in ai.json"
-            )
+        if problem := await other_files(conn, config):
+            say(problem)
             return 2
         rows = await select_posts(conn, chosen, config.version, run)
         texts = [PostText(normalize(r.text), await quoted_words(conn, r)) for r in rows]
@@ -336,6 +346,9 @@ async def _ai_pick(
         if listings is None:
             say("no Alpaca keys: tickers no rules version reviewed stay unmapped")
         for n, (row, post) in enumerate(zip(rows, texts, strict=True), 1):
+            if not await lease.acquire():  # renews it; fails only if another run took it
+                say(f"stopped at {row.key}: lost the ai-pick lease to another run")
+                return 1
             try:
                 async with db.begin() as conn:
                     book = await load_book(conn, rules)

@@ -17,6 +17,10 @@ pool's end, and the sets never overlap:
   outside every set above, among posts the rules picker gives a market link: the 100
   random dev posts hold only a handful with anything to name. Drawn with its own seed
   after the sets above, so they are unchanged. The AI stability check reruns these.
+  Which posts the rules picker flags depends on the rules version and on the instruments
+  in the names table (a ticker added since can make a name count), so the draw refuses
+  any rules version but 1, and it matches only on a names table synced from version 1
+  with no instruments added since.
 """
 
 import argparse
@@ -41,6 +45,8 @@ EARLY_START = datetime(2022, 2, 1, tzinfo=UTC)
 WINDOW_START = datetime(2025, 11, 1, tzinfo=UTC)
 POOL_END = datetime(2026, 10, 1, tzinfo=UTC)
 """Posts made before this; fixed so a redraw on another copy of the history matches."""
+DEV_MARKET_RULES = 1
+"""The rules version dev_market's market links were read with."""
 OUT = Path(__file__).parent.parent / "precision" / "samples.csv"
 
 
@@ -59,7 +65,13 @@ async def text_posts(settings: Settings) -> tuple[list[tuple[str, datetime]], se
                 )
                 .order_by(signals.c.key)
             )
-            book = await load_book(conn, current_rules())
+            rules = current_rules()
+            if rules.version != DEV_MARKET_RULES:
+                raise SystemExit(
+                    f"dev_market was drawn with rules version {DEV_MARKET_RULES}, "
+                    f"not {rules.version}"
+                )
+            book = await load_book(conn, rules)
             posts, flagged = [], set()
             for row in rows:
                 if normalize(row.text):

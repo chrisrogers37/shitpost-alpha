@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "about": "The reason line's version (reason.py), apart from the AI picker's: the line decides nothing, so it can change without a new picker version or a rerun of the window. Its files are pinned by hash like the picker's. 'provider' names which of the picker's pinned models writes it.",
+  "prompt": "extract/prompts/reason.md",
+  "provider": "anthropic",
+  "max_output_tokens": 80,
+  "max_chars": 120,
+  "files": {
+    "extract/prompts/reason.md": "64b7fe9fb617416e57f33c42bb535218454a3fd0dc3b89fba4612daf79bfd2d2"
+  }
+}
