@@ -7,6 +7,7 @@ import pytest
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from psycopg import sql
 from sqlalchemy import create_engine, text
 
@@ -142,8 +143,8 @@ FORGETS_ITS_SCHEMA = """
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0002"
-down_revision = "0001"
+revision = "forgets_its_schema"
+down_revision = "{head}"
 
 
 def upgrade() -> None:
@@ -156,8 +157,11 @@ def test_a_migration_that_forgets_its_schema_puts_the_table_in_public(
 ) -> None:
     scripts = tmp_path / "migrations"
     shutil.copytree(MIGRATIONS, scripts, ignore=shutil.ignore_patterns("__pycache__"))
-    (scripts / "versions" / "0002_forgets_its_schema.py").write_text(FORGETS_ITS_SCHEMA)
     config = alembic_config(engine_first.db_url)
+    head = ScriptDirectory.from_config(config).get_current_head()
+    (scripts / "versions" / "forgets_its_schema.py").write_text(
+        FORGETS_ITS_SCHEMA.format(head=head)
+    )
     config.set_main_option("script_location", str(scripts))
     command.upgrade(config, "head")
     query = "SELECT schemaname FROM pg_tables WHERE tablename = 'forgot_its_schema'"
