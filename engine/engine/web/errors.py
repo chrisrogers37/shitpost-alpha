@@ -13,6 +13,8 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from starlette.exceptions import HTTPException
 
+from engine.web.db import failure_line
+
 log = logging.getLogger(__name__)
 
 ErrorCode = Literal["bad_request", "not_found", "rate_limited", "unavailable", "internal"]
@@ -75,13 +77,13 @@ def error_response(
 def install_error_handlers(app: FastAPI) -> None:
     """Handlers for errors raised inside the app. Anything unhandled is ResponsePolicy's."""
 
-    async def api_error(request: Request, exc: Exception) -> Response:
-        assert isinstance(exc, ApiError)
+    @app.exception_handler(ApiError)
+    async def api_error(request: Request, exc: ApiError) -> Response:
         return error_response(request.url.path, exc.code, exc.message)
 
-    async def http_error(request: Request, exc: Exception) -> Response:
+    @app.exception_handler(HTTPException)
+    async def http_error(request: Request, exc: HTTPException) -> Response:
         # Routing's own errors: unknown path (404) and wrong method (405, kept with Allow).
-        assert isinstance(exc, HTTPException)
         if exc.status_code == 404:
             code: ErrorCode = "not_found"
         elif exc.status_code < 500:
@@ -91,19 +93,15 @@ def install_error_handlers(app: FastAPI) -> None:
         message = "Not found" if code == "not_found" else str(exc.detail)
         return error_response(request.url.path, code, message, exc.status_code, exc.headers)
 
-    async def bad_request(request: Request, exc: Exception) -> Response:
-        assert isinstance(exc, RequestValidationError)
+    @app.exception_handler(RequestValidationError)
+    async def bad_request(request: Request, exc: RequestValidationError) -> Response:
         problems = "; ".join(
             f"{'.'.join(map(str, e['loc'][1:])) or e['loc'][0]}: {e['msg']}" for e in exc.errors()
         )
         return error_response(request.url.path, "bad_request", problems)
 
+    @app.exception_handler(OperationalError)  # refused, lost, timed out
+    @app.exception_handler(PoolTimeoutError)  # every connection busy
     async def unavailable(request: Request, exc: Exception) -> Response:
-        log.warning("database unavailable on %s: %s", request.url.path, type(exc).__name__)
+        log.warning("database unavailable on %s: %s", request.url.path, failure_line(exc))
         return error_response(request.url.path, "unavailable", "The database is unavailable")
-
-    app.add_exception_handler(ApiError, api_error)
-    app.add_exception_handler(HTTPException, http_error)
-    app.add_exception_handler(RequestValidationError, bad_request)
-    app.add_exception_handler(OperationalError, unavailable)  # refused, lost, timed out
-    app.add_exception_handler(PoolTimeoutError, unavailable)  # every connection busy

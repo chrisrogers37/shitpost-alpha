@@ -1,5 +1,6 @@
 """A short in-process cache for GET responses, keyed by path and query string."""
 
+import math
 import time
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
@@ -13,7 +14,7 @@ MAX_ENTRIES = 256
 
 class ResponseCache:
     """Serves a route's response from memory for `ttl` seconds, and tells browsers and
-    proxies they may keep it as long (`Cache-Control: public, max-age=<ttl>`).
+    proxies they may keep it until then (`Cache-Control: public, max-age=<seconds left>`).
 
     Only 200s are cached: `build` returns the body, and an error it raises is not kept.
     Usage: `return await cache.respond(request, lambda: load_body(db, ...))`.
@@ -30,15 +31,18 @@ class ResponseCache:
         now = self._clock()
         hit = self._entries.get(key)
         if hit is not None and hit[0] > now:
-            body = hit[1]
+            expires, body = hit
         else:
-            body = (await build()).model_dump_json().encode()
+            expires, body = now + self._ttl, (await build()).model_dump_json().encode()
             self._entries.pop(key, None)
-            self._entries[key] = (now + self._ttl, body)  # oldest first
+            self._entries[key] = (expires, body)  # oldest first
             while len(self._entries) > MAX_ENTRIES:
                 self._entries.popitem(last=False)
         return Response(
             body,
             media_type="application/json",
-            headers={"Cache-Control": f"public, max-age={self._ttl}"},
+            headers={"Cache-Control": f"public, max-age={math.ceil(expires - now)}"},
         )
+
+    def __len__(self) -> int:
+        return len(self._entries)

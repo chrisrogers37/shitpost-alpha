@@ -18,6 +18,9 @@ VISITOR = ("203.0.113.10", 50000)  # the socket address requests come from by de
 
 MakeClient = Callable[..., AsyncClient]
 
+NO_DATABASE = WebSettings(database_url="postgresql://unused")
+"""For tests that build the app and never query it."""
+
 
 @pytest.fixture
 def web_url(database_url: str, make_role: Callable[..., str]) -> str:
@@ -53,4 +56,4 @@ async def make_client(web_settings: WebSettings) -> AsyncIterator[MakeClient]:
     yield make
     for app, http in made:
         await http.aclose()
-        await app.state.web.db.dispose()
+        await app.state.web.close()

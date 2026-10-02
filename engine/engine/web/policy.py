@@ -20,8 +20,9 @@ SECURITY_HEADERS = {
     "Referrer-Policy": "strict-origin-when-cross-origin",
 }
 
-OPEN_CORS = {"Access-Control-Allow-Origin": "*"}
-"""Any site may read /api/v1 with GET, without credentials. Other methods get no CORS."""
+OPEN_CORS = {"Access-Control-Allow-Origin": "*", "Access-Control-Expose-Headers": "Retry-After"}
+"""Any site may read /api/v1 with GET, without credentials, and see when to retry after a
+429. Other methods get no CORS."""
 
 
 class ResponsePolicy:
@@ -38,6 +39,7 @@ class ResponsePolicy:
             await self.app(scope, receive, send)
             return
         method, path = scope["method"], scope["path"]
+        printable = path.encode("unicode_escape").decode()  # no forged log lines
         headers = SECURITY_HEADERS
         if method == "GET" and path.startswith("/api/v1/"):
             headers = SECURITY_HEADERS | OPEN_CORS
@@ -53,12 +55,11 @@ class ResponsePolicy:
         try:
             await self.app(scope, receive, send_with_headers)
         except Exception:
-            log.exception("unhandled error on %s %s", method, path)
+            log.exception("unhandled error on %s %s", method, printable)
             if status:  # the response already began; the server closes the connection
                 raise
             response = error_response(path, "internal", "Internal error")
             await response(scope, receive, send_with_headers)
         finally:
             elapsed_ms = (time.perf_counter() - started) * 1000
-            printable = path.encode("unicode_escape").decode()  # no forged log lines
             log.info("%s %s %s %.0fms", method, printable, status or "-", elapsed_ms)

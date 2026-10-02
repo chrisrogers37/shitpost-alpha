@@ -1,17 +1,20 @@
+import logging
 import uuid
 
 import psycopg
 import pytest
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 from engine.web.app import create_app
 from engine.web.db import make_web_engine
+from engine.web.models import ApiModel, ApiResponse
 from engine.web.router import ApiRouter
 from engine.web.settings import WebSettings
 from engine.web.stream import StreamIds
 from tests.web.api_checks import assert_security_headers
-from tests.web.conftest import MakeClient
+from tests.web.conftest import NO_DATABASE, MakeClient
 from tests.web.routes import FakeClock, Probe, ProbeRoutes
 
 
@@ -24,6 +27,13 @@ async def test_an_unknown_api_path_is_a_json_404_with_every_header(
     assert_security_headers(response)
     assert response.headers["access-control-allow-origin"] == "*"
     assert "server" not in response.headers
+
+
+async def test_a_trailing_slash_is_a_404_not_a_redirect(make_client: MakeClient) -> None:
+    # Behind the TLS edge the app sees http, so a redirect would send visitors to http://.
+    response = await make_client().get("/api/v1/openapi.json/")
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
 
 
 async def test_errors_outside_the_api_are_plain_text(make_client: MakeClient) -> None:
@@ -59,6 +69,20 @@ async def test_an_unhandled_error_is_a_500_without_its_details(
     assert "secret" not in response.text
     assert_security_headers(response)
     assert any("secret detail" in str(r.exc_info[1]) for r in caplog.records if r.exc_info)
+
+
+async def test_the_unhandled_error_line_escapes_the_path(
+    make_client: MakeClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    router = ApiRouter()
+
+    @router.get("/signals/{public_id}", response_model=Probe)
+    async def signal(public_id: str) -> Probe:
+        raise RuntimeError("boom")
+
+    await make_client(router).get("/api/v1/signals/a%0A2026-10-02 INFO engine: forged")
+    (line,) = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
+    assert line == "unhandled error on GET /api/v1/signals/a\\n2026-10-02 INFO engine: forged"
 
 
 async def test_cors_is_open_to_get_only(make_client: MakeClient) -> None:
@@ -110,7 +134,7 @@ async def test_stream_id_is_read_once_a_minute(database_url: str, web_url: str) 
         await db.dispose()
 
 
-def test_every_api_route_must_declare_an_api_response(web_settings: WebSettings) -> None:
+def test_every_api_route_must_declare_an_api_response() -> None:
     class Bare(BaseModel):
         answer: int
 
@@ -132,7 +156,40 @@ def test_every_api_route_must_declare_an_api_response(web_settings: WebSettings)
         return Probe(stream_id=uuid.uuid4(), answer=1)
 
     assert [getattr(route, "path", None) for route in router.routes] == ["/good"]
-    create_app(web_settings, [router])
+    create_app(NO_DATABASE, [router])
+    with pytest.raises(TypeError, match="ApiRouters only"):
+        create_app(NO_DATABASE, [APIRouter()])  # type: ignore[list-item]
+
+
+def test_every_api_route_is_in_the_schema() -> None:
+    router = ApiRouter()
+    with pytest.raises(TypeError, match="must be in the schema"):
+        router.add_api_route("/hidden", lambda: None, response_model=Probe, include_in_schema=False)
+    with pytest.raises(TypeError, match="must be in the schema"):
+        ApiRouter(include_in_schema=False).add_api_route(
+            "/hidden", lambda: None, response_model=Probe
+        )
+    with pytest.raises(TypeError, match="must be in the schema"):
+        router.include_router(ApiRouter(), include_in_schema=False)
+    assert router.routes == []
+
+
+def test_api_models_take_no_aliases() -> None:
+    for field in (
+        Field(alias="c"),
+        Field(serialization_alias="c"),
+        Field(validation_alias="c"),
+    ):
+        with pytest.raises(TypeError, match="no aliases"):
+
+            class Quote(ApiResponse):
+                close: float = field
+
+    with pytest.raises(TypeError, match="no aliases"):
+
+        class Camel(ApiModel):
+            model_config = ConfigDict(alias_generator=to_camel)
+            public_id: str
 
 
 async def test_a_row_with_unlisted_fields_never_passes_through(make_client: MakeClient) -> None:

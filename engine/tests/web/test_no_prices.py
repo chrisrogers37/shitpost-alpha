@@ -1,4 +1,7 @@
-"""No API response may carry a price: public output is % moves only, never raw prices."""
+"""No API response may carry a price: public output is % moves only, never raw prices.
+
+The walk covers every field the API can send because ApiRouter refuses routes left out of
+the schema and ApiModel refuses aliases (tested in test_api_conventions.py)."""
 
 import re
 from typing import Any
@@ -8,10 +11,10 @@ from fastapi import FastAPI
 from engine.web.app import create_app
 from engine.web.models import ApiModel, ApiResponse
 from engine.web.router import ApiRouter
-from engine.web.settings import WebSettings
+from tests.web.conftest import NO_DATABASE
 
-PRICE_TOKENS = {"price", "open", "high", "low", "close", "vwap", "volume", "bid", "ask", "ohlc"}
-PRICE_TOKENS |= {"bar", "bars"}
+PRICE_TOKENS = {"price", "open", "high", "low", "close", "vwap", "volume", "bid", "ask", "bar"}
+PRICE_TOKENS |= {"ohlc", "ohlcv"}
 
 ALLOWED = {
     "market_open": "whether the market is open now: a flag, not an opening price",
@@ -19,9 +22,15 @@ ALLOWED = {
 
 
 def tokens(name: str) -> set[str]:
-    """Split on underscores and camel case: closePrice and close_price give close, price."""
+    """Split on underscores and camel case (closePrice and close_price give close, price),
+    drop trailing digits, and give each plural's singular too (prices gives price)."""
     words = re.split(r"_|(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", name)
-    return {word.lower() for word in words if word}
+    found: set[str] = set()
+    for word in words:
+        word = word.lower().rstrip("0123456789")
+        if word:
+            found |= {word, word.removesuffix("s")}
+    return found
 
 
 def price_fields(app: FastAPI) -> set[str]:
@@ -54,23 +63,41 @@ def price_fields(app: FastAPI) -> set[str]:
 
 def test_tokens_split_both_spellings() -> None:
     assert tokens("close_price") == tokens("closePrice") == {"close", "price"}
-    assert tokens("OHLCBars") == {"ohlc", "bars"}
+    assert tokens("OHLCBars") == {"ohlc", "bars", "bar"}
     assert tokens("market_open") == {"market", "open"}
+    assert tokens("prices") == {"prices", "price"} and tokens("price2") == {"price"}
 
 
-def test_no_response_field_is_a_price(web_settings: WebSettings) -> None:
-    assert price_fields(create_app(web_settings)) == set()
+def test_no_response_field_is_a_price() -> None:
+    assert price_fields(create_app(NO_DATABASE)) == set()
 
 
-def test_the_check_catches_a_price_field(web_settings: WebSettings) -> None:
+def test_the_check_catches_a_price_field() -> None:
     class Quote(ApiModel):
         close_price: float
 
+    class Candle(ApiModel):
+        ohlcv: list[float]
+        highs: list[float]
+
     class Quotes(ApiResponse):
         quotes: list[Quote]
+        candles: list[Candle]
         lastTradeVolume: int
+        prices: list[float]
+        closes: list[float]
+        price2: float
         market_open: bool
 
     router = ApiRouter()
     router.add_api_route("/quotes", lambda: None, response_model=Quotes)
-    assert price_fields(create_app(web_settings, [router])) == {"close_price", "lastTradeVolume"}
+    found = price_fields(create_app(NO_DATABASE, [router]))
+    assert found == {
+        "close_price",
+        "ohlcv",
+        "highs",
+        "lastTradeVolume",
+        "prices",
+        "closes",
+        "price2",
+    }

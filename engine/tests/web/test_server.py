@@ -50,6 +50,25 @@ def test_bad_web_settings_are_a_clear_error(
     assert "secret" not in err
 
 
+@pytest.mark.usefixtures("no_settings")
+@pytest.mark.parametrize(
+    "url",
+    [
+        "web:secret@db.example/engine",  # no scheme
+        "postgresql://web:secret@db.example:port/engine",  # a port that isn't a number
+        "mysql://web:secret@db.example/engine",
+        "postgresql+asyncpg://web:secret@db.example/engine",  # a driver not installed
+    ],
+)
+def test_a_bad_database_url_is_one_line_without_the_password(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], url: str
+) -> None:
+    monkeypatch.setenv("WEB_DATABASE_URL", url)
+    assert engine_cli.main(["web"]) == 2
+    err = capsys.readouterr().err
+    assert err == "invalid web settings: WEB_DATABASE_URL: Value error, not a postgresql:// URL\n"
+
+
 def free_port() -> int:
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -102,3 +121,19 @@ def test_the_server_process(web_url: str, tmp_path: Path) -> None:
     assert "GET /healthz 200" in output and "GET /api/v1/x 429" in output
     assert "127.0.0.1" not in output and "203.0.113" not in output  # no visitor addresses
     assert "Finished server process" in output  # a clean shutdown
+
+
+def test_the_server_refuses_to_start_as_a_superuser(database_url: str) -> None:
+    environ = {k: v for k, v in os.environ.items() if not k.startswith(("ENGINE_", "WEB_"))}
+    environ |= {"WEB_DATABASE_URL": database_url, "PORT": str(free_port())}  # the test admin
+    server = subprocess.run(
+        [sys.executable, "-m", "engine", "web"],
+        cwd=PROJECT,
+        env=environ,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert server.returncode == 3  # uvicorn's startup failure
+    assert "the web role holds more than WEB_GRANTS (superuser" in server.stderr
+    assert "Application startup failed" in server.stderr

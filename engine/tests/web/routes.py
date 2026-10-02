@@ -1,15 +1,13 @@
 """Test-only: /api/v1 routes that exercise the conventions. No real route exists yet."""
 
-from typing import Annotated
-
-from fastapi import Depends, Request, Response
+from fastapi import Request, Response
 from sqlalchemy import text
 
 from engine.web.cache import ResponseCache
 from engine.web.deps import Db, StreamId
 from engine.web.errors import ApiError
 from engine.web.models import ApiModel, ApiResponse
-from engine.web.paging import Page, PageQuery, page_query, take_page
+from engine.web.paging import Page, PageParams, take_page
 from engine.web.router import ApiRouter
 
 NUMBERS = list(range(50, 0, -1))  # a list of 50 rows, newest (highest) first
@@ -55,9 +53,7 @@ class ProbeRoutes:
             raise ApiError("not_found", "No such thing")
 
         @router.get("/numbers", response_model=Page[Number])
-        async def numbers(
-            stream_id: StreamId, page: Annotated[PageQuery, Depends(page_query)]
-        ) -> Page[Number]:
+        async def numbers(stream_id: StreamId, page: PageParams) -> Page[Number]:
             key = page.before_key(1)
             rows = [n for n in NUMBERS if key is None or n < key[0]][: page.limit + 1]
             items, next_before = take_page(rows, page.limit, lambda n: (n,))

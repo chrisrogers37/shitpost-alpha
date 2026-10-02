@@ -1,9 +1,14 @@
-import pytest
+import uuid
 
+import pytest
+from fastapi import Request
+
+from engine.web.cache import MAX_ENTRIES, ResponseCache
 from engine.web.errors import ApiError
+from engine.web.models import ApiResponse
 from engine.web.paging import decode_cursor, encode_cursor, take_page
 from tests.web.conftest import MakeClient
-from tests.web.routes import ProbeRoutes
+from tests.web.routes import FakeClock, ProbeRoutes
 
 
 def test_a_cursor_round_trips_and_is_url_safe() -> None:
@@ -85,7 +90,11 @@ async def test_the_cache_serves_a_second_hit_without_building_and_expires(
     await client.get("/api/v1/test/cached?a=2")  # another query string, another entry
     assert routes.builds == 2
 
-    routes.clock.now += 5
+    routes.clock.now += 4.1  # a late hit may be kept only as long as the entry lives
+    late = await client.get("/api/v1/test/cached?a=1")
+    assert late.headers["cache-control"] == "public, max-age=1" and routes.builds == 2
+
+    routes.clock.now += 0.9
     assert (await client.get("/api/v1/test/cached?a=1")).json()["answer"] == 3
 
 
@@ -96,3 +105,15 @@ async def test_the_cache_keeps_only_200s(make_client: MakeClient) -> None:
         response = await client.get("/api/v1/test/cached?fail=true")
         assert response.status_code == 404 and "cache-control" not in response.headers
     assert routes.builds == 2
+
+
+async def test_the_cache_stays_bounded() -> None:
+    cache = ResponseCache(ttl=5, clock=FakeClock())
+
+    async def build() -> ApiResponse:
+        return ApiResponse(stream_id=uuid.uuid4())
+
+    for n in range(MAX_ENTRIES + 100):
+        scope = {"type": "http", "path": "/api/v1/x", "query_string": f"n={n}".encode()}
+        await cache.respond(Request(scope | {"headers": []}), build)
+    assert len(cache) == MAX_ENTRIES

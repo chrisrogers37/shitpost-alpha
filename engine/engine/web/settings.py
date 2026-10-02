@@ -1,7 +1,11 @@
 """Web settings, read from WEB_* environment variables (and Railway's PORT)."""
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
+
+POSTGRES_DRIVERS = ("postgres", "postgresql", "postgresql+psycopg")
 
 
 class WebSettings(BaseSettings):
@@ -18,7 +22,7 @@ class WebSettings(BaseSettings):
     rate_limit_burst: int = Field(default=30, ge=1)
     """Requests a visitor may make at once on top of that, from a rested bucket."""
 
-    client_ip_header: str = Field(default="X-Real-IP", min_length=1)
+    client_ip_header: str = Field(default="X-Real-IP", pattern=r"^[A-Za-z0-9-]+$")
     """Header that carries the visitor's address, as written by Railway's edge proxy:
     https://docs.railway.com/networking/public-networking/specs-and-limits ("X-Real-IP for
     identifying client's remote IP"). Without the header, the socket address is used."""
@@ -31,6 +35,17 @@ class WebSettings(BaseSettings):
 
     port: int = Field(default=8000, ge=1, le=65535, validation_alias="PORT")
     """Port to listen on; Railway sets PORT."""
+
+    @field_validator("database_url")
+    @classmethod
+    def _is_postgres_url(cls, url: SecretStr) -> SecretStr:
+        try:
+            driver = make_url(url.get_secret_value()).drivername
+        except (ArgumentError, ValueError):  # not a URL, or a port that isn't a number
+            driver = None
+        if driver not in POSTGRES_DRIVERS:
+            raise ValueError("not a postgresql:// URL")  # never echo the value: it has the password
+        return url
 
     @property
     def db_url(self) -> str:

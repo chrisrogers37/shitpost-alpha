@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from engine.web.health import HealthProbe
 from engine.web.stream import StreamIds
 
 
@@ -15,6 +16,11 @@ from engine.web.stream import StreamIds
 class WebState:
     db: AsyncEngine
     stream_ids: StreamIds
+    health: HealthProbe
+
+    async def close(self) -> None:
+        await self.health.close()
+        await self.db.dispose()
 
 
 def web_state(request: Request) -> WebState:

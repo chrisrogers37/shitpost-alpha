@@ -171,15 +171,12 @@ For comprehensive information about each component, see the detailed README file
 - Enhanced context analysis
 - Bypass functionality for unanalyzable content
 
-### 📊 Performance Dashboard
-- React 19 + TypeScript single-post feed with prediction outcomes
-- TradingView Lightweight Charts with post markers
-- Price KPIs, outcome bubbles (T+1/3/7/30), ticker selection
+### 🌐 [Website API](engine/README.md#public-api)
+- Public read API under `/api/v1`, served by `python -m engine web` (`engine/engine/web/`)
 
 ### 🔔 [Notifications](documentation/TELEGRAM_SETUP_GUIDE.md)
 - Telegram bot with subscriber management
 - Alert engine with configurable thresholds
-- Browser push alerts via dashboard
 
 ### 📈 [Market Data](documentation/MARKET_DATA_ARCHITECTURE.md)
 - Multi-provider price fetching (yfinance + Alpha Vantage)

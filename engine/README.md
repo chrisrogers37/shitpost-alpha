@@ -58,7 +58,19 @@ Rows at a stage this copy doesn't know are left alone (a newer copy may know it)
 
 `engine/web/` is the website's process: the public read API under `/api/v1` and
 `/healthz`. It connects as the web role, reads only what `WEB_GRANTS` gives that role,
-and never migrates. Railway settings for its service:
+and never migrates.
+
+Create the web role with SQL, as the database owner, before the first `migrate` (which
+then grants it `WEB_GRANTS`):
+
+    CREATE ROLE web LOGIN PASSWORD '<new password>';
+
+Not a role made in Neon's console: those can carry more than a plain role. At startup the
+process checks its role and refuses to serve (exit 3) if it is a superuser, can create
+roles or databases, bypasses row security, is a member of `pg_read_all_data` or can use
+the `prices` schema. If the database can't be reached then, it logs a warning and serves.
+
+Railway settings for its service:
 
 - Root directory: `engine/`, as for the engine service.
 - Start command: `python -m engine web` (one uvicorn process on `0.0.0.0:$PORT`).
@@ -67,46 +79,64 @@ and never migrates. Railway settings for its service:
 - Config file path: none. Railway reads a config file from the repo root unless a service
   names one, whatever its root directory (https://docs.railway.com/deployments/monorepo),
   so the engine service names `/engine/railway.json` and this one names nothing.
-- Variables: `WEB_DATABASE_URL`, the engine database as the web role, on Neon's direct
-  (unpooled) endpoint. A transaction pooler would drop each connection's 5 s statement
-  timeout.
+- Variables: `WEB_DATABASE_URL`, the engine database as the web role
+  (`postgresql://web:...`), on Neon's direct (unpooled) endpoint. A transaction pooler
+  would drop each connection's 5 s statement timeout.
 - Keep Railway's CDN off for this service: behind it, `X-Real-IP` holds the CDN's address,
   so every visitor would share a rate-limit bucket.
 
 Other settings (`engine/web/settings.py`) have defaults: `WEB_RATE_LIMIT_PER_MINUTE`
 (120) and `WEB_RATE_LIMIT_BURST` (30) per visitor address; `WEB_CLIENT_IP_HEADER`
 (`X-Real-IP`) and `WEB_TRUSTED_HOPS` (1), where the visitor's address comes from;
-`WEB_POOL_SIZE` (5) database connections.
+`WEB_POOL_SIZE` (5) database connections for the API. A new connection gives up after
+3 s (a `connect_timeout` in the URL wins), a statement after 5 s, and a request waiting
+for a free connection after 5 s: each is a 503.
 
-`/healthz` runs `SELECT 1` with a 2 s timeout: `{"ok": true}` (200) or `{"ok": false}`
-(503), never cached and never rate limited. The access log has method, path, status and
-duration, never the visitor's address.
+`/healthz` means "the database answers": `{"ok": true}` (200) if `SELECT 1` answered
+within 2 s, else `{"ok": false}` (503), never cached and never rate limited. It has its
+own connection, not one of the API's, so a busy API doesn't fail it and a flood of it
+doesn't slow the API: callers share one query at a time, and an answer is reused for 1 s.
+
+The access log has method, path, status and duration, never the visitor's address.
 
 The visitor's address is the one Railway's edge proxy saw: its docs list "`X-Real-IP` for
 identifying client's remote IP"
 (https://docs.railway.com/networking/public-networking/specs-and-limits). The limiter
 takes the entry `WEB_TRUSTED_HOPS` from the right of that header, so a header that proxies
 append to (`X-Forwarded-For`) also works: what a visitor writes lands on the left and never
-counts. Without the header (local runs) it uses the socket address; uvicorn's own
-proxy-header handling is off.
+counts. Without a usable entry it uses the socket address, which behind a proxy is the
+proxy's, putting every visitor in one bucket; for a request from another machine it logs
+a warning about that at most every 5 minutes. uvicorn's own proxy-header handling is off.
+
+To check on a new deploy that the edge overwrites an `X-Real-IP` a visitor sends, run
+from one machine:
+
+    for i in $(seq 1 31); do curl -s -o /dev/null -w "%{http_code}\n" \
+      -H "X-Real-IP: 203.0.113.$i" https://<service>.up.railway.app/api/v1/x; done
+
+30 x 404 then a 429 means it does. 31 x 404 means visitors can pick their own bucket:
+stop and look before the site goes public.
 
 ## Public API
 
 Every route under `/api/v1` follows these rules; each has a small module in `engine/web/`.
 
 - **Explicit fields** (`models.py`, `router.py`). Routes are defined on an `ApiRouter`,
-  which refuses a route whose `response_model` isn't an `ApiResponse`. Models list their
-  fields and forbid others, so a row or dict never passes through as is.
+  which refuses a route whose `response_model` isn't an `ApiResponse` and a route left
+  out of the schema; `create_app` takes only `ApiRouter`s. Models list their fields and
+  forbid others, so a row or dict never passes through as is, and take no aliases, so a
+  field goes out under its own name.
 - **stream_id** (`stream.py`, `deps.py`). Every successful JSON body carries `stream_id`
   at the top level, from `engine.engine_meta`, read at most once a minute. Take it as a
   `StreamId` parameter. A new value means the database was rebuilt.
 - **Lists** (`paging.py`). A list is `Page[Item]`: `{stream_id, items, next_before}`. It
   takes `?before=<cursor>&limit=` (`limit` 1 to 100, default 20). The cursor is opaque:
   URL-safe base64 of the sort key, a list of integers. A bad `limit` or cursor is a 400.
-  The route fetches `limit + 1` rows below `page.before_key(n)` and calls `take_page`.
+  Take it as a `page: PageParams` parameter; the route fetches `limit + 1` rows below
+  `page.before_key(n)` and calls `take_page`.
 - **Errors** (`errors.py`). Under `/api/`, every error is
-  `{"error": {"code": ..., "message": ...}}`, including unknown paths. Raise
-  `ApiError(code, message)` from a route.
+  `{"error": {"code": ..., "message": ...}}`, including unknown paths (a trailing slash
+  is one: there are no redirects). Raise `ApiError(code, message)` from a route.
 
   | Code | Status |
   |---|---|
@@ -118,15 +148,17 @@ Every route under `/api/v1` follows these rules; each has a small module in `eng
 
   Outside `/api/` the same statuses are plain text.
 - **Cache** (`cache.py`). `ResponseCache(ttl).respond(request, build)` serves a GET from
-  memory for `ttl` seconds, keyed by path and query string, and sends
-  `Cache-Control: public, max-age=<ttl>`. Only 200s are kept.
+  memory for `ttl` seconds, keyed by path and query string (at most 256 entries), and
+  sends `Cache-Control: public, max-age=<seconds left>`. Only 200s are kept.
 - **CORS** (`policy.py`). Any origin may GET `/api/v1/*`:
-  `Access-Control-Allow-Origin: *`, no credentials. Other methods get no CORS headers.
+  `Access-Control-Allow-Origin: *`, no credentials, and `Retry-After` readable.
+  Other methods get no CORS headers.
 - **Headers** (`policy.py`). Every response, errors and `/healthz` included, has
   `Content-Security-Policy`, `Strict-Transport-Security: max-age=31536000`,
   `X-Content-Type-Options: nosniff` and `Referrer-Policy: strict-origin-when-cross-origin`.
 - **No prices.** No response field may be a price (`tests/web/test_no_prices.py` walks
-  the OpenAPI schema for price-like names; public output is % moves only).
+  the OpenAPI schema for price-like names, plurals included; public output is % moves
+  only). The web role can't read `prices` either, and the process checks that at startup.
 
 The schema is at `/api/v1/openapi.json`, the one body under `/api/v1` without
 `stream_id`; it documents the error shape as each route's 4XX and 5XX. The docs pages

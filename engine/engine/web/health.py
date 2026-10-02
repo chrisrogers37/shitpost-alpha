@@ -1,35 +1,77 @@
-"""GET /healthz: whether the web process can query its database. Railway's health check
-and the engine's outside check call it; it is never rate limited."""
+"""GET /healthz: whether the database answers. Railway's health check and the engine's
+outside check call it. It is never rate limited, so it has its own connection and runs one
+query at a time however many call: a flood of it never reaches the API's pool."""
 
 import asyncio
 import logging
+import math
+import time
+from collections.abc import Callable
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from engine.db import raise_if_cancelling
-from engine.web.deps import Db
+from engine.web.db import failure_line
 
 log = logging.getLogger(__name__)
 
 HEALTH_TIMEOUT_SECONDS = 2.0
+"""Longest /healthz waits for an answer."""
+FRESH_SECONDS = 1.0
+"""How long an answer is reused for later callers."""
 
-router = APIRouter()
+
+class HealthProbe:
+    """SELECT 1 on `db` (a one-connection engine). Callers that arrive while a query runs
+    wait on that query; an answer is reused for FRESH_SECONDS."""
+
+    def __init__(self, db: AsyncEngine, clock: Callable[[], float] = time.monotonic) -> None:
+        self.db, self._clock = db, clock
+        self._query: asyncio.Task[bool] | None = None
+        self._answered_at = -math.inf
+
+    async def ok(self) -> bool:
+        """Whether the database answered, within HEALTH_TIMEOUT_SECONDS of this call. A
+        query the driver is still winding down (psycopg's cancel can take 10 s) keeps
+        running, and callers meanwhile get False on time."""
+        query = self._query
+        if query is None or (query.done() and self._clock() - self._answered_at >= FRESH_SECONDS):
+            query = self._query = asyncio.create_task(self._select_1())
+        done, _ = await asyncio.wait({query}, timeout=HEALTH_TIMEOUT_SECONDS)
+        return bool(done) and not query.cancelled() and query.result()
+
+    async def _select_1(self) -> bool:
+        try:
+            async with asyncio.timeout(HEALTH_TIMEOUT_SECONDS), self.db.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            return True
+        except Exception as exc:
+            raise_if_cancelling()
+            log.warning("health check failed: %s", failure_line(exc))
+            return False
+        finally:
+            self._answered_at = self._clock()
+
+    async def close(self) -> None:
+        if self._query is not None and not self._query.done():
+            self._query.cancel()
+            await asyncio.wait({self._query})
+        await self.db.dispose()
 
 
-@router.get("/healthz", include_in_schema=False)
-async def healthz(db: Db) -> JSONResponse:
-    """{"ok": true} (200) if SELECT 1 answers within 2 s, else {"ok": false} (503)."""
-    try:
-        async with asyncio.timeout(HEALTH_TIMEOUT_SECONDS), db.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-        ok = True
-    except (TimeoutError, SQLAlchemyError) as exc:
-        raise_if_cancelling()
-        log.warning("health check failed: %s", type(exc).__name__)
-        ok = False
-    return JSONResponse(
-        {"ok": ok}, status_code=200 if ok else 503, headers={"Cache-Control": "no-store"}
-    )
+def health_router(probe: HealthProbe) -> APIRouter:
+    router = APIRouter()
+
+    @router.get("/healthz", include_in_schema=False)
+    async def healthz() -> JSONResponse:
+        """{"ok": true} (200) if the database answered SELECT 1 within 2 s, else
+        {"ok": false} (503)."""
+        ok = await probe.ok()
+        return JSONResponse(
+            {"ok": ok}, status_code=200 if ok else 503, headers={"Cache-Control": "no-store"}
+        )
+
+    return router

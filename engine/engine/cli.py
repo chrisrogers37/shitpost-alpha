@@ -6,7 +6,6 @@ import signal
 import sys
 from collections.abc import Sequence
 
-import uvicorn
 from pydantic import ValidationError
 from pydantic_settings import BaseSettings
 from sqlalchemy import select
@@ -20,7 +19,6 @@ from engine.registry import Registry, build_registry
 from engine.runtime import run_engine
 from engine.settings import Settings
 from engine.tables import engine_lease, engine_meta
-from engine.web.app import create_app
 from engine.web.settings import WebSettings
 
 STATUS_FIELDS = ("stream_id", "started_at", "last_heartbeat_at", "lease_holder", "code_version")
@@ -82,6 +80,10 @@ def _variable(prefix: str, loc: tuple[int | str, ...]) -> str:
 def serve_web(settings: WebSettings) -> None:
     """One uvicorn process on 0.0.0.0:PORT. Proxy headers stay off: the rate limit reads
     the edge's header itself. No server header; ResponsePolicy writes the access log."""
+    import uvicorn  # here, so the engine's own commands never load the web stack
+
+    from engine.web.app import create_app
+
     uvicorn.run(
         create_app(settings),
         host="0.0.0.0",

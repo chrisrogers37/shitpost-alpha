@@ -8,10 +8,10 @@ import base64
 import binascii
 import json
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import Query
+from pydantic import BaseModel, Field
 
 from engine.web.errors import ApiError
 from engine.web.models import ApiModel, ApiResponse
@@ -50,22 +50,18 @@ def decode_cursor(cursor: str, size: int) -> SortKey:
     return tuple(key)
 
 
-@dataclass(frozen=True)
-class PageQuery:
-    before: str | None
-    limit: int
+class PageQuery(BaseModel):
+    """?before=<cursor>&limit=. Take it as a `page: PageParams` parameter."""
+
+    before: str | None = Field(default=None, max_length=200)
+    limit: int = Field(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT)
 
     def before_key(self, size: int) -> SortKey | None:
         """The decoded `before` cursor, or None for the first page."""
         return None if self.before is None else decode_cursor(self.before, size)
 
 
-def page_query(
-    before: Annotated[str | None, Query(max_length=200)] = None,
-    limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
-) -> PageQuery:
-    """Use as `page: Annotated[PageQuery, Depends(page_query)]`."""
-    return PageQuery(before, limit)
+PageParams = Annotated[PageQuery, Query()]
 
 
 def take_page[RowT](

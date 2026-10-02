@@ -5,10 +5,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from engine.web import health
-from engine.web.db import make_web_engine
+from engine.web.db import check_role, make_web_engine
 from engine.web.deps import WebState
 from engine.web.errors import install_error_handlers
+from engine.web.health import HealthProbe, health_router
 from engine.web.policy import ResponsePolicy
 from engine.web.ratelimit import RateLimit, TokenBuckets
 from engine.web.router import ApiRouter
@@ -22,12 +22,16 @@ API_ROUTERS: tuple[ApiRouter, ...] = ()
 
 
 def create_app(settings: WebSettings, routers: Sequence[ApiRouter] = API_ROUTERS) -> FastAPI:
-    db = make_web_engine(settings)  # connects on first use
+    db = make_web_engine(settings)  # both connect on first use
+    state = WebState(db, StreamIds(db), HealthProbe(make_web_engine(settings, pool_size=1)))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        yield
-        await db.dispose()
+        try:
+            await check_role(db)
+            yield
+        finally:
+            await state.close()
 
     app = FastAPI(
         title="shitpost-alpha",
@@ -35,12 +39,15 @@ def create_app(settings: WebSettings, routers: Sequence[ApiRouter] = API_ROUTERS
         openapi_url=f"{API_PREFIX}/openapi.json",
         docs_url=None,  # the docs pages load scripts from a CDN
         redoc_url=None,
+        redirect_slashes=False,  # behind the edge it would redirect to http://; a 404 instead
         lifespan=lifespan,
     )
-    app.state.web = WebState(db=db, stream_ids=StreamIds(db))
+    app.state.web = state
     install_error_handlers(app)
-    app.include_router(health.router)
+    app.include_router(health_router(state.health))
     for router in routers:
+        if not isinstance(router, ApiRouter):  # its routes could return anything
+            raise TypeError("create_app mounts ApiRouters only")
         app.include_router(router, prefix=API_PREFIX)
 
     buckets = TokenBuckets(settings.rate_limit_per_minute, settings.rate_limit_burst)
