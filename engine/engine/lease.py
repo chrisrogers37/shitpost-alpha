@@ -47,7 +47,7 @@ class Lease:
         self._renewed_at = 0.0  # start of the last successful renewal, by the loop clock
         self._deadline = 0.0  # the step-down point
         self._renewal: asyncio.Task[bool] | None = None
-        self._ever_held = False
+        self._may_hold = False  # a take was sent, so the row may name this copy
 
     async def acquire(self) -> bool:
         """Take the lease if it is free, expired or already ours. Returns whether we hold it."""
@@ -77,10 +77,11 @@ class Lease:
     async def release(self) -> None:
         """Give the lease up, so the next copy can take it at once.
 
-        Bounded, and never raises a database error: if the database doesn't answer in
-        time, the row just expires.
+        Bounded by the answer window (plus the driver's own cancel, up to the connect
+        timeout, if the network is frozen), and never raises a database error: if the
+        database doesn't answer in time, the row just expires.
         """
-        if not self._ever_held:
+        if not self._may_hold:
             return
         try:
             async with asyncio.timeout(self._answer_within):
@@ -95,7 +96,7 @@ class Lease:
                     )
         except (SQLAlchemyError, OSError, TimeoutError) as exc:
             raise_if_cancelling()
-            log.warning("could not release the lease (%r); it expires in %gs", exc, self._ttl)
+            log.warning("could not release the lease (%r); it expires within %gs", exc, self._ttl)
 
     async def _renew_until_answered(self) -> bool:
         while True:
@@ -127,10 +128,10 @@ class Lease:
         ).returning(engine_lease.c.holder)
 
         async with self._db.begin() as conn:
+            self._may_hold = True  # set before sending: a late or lost answer may have committed
             await self._bound_statements(conn)
             held = (await conn.execute(stmt)).first() is not None
         if held:
-            self._ever_held = True
             self._renewed_at = started
             self._deadline = started + self._ttl - self._renew
         return held
