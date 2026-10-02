@@ -645,17 +645,18 @@ async def test_cnn_keeps_its_catch_up_odd_items_apart_from_the_newest_reads(
     assert caplog.text.count("items that don't map") == 2  # the first read, the catch-up
 
 
-async def test_a_post_with_a_nul_character_is_stored_without_it(
+async def test_a_post_with_characters_postgres_refuses_is_stored_without_them(
     make_live: MakeLive, web: FakeWeb, db: AsyncEngine
 ) -> None:
-    body = b'[{"id": "%s", "content": "bad \\u0000 text"}, {"id": "1' % HEAD[0].encode()
+    content = "bad \\u0000 text\\ud83d!"  # a NUL, and half an emoji
+    body = b'[{"id": "%s", "content": "%s"}, {"id": "1' % (HEAD[0].encode(), content.encode())
     web.routes[CNN_HOST] = lambda request: httpx.Response(
         206, content=body, headers={"content-type": "application/json"}
     )
     cnn = (await started(make_live(sources_off=ONLY_CNN))).pollers["cnn"]
     await cnn.poll()
     row = await one(db, select(signals.c.text, signals.c.raw))
-    assert (row.text, row.raw["content"]) == ("bad  text", "bad  text") and cnn.state == "up"
+    assert (row.text, row.raw["content"]) == ("bad  text!", "bad  text!") and cnn.state == "up"
 
 
 async def test_a_poll_that_fails_past_the_feeds_own_handling_shows_in_status(
@@ -671,6 +672,50 @@ async def test_a_poll_that_fails_past_the_feeds_own_handling_shows_in_status(
     async with db.connect() as conn:
         (line,) = [line for line in await status_lines(conn) if line.startswith("feed cnn")]
     assert line.startswith("feed cnn: up (DataError: (builtins.Exception) a value the database")
+
+
+async def test_status_shows_a_catch_up_whose_posts_are_not_stored_yet(
+    make_live: MakeLive, web: FakeWeb, db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await store_imported(db, GAP_START)
+    web.routes[CNN_HOST] = cnn_after_outage([])
+    cnn = (await started(make_live(sources_off=ONLY_CNN))).pollers["cnn"]
+    gap = {cnn_post(cnn_item(i)).key for i in GAP}
+
+    async def refuses_the_gap(conn: Any, source_id: int, feed: str, posts: Any) -> Any:
+        if gap & {post.key for post in posts}:
+            raise DataError("INSERT", {}, Exception("a value the database refuses"))
+        return await store_posts(conn, source_id, feed, posts)
+
+    monkeypatch.setattr(live_module, "store_posts", refuses_the_gap)
+    with pytest.raises(DataError):
+        await cnn.poll()
+    await cnn.poll()  # the catch-up waits its back-off; the newest posts are stored
+    async with db.connect() as conn:
+        (line,) = [line for line in await status_lines(conn) if line.startswith("feed cnn")]
+    assert line.startswith(f"feed cnn: up (catch-up to {cnn.caught_up_to} not stored yet)")
+
+
+async def test_a_post_dated_far_ahead_is_skipped_and_cannot_hide_a_gap(
+    make_live: MakeLive, web: FakeWeb, db: AsyncEngine
+) -> None:
+    downloads: list[httpx.Request] = []
+    after_outage = cnn_after_outage(downloads)
+    first: list[bytes] = [cnn_head(["9000000000000000000", day(5)])]  # the year 6000-odd
+
+    def archive(request: httpx.Request) -> httpx.Response:
+        if "range" in request.headers and first:
+            return httpx.Response(
+                206, content=first.pop(), headers={"content-type": "application/json"}
+            )
+        return after_outage(request)
+
+    web.routes[CNN_HOST] = archive
+    cnn = (await started(make_live(sources_off=ONLY_CNN))).pollers["cnn"]
+    await cnn.poll()
+    assert cnn.caught_up_to == cnn_post(cnn_item(day(5))).posted_at
+    await cnn.poll()  # after an outage: the head starts at day 26
+    assert len(downloads) == 1 and {day(8), day(10)} <= await stored_ids(db)
 
 
 async def test_scrapecreators_check_does_not_catch_up_while_direct_is_healthy(
@@ -899,6 +944,38 @@ async def test_the_feeds_stop_when_the_driver_turns_a_cancellation_into_an_error
     if not done:
         await helpers.cancel_wedged()
     assert done and task.cancelled()
+
+
+async def test_the_feeds_stop_when_recording_a_failed_poll_turns_a_cancellation_into_an_error(
+    make_live: MakeLive, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The store fails once and then works: a cancellation while that failure is recorded
+    must still stop the feed."""
+    stores = counts = 0
+
+    async def store_fails_once(*args: Any, **kwargs: Any) -> Any:
+        nonlocal stores
+        stores += 1
+        if stores == 1:
+            raise DataError("INSERT", {}, Exception("a value the database refuses"))
+        return await store_posts(*args, **kwargs)
+
+    async def recording_stalls(*args: Any, **kwargs: Any) -> None:
+        nonlocal counts
+        counts += 1
+        if counts == 1:  # _record_failure's write
+            await helpers.stall_then_fail_on_cancel()
+        await store_module.count(*args, **kwargs)
+
+    monkeypatch.setattr(live_module, "store_posts", store_fails_once)
+    monkeypatch.setattr(live_module, "count", recording_stalls)
+    task = asyncio.create_task((await started(make_live(sources_off=ONLY_CNN))).run())
+    await asyncio.sleep(0.3)  # stalled
+    task.cancel()
+    done, _ = await asyncio.wait({task}, timeout=2.0)
+    if not done:
+        await helpers.cancel_wedged()
+    assert done and task.cancelled() and stores == 1
 
 
 async def test_store_writes_in_batches(db: AsyncEngine, monkeypatch: pytest.MonkeyPatch) -> None:

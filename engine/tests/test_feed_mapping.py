@@ -467,6 +467,12 @@ def test_trumpstruth_item_without_its_id_fails(offline_settings: Settings, field
         parse_feed(rss_item(fields), offline_settings)
 
 
+def test_trumpstruth_checks_an_id_taken_from_its_link(offline_settings: Settings) -> None:
+    link = f"https://truthsocial.com/@realDonaldTrump/{'9' * 20}"  # past a bigint
+    with pytest.raises(FeedFailed, match="not a Truth Social status id"):
+        parse_feed(rss_item(f"<truth:originalUrl>{link}</truth:originalUrl>"), offline_settings)
+
+
 def test_trumpstruth_skips_one_odd_item_and_keeps_the_rest(offline_settings: Settings) -> None:
     body = fixture_bytes("trumpstruth_feed.xml").replace(
         b"</channel>",

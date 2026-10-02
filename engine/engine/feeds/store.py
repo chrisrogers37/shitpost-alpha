@@ -13,7 +13,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.sql.elements import ColumnElement
 
-from engine.feeds.posts import ACCOUNT_ID, PLATFORM, Post, signal_key
+from engine.feeds.posts import ACCOUNT_ID, PLATFORM, Post, signal_key, storable
 from engine.stages import DONE
 from engine.tables import feed_status, signal_sightings, signals, source_stats, sources
 
@@ -49,15 +49,15 @@ async def newest_posted_at(conn: AsyncConnection, source_id: int) -> datetime | 
     return newest
 
 
-def without_nuls(value: Any) -> Any:
-    """A feed's payload with NUL characters dropped from its strings: jsonb refuses them,
-    and one such post would fail every store of its batch."""
+def storable_payload(value: Any) -> Any:
+    """A feed's payload without the characters jsonb refuses (NUL, a lone surrogate): one
+    such post would fail every store of its batch."""
     if isinstance(value, str):
-        return value.replace("\x00", "")
+        return storable(value)
     if isinstance(value, dict):
-        return {without_nuls(key): without_nuls(item) for key, item in value.items()}
+        return {storable_payload(key): storable_payload(item) for key, item in value.items()}
     if isinstance(value, list):
-        return [without_nuls(item) for item in value]
+        return [storable_payload(item) for item in value]
     return value
 
 
@@ -72,7 +72,7 @@ def signal_row(post: Post, source_id: int, via: str, *, imported: bool) -> dict[
         "text": post.text,
         "posted_at": post.posted_at,
         "has_media": post.has_media,
-        "raw": without_nuls(post.raw),
+        "raw": storable_payload(post.raw),
         "raw_via": via,
         "first_seen_at": func.now(),
         "first_seen_via": via,

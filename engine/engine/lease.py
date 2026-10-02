@@ -21,7 +21,7 @@ from typing import NoReturn
 from sqlalchemy import case, delete, func, or_, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from engine.db import raise_if_cancelling
 from engine.tables import engine_lease
@@ -47,6 +47,7 @@ class Lease:
         self._renewed_at = 0.0  # start of the last successful renewal, by the loop clock
         self._deadline = 0.0  # the step-down point
         self._renewal: asyncio.Task[bool] | None = None
+        self._ever_held = False
 
     async def acquire(self) -> bool:
         """Take the lease if it is free, expired or already ours. Returns whether we hold it."""
@@ -74,15 +75,27 @@ class Lease:
                 self._renewal.cancel()  # without waiting: the driver can take 10 s to give up
 
     async def release(self) -> None:
-        """Give the lease up, so the next copy can take it at once."""
-        if self._renewal is not None:
-            await asyncio.wait({self._renewal})  # a renewal cancelled at the step-down
-        async with self._db.begin() as conn:
-            await conn.execute(
-                delete(engine_lease).where(
-                    engine_lease.c.name == LEASE_NAME, engine_lease.c.holder == self.holder
-                )
-            )
+        """Give the lease up, so the next copy can take it at once.
+
+        Bounded, and never raises a database error: if the database doesn't answer in
+        time, the row just expires.
+        """
+        if not self._ever_held:
+            return
+        try:
+            async with asyncio.timeout(self._answer_within):
+                if self._renewal is not None:
+                    await asyncio.wait({self._renewal})  # a renewal cancelled at the step-down
+                async with self._db.begin() as conn:
+                    await self._bound_statements(conn)
+                    await conn.execute(
+                        delete(engine_lease).where(
+                            engine_lease.c.name == LEASE_NAME, engine_lease.c.holder == self.holder
+                        )
+                    )
+        except (SQLAlchemyError, OSError, TimeoutError) as exc:
+            raise_if_cancelling()
+            log.warning("could not release the lease (%r); it expires in %gs", exc, self._ttl)
 
     async def _renew_until_answered(self) -> bool:
         while True:
@@ -113,17 +126,21 @@ class Lease:
             where=or_(mine, engine_lease.c.expires_at < now),
         ).returning(engine_lease.c.holder)
 
-        timeout = f"{int(self._answer_within * 1000)}ms"
         async with self._db.begin() as conn:
-            await conn.execute(
-                text(
-                    "SELECT set_config('lock_timeout', :t, true),"
-                    " set_config('statement_timeout', :t, true)"
-                ),
-                {"t": timeout},
-            )
+            await self._bound_statements(conn)
             held = (await conn.execute(stmt)).first() is not None
         if held:
+            self._ever_held = True
             self._renewed_at = started
             self._deadline = started + self._ttl - self._renew
         return held
+
+    async def _bound_statements(self, conn: AsyncConnection) -> None:
+        """Lock and statement timeouts for the rest of this transaction."""
+        await conn.execute(
+            text(
+                "SELECT set_config('lock_timeout', :t, true),"
+                " set_config('statement_timeout', :t, true)"
+            ),
+            {"t": f"{int(self._answer_within * 1000)}ms"},
+        )

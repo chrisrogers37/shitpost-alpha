@@ -25,7 +25,7 @@ def item_status_id(item: ET.Element) -> str:
             f"item {item.findtext('guid')!r} has neither truth:originalId "
             "nor a status link in truth:originalUrl"
         )
-    return url["id"]
+    return parse_status_id(url["id"])
 
 
 def feed_post(item: ET.Element) -> Post:

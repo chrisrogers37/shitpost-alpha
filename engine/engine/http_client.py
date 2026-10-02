@@ -12,7 +12,7 @@ SECRET_HEADERS = frozenset({"x-api-key", "apca-api-key-id", "apca-api-secret-key
 """Request headers that carry a key (lowercase). Their values never reach error text."""
 
 KEEPALIVE_SECONDS = 75.0
-"""Longer than any poll interval (60 s), so a feed polled on time reuses its connection."""
+"""Longer than the 15 s and 60 s poll intervals, so those feeds reuse their connection."""
 
 
 def _engine_version() -> str:
@@ -35,7 +35,9 @@ def make_client(
     return httpx.AsyncClient(
         headers={"User-Agent": USER_AGENT},
         timeout=settings.http_timeout_seconds,
-        limits=httpx.Limits(keepalive_expiry=KEEPALIVE_SECONDS),
+        limits=httpx.Limits(  # httpx's default caps, which a Limits without them drops
+            max_connections=100, max_keepalive_connections=20, keepalive_expiry=KEEPALIVE_SECONDS
+        ),
         follow_redirects=False,
         transport=transport,
     )

@@ -1,6 +1,6 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 import psycopg
 import pytest
@@ -105,7 +105,7 @@ async def test_a_stalled_renewal_steps_down_on_time_even_if_the_driver_is_slow_t
     async def stalled() -> bool:
         # psycopg can take seconds to give up a cancelled query, then raise a database
         # error instead of CancelledError.
-        await helpers.stall_then_fail_on_cancel(gives_up_after=TTL)
+        await helpers.stall_then_fail_on_cancel(gives_up_after=TTL / 3)
 
     monkeypatch.setattr(a, "_take_or_renew", stalled)
     with pytest.raises(LeaseLost):
@@ -164,3 +164,33 @@ async def test_release_lets_the_next_copy_in_at_once(db: AsyncEngine) -> None:
     await a.release()
     assert await lease_row(db) is None
     assert await b.acquire()
+
+
+async def test_release_does_nothing_if_the_lease_was_never_held() -> None:
+    no_database = cast(AsyncEngine, None)  # any database call would raise
+    await Lease(no_database, "a", ttl=TTL, renew=RENEW).release()
+
+
+async def test_release_gives_up_in_time_if_the_row_is_locked(
+    migrated: Settings, db: AsyncEngine
+) -> None:
+    a = lease(db, "a")
+    assert await a.acquire()
+    loop = asyncio.get_running_loop()
+    async with await psycopg.AsyncConnection.connect(migrated.db_url) as stuck:
+        await stuck.execute("UPDATE engine.engine_lease SET expires_at = expires_at")
+        started = loop.time()
+        await a.release()  # doesn't raise
+        assert loop.time() - started < TTL
+        await stuck.rollback()
+    row = await lease_row(db)
+    assert row is not None and row.holder == "a"  # left to expire
+
+
+async def test_release_gives_up_in_time_if_the_database_stalls(
+    db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    a = lease(db, "a")
+    assert await a.acquire()
+    monkeypatch.setattr(a, "_db", helpers.StalledDb(db))
+    await asyncio.wait_for(a.release(), timeout=TTL)  # doesn't raise

@@ -34,6 +34,8 @@ _MOJIBAKE = re.compile(
 )
 # What is left of a no-break space ("Â\xa0") when the space was trimmed away.
 _ORPHAN_A = re.compile(r"Â(?=\s|$)")
+# NUL, and half an emoji (a lone surrogate): Postgres text and jsonb refuse both.
+_UNSTORABLE = re.compile(r"[\x00\ud800-\udfff]")
 
 
 def parse_status_id(value: object) -> str:
@@ -111,10 +113,14 @@ def split_quote(text: str) -> tuple[str, str | None]:
     return text, None
 
 
+def storable(text: str) -> str:
+    """`text` without the characters Postgres refuses (NUL, a lone surrogate)."""
+    return _UNSTORABLE.sub("", text)
+
+
 def clean_text(text: str) -> str:
-    """Turn no-break spaces into spaces, drop NULs (Postgres text refuses them) and trim
-    blank space."""
-    lines = (line.rstrip() for line in text.replace("\xa0", " ").replace("\x00", "").splitlines())
+    """Turn no-break spaces into spaces, drop what Postgres refuses and trim blank space."""
+    lines = (line.rstrip() for line in storable(text).replace("\xa0", " ").splitlines())
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 

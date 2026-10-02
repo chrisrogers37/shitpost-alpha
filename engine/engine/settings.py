@@ -16,7 +16,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="ENGINE_", frozen=True, populate_by_name=True, hide_input_in_errors=True
     )
-    """hide_input_in_errors: a rejected value (a key, the database URL) never prints."""
 
     database_url: SecretStr = Field(min_length=1)
     """Engine database. Never the old system's DATABASE_URL. Secret, so it never prints."""
@@ -80,7 +79,8 @@ class Settings(BaseSettings):
     alpaca_calls_per_minute: float = Field(default=150.0, gt=0, le=200)
     """Client-side cap on Alpaca calls, under the free plan's 200 a minute."""
     alpaca_backoff_seconds: float = Field(default=2.0, gt=0)
-    """First wait after a 429 when Alpaca doesn't say when to come back; doubles each try."""
+    """First wait before a retry (a 5xx, a dropped call, or a 429 that names no reset);
+    doubles each try."""
     bars_cache_dir: Path = Path.home() / ".cache" / "shitpost-engine" / "bars"
     """Minute-bar cache (ENGINE_BARS_CACHE_DIR), outside the repo."""
 

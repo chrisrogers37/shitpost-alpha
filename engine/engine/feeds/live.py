@@ -26,7 +26,7 @@ import httpx
 from sqlalchemy import Row, func, select, update
 from sqlalchemy.exc import SQLAlchemyError
 
-from engine.db import TRANSIENT_ERRORS, db_now, error_text, raise_if_cancelling
+from engine.db import db_now, error_text, is_permanent, raise_if_cancelling
 from engine.feeds.base import Feed, FeedBlocked, FeedFailed, Read
 from engine.feeds.cnn import CnnFeed
 from engine.feeds.mastodon import DirectFeed, ScrapeCreatorsFeed
@@ -168,6 +168,7 @@ class FeedPoller:
         # read back at the poll rate. A stored answer with no catch-up owed resets it.
         self.catch_up_wait = self._doubled(self.catch_up_wait)
         self.catch_up_after = time.monotonic() + self.catch_up_wait
+        self.catch_up_error = f"catch-up to {mark} not stored yet"
         try:
             back = await self.feed.read_back(posts, mark)
         except FeedBlocked as exc:
@@ -339,7 +340,7 @@ class Live:
                 await poller.poll()
             except Exception as exc:  # never let one feed's bug or a lost connection stop the rest
                 raise_if_cancelling()
-                if isinstance(exc, TRANSIENT_ERRORS):
+                if isinstance(exc, SQLAlchemyError | OSError) and not is_permanent(exc):
                     log.warning("%s: database write failed, trying again: %s", poller.name, exc)
                 else:
                     log.exception("%s: poll failed; trying again next poll", poller.name)
