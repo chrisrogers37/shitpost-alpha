@@ -1,26 +1,44 @@
 {
-  "about": "AI picker version settings: the three models, their settings and prices, the window start, the answer schema and the reason line's model. Pinned with the prompts by ai.json. Part A drafted this; Part B2 verifies each model's cutoff, availability and price (setting 'checked' to the day it read the provider's pricing page), picks xAI's model and sets window_start: 3 months after the latest cutoff, at the start of the next day. Prices are US dollars per million tokens. temperature null means the provider takes none.",
+  "about": "AI picker version settings: the models, their settings and prices, the window start, the answer schema and the reason line's model. Pinned with the prompts by ai.json. Prices are US dollars per million tokens, from each provider's pricing page on the day in 'checked'. temperature null means the provider takes none. The window starts 3 months after the latest model cutoff, at the start of the next New York day.",
   "models": {
     "openai": {
       "model": "gpt-4.1-2025-04-14",
       "temperature": 0,
       "cutoff": "2024-06-01",
-      "cutoff_source": "https://platform.openai.com/docs/models/gpt-4.1",
-      "prices": {"input": 2.0, "cached_input": 0.5, "output": 8.0, "checked": null}
+      "cutoff_source": "https://developers.openai.com/api/docs/models/gpt-4.1",
+      "retirement": "none announced (https://developers.openai.com/api/docs/deprecations, checked 2026-10-02)",
+      "prices": {
+        "input": 2.0,
+        "cached_input": 0.5,
+        "output": 8.0,
+        "checked": "2026-10-02"
+      }
     },
     "xai": {
-      "model": null,
+      "model": "grok-4.20-0309-non-reasoning",
       "temperature": 0,
-      "cutoff": null,
-      "cutoff_source": null,
-      "prices": null
+      "cutoff": "2025-09-01",
+      "cutoff_source": "unofficial: xAI publishes none; https://openrouter.ai/x-ai/grok-4.20",
+      "retirement": "none announced (https://docs.x.ai/developers/models, checked 2026-10-02)",
+      "prices": {
+        "input": 1.25,
+        "cached_input": 0.2,
+        "output": 2.5,
+        "checked": "2026-10-02"
+      }
     },
     "anthropic": {
-      "model": "claude-sonnet-4-5-20250929",
+      "model": "claude-haiku-4-5-20251001",
       "temperature": 0,
       "cutoff": "2025-07-31",
-      "cutoff_source": "https://docs.claude.com/en/docs/about-claude/models/overview",
-      "prices": {"input": 3.0, "cached_input": 0.3, "output": 15.0, "checked": null}
+      "cutoff_source": "https://platform.claude.com/docs/en/models/overview (training data Jul 2025; reliable knowledge Feb 2025)",
+      "retirement": "none announced; not sooner than 2026-10-15 (https://platform.claude.com/docs/en/about-claude/model-deprecations, checked 2026-10-02)",
+      "prices": {
+        "input": 1.0,
+        "cached_input": 0.1,
+        "output": 5.0,
+        "checked": "2026-10-02"
+      }
     }
   },
   "settings": {
@@ -33,24 +51,57 @@
   "schema": {
     "type": "object",
     "properties": {
-      "market_link": {"type": "boolean"},
+      "market_link": {
+        "type": "boolean"
+      },
       "instruments": {
         "type": "array",
         "items": {
           "type": "object",
           "properties": {
-            "name": {"type": "string"},
-            "ticker": {"type": ["string", "null"]},
-            "asset": {"type": "string", "enum": ["stock", "etf", "coin"]},
-            "link": {"type": "string", "enum": ["explicit", "implied"]},
-            "why": {"type": "string"}
+            "name": {
+              "type": "string"
+            },
+            "ticker": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "asset": {
+              "type": "string",
+              "enum": [
+                "stock",
+                "etf",
+                "coin"
+              ]
+            },
+            "link": {
+              "type": "string",
+              "enum": [
+                "explicit",
+                "implied"
+              ]
+            },
+            "why": {
+              "type": "string"
+            }
           },
-          "required": ["name", "ticker", "asset", "link", "why"],
+          "required": [
+            "name",
+            "ticker",
+            "asset",
+            "link",
+            "why"
+          ],
           "additionalProperties": false
         }
       }
     },
-    "required": ["market_link", "instruments"],
+    "required": [
+      "market_link",
+      "instruments"
+    ],
     "additionalProperties": false
   },
   "reason": {

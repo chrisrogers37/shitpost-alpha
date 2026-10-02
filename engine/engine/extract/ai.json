@@ -4,7 +4,7 @@
   "config": "extract/ai_picker.json",
   "prompt": "extract/prompts/picker.md",
   "files": {
-    "extract/ai_picker.json": "4d5503e2c1ead69e4b3c74871fa760f1af8b8f64b1947e462bf820b02057958c",
+    "extract/ai_picker.json": "d3e28cfbbe2a90af3d4af32f0a05901d874bdaa320e88afdcaa1d9a68aa61c5c",
     "extract/prompts/picker.md": "f4950178c56fd59782834d2a8abc710f6d9e7a2c710b294f10feefca0619335c",
     "extract/prompts/reason.md": "64b7fe9fb617416e57f33c42bb535218454a3fd0dc3b89fba4612daf79bfd2d2"
   }
