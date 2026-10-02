@@ -38,7 +38,7 @@ _ORPHAN_A = re.compile(r"Â(?=\s|$)")
 
 def parse_status_id(value: object) -> str:
     status_id = str(value).strip()
-    if not _STATUS_ID.fullmatch(status_id):
+    if not _STATUS_ID.fullmatch(status_id) or int(status_id) >= 2**63:  # ids are bigints
         raise ValueError(f"not a Truth Social status id: {value!r}")
     return status_id
 
@@ -112,8 +112,9 @@ def split_quote(text: str) -> tuple[str, str | None]:
 
 
 def clean_text(text: str) -> str:
-    """Turn no-break spaces into spaces and trim blank space."""
-    lines = (line.rstrip() for line in text.replace("\xa0", " ").splitlines())
+    """Turn no-break spaces into spaces, drop NULs (Postgres text refuses them) and trim
+    blank space."""
+    lines = (line.rstrip() for line in text.replace("\xa0", " ").replace("\x00", "").splitlines())
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 

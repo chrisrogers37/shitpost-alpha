@@ -18,8 +18,9 @@ from typing import Any, Literal, NoReturn
 import httpx
 
 from engine.db import raise_if_cancelling
-from engine.feeds.base import UNEXPECTED, make_client
-from engine.settings import KEY_TEXT, Settings
+from engine.feeds.base import UNEXPECTED
+from engine.http_client import make_client, request_error_text
+from engine.settings import Settings
 
 log = logging.getLogger(__name__)
 
@@ -134,12 +135,6 @@ class Alpaca:
         self.settings = settings
         self.clock = clock
         self._keys = settings.alpaca_keys
-        # What an error could quote of the keys, raw or inside a repr: their printable runs.
-        self._hidden = sorted(
-            (run for key in self._keys or () for run in KEY_TEXT.findall(key) if len(run) >= 4),
-            key=len,
-            reverse=True,
-        )
         self._pacer = Pacer(settings.alpaca_calls_per_minute)
         self._client = make_client(settings, transport)  # no redirects: keys stay on this host
         if self._keys is not None:
@@ -222,9 +217,9 @@ class Alpaca:
                 response = await self._client.get(DATA_URL + path, params=params)
             except RETRY_ERRORS as exc:
                 raise_if_cancelling()
-                failure, wait = self._scrub(_describe(exc)), self._backoff(attempt)
+                failure, wait = self._describe(exc), self._backoff(attempt)
             except httpx.HTTPError as exc:
-                self._fail(f"{path}: {_describe(exc)}")
+                self._fail(f"{path}: {self._describe(exc)}")
             else:
                 if response.status_code not in RETRY_STATUSES:
                     return self._body(path, response)
@@ -246,15 +241,17 @@ class Alpaca:
             self._fail(f"{path}: the answer is a {type(body).__name__}, not an object")
         return body
 
-    def _scrub(self, text: str) -> str:
-        for hidden in self._hidden:
-            text = text.replace(hidden, "[key]")
-        return text
+    def _describe(self, exc: httpx.HTTPError) -> str:
+        """An httpx error as text, with the key headers' values blanked (httpx quotes a
+        header value it refuses). A timeout's own message is empty."""
+        if not str(exc):
+            return f"{type(exc).__name__} (no detail)"
+        return request_error_text(exc, self._client.headers)
 
     def _fail(self, text: str) -> NoReturn:
-        """Raise AlpacaError with the keys cut out of its text. It chains no cause: the
-        cause's own text (an httpx error quoting a header) could hold a key."""
-        raise AlpacaError(self._scrub(text)) from None
+        """Raise AlpacaError. It chains no cause: the cause's own text (an httpx error
+        quoting a header) could hold a key."""
+        raise AlpacaError(text) from None
 
     def _backoff(self, attempt: int) -> float:
         """A wait doubling from the setting each try; never past a minute."""
@@ -269,8 +266,3 @@ class Alpaca:
         except (KeyError, ValueError):
             wait = self._backoff(attempt)
         return min(max(wait, self.settings.alpaca_backoff_seconds), LONGEST_WAIT_SECONDS)
-
-
-def _describe(exc: BaseException) -> str:
-    """An httpx error as text; a timeout's own message is empty."""
-    return f"{type(exc).__name__}: {exc}" if str(exc) else f"{type(exc).__name__} (no detail)"

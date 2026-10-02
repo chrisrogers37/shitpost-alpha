@@ -1,6 +1,6 @@
-"""What every feed shares: the HTTP client with an honest User-Agent, and what counts as
-blocked. Feeds never use proxies, rotating addresses, browser impersonation or logins: a
-blocked feed backs off and the others carry on."""
+"""What every feed shares: reading an answer, and what counts as blocked. Feeds never use
+proxies, rotating addresses, browser impersonation or logins: a blocked feed backs off and
+the others carry on."""
 
 import logging
 from abc import ABC, abstractmethod
@@ -8,43 +8,18 @@ from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
-from importlib.metadata import PackageNotFoundError, version
 from typing import ClassVar
 
 import httpx
 
 from engine.feeds.posts import Post
+from engine.http_client import request_error_text
 from engine.settings import Settings
 
 log = logging.getLogger(__name__)
 
 UNEXPECTED = (ValueError, KeyError, TypeError, AttributeError)
 """What parsing or mapping an answer of an unexpected shape raises."""
-
-
-def _engine_version() -> str:
-    try:
-        return version("shitpost-engine")
-    except PackageNotFoundError:
-        return "unknown"
-
-
-USER_AGENT = (
-    f"shitpost-alpha-engine/{_engine_version()} (+https://github.com/chrisrogers37/shitpost-alpha)"
-)
-
-
-def make_client(
-    settings: Settings, transport: httpx.AsyncBaseTransport | None = None
-) -> httpx.AsyncClient:
-    # No redirects: none of the feeds' URLs redirect, a redirect to a login or challenge
-    # page is a failure, and httpx would carry the ScrapeCreators key to another host.
-    return httpx.AsyncClient(
-        headers={"User-Agent": USER_AGENT},
-        timeout=settings.http_timeout_seconds,
-        follow_redirects=False,
-        transport=transport,
-    )
 
 
 class FeedBlocked(Exception):
@@ -127,6 +102,7 @@ class Feed(ABC):
             async with self.client.stream("GET", url, params=params, headers=sent) as response:
                 self.check(response)
                 if response.status_code == 304:
+                    await response.aread()  # the (empty) body, so the connection is reused
                     return None
                 if range_bytes and response.status_code != 206:
                     raise FeedFailed(
@@ -135,7 +111,9 @@ class Feed(ABC):
                     )
                 body = await _read_body(response, range_bytes)
         except httpx.HTTPError as exc:
-            raise FeedFailed(f"{type(exc).__name__}: {exc}") from exc
+            # Not chained: the original's text can quote a key header, and a traceback would
+            # print it.
+            raise FeedFailed(request_error_text(exc, self.client.headers, sent)) from None
         return Answer(response.status_code, response.headers, body)
 
     @classmethod

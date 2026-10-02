@@ -2,6 +2,7 @@
 all dark, the off switch, carrying on across copies, and the lease."""
 
 import asyncio
+import json
 import time
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime, timedelta
@@ -11,10 +12,11 @@ import httpx
 import pytest
 from pydantic import SecretStr
 from sqlalchemy import event, func, insert, select
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import DataError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from engine.feeds import live as live_module
+from engine.feeds import mastodon
 from engine.feeds import store as store_module
 from engine.feeds.cnn import cnn_post, leading_items
 from engine.feeds.live import Live, feeds_worker
@@ -22,6 +24,7 @@ from engine.feeds.mastodon import DirectFeed
 from engine.feeds.posts import ACCOUNT_ID, mirror_post
 from engine.feeds.status import status_lines
 from engine.feeds.store import insert_signals, set_feed_status, store_posts, trump_source_id
+from engine.http_client import make_client
 from engine.lease import LEASE_NAME
 from engine.registry import EngineContext, Registry
 from engine.runtime import run_engine
@@ -572,6 +575,104 @@ async def test_a_failed_store_is_read_again(
     assert set(HEAD) <= await stored_ids(db)
 
 
+async def test_a_store_that_fails_after_a_catch_up_does_not_download_again_at_once(
+    make_live: MakeLive, web: FakeWeb, db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await store_imported(db, GAP_START)
+    downloads: list[httpx.Request] = []
+    web.routes[CNN_HOST] = cnn_after_outage(downloads)
+    cnn = (await started(make_live(sources_off=ONLY_CNN))).pollers["cnn"]
+
+    async def lost(*args: Any, **kwargs: Any) -> NoReturn:
+        raise OperationalError("INSERT", {}, Exception("server closed the connection"))
+
+    monkeypatch.setattr(live_module, "store_posts", lost)
+    for _ in range(3):
+        with pytest.raises(OperationalError):
+            await cnn.poll()
+    assert len(downloads) == 1  # the next whole-file read waits its back-off
+
+
+async def test_the_catch_up_back_off_starts_over_once_no_catch_up_is_owed(
+    make_live: MakeLive, web: FakeWeb, db: AsyncEngine
+) -> None:
+    await store_imported(db, GAP_START)
+    web.routes[CNN_HOST] = cnn_after_outage([], status(503))
+    cnn = (await started(make_live(sources_off=ONLY_CNN))).pollers["cnn"]
+    await cnn.poll()
+    assert cnn.catch_up_wait == 60
+    web.routes[CNN_HOST] = lambda request: httpx.Response(  # reaches back to the mark
+        206, content=cnn_head([*HEAD, GAP_START]), headers={"content-type": "application/json"}
+    )
+    await cnn.poll()
+    assert (cnn.catch_up_wait, cnn.catch_up_error) == (0, None)
+
+
+async def test_a_page_back_keeps_its_odd_items_apart_from_the_newest_pages(
+    make_live: MakeLive, web: FakeWeb, db: AsyncEngine, caplog: pytest.LogCaptureFixture
+) -> None:
+    await store_imported(db, GAP_START)
+    page_one = [None, *[status_json(i) for i in HEAD]]
+    page_two = [status_json(i) for i in [*GAP, GAP_START]]
+    web.routes[DIRECT_HOST] = lambda request: json_response(
+        page_two if "max_id" in request.url.params else page_one
+    )
+    direct = (await started(make_live(sources_off=ONLY_DIRECT))).pollers["direct"]
+    for _ in range(3):
+        await direct.poll()
+    assert set(GAP) <= await stored_ids(db)
+    assert caplog.text.count("items that don't map") == 1
+
+
+async def test_cnn_keeps_its_catch_up_odd_items_apart_from_the_newest_reads(
+    make_live: MakeLive, web: FakeWeb, db: AsyncEngine, caplog: pytest.LogCaptureFixture
+) -> None:
+    await store_imported(db, GAP_START)
+    head = [{"id": "odd-1"}, *[cnn_item(i) for i in HEAD]]
+    whole = [{"id": "odd-1"}, {"id": "odd-2"}, *[cnn_item(i) for i in [*WINDOW, *GAP, GAP_START]]]
+
+    def archive(request: httpx.Request) -> httpx.Response:
+        if "range" not in request.headers:
+            return json_response(whole)
+        body = b"[" + b", ".join(json.dumps(item).encode() for item in head) + b', {"id": "1'
+        return httpx.Response(206, content=body, headers={"content-type": "application/json"})
+
+    web.routes[CNN_HOST] = archive
+    cnn = (await started(make_live(sources_off=ONLY_CNN))).pollers["cnn"]
+    for _ in range(3):
+        await cnn.poll()
+    assert set(GAP) <= await stored_ids(db)
+    assert caplog.text.count("items that don't map") == 2  # the first read, the catch-up
+
+
+async def test_a_post_with_a_nul_character_is_stored_without_it(
+    make_live: MakeLive, web: FakeWeb, db: AsyncEngine
+) -> None:
+    body = b'[{"id": "%s", "content": "bad \\u0000 text"}, {"id": "1' % HEAD[0].encode()
+    web.routes[CNN_HOST] = lambda request: httpx.Response(
+        206, content=body, headers={"content-type": "application/json"}
+    )
+    cnn = (await started(make_live(sources_off=ONLY_CNN))).pollers["cnn"]
+    await cnn.poll()
+    row = await one(db, select(signals.c.text, signals.c.raw))
+    assert (row.text, row.raw["content"]) == ("bad  text", "bad  text") and cnn.state == "up"
+
+
+async def test_a_poll_that_fails_past_the_feeds_own_handling_shows_in_status(
+    make_live: MakeLive, db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def rejected(*args: Any, **kwargs: Any) -> NoReturn:
+        raise DataError("INSERT", {}, Exception("a value the database refuses"))
+
+    monkeypatch.setattr(live_module, "store_posts", rejected)
+    await run_for(await started(make_live(sources_off=ONLY_CNN)), 0.3)
+    row = await one(db, select(source_stats).where(source_stats.c.feed == "cnn"))
+    assert row.errors >= 1 and row.polls == row.errors
+    async with db.connect() as conn:
+        (line,) = [line for line in await status_lines(conn) if line.startswith("feed cnn")]
+    assert line.startswith("feed cnn: up (DataError: (builtins.Exception) a value the database")
+
+
 async def test_scrapecreators_check_does_not_catch_up_while_direct_is_healthy(
     make_live: MakeLive, web: FakeWeb, db: AsyncEngine
 ) -> None:
@@ -671,6 +772,38 @@ async def test_recovery_is_announced_once_the_answer_is_stored(
     assert direct.state == "blocked" and operator_notices(caplog, "feed_recovered") == []
     await direct.poll()
     assert direct.state == "up" and len(operator_notices(caplog, "feed_recovered")) == 1
+
+
+async def test_a_key_that_cannot_be_sent_never_reaches_logs_status_or_notices(
+    migrated: Settings,
+    db: AsyncEngine,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Settings strip a pasted newline; this is the backstop. Over a real socket: a fake
+    transport skips h11, whose error quotes the header value it refuses."""
+    key = "sc-test-key-0123456789"
+    server = await asyncio.start_server(lambda reader, writer: writer.close(), "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    monkeypatch.setattr(mastodon, "SCRAPECREATORS_URL", f"http://127.0.0.1:{port}/posts")
+    settings = feed_settings(
+        migrated,
+        sources_off=frozenset({"direct", "trumpstruth", "cnn"}),
+        scrapecreators_key=SecretStr(f"{key}\n"),  # past the settings check
+        feed_failures_to_block=1,
+    )
+    try:
+        async with make_client(settings, httpx.AsyncHTTPTransport()) as client:
+            live = Live(EngineContext(settings, db), client)
+            await live.start()
+            await live.pollers["scrapecreators"].poll()
+    finally:
+        server.close()
+        await server.wait_closed()
+    row = await one(db, select(feed_status).where(feed_status.c.feed == "scrapecreators"))
+    assert row.state == "blocked" and "Illegal header value b'[key]" in row.last_error
+    assert len(operator_notices(caplog, "feed_blocked")) == 1
+    assert key not in row.last_error and key not in caplog.text
 
 
 async def test_scrapecreators_check_is_not_repeated_by_a_new_copy(
