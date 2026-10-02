@@ -14,9 +14,9 @@ Run from this directory, with `ENGINE_DATABASE_URL` set (never the old `DATABASE
     python -m engine import-history   # past posts: CC0 archive copy, then CNN's live file
 
 Settings are `ENGINE_*` variables; see `engine/settings.py`. New database connections
-give up after 10 s; a `connect_timeout` in the URL wins. In `engine.engine_meta`,
-`last_heartbeat_at` shows whether a copy is working; `lease_holder` names the last holder
-and is not cleared when it stops.
+give up after 10 s per address the host resolves to; a `connect_timeout` in the URL wins.
+In `engine.engine_meta`, `last_heartbeat_at` shows whether a copy is working;
+`lease_holder` names the last holder and is not cleared when it stops.
 
 ## Feeds
 

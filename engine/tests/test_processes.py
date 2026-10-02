@@ -2,19 +2,22 @@
 
 import os
 import signal
+import socket
 import subprocess
 import sys
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import IO
+from typing import IO, NoReturn
 
 import psycopg
 import pytest
 from pydantic import SecretStr
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from engine import cli as engine_cli
 from engine.settings import Settings
 from tests import helpers
 
@@ -191,3 +194,35 @@ def test_bad_settings_are_a_clear_error_that_never_prints_the_url(settings: Sett
     assert result.returncode == 2
     assert "lease_ttl_seconds must be at least" in result.stderr
     assert settings.db_url not in result.stderr + result.stdout
+
+
+@pytest.mark.parametrize("command", ["status", "migrate"])
+def test_a_host_that_does_not_resolve_is_reported_as_unreachable(
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+) -> None:
+    def no_dns(*args: object, **kwargs: object) -> NoReturn:
+        raise socket.gaierror(socket.EAI_NONAME, "Name or service not known")
+
+    monkeypatch.setattr(socket, "getaddrinfo", no_dns)
+    monkeypatch.setattr(engine_cli, "configure_logging", lambda: None)  # keep pytest's
+    url = make_url(settings.db_url).set(host="engine-db.example")
+    monkeypatch.setenv("ENGINE_DATABASE_URL", url.render_as_string(hide_password=False))
+    assert engine_cli.main([command]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith("could not reach the engine database: failed to resolve host")
+
+
+def test_other_database_errors_are_labelled_as_errors_from_it() -> None:
+    def error(message: str) -> OperationalError:
+        return OperationalError("SELECT 1", {}, Exception(message))
+
+    timeout = "canceling statement due to statement timeout"
+    assert (
+        engine_cli.database_error_line(error(timeout))
+        == f"error from the engine database: {timeout}"
+    )
+    empty = engine_cli.database_error_line(error(""))
+    assert empty == "error from the engine database: OperationalError"
