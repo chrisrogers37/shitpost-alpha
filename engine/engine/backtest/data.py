@@ -29,6 +29,7 @@ from engine.tables import (
     signal_mentions,
     signals,
 )
+from engine.text import has_words
 
 SESSIONS_BEFORE = timedelta(days=400)
 """Sessions kept before the sample, so beta has its 120 prior sessions."""
@@ -74,11 +75,12 @@ def sample_span(data_to: date) -> Span:
 async def load_posts(
     conn: AsyncConnection, span: Span, model_version: str
 ) -> tuple[Posts, Similarity]:
-    """The sample: every text post in the span with a vector, oldest first, and the
-    similarity matrix over the same posts in the same order."""
-    rows = (
+    """The sample: every text post in the span with a vector and words (has_words: an
+    emoji-only post is left out, as a links-only one has no vector), oldest first, and
+    the similarity matrix over the same posts in the same order."""
+    found = (
         await conn.execute(
-            select(signals.c.key, signals.c.posted_at, signal_embeddings.c.vector)
+            select(signals.c.key, signals.c.posted_at, signals.c.text, signal_embeddings.c.vector)
             .join(signal_embeddings, signal_embeddings.c.signal_key == signals.c.key)
             .where(
                 signal_embeddings.c.model_version == model_version,
@@ -89,6 +91,7 @@ async def load_posts(
             .order_by(signals.c.posted_at, signals.c.key)
         )
     ).all()
+    rows = [row for row in found if has_words(row.text or "")]
     keys = [row.key for row in rows]
     times = [row.posted_at for row in rows]
     vectors = [np.frombuffer(row.vector, dtype="<f4") for row in rows]

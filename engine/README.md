@@ -252,7 +252,9 @@ before any run on real data and never edited after one (a change is a new versio
   weekday and hour are the send rule's baselines (`engine.random_baselines`).
 - **Calls** (`evaluate.py`): matches from PR 4's similarity and match rule v1, from posts
   whose window had closed by the alert; the call is the majority direction; then send
-  rule v1's rules 1, 3, 4 and 6. Statistics count New York days; the p-value replaces
+  rule v1's rules 1, 3, 4 and 6. A post without words (only links, emoji or symbols,
+  `engine.text.has_words`) is not in the sample: emoji-only posts share one vector, so
+  each would match every earlier one. Statistics count New York days; the p-value replaces
   each call's move with its own post's random-time moves 10,000 times
   (`stats.py`); Benjamini-Hochberg runs across the 22 gate tests.
 - **`build-moves --to DAY`** (`build.py`): adds XLE, backfills the daily bars and fills
@@ -267,7 +269,9 @@ before any run on real data and never edited after one (a change is a new versio
   (numbers, keys sorted, floats rounded) and `.md` (made from the JSON), and records the
   run in `engine.backtest_runs` and `engine.backtest_summary`. `--rebuild` writes both
   again and exits 1 unless the JSON's SHA-256 matches the last run. Neither file holds a
-  price or another site's link (`report.check_publishable`). `--divergent-days FILE`
+  price or another site's link (`report.check_publishable`). The report also sets match
+  rule v1's reading (`precision/match-labels.csv`) next to the same shares weighted by
+  the matches the rule serves the read posts (`reading.py`). `--divergent-days FILE`
   (PR 3's cross-check output) also prints BTC without those days, for the sandbox only.
 
 ## Database

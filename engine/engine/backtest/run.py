@@ -30,6 +30,7 @@ from engine.backtest.data import (
 )
 from engine.backtest.evaluate import Matcher, MoveBook, Outcome, PairResult, Universe, run_backtest
 from engine.backtest.randomtimes import NEW_YORK, RandomTimes
+from engine.backtest.reading import match_reading
 from engine.db import make_engine
 from engine.extract.ai import current_ai_config
 from engine.extract.rules import MANIFEST as RULES_MANIFEST
@@ -148,7 +149,8 @@ async def backtest(
         "shared_posts": outcome.shared_posts,
     }
     sample_times = [datetime.fromtimestamp(s, UTC) for s in posts.seconds]
-    built = report.build(outcome, inputs, counts, sample_times, every_text_post)
+    reading = match_reading(similarity, match.threshold, match.max_matches)
+    built = report.build(outcome, inputs, counts, sample_times, every_text_post, reading)
     return Done(outcome, report.write(built, out_dir), data_to)
 
 

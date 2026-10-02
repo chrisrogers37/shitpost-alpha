@@ -16,6 +16,8 @@ from typing import Any
 
 from engine.backtest import gate
 from engine.backtest.evaluate import Outcome, PairResult
+from engine.backtest.reading import Reading
+from engine.backtest.stats import wilson
 from engine.feeds.history import measure_bursts
 
 NAME = "backtest-v1"
@@ -86,6 +88,7 @@ def build(
     post_counts: Mapping[str, Any],
     sample_times: Sequence[datetime],
     all_text_times: Sequence[datetime],
+    reading: Reading,
 ) -> dict[str, Any]:
     """The report as one JSON-ready dict."""
     public = [r for r in outcome.results if r.view not in PRIVATE_VIEWS]
@@ -135,6 +138,11 @@ def build(
         "views": views,
         "coin_skips": _coin_skips(public),
         "bursts": _bursts(gate_tests, sample_times, all_text_times),
+        "match_reading": {
+            "labels_sha256": reading.labels_sha256,
+            "read_posts": reading.posts,
+            "bands": [vars(band) for band in reading.bands],
+        },
     }
 
 
@@ -409,6 +417,7 @@ def markdown(report: Mapping[str, Any]) -> str:
             lines += [f"### {title}", "", *_table(tests, judged=False), ""]
     lines += ["## What the filters dropped and what was skipped", "", *_counts(report), ""]
     lines += _burst_lines(report["bursts"])
+    lines += ["", *_reading_lines(report["match_reading"], report["inputs"]["match_rule"])]
     lines += [
         "",
         "## Inputs",
@@ -456,3 +465,38 @@ def _burst_lines(bursts: Mapping[str, Any]) -> list[str]:
         f"{sample['clusters']:,} clusters. Rule 6 (one call per instrument per 30 minutes) "
         f"dropped {dropped:,} calls across the 22 gate tests.",
     ]
+
+
+def _reading_lines(reading: Mapping[str, Any], rule: Mapping[str, Any]) -> list[str]:
+    """Match rule v1's reading next to the same shares weighted by the matches served."""
+    lines = [
+        "## The match rule, as read and as served",
+        "",
+        f"Match rule v{rule['version']}'s threshold was set by reading up to 3 earlier "
+        "posts per score band for each read post. The rule serves up to "
+        f"{rule['max_matches']} matches a post, so a post with many neighbours counts for "
+        "more in what is served than in what was read. The last column counts each read "
+        "post's share once for every match the rule serves it in that band "
+        f"({reading['read_posts']} of the read posts are in the sample).",
+        "",
+        "| Score | Pairs read | Same subject, as read (95% interval) | Matches served "
+        "| Same subject, weighted by matches served |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for band in reading["bands"]:
+        if band["low"] is None:
+            score = f"{rule['threshold']:.2f} and up"
+        elif band["high"] is None:
+            score = f"{band['low']:.2f} and up"
+        else:
+            score = f"{band['low']:.2f} to {band['high']:.2f}"
+        found = wilson(band["same"], band["read"])
+        read = "none" if found is None else (
+            f"{band['same'] / band['read']:.0%} ({band['same']}/{band['read']}; "
+            f"{found[0]:.0%} to {found[1]:.0%})"
+        )  # fmt: skip
+        lines.append(
+            f"| {score} | {band['read']:,} | {read} | {band['served']:,} | "
+            f"{_share(band['weighted'])} |"
+        )
+    return lines

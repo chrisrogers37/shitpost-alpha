@@ -28,11 +28,12 @@ from engine.backtest.data import (
 )
 from engine.backtest.evaluate import MoveBook, run_backtest
 from engine.backtest.randomtimes import NEW_YORK, RandomTimes
+from engine.backtest.reading import Band, Reading, match_reading
 from engine.backtest.run import divergent_days, run_backtest_command
 from engine.extract.records import Extraction, record
 from engine.extract.rules import Mention, current_rules
 from engine.extract.score import store_embedding
-from engine.extract.similarity import Embedded, load_pin
+from engine.extract.similarity import Embedded, Similarity, load_pin
 from engine.feeds.posts import Post
 from engine.feeds.store import insert_signals, trump_source_id
 from engine.market.alpaca import utc_text
@@ -46,6 +47,7 @@ from engine.tables import (
     random_baselines,
     signal_moves,
 )
+from engine.text import has_words
 from tests.backtest_helpers import planted_world
 from tests.feeds_helpers import status_id_at
 from tests.market_helpers import NOW, FakeAlpaca, market_settings, weekdays
@@ -137,6 +139,11 @@ async def seed_posts(db: AsyncEngine, rng: np.random.Generator) -> None:
                     Extraction("rules", rules.version, when, when, market_link=linked,
                                topic="trade" if linked else "other", mentions=mentions),
                 )  # fmt: skip
+        # Only flags: no words, so not in the sample, though it has a vector on the theme.
+        when = datetime.combine(date(2022, 2, 1), time(11), NEW_YORK)
+        flags = Post(status_id_at(when), "post", None, "🇺🇸🇫🇷 https://x.example/a", False, {})
+        await insert_signals(conn, source, "cnn", [flags], imported=True)
+        await store_embedding(conn, flags.key, version, "🇺🇸🇫🇷", Embedded(theme, False))
 
 
 @pytest.fixture
@@ -326,7 +333,9 @@ def test_the_report_from_a_planted_run_holds_moves_and_counts_only(tmp_path: Pat
     )  # fmt: skip
     answered = {"rules": 250, "ai": 0, "ai:openai": 0, "ai:anthropic": 0}
     counts = {"text_posts": 250, "picker_posts": answered, "shared_posts": 0}
-    built = report.build(outcome, inputs, counts, world.times, world.times)
+    bands = (Band(0.9, None, 14, 14, 30, 1.0), Band(None, None, 46, 40, 90, 0.8))
+    read = Reading("l" * 64, 2, bands)
+    built = report.build(outcome, inputs, counts, world.times, world.times, read)
     written = report.write(built, tmp_path)
     content = json.loads(written.json_path.read_bytes())
     prices = {round(float(x), 6) for p in world.prices.values() for x in p.bars.opens[::997]}
@@ -336,6 +345,8 @@ def test_the_report_from_a_planted_run_holds_moves_and_counts_only(tmp_path: Pat
     md = written.md_path.read_text()
     assert "**Gate 0 passes:**" in md and "rules SPY at 1 hour" in md
     assert "no head-to-head: **the rules pick.**" in md
+    assert "| 0.90 and up | 14 | 100% (14/14; 78% to 100%) | 30 | 100.0% |" in md
+    assert "| 0.85 and up | 46 | 87% (40/46; 74% to 94%) | 90 | 80.0% |" in md
     assert report.write(built, tmp_path / "again").sha256 == written.sha256
 
 
@@ -351,3 +362,54 @@ def test_divergent_days_come_from_the_cross_check_lists(tmp_path: Path) -> None:
         (date(2022, 5, 9) - epoch).days,
         (date(2023, 5, 6) - epoch).days,
     }
+
+
+def test_a_post_of_only_emoji_symbols_or_links_has_no_words() -> None:
+    for none in ("🇺🇸🇫🇷", "—>", "🇺🇸 https://x.example/a", "!!! ___", ""):
+        assert not has_words(none), none
+    for some in ("MAGA 🇺🇸", "2024", "Ça va", "x"):
+        assert has_words(some), some
+
+
+def test_the_reading_is_weighted_by_the_matches_the_rule_serves(tmp_path: Path) -> None:
+    """Post A has 10 neighbours scoring 0.87 and one 0.95, B two at 0.87; of A's three
+    0.85-0.90 pairs read, one is on its subject, and both of B's are."""
+    dims, start = 32, datetime(2024, 1, 1, tzinfo=UTC)
+    rows: list[tuple[str, np.ndarray]] = []
+
+    def near(axis: int, other: int, score: float) -> np.ndarray:
+        vector = np.zeros(dims)
+        vector[axis], vector[other] = score, np.sqrt(1 - score**2)
+        return vector
+
+    rows += [(f"a{i}", near(0, 2 + i, 0.87)) for i in range(10)]
+    rows += [("a-top", near(0, 12, 0.95)), ("b0", near(1, 13, 0.87)), ("b1", near(1, 14, 0.87))]
+    rows += [("A", np.eye(dims)[0]), ("B", np.eye(dims)[1])]
+    times = [start + timedelta(hours=n) for n in range(len(rows))]
+    similarity = Similarity([k for k, _ in rows], times, np.array([v for _, v in rows]))
+    labels = tmp_path / "labels.csv"
+    labels.write_text(
+        "key,past_key,band,score,same\n"
+        "A,a0,0.85,0.87,yes\nA,a1,0.85,0.87,no\nA,a2,0.85,0.87,no\n"
+        "A,a-top,0.90,0.95,yes\nA,x,0.80,0.81,no\n"
+        "B,b0,0.85,0.87,yes\nB,b1,0.85,0.87,yes\n"
+        "gone,y,0.85,0.86,no\n"  # a read post outside the sample: read, never served
+    )
+    found = match_reading(similarity, 0.85, 50, labels)
+    top, band, every = found.bands
+    assert found.posts == 2
+    assert found.labels_sha256 == hashlib.sha256(labels.read_bytes()).hexdigest()
+    assert (top.low, top.high, top.read, top.same, top.served, top.weighted) == (
+        0.9,
+        None,
+        1,
+        1,
+        1,
+        1.0,
+    )
+    assert (band.low, band.high, band.read, band.same, band.served) == (0.85, 0.9, 6, 3, 12)
+    assert band.weighted == pytest.approx((10 / 3 + 2) / 12)  # 44%, against 50% as read
+    assert (every.low, every.read, every.same, every.served) == (None, 7, 4, 13)
+    assert every.weighted == pytest.approx((10 / 3 + 2 + 1) / 13)
+    capped = match_reading(similarity, 0.85, 5, labels).bands
+    assert capped[1].served == 4 + 2  # A's best 5: the 0.95 and four of the 0.87s
