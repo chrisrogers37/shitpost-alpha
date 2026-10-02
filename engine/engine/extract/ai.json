@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "about": "The AI picker's version: the files below, each pinned by its SHA-256 (the config holds the schema, models, settings, prices and window start; the prompts are the picker's and the reason line's). Every AI extraction records the version, and the vote records the version's hash. Version 1 is frozen at the end of PR 4, after B2 checks the models and prices.",
+  "config": "extract/ai_picker.json",
+  "prompt": "extract/prompts/picker.md",
+  "files": {
+    "extract/ai_picker.json": "4d5503e2c1ead69e4b3c74871fa760f1af8b8f64b1947e462bf820b02057958c",
+    "extract/prompts/picker.md": "a77e60ca49b68197ccbee098e8d559fb5502df3b74f3aeb8ec3070259d15c62c",
+    "extract/prompts/reason.md": "01132fce6badee16a77fc2632835499281a0162f9260bbcc981eac94bc2d0436"
+  }
+}

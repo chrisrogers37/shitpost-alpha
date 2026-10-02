@@ -41,3 +41,9 @@ No request headers were kept.
   giving the full count. In `f_nvda_split_raw.json` each stand-in price is the matching
   `f_nvda_split_all.json` stand-in times that day's real ratio of raw to adjusted close,
   rounded to two places (10.03 before the split, 1.00 after).
+
+## ai/ (PR 4)
+
+Hand-made provider response bodies (`*.unverified.json`), shaped like each API's documented
+answer, for the AI picker's parsing tests. No real call made them; Part B2 records real
+answers (bodies only, never request headers) and checks these shapes against them.

@@ -1,0 +1,15 @@
+{
+  "about": "The similarity model, pinned: the Hugging Face repo, its commit and each file's SHA-256. `python -m engine fetch-model` downloads these into ENGINE_MODEL_DIR (outside the repo) and refuses a mismatch; model files are never committed. The commit and hashes are filled in Part B1, when the session can reach huggingface.co. pooling: the repo's 1_Pooling/config.json (CLS). Changing anything here changes the model version recorded with every vector.",
+  "repo": "BAAI/bge-small-en-v1.5",
+  "license": "MIT",
+  "revision": null,
+  "files": {
+    "onnx/model.onnx": null,
+    "tokenizer.json": null,
+    "config.json": null,
+    "1_Pooling/config.json": null
+  },
+  "pooling": "cls",
+  "max_tokens": 512,
+  "dims": 384
+}

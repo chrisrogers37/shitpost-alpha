@@ -1,10 +1,14 @@
-"""Command line: `python -m engine migrate | run | status | import-history | backfill-bars`."""
+"""Command line: `python -m engine migrate | run | status | import-history | backfill-bars |
+sync-names | extract | fetch-model | embed | ai-pick | review-list`."""
 
 import argparse
 import asyncio
 import signal
 import sys
 from collections.abc import Sequence
+from datetime import date
+from decimal import Decimal
+from pathlib import Path
 
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -37,6 +41,25 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
     commands.add_parser(
         "backfill-bars", help="fetch every instrument's missing daily bars from Alpaca"
     )
+    commands.add_parser(
+        "sync-names", help="add aliases.json's instruments and names to the database"
+    )
+    commands.add_parser("extract", help="run the rules picker over every text post")
+    commands.add_parser("fetch-model", help="download the pinned similarity model files")
+    commands.add_parser("embed", help="make the similarity vector of every text post")
+    ai_pick = commands.add_parser("ai-pick", help="run the AI picker over chosen posts")
+    ai_pick.add_argument(
+        "--keys", type=Path, help="file of signal keys, one per line (truth_social:<id>)"
+    )
+    ai_pick.add_argument("--from", dest="start", type=date.fromisoformat, help="first day")
+    ai_pick.add_argument("--to", dest="end", type=date.fromisoformat, help="last day")
+    ai_pick.add_argument(
+        "--run", type=int, default=1, choices=(1, 2), help="2: a stability rerun, kept apart"
+    )
+    ai_pick.add_argument("--max-usd", type=Decimal, default=Decimal(5))
+    commands.add_parser(
+        "review-list", help="names the AI vote counted that the rules missed, for review"
+    )
     args = parser.parse_args(argv)
 
     configure_logging()
@@ -65,12 +88,39 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
             from engine.market.bars import run_backfill  # pandas loads only for this command
 
             return asyncio.run(run_backfill(settings))
+        if args.command in EXTRACT_COMMANDS:
+            return _extract_command(args, settings)
         return asyncio.run(_status(settings))
     except OperationalError as exc:
         # The driver's first line names the host and user, never the password.
         reason = str(exc.orig or exc).splitlines()[0]
         print(f"could not reach the engine database: {reason}", file=sys.stderr)
         return 1
+
+
+EXTRACT_COMMANDS = ("sync-names", "extract", "fetch-model", "embed", "ai-pick", "review-list")
+
+
+def _extract_command(args: argparse.Namespace, settings: Settings) -> int:
+    from engine.extract import batch, names, similarity
+
+    if args.command == "sync-names":
+        return asyncio.run(names.run_sync_names(settings))
+    if args.command == "extract":
+        return asyncio.run(batch.run_extract(settings))
+    if args.command == "fetch-model":
+        hosts = similarity.fetch_model(settings)
+        print(f"downloaded through: {', '.join(sorted(hosts)) or 'nothing new'}")
+        return 0
+    if args.command == "embed":
+        return asyncio.run(batch.run_embed(settings))
+    if args.command == "review-list":
+        return asyncio.run(batch.run_review_list(settings))
+    keys = None
+    if args.keys:
+        keys = [line.strip() for line in args.keys.read_text("utf-8").splitlines() if line.strip()]
+    chosen = batch.Selection(keys, args.start, args.end)
+    return asyncio.run(batch.run_ai_pick(settings, chosen, max_usd=args.max_usd, run=args.run))
 
 
 async def _run(settings: Settings, registry: Registry) -> None:

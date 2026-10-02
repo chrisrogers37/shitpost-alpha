@@ -1,0 +1,63 @@
+{
+  "about": "AI picker version settings: the three models, their settings and prices, the window start, the answer schema and the reason line's model. Pinned with the prompts by ai.json. Part A drafted this; Part B2 verifies each model's cutoff, availability and price (setting 'checked' to the day it read the provider's pricing page), picks xAI's model and sets window_start: 3 months after the latest cutoff, at the start of the next day. Prices are US dollars per million tokens. temperature null means the provider takes none.",
+  "models": {
+    "openai": {
+      "model": "gpt-4.1-2025-04-14",
+      "temperature": 0,
+      "cutoff": "2024-06-01",
+      "cutoff_source": "https://platform.openai.com/docs/models/gpt-4.1",
+      "prices": {"input": 2.0, "cached_input": 0.5, "output": 8.0, "checked": null}
+    },
+    "xai": {
+      "model": null,
+      "temperature": 0,
+      "cutoff": null,
+      "cutoff_source": null,
+      "prices": null
+    },
+    "anthropic": {
+      "model": "claude-sonnet-4-5-20250929",
+      "temperature": 0,
+      "cutoff": "2025-07-31",
+      "cutoff_source": "https://docs.claude.com/en/docs/about-claude/models/overview",
+      "prices": {"input": 3.0, "cached_input": 0.3, "output": 15.0, "checked": null}
+    }
+  },
+  "settings": {
+    "max_output_tokens": 800,
+    "timeout_seconds": 15,
+    "max_instruments": 8,
+    "why_max_chars": 100
+  },
+  "window_start": null,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "market_link": {"type": "boolean"},
+      "instruments": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "ticker": {"type": ["string", "null"]},
+            "asset": {"type": "string", "enum": ["stock", "etf", "coin"]},
+            "link": {"type": "string", "enum": ["explicit", "implied"]},
+            "why": {"type": "string"}
+          },
+          "required": ["name", "ticker", "asset", "link", "why"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["market_link", "instruments"],
+    "additionalProperties": false
+  },
+  "reason": {
+    "version": 1,
+    "prompt": "extract/prompts/reason.md",
+    "provider": "anthropic",
+    "max_output_tokens": 80,
+    "max_chars": 120
+  }
+}

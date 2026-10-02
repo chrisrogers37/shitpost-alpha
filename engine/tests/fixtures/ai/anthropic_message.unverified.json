@@ -1,0 +1,20 @@
+{
+  "id": "msg_HANDMADE0001",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-4-5-20250929",
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"market_link\": true, \"instruments\": [{\"name\": \"Nvidia\", \"ticker\": \"NVDA\", \"asset\": \"stock\", \"link\": \"explicit\", \"why\": \"Nvidia is named spending in the US\"}]}"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 1190,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 60
+  }
+}
