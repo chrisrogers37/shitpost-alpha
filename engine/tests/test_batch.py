@@ -106,10 +106,10 @@ async def test_ai_pick_refuses_a_run_over_max_usd(migrated: Settings, db: AsyncE
     )  # fmt: skip
     assert refused == 1
     assert said[0] == (
-        "4 posts (1 without words, not asked); projected $0.04 "
-        "(openai $0.01, xai $0.01, anthropic $0.01); spent so far $0.00"
+        "4 posts (1 without words, not asked); projected $0.03 "
+        "(openai $0.01, anthropic $0.01); spent so far $0.00"
     )
-    assert said[-1] == "refused: projected $0.04 is over --max-usd 0.001"
+    assert said[-1] == "refused: projected $0.03 is over --max-usd 0.001"
     assert await count(db, extractions) == 0
     assert all(not client.asked for client in picker.clients.values())  # type: ignore[attr-defined]
 
@@ -127,9 +127,9 @@ async def test_ai_pick_records_answers_and_a_rerun_asks_again_without_overwritin
         migrated, chosen, max_usd=Decimal(5), say=said.append, picker=picker, listings=CountsAll()
     )
     assert done == 0
-    asked = 3 * (len(posts) - 1)
+    asked = 2 * (len(posts) - 1)
     assert await count(db, extractions, extractions.c.method.like("ai:%")) == asked + len(posts)
-    assert said[-1] == "spent so far $0.025200"  # 9 answers of 1,000 tokens in and 100 out
+    assert said[-1] == "spent so far $0.016800"  # 6 answers of 1,000 tokens in and 100 out
 
     again = await run_ai_pick(
         migrated, chosen, max_usd=Decimal(5), say=said.append, picker=picker, listings=CountsAll()
@@ -159,8 +159,8 @@ async def test_ai_pick_stops_once_a_run_costs_more_than_max_usd(
         say=said.append, picker=AiPicker(ready_config(), wordy),
         listings=CountsAll(),
     )  # fmt: skip
-    assert stopped == 1  # projected $0.04, but the first post's answers cost $1.206
-    assert said[-1] == "stopped after 1 posts: this run cost $1.206000, over --max-usd"
+    assert stopped == 1  # projected $0.03, but the first post's answers cost $0.804
+    assert said[-1] == "stopped after 1 posts: this run cost $0.804000, over --max-usd"
     assert await count(db, extractions, extractions.c.method == "ai:vote") == 1
 
 
@@ -179,7 +179,7 @@ async def test_review_list_shows_names_the_vote_counted_that_the_rules_missed(
     assert lines == [
         "rules v1 missed, AI v1 vote counted:",
         "  NVDA   'nvidia' (ai_implied): 1 posts",
-        "named by two or more models, not mapped:",
+        "named by both models, not mapped:",
     ]
 
 
@@ -190,12 +190,12 @@ async def test_ai_pick_stops_on_a_bad_key_with_nothing_recorded(
 
     await sync_names(db)
     posts = await store_history(db)
-    request = httpx.Request("POST", "https://api.x.ai/v1/chat/completions")
+    request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
     revoked = openai.AuthenticationError(
         "Incorrect API key", response=httpx.Response(401, request=request), body=None
     )
     clients: dict[str, Client] = {p: StubClient(p) for p in PROVIDERS}
-    clients["xai"] = StubClient("xai", fail=revoked)
+    clients["openai"] = StubClient("openai", fail=revoked)
     said: list[str] = []
     stopped = await run_ai_pick(
         migrated, Selection(keys=[p.key for p in posts]), max_usd=Decimal(5),
@@ -203,11 +203,11 @@ async def test_ai_pick_stops_on_a_bad_key_with_nothing_recorded(
     )  # fmt: skip
     assert stopped == 1
     assert said[-1] == (
-        f"stopped at {posts[0].key}, not recorded: xai (stub-model): "
+        f"stopped at {posts[0].key}, not recorded: openai (stub-model): "
         "AuthenticationError: Incorrect API key"
     )
     assert await count(db, extractions) == 0
-    assert len(clients["openai"].asked) == 1  # type: ignore[attr-defined]
+    assert len(clients["anthropic"].asked) == 1  # type: ignore[attr-defined]
     fixed = await run_ai_pick(
         migrated, Selection(keys=[p.key for p in posts]), max_usd=Decimal(5),
         say=said.append, picker=stub_picker(), listings=CountsAll(),
@@ -296,8 +296,8 @@ async def test_ai_pick_keeps_to_the_total_limit(migrated: Settings, db: AsyncEng
         migrated, keys, max_usd=Decimal(5), max_total_usd=Decimal("0.5"), say=said.append,
         picker=AiPicker(ready_config(), wordy), listings=CountsAll(),
     )  # fmt: skip
-    assert stopped == 1  # projected $0.04, but the first post's answers cost $1.206
-    assert said[-1] == "stopped after 1 posts: spent $1.206000, over --max-total-usd"
+    assert stopped == 1  # projected $0.03, but the first post's answers cost $0.804
+    assert said[-1] == "stopped after 1 posts: spent $0.804000, over --max-total-usd"
 
 
 async def test_only_one_ai_pick_runs_at_a_time(migrated: Settings, db: AsyncEngine) -> None:

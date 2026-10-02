@@ -39,7 +39,7 @@ def upgrade() -> None:
         sa.Column("error", sa.Text),
         sa.UniqueConstraint("signal_key", "method", "version", "run", name="extractions_key"),
         sa.CheckConstraint(
-            "method IN ('rules', 'ai:openai', 'ai:xai', 'ai:anthropic', 'ai:vote')",
+            "method IN ('rules', 'ai:openai', 'ai:anthropic', 'ai:vote')",
             name="extractions_method_check",
         ),
         sa.CheckConstraint("run >= 1", name="extractions_run_check"),

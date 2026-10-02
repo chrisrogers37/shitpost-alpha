@@ -64,7 +64,6 @@ def settings(database_url: str, tmp_path: Path) -> Settings:
         alpaca_key_id=None,  # never the session's real keys
         alpaca_secret_key=None,
         openai_key=None,
-        xai_key=None,
         anthropic_key=None,
         bars_cache_dir=tmp_path / "bars",
         model_dir=tmp_path / "models",

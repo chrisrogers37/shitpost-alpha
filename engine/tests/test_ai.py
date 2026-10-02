@@ -39,7 +39,7 @@ from engine.extract.names import load_book
 from engine.extract.rules import Listed, Mention, RulesFileChanged, current_rules, pick
 from engine.extract.score import new_ticker_adder
 from engine.market.alpaca import AlpacaError
-from engine.market.instruments import AssetClass
+from engine.market.instruments import NEW_YORK, AssetClass
 from engine.settings import Settings
 from tests.extract_helpers import FIXTURES, CountsAll, StubClient, answer, ready_config, sync_names
 from tests.test_rules import file_book
@@ -48,7 +48,6 @@ BOOK = file_book()
 WHEN = datetime(2026, 3, 2, 15, tzinfo=UTC)
 CONFIG = ready_config()
 OPENAI_KEY = "sk-test-openai-DO-NOT-LOG-1234567890"
-XAI_KEY = "xai-test-DO-NOT-LOG-0987654321"
 ANTHROPIC_KEY = "sk-ant-test-DO-NOT-LOG-1122334455"
 
 
@@ -66,19 +65,25 @@ def symbols(mentions: tuple[Mention, ...] | list[Mention]) -> set[str]:
 # --- the version and the answer -----------------------------------------------------
 
 
-def test_the_picker_version_loads_with_dated_models_and_checked_prices() -> None:
+def test_version_1_is_two_dated_models_with_checked_prices_and_its_window() -> None:
     config = current_ai_config()
     assert config.version == 1
     assert len(config.hash) == 64
     assert "market_link" in config.instructions
     assert set(config.schema["required"]) == {"market_link", "instruments"}
     assert not config.problems()
+    assert {p: s.model for p, s in config.models.items()} == {
+        "openai": "gpt-4.1-2025-04-14",
+        "anthropic": "claude-haiku-4-5-20251001",
+    }
     for spec in config.models.values():
         assert re.search(r"\d{4}", spec.model or "")  # a dated snapshot, not an alias
+    assert config.window_start == datetime(2025, 11, 1, tzinfo=NEW_YORK)
     unpinned = replace(
-        config, models={**config.models, "xai": replace(config.models["xai"], model=None)}
+        config,
+        models={**config.models, "anthropic": replace(config.models["anthropic"], model=None)},
     )
-    assert unpinned.problems() == ["xai: no model pinned"]
+    assert unpinned.problems() == ["anthropic: no model pinned"]
 
 
 def test_cost_counts_cached_input_apart() -> None:
@@ -115,9 +120,7 @@ async def test_openai_answer_through_the_sdk(monkeypatch: pytest.MonkeyPatch) ->
         return httpx.Response(200, json=ai_fixture("openai_chat_completion.unverified.json"))
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(route)) as http:
-        client = OpenAIChat(
-            "openai", "gpt-test", OPENAI_KEY, temperature=0, timeout=15, http_client=http
-        )
+        client = OpenAIChat("gpt-test", OPENAI_KEY, temperature=0, timeout=15, http_client=http)
         result = await ask_model(client, CONFIG, PostText("Nvidia will spend").user_message())
     assert result.ok and result.market_link
     assert [i.ticker for i in result.items] == ["NVDA"]
@@ -127,21 +130,6 @@ async def test_openai_answer_through_the_sdk(monkeypatch: pytest.MonkeyPatch) ->
     assert body["temperature"] == 0
     assert body["response_format"]["json_schema"]["strict"] is True
     assert sent[0].url.host == "api.openai.com"
-
-
-async def test_xai_goes_through_the_openai_sdk_at_its_own_host() -> None:
-    hosts: list[str] = []
-
-    def route(request: httpx.Request) -> httpx.Response:
-        hosts.append(request.url.host)
-        return httpx.Response(200, json=ai_fixture("xai_chat_completion.unverified.json"))
-
-    async with httpx.AsyncClient(transport=httpx.MockTransport(route)) as http:
-        client = OpenAIChat(
-            "xai", "grok-test", XAI_KEY, temperature=0, timeout=15, http_client=http
-        )
-        result = await ask_model(client, CONFIG, "Post:\nNvidia")
-    assert result.ok and hosts == ["api.x.ai"]
 
 
 async def test_anthropic_answer_through_the_sdk(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -171,9 +159,7 @@ async def test_keys_never_reach_errors_or_logs(caplog: pytest.LogCaptureFixture)
 
     caplog.set_level(logging.DEBUG)
     async with httpx.AsyncClient(transport=httpx.MockTransport(route)) as http:
-        client = OpenAIChat(
-            "openai", "gpt-test", OPENAI_KEY, temperature=0, timeout=15, http_client=http
-        )
+        client = OpenAIChat("gpt-test", OPENAI_KEY, temperature=0, timeout=15, http_client=http)
         result = await ask_model(client, CONFIG, "Post:\nx", secrets=[OPENAI_KEY])
     assert result.error and "[key]" in result.error
     assert OPENAI_KEY not in result.error
@@ -185,27 +171,30 @@ def with_keys(settings: Settings, **keys: str) -> Settings:
     return Settings.model_validate(settings.model_dump() | keys)
 
 
-ALL_KEYS = {"openai_key": OPENAI_KEY, "xai_key": XAI_KEY, "anthropic_key": ANTHROPIC_KEY}
+ALL_KEYS = {"openai_key": OPENAI_KEY, "anthropic_key": ANTHROPIC_KEY}
 
 
-def test_no_picker_without_all_three_keys_or_a_ready_version(settings: Settings) -> None:
+def test_no_picker_without_both_keys_or_a_ready_version(settings: Settings) -> None:
     assert build_clients(settings, CONFIG) == {}
-    with pytest.raises(NotReady, match="not set: ENGINE_OPENAI_KEY, ENGINE_XAI_KEY, ENGINE_ANT"):
+    with pytest.raises(NotReady, match=r"not set: ENGINE_OPENAI_KEY, ENGINE_ANTHROPIC_KEY$"):
         AiPicker.from_settings(settings, CONFIG)
-    with pytest.raises(NotReady, match=r"not set: ENGINE_XAI_KEY, ENGINE_ANTHROPIC_KEY$"):
+    with pytest.raises(NotReady, match=r"not set: ENGINE_ANTHROPIC_KEY$"):
         AiPicker.from_settings(with_keys(settings, openai_key=OPENAI_KEY), CONFIG)
     unpinned = replace(
-        CONFIG, models={**CONFIG.models, "xai": replace(CONFIG.models["xai"], model=None)}
+        CONFIG,
+        models={**CONFIG.models, "anthropic": replace(CONFIG.models["anthropic"], model=None)},
     )
-    with pytest.raises(NotReady, match=r"isn.t ready: xai: no model pinned$"):
+    with pytest.raises(NotReady, match=r"isn.t ready: anthropic: no model pinned$"):
         AiPicker.from_settings(with_keys(settings, **ALL_KEYS), unpinned)
 
 
 def test_ai_keys_must_be_safe_in_a_header(settings: Settings) -> None:
-    assert with_keys(settings, xai_key=f"  {XAI_KEY}\n").ai_keys == {"xai": XAI_KEY}
-    for bad in ("xai-a b", "xai-a\nb", "xai-\u00e9"):
-        with pytest.raises(ValidationError, match="xai_key") as caught:
-            with_keys(settings, xai_key=bad)
+    assert with_keys(settings, anthropic_key=f"  {ANTHROPIC_KEY}\n").ai_keys == {
+        "anthropic": ANTHROPIC_KEY
+    }
+    for bad in ("sk-ant-a b", "sk-ant-a\nb", "sk-ant-\u00e9"):
+        with pytest.raises(ValidationError, match="anthropic_key") as caught:
+            with_keys(settings, anthropic_key=bad)
         assert bad not in str(caught.value)
 
 
@@ -220,11 +209,10 @@ def test_sdk_header_variables_are_refused(
 
 def test_no_client_follows_a_redirect() -> None:
     sdks: list[Any] = [
-        OpenAIChat("openai", "m", OPENAI_KEY, temperature=0, timeout=15).client,
-        OpenAIChat("xai", "m", XAI_KEY, temperature=0, timeout=15).client,
+        OpenAIChat("m", OPENAI_KEY, temperature=0, timeout=15).client,
         AnthropicMessages("m", ANTHROPIC_KEY, temperature=0, timeout=15).client,
     ]
-    assert [sdk._client.follow_redirects for sdk in sdks] == [False, False, False]
+    assert [sdk._client.follow_redirects for sdk in sdks] == [False, False]
 
 
 async def test_the_picker_from_settings_hides_its_keys(
@@ -240,7 +228,7 @@ async def test_the_picker_from_settings_hides_its_keys(
     caplog.set_level(logging.DEBUG)
     async with httpx.AsyncClient(transport=httpx.MockTransport(route)) as http:
         openai_client = OpenAIChat(
-            "openai", "gpt-test", OPENAI_KEY, temperature=0, timeout=15, http_client=http
+            "gpt-test", OPENAI_KEY, temperature=0, timeout=15, http_client=http
         )
         mocked = replace(picker, clients=picker.clients | {"openai": openai_client})
         result = await mocked.pick(BOOK, PostText("Nvidia"), WHEN, RULES_PICK, None)
@@ -261,26 +249,20 @@ def test_a_changed_picker_file_is_refused(tmp_path: Path, name: str) -> None:
 
 
 def test_clients_get_the_engine_keys_passed_in(settings: Settings) -> None:
-    keyed = settings.model_copy(
-        update={
-            "openai_key": OPENAI_KEY,
-            "xai_key": XAI_KEY,
-            "anthropic_key": ANTHROPIC_KEY,
-        }
-    )
+    keyed = settings.model_copy(update={"openai_key": OPENAI_KEY, "anthropic_key": ANTHROPIC_KEY})
     keyed = Settings.model_validate(keyed.model_dump())
     clients = build_clients(keyed, CONFIG)
-    assert set(clients) == {"openai", "xai", "anthropic"}
+    assert [type(c) for c in clients.values()] == [OpenAIChat, AnthropicMessages]
     assert [getattr(c, "client").api_key for c in clients.values()] == [  # noqa: B009
         OPENAI_KEY,
-        XAI_KEY,
         ANTHROPIC_KEY,
     ]
     assert OPENAI_KEY not in repr(keyed)
     unpinned = replace(
-        CONFIG, models={**CONFIG.models, "xai": replace(CONFIG.models["xai"], model=None)}
+        CONFIG,
+        models={**CONFIG.models, "anthropic": replace(CONFIG.models["anthropic"], model=None)},
     )
-    assert "xai" not in build_clients(keyed, unpinned)
+    assert set(build_clients(keyed, unpinned)) == {"openai"}
 
 
 # --- mapping --------------------------------------------------------------------------------
@@ -425,74 +407,76 @@ async def names(*items: tuple[str, str]) -> tuple[Mention, ...]:
     return tuple([await mapped(Item(n, t, "stock", "explicit", "")) for n, t in items])
 
 
-async def test_all_three_agree() -> None:
-    each = await names(("Nvidia", "NVDA"))
-    result = vote([ok(p, True) for p in ("openai", "xai", "anthropic")], dict.fromkeys(
-        ("openai", "xai", "anthropic"), each), RULES_PICK)  # fmt: skip
-    assert result.market_link and not result.fallback
+async def test_both_agree() -> None:
+    result = vote(
+        [ok("openai", True), ok("anthropic", True)],
+        {"openai": await names(("Nvidia", "NVDA")), "anthropic": await names(("NVIDIA", "NVDA"))},
+        RULES_PICK,
+    )
+    assert result.market_link and not result.fallback and result.answered == 2
     assert symbols(result.mentions) == {"NVDA"}
-    assert [m.models for m in result.mentions] == [3]
+    assert [m.models for m in result.mentions] == [2]
 
 
-async def test_two_of_three_count_and_one_does_not() -> None:
-    answers = [ok("openai", True), ok("xai", True), ok("anthropic", False)]
+async def test_a_link_or_a_name_counts_only_when_both_make_it() -> None:
+    answers = [ok("openai", True), ok("anthropic", False)]
     mapped_names = {
         "openai": await names(("Nvidia", "NVDA"), ("Apple", "AAPL")),
-        "xai": await names(("NVIDIA Corp", "NVDA")),
         "anthropic": await names(("Apple Inc.", "AAPL"), ("Tesla", "TSLA")),
     }
     result = vote(answers, mapped_names, RULES_PICK)
-    assert result.market_link
-    assert symbols(result.mentions) == {"NVDA", "AAPL"}
-    tesla = next(m for m in result.mentions if m.models == 1)
-    assert not tesla.counted
+    assert not result.market_link and not result.fallback
+    assert symbols(result.mentions) == {"AAPL"}
+    alone = {m.name for m in result.mentions if m.models == 1}
+    assert alone == {"Nvidia", "Tesla"}
+    assert not any(m.counted for m in result.mentions if m.models == 1)
 
 
-async def test_a_model_naming_it_without_a_ticker_does_not_lose_the_counted_name() -> None:
-    answers = [ok(p, True) for p in ("openai", "xai", "anthropic")]
+async def test_a_name_also_given_without_a_ticker_does_not_lose_the_counted_name() -> None:
+    answers = [ok(p, True) for p in ("openai", "anthropic")]
     with_ticker = await names(("Some Chip Firm", "NVDA"))
     no_ticker = (await mapped(Item("Some Chip Firm", None, "stock", "implied", "")),)
     assert no_ticker[0].unmapped == "no_ticker"
-    for order in (("openai", "xai", "anthropic"), ("anthropic", "openai", "xai")):
-        mapped_names = dict.fromkeys(order[:2], with_ticker) | {order[2]: no_ticker}
-        result = vote(answers, {p: mapped_names[p] for p in order}, RULES_PICK)
+    for first, second in ((with_ticker, no_ticker), (no_ticker, with_ticker)):
+        mapped_names = {"openai": first + second, "anthropic": second + first}
+        result = vote(answers, mapped_names, RULES_PICK)
         assert [(m.normalized, m.counted, m.models) for m in result.mentions] == [
             ("some chip firm", True, 2)
         ]
         assert symbols(result.mentions) == {"NVDA"}
+    alone = vote(answers, {"openai": with_ticker, "anthropic": no_ticker}, RULES_PICK)
+    assert [(m.counted, m.models, m.unmapped) for m in alone.mentions] == [(False, 1, None)]
 
 
 async def test_one_name_given_two_tickers_keeps_the_counted_one() -> None:
-    answers = [ok(p, True) for p in ("openai", "xai", "anthropic")]
+    answers = [ok(p, True) for p in ("openai", "anthropic")]
     lone = await names(("Some Chip Firm", "NVDA"))
     agreed = await names(("Some Chip Firm", "AAPL"))
-    mapped_names = {"openai": lone, "xai": agreed, "anthropic": agreed}
-    result = vote(answers, mapped_names, RULES_PICK)
+    result = vote(answers, {"openai": lone + agreed, "anthropic": agreed}, RULES_PICK)
     assert [(m.normalized, m.counted, m.models) for m in result.mentions] == [
         ("some chip firm", True, 2)
     ]
     assert symbols(result.mentions) == {"AAPL"}
 
 
-async def test_with_one_failed_the_other_two_must_agree() -> None:
-    answers = [ok("openai", True), ok("xai", False), failed("anthropic")]
-    mapped_names = {"openai": await names(("Nvidia", "NVDA")), "xai": ()}
-    result = vote(answers, mapped_names, RULES_PICK)
-    assert not result.market_link and not result.fallback and result.answered == 2
-    assert symbols(result.mentions) == set()
-
-
-async def test_with_two_failed_the_rules_stand_in() -> None:
-    answers = [ok("openai", True), failed("xai", "invalid answer"), failed("anthropic")]
-    result = vote(answers, {"openai": await names(("Nvidia", "NVDA"))}, RULES_PICK)
-    assert result.fallback and result.answered == 1
-    assert result.market_link == RULES_PICK.market_link
-    assert symbols(result.mentions) == {"F"}
+@pytest.mark.parametrize(
+    "error", ["timeout after 15 s", "invalid answer: not JSON", "APIConnectionError: reset"]
+)
+async def test_if_either_model_fails_the_rules_stand_in(error: str) -> None:
+    for answers in ([ok("openai", True), failed("anthropic", error)],
+                    [failed("openai", error), ok("anthropic", True)]):  # fmt: skip
+        said: dict[str, tuple[Mention, ...]] = {
+            a.provider: await names(("Nvidia", "NVDA")) for a in answers if a.ok
+        }
+        result = vote(answers, said, RULES_PICK)
+        assert result.fallback and result.answered == 1
+        assert result.market_link == RULES_PICK.market_link
+        assert symbols(result.mentions) == {"F"}
+    both = vote([failed("openai", error), failed("anthropic", error)], {}, RULES_PICK)
+    assert both.fallback and both.answered == 0 and symbols(both.mentions) == {"F"}
 
 
 async def test_a_timeout_counts_as_missed() -> None:
-    from dataclasses import replace
-
     quick = replace(CONFIG, timeout_seconds=0.05)
     slow = StubClient("anthropic", default=answer(True), delay=1.0)
     result = await ask_model(slow, quick, "Post:\nx", retries=3)
@@ -560,9 +544,7 @@ async def openai_reply(changes: dict[str, Any]) -> ModelAnswer:
         return httpx.Response(200, json=body)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(route)) as http:
-        client = OpenAIChat(
-            "openai", "gpt-test", OPENAI_KEY, temperature=0, timeout=15, http_client=http
-        )
+        client = OpenAIChat("gpt-test", OPENAI_KEY, temperature=0, timeout=15, http_client=http)
         return await ask_model(client, CONFIG, "Post:\nNvidia")
 
 
@@ -597,16 +579,32 @@ async def test_an_anthropic_reply_cut_off_keeps_its_cost() -> None:
     assert result.cost and result.cost > 0 and result.reply is not None
 
 
-async def test_the_picker_asks_all_three_and_votes() -> None:
+async def test_the_picker_asks_both_and_votes() -> None:
     words = "Nvidia will invest 500 billion dollars in America"
     said = answer(True, ("Nvidia", "NVDA", "stock", "explicit"))
-    clients = {p: StubClient(p, answers={words: said}) for p in ("openai", "xai", "anthropic")}
+    clients = {p: StubClient(p, answers={words: said}) for p in ("openai", "anthropic")}
     picker = AiPicker(CONFIG, clients)  # type: ignore[arg-type]
     result = await picker.pick(BOOK, PostText(words), WHEN, pick(BOOK, words, WHEN), None)
-    assert len(result.answers) == 3 and result.vote.market_link
+    assert len(result.answers) == 2 and result.vote.market_link
     assert symbols(result.vote.mentions) == {"NVDA"}
-    methods = [e.method for e in result.extractions(BOOK, CONFIG)]
-    assert methods == ["ai:openai", "ai:xai", "ai:anthropic", "ai:vote"]
+    rows = result.extractions(BOOK, CONFIG)
+    assert [e.method for e in rows] == ["ai:openai", "ai:anthropic", "ai:vote"]
+    assert rows[-1].result and rows[-1].result["ai_fallback"] is False
+
+
+async def test_a_model_past_the_deadline_sends_the_post_to_the_rules() -> None:
+    words = "Nvidia will invest 500 billion dollars in America"
+    said = answer(True, ("Nvidia", "NVDA", "stock", "explicit"))
+    clients = {
+        "openai": StubClient("openai", answers={words: said}),
+        "anthropic": StubClient("anthropic", answers={words: said}, delay=1.0),
+    }
+    picker = AiPicker(replace(CONFIG, timeout_seconds=0.05), clients)  # type: ignore[arg-type]
+    rules = pick(BOOK, words, WHEN)
+    result = await picker.pick(BOOK, PostText(words), WHEN, rules, None)
+    assert result.vote.fallback and result.vote.mentions == rules.mentions
+    vote_row = result.extractions(BOOK, CONFIG)[-1]
+    assert vote_row.result and vote_row.result["ai_fallback"] is True
 
 
 async def test_a_post_of_only_links_asks_no_model() -> None:

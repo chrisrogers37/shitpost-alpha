@@ -205,7 +205,6 @@ async def test_a_new_text_post_ends_at_done_with_rules_mentions_and_embedding(
 
 KEYS = {
     "openai_key": SecretStr("sk-test-0000-DO-NOT-LOG"),
-    "xai_key": SecretStr("xai-test-0000-DO-NOT-LOG"),
     "anthropic_key": SecretStr("sk-ant-test-0000-DO-NOT-LOG"),
 }
 
@@ -218,22 +217,23 @@ async def test_the_ai_is_off_unless_engine_ai_live_is_on(
     assert not migrated.ai_live
     assert live_ai(keyed, ready) is None  # keys and a ready version, but not switched on
     live = live_ai(keyed.model_copy(update={"ai_live": True}), ready)
-    assert live is not None and set(live.clients) == {"openai", "xai", "anthropic"}
+    assert live is not None and set(live.clients) == {"openai", "anthropic"}
     one_short = migrated.model_copy(update={"ai_live": True, "openai_key": KEYS["openai_key"]})
     unpriced = replace(
-        ready, models={**ready.models, "xai": replace(ready.models["xai"], price=None)}
+        ready,
+        models={**ready.models, "anthropic": replace(ready.models["anthropic"], price=None)},
     )
     with caplog.at_level(logging.WARNING):
         assert live_ai(one_short, ready) is None
         assert live_ai(keyed.model_copy(update={"ai_live": True}), unpriced) is None
-    assert "not set: ENGINE_XAI_KEY, ENGINE_ANTHROPIC_KEY" in caplog.text
-    assert "isn't ready: xai: price not checked" in caplog.text
+    assert "not set: ENGINE_ANTHROPIC_KEY" in caplog.text
+    assert "isn't ready: anthropic: price not checked" in caplog.text
     scorer = Scorer(current_rules(), StubEmbedder(), live)
     for shown in (repr(live), repr(scorer), caplog.text):
         assert not any(key.get_secret_value() in shown for key in KEYS.values())
 
 
-async def test_with_stub_ai_on_there_are_three_answers_and_a_vote(
+async def test_with_stub_ai_on_there_are_two_answers_and_a_vote(
     migrated: Settings, db: AsyncEngine
 ) -> None:
     await sync_names(db)
@@ -244,11 +244,7 @@ async def test_with_stub_ai_on_there_are_three_answers_and_a_vote(
         migrated, db, original.key, embedder_loader=lambda s: StubEmbedder()
     )
     nvidia = answer(True, ("Nvidia", "NVDA", "stock", "explicit"))
-    clients = {
-        "openai": StubClient("openai", default=nvidia),
-        "xai": StubClient("xai", default=nvidia),
-        "anthropic": StubClient("anthropic", default=answer(True)),
-    }
+    clients = {p: StubClient(p, default=nvidia) for p in ("openai", "anthropic")}
     config = ready_config()
     await store(db, quote)
     await run_worker_until_done(
@@ -266,7 +262,6 @@ async def test_with_stub_ai_on_there_are_three_answers_and_a_vote(
         ("ai:anthropic", True, Decimal("0.002800")),
         ("ai:openai", True, Decimal("0.002800")),
         ("ai:vote", True, None),
-        ("ai:xai", True, Decimal("0.002800")),
         ("rules", True, None),
     ]
     (asked,) = clients["openai"].asked
@@ -314,7 +309,7 @@ async def test_the_replay_harness_runs_recorded_posts(db: AsyncEngine) -> None:
     feeds = recorded_posts()
     assert all(feeds.values())
     delivered: list[str] = []
-    clients = {p: StubClient(p, default=answer(False)) for p in ("openai", "xai", "anthropic")}
+    clients = {p: StubClient(p, default=answer(False)) for p in ("openai", "anthropic")}
     result = await replay(
         db, feeds, embedder=replay_embedder(REAL_DIR), clients=clients, config=ready_config(),  # type: ignore[arg-type]
         deliver=lambda scored: delivered.append(scored.key),
