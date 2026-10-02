@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import time
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -14,6 +15,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from engine.extract.similarity import (
+    PART,
     ModelMissing,
     ModelPin,
     OnnxEmbedder,
@@ -177,6 +179,32 @@ def test_fetch_model_refuses_a_file_that_does_not_match(settings: Settings) -> N
     assert sorted(p.name for p in directory.rglob("*") if p.is_file()) == ["model.onnx"]
 
 
+class Dropped(httpx.SyncByteStream):
+    def __iter__(self) -> Iterator[bytes]:
+        yield b"half a model"
+        raise httpx.ReadError("connection dropped")
+
+
+def test_a_dropped_download_leaves_nothing_and_a_killed_ones_part_is_cleared(
+    settings: Settings,
+) -> None:
+    pin = pinned()
+    directory = pin.directory(settings.model_dir)
+    directory.mkdir(parents=True)
+    killed = directory / f"{PART}abc123"  # what a SIGKILL mid-download leaves
+    killed.write_bytes(b"x")
+
+    def dropped(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, stream=Dropped())
+
+    with pytest.raises(httpx.ReadError):
+        fetch_model(settings, pin, httpx.MockTransport(dropped), lambda line: None)
+    assert [p for p in directory.rglob("*") if p.is_file()] == []
+    fetch_model(settings, pin, hugging_face(FILES, []), lambda line: None)
+    modes = {p: (directory / p).stat().st_mode & 0o777 for p in FILES}
+    assert modes == {p: 0o644 for p in FILES}
+
+
 # --- the real model, when its files are here -------------------------------------------------
 
 REAL = load_pin()
@@ -205,6 +233,9 @@ def test_the_real_model_is_deterministic_normalised_and_ranks_a_paraphrase_first
     assert post.vector @ paraphrase.vector > post.vector @ unrelated.vector
     (long,) = model.embed(["tariffs " * 1000])
     assert long.truncated and not post.truncated
+    # The CLS vector of the pinned files (catches a pooling, tokenizer or feed change).
+    golden = [-0.0720, 0.0076, -0.0272, 0.0465, 0.0500, 0.0316]
+    assert post.vector[:6] == pytest.approx(golden, abs=2e-4)
 
 
 # --- the match rule and the stored index ------------------------------------------------------
@@ -221,9 +252,11 @@ def test_a_match_rule_set_for_another_model_is_refused(tmp_path: Path) -> None:
 
 
 def test_the_shipped_match_rule_is_v1_for_the_pinned_model() -> None:
+    from scripts.match_rule import counts, pick_threshold
+
     rule = load_match_rule()
     assert (rule.version, rule.model_version, rule.max_matches) == (1, REAL.version, 50)
-    assert 0.7 <= rule.threshold < 1
+    assert rule.threshold == pick_threshold(*counts())  # what the committed reading gives
 
 
 async def test_the_index_loads_every_stored_vector_with_its_post_time(db: AsyncEngine) -> None:

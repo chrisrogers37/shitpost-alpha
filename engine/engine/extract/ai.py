@@ -409,8 +409,18 @@ FATAL = (
 know, a request it refuses. Every post would fail the same way."""
 
 
+def _fatal(exc: BaseException) -> bool:
+    """FATAL, or OpenAI's empty balance: a 429 whose code is `insufficient_quota`, which no
+    wait lifts. (Anthropic's low balance is a 400, already FATAL.)"""
+    out_of_credit = isinstance(exc, openai.RateLimitError) and "insufficient_quota" in (
+        exc.code,
+        exc.type,
+    )
+    return out_of_credit or isinstance(exc, FATAL)
+
+
 def _retryable(exc: BaseException) -> bool:
-    if isinstance(exc, openai.APITimeoutError | anthropic.APITimeoutError):
+    if _fatal(exc) or isinstance(exc, openai.APITimeoutError | anthropic.APITimeoutError):
         return False
     if isinstance(exc, openai.APIStatusError | anthropic.APIStatusError):
         return exc.status_code in RETRY_STATUSES
@@ -442,7 +452,7 @@ class ModelAnswer:
     cost: Decimal | None = None
     """Whenever a reply was billed, valid or not."""
     fatal: bool = False
-    """The error is one no retry can fix (FATAL)."""
+    """The error is one no retry can fix (FATAL, or OpenAI out of credit)."""
 
     @property
     def ok(self) -> bool:
@@ -517,7 +527,7 @@ async def ask_model(
                 await asyncio.sleep(backoff_seconds * 2 ** (attempt - 1))
                 continue
             error = scrubbed(f"{type(exc).__name__}: {exc}", secrets)
-            fatal = isinstance(exc, FATAL)
+            fatal = _fatal(exc)
         else:
             return _answered(client, config, reply, started, clock())
         log.warning("%s (%s) failed: %s", client.provider, client.model, error)
@@ -697,8 +707,9 @@ def vote(
             )
         )  # fmt: skip
     # One mention per name: a model that gave a counted name without its ticker must not
-    # replace the counted mention with its unmapped one.
-    mentions.sort(key=lambda m: (not m.counted, m.instrument_id is None, -(m.models or 0)))
+    # replace the counted mention with its unmapped one; among uncounted ones, the name
+    # most models gave stays (review-list reads it).
+    mentions.sort(key=lambda m: (not m.counted, -(m.models or 0), m.instrument_id is None))
     return Vote(market_link, unique_names(mentions), len(ok), fallback=False)
 
 
@@ -828,9 +839,9 @@ class AiPicker:
         mapped: dict[str, tuple[Mention, ...]] = {}
         for answer in answers:
             if answer.ok:
-                mapped[answer.provider] = unique_names(
-                    [await map_item(book, item, posted_at, add_new) for item in answer.items]
-                )
+                said = [await map_item(book, item, posted_at, add_new) for item in answer.items]
+                said.sort(key=lambda m: m.instrument_id is None)  # a name given twice: mapped
+                mapped[answer.provider] = unique_names(said)
         result = vote(answers, mapped, rules)
         real = tuple(a for a in answers if a.provider in self.clients)
         return AiPick(real, mapped, result, started, self.clock())

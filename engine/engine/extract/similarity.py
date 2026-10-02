@@ -51,8 +51,13 @@ class ModelPin:
 
     @property
     def version(self) -> str:
-        """The model version recorded with every vector."""
-        return f"{self.repo.rsplit('/', 1)[-1]}@{(self.revision or 'unpinned')[:12]}"
+        """The model version recorded with every vector: the repo's commit, and a digest
+        of everything else pinned (files, pooling, token limit), so any change shows."""
+        rest = json.dumps(
+            [self.files, self.pooling, self.max_tokens, self.dims], sort_keys=True
+        ).encode()
+        digest = hashlib.sha256(rest).hexdigest()[:8]
+        return f"{self.repo.rsplit('/', 1)[-1]}@{(self.revision or 'unpinned')[:12]}.{digest}"
 
     def problems(self) -> list[str]:
         found = [] if self.revision else ["no commit pinned"]
@@ -172,6 +177,10 @@ def load_embedder(settings: Settings, pin: ModelPin | None = None) -> OnnxEmbedd
 # --- the download --------------------------------------------------------------------------
 
 
+PART = ".part-"
+"""Downloads land in `.part-*` files beside their target until the hash checks."""
+
+
 def fetch_model(
     settings: Settings,
     pin: ModelPin | None = None,
@@ -184,6 +193,8 @@ def fetch_model(
     if problems := pin.problems():
         raise ModelMissing(f"the similarity model isn't pinned yet: {'; '.join(problems)}")
     directory = pin.directory(settings.model_dir)
+    for stale in directory.rglob(f"{PART}*") if directory.is_dir() else ():
+        stale.unlink(missing_ok=True)  # left by a killed download
     hosts: set[str] = set()
     # Not make_client: the hub redirects every file to its CDN (no key is sent), and the
     # model is a large download, so it takes the CNN archive's download timeout.
@@ -201,7 +212,7 @@ def fetch_model(
             target.parent.mkdir(parents=True, exist_ok=True)
             url = f"https://huggingface.co/{pin.repo}/resolve/{pin.revision}/{path}"
             got = hashlib.sha256()
-            with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as part:
+            with tempfile.NamedTemporaryFile(dir=target.parent, prefix=PART, delete=False) as part:
                 partial = Path(part.name)
                 try:
                     with client.stream("GET", url) as response:
@@ -217,6 +228,7 @@ def fetch_model(
             if got.hexdigest() != digest:
                 partial.unlink()
                 raise ModelMissing(f"{path}: SHA-256 {got.hexdigest()} isn't the pinned {digest}")
+            partial.chmod(0o644)  # readable by a worker running as another user
             partial.replace(target)
             say(f"{path}: {target.stat().st_size:,} bytes, SHA-256 checked")
     return hosts
@@ -268,7 +280,7 @@ async def load_similarity(conn: AsyncConnection, model_version: str) -> Similari
             select(signal_embeddings.c.signal_key, signals.c.posted_at, signal_embeddings.c.vector)
             .join(signals, signals.c.key == signal_embeddings.c.signal_key)
             .where(signal_embeddings.c.model_version == model_version)
-            .order_by(signals.c.posted_at)
+            .order_by(signals.c.posted_at, signal_embeddings.c.signal_key)
         )
     ).all()
     vectors = np.array([np.frombuffer(row.vector, dtype="<f4") for row in rows], dtype=np.float32)

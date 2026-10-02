@@ -459,6 +459,34 @@ async def test_one_name_given_two_tickers_keeps_the_counted_one() -> None:
     assert symbols(result.mentions) == {"AAPL"}
 
 
+async def test_with_nothing_counted_the_name_most_models_gave_stays() -> None:
+    """For review-list's "named by two or more models, not mapped" (three answers here)."""
+    answers = [ok(p, True) for p in ("openai", "anthropic", "third")]
+    no_ticker = (await mapped(Item("Some Chip Firm", None, "stock", "implied", "")),)
+    nvda = await names(("Some Chip Firm", "NVDA"))
+    said = {"openai": no_ticker, "anthropic": no_ticker, "third": nvda}
+    result = vote(answers, said, RULES_PICK)
+    assert [(m.normalized, m.unmapped, m.counted, m.models) for m in result.mentions] == [
+        ("some chip firm", "no_ticker", False, 2)
+    ]
+
+
+async def test_a_model_naming_it_twice_keeps_its_mapped_mention() -> None:
+    twice = answer(
+        True, ("Some Chip Firm", None, "stock", "implied"),
+        ("Some Chip Firm", "NVDA", "stock", "implied"),
+    )  # fmt: skip
+    once = answer(True, ("Some Chip Firm", "NVDA", "stock", "implied"))
+    clients = {"openai": StubClient("openai", default=twice),
+               "anthropic": StubClient("anthropic", default=once)}  # fmt: skip
+    picker = AiPicker(CONFIG, clients)  # type: ignore[arg-type]
+    words = "Chips are the future"
+    result = await picker.pick(BOOK, PostText(words), WHEN, pick(BOOK, words, WHEN), None)
+    assert [m.unmapped for m in result.mapped["openai"]] == [None]
+    assert [(m.counted, m.models) for m in result.vote.mentions] == [(True, 2)]
+    assert symbols(result.vote.mentions) == {"NVDA"}
+
+
 @pytest.mark.parametrize(
     "error", ["timeout after 15 s", "invalid answer: not JSON", "APIConnectionError: reset"]
 )
@@ -523,6 +551,29 @@ async def test_errors_no_retry_can_fix_are_fatal_and_not_retried() -> None:
         result = await ask_model(client, CONFIG, "Post:\nx", retries=2, backoff_seconds=0)
         assert result.fatal is fatal, error
         assert len(client.asked) == (1 if fatal else 3), error
+
+
+async def test_openai_out_of_credit_is_fatal_and_not_retried() -> None:
+    """OpenAI answers an empty balance with a 429, which a wait can't lift."""
+    quota = {
+        "error": {
+            "message": "You exceeded your current quota, please check your plan.",
+            "type": "insufficient_quota",
+            "param": None,
+            "code": "insufficient_quota",
+        }
+    }
+    calls: list[httpx.Request] = []
+
+    def route(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(429, json=quota)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(route)) as http:
+        client = OpenAIChat("gpt-test", OPENAI_KEY, temperature=0, timeout=15, http_client=http)
+        result = await ask_model(client, CONFIG, "Post:\nx", retries=3, backoff_seconds=0)
+    assert result.fatal and len(calls) == 1
+    assert (result.error or "").startswith("RateLimitError:")
 
 
 async def test_an_sdk_timeout_is_not_retried() -> None:

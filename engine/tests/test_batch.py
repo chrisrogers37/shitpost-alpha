@@ -2,18 +2,23 @@
 reason line's check."""
 
 import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
 import httpx
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from engine.extract.ai import PROVIDERS, AiPicker, Client
+from engine.extract.ai import PROVIDERS, AiPicker, Client, Reply
 from engine.extract.batch import (
+    AI_PICK_LEASE,
+    AI_PICK_LEASE_SECONDS,
+    EMBED_BATCH_CHARS,
     Selection,
+    embed_batches,
     review_list,
     run_ai_pick,
     run_embed,
@@ -24,8 +29,15 @@ from engine.extract.rules import current_rules
 from engine.extract.score import Scorer
 from engine.feeds.posts import Post
 from engine.feeds.store import insert_signals, trump_source_id
+from engine.lease import Lease
 from engine.settings import Settings
-from engine.tables import extractions, signal_embeddings, signal_mentions, signals
+from engine.tables import (
+    engine_lease,
+    extractions,
+    signal_embeddings,
+    signal_mentions,
+    signals,
+)
 from tests.extract_helpers import (
     CountsAll,
     StubClient,
@@ -93,6 +105,29 @@ async def test_embed_resumes_and_skips_posts_without_words(
     assert "1 without words skipped" in said[-1]
     assert await run_embed(migrated, said.append, StubEmbedder()) == 0
     assert "embedded 0 posts" in said[-1]
+
+
+async def test_embed_makes_vectors_again_for_a_new_model_version(
+    migrated: Settings, db: AsyncEngine
+) -> None:
+    await store_history(db)
+    said: list[str] = []
+    assert await run_embed(migrated, said.append, StubEmbedder()) == 0
+    newer = StubEmbedder()
+    newer.version = "stub@1"
+    assert await run_embed(migrated, said.append, newer) == 0
+    assert len(newer.texts) == len(TEXTS) - 1
+    assert await count(db, signal_embeddings) == 2 * (len(TEXTS) - 1)
+
+
+def test_embed_batches_hold_similar_lengths_within_the_padded_size() -> None:
+    short = [(f"s{n}", "x" * 100) for n in range(100)]
+    long = [(f"l{n}", "y" * 5_000) for n in range(10)]
+    batches = embed_batches([*long[:5], *short, *long[5:]])
+    assert [len(b) for b in batches] == [64, 36, 6, 4]  # long posts six at a time
+    assert all(len(b) * max(len(w) for _, w in b) <= EMBED_BATCH_CHARS for b in batches)
+    assert sorted(key for b in batches for key, _ in b) == sorted(k for k, _ in short + long)
+    assert embed_batches([("huge", "z" * 100_000)]) == [[("huge", "z" * 100_000)]]
 
 
 async def test_ai_pick_refuses_a_run_over_max_usd(migrated: Settings, db: AsyncEngine) -> None:
@@ -301,18 +336,63 @@ async def test_ai_pick_keeps_to_the_total_limit(migrated: Settings, db: AsyncEng
 
 
 async def test_only_one_ai_pick_runs_at_a_time(migrated: Settings, db: AsyncEngine) -> None:
-    from engine.extract.batch import AI_PICK_LOCK
-
+    await sync_names(db)
     posts = await store_history(db)
     said: list[str] = []
-    async with db.connect() as other:
-        await other.execute(select(func.pg_advisory_lock(AI_PICK_LOCK)))
-        busy = await run_ai_pick(
-            migrated, Selection(keys=[posts[0].key]), max_usd=Decimal(5), say=said.append,
-            picker=stub_picker(), listings=CountsAll(),
-        )  # fmt: skip
-        await other.execute(select(func.pg_advisory_unlock(AI_PICK_LOCK)))
-    assert busy == 1 and said == ["another ai-pick is running; wait for it to finish"]
+    other = Lease(db, "another run", ttl=AI_PICK_LEASE_SECONDS, renew=60, name=AI_PICK_LEASE)
+    assert await other.acquire()
+    busy = await run_ai_pick(
+        migrated, Selection(keys=[posts[0].key]), max_usd=Decimal(5), say=said.append,
+        picker=stub_picker(), listings=CountsAll(),
+    )  # fmt: skip
+    assert busy == 1 and said == [
+        "another ai-pick is running; wait for it to finish (a killed run's hold lapses "
+        "10 minutes after its last post)"
+    ]
+    await other.release()
+    done = await run_ai_pick(
+        migrated, Selection(keys=[posts[0].key]), max_usd=Decimal(5), say=said.append,
+        picker=stub_picker(), listings=CountsAll(),
+    )  # fmt: skip
+    assert done == 0 and await count(db, engine_lease) == 0  # given up at the end
+
+
+@dataclass
+class TakesTheLease(StubClient):
+    """Answers, but first hands the ai-pick lease to another run (as if this run's had
+    lapsed and another took it)."""
+
+    db: AsyncEngine | None = None
+
+    async def ask(
+        self, instructions: str, user: str, schema: dict[str, Any] | None, max_tokens: int
+    ) -> Reply:
+        assert self.db is not None
+        async with self.db.begin() as conn:
+            await conn.execute(
+                update(engine_lease)
+                .where(engine_lease.c.name == AI_PICK_LEASE)
+                .values(holder="another run")
+            )
+        return await super().ask(instructions, user, schema, max_tokens)
+
+
+async def test_an_ai_pick_that_loses_its_lease_stops_before_the_next_post(
+    migrated: Settings, db: AsyncEngine
+) -> None:
+    await sync_names(db)
+    posts = await store_history(db)
+    clients: dict[str, Client] = {p: StubClient(p) for p in PROVIDERS}
+    clients["openai"] = TakesTheLease("openai", db=db)
+    said: list[str] = []
+    stopped = await run_ai_pick(
+        migrated, Selection(keys=[p.key for p in posts]), max_usd=Decimal(5),
+        say=said.append, picker=AiPicker(ready_config(), clients), listings=CountsAll(),
+    )  # fmt: skip
+    assert stopped == 1
+    assert said[-1] == f"stopped at {posts[1].key}: lost the ai-pick lease to another run"
+    assert await count(db, extractions, extractions.c.method == "ai:vote") == 1
+    assert await count(db, engine_lease, engine_lease.c.holder == "another run") == 1
 
 
 async def test_ai_pick_refuses_a_version_whose_files_changed(
@@ -392,6 +472,7 @@ POST = "Nvidia will build 4 chip plants in Arizona, a 500 billion dollar investm
         ("Nvidia's 5 new plants", "number the post doesn't have: 5"),
         ("American Eagle benefits from its ad", "direction"),
         ("Imports harming the auto industry", "direction"),
+        ("Names steel under the Harmonized Tariff Schedule", None),
     ],
 )
 def test_the_reason_line_check(line: str, problem: str | None) -> None:
