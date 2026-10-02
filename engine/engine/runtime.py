@@ -12,7 +12,7 @@ from typing import Any, NoReturn
 from sqlalchemy import func, update
 from sqlalchemy.exc import SQLAlchemyError
 
-from engine.db import make_engine
+from engine.db import make_engine, raise_if_cancelling
 from engine.lease import Lease, LeaseLost
 from engine.notify import notify_operator
 from engine.registry import EngineContext, Registry, WorkerFunc
@@ -90,6 +90,7 @@ async def _try_acquire(lease: Lease) -> bool:
     try:
         return await lease.acquire()
     except (SQLAlchemyError, OSError) as exc:
+        raise_if_cancelling()
         log.warning("could not take the lease: %s", exc)
         return False
 
@@ -102,14 +103,16 @@ async def _hold(
     healthy = asyncio.create_task(streak.recovered_after())
     try:
         await _work(ctx, registry, lease, stop)
+        return
     except Exception as exc:
+        raise_if_cancelling()
         log.exception("engine work failed; stepping down")
         delay = await streak.failed(exc)
-        with suppress(SQLAlchemyError, OSError):
-            await lease.release()
-        await _wait(stop, delay)
     finally:
-        healthy.cancel()
+        healthy.cancel()  # before the back-off: waiting it out is not running healthily
+    with suppress(SQLAlchemyError, OSError):
+        await lease.release()
+    await _wait(stop, delay)
 
 
 async def _work(ctx: EngineContext, registry: Registry, lease: Lease, stop: asyncio.Event) -> None:
@@ -143,6 +146,7 @@ async def _heartbeat(ctx: EngineContext, holder: str) -> NoReturn:
                 )
             status = {}
         except (SQLAlchemyError, OSError) as exc:
+            raise_if_cancelling()
             log.warning("heartbeat failed: %s", exc)
         await asyncio.sleep(ctx.settings.lease_renew_seconds)
 
@@ -155,6 +159,7 @@ async def _supervise(name: str, worker: WorkerFunc, ctx: EngineContext) -> None:
         try:
             await worker(ctx)
         except Exception as exc:
+            raise_if_cancelling()
             log.exception("worker %s failed", name)
             delay = await streak.failed(exc)
         else:

@@ -5,7 +5,8 @@ resumes where it stopped after a restart. A stage's handler runs in one transact
 the stage advance: its writes and the advance commit together or not at all.
 
 Items at a stage this release doesn't know (added by a newer release, during a deploy
-overlap or a rollback) are left alone for a copy that knows it.
+overlap or a rollback) are left alone for a copy that knows it. A runner logs them on its
+first pass only: finding them scans the table.
 
 An attempt is counted before the handler runs, so a crash or kill mid-handler still
 counts and an item that keeps crashing the process reaches the error state instead of
@@ -21,6 +22,7 @@ from typing import Any
 from sqlalchemy import Column, Integer, Row, Table, Text, select, update
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
+from engine.db import error_text, raise_if_cancelling
 from engine.notify import notify_operator
 
 log = logging.getLogger(__name__)
@@ -44,6 +46,8 @@ def stage_columns() -> list[Column[Any]]:
 
 @dataclass(frozen=True)
 class Stage:
+    """A named stage and the handler that does its work for one item."""
+
     name: str
     handler: StageHandler
 
@@ -63,41 +67,28 @@ class StageRunner:
         self._handlers = {stage.name: stage.handler for stage in stages}
         self._next = dict(zip(names, [*names[1:], DONE], strict=True))
         self._max_attempts = max_attempts
-        self._unknown_seen: set[str] = set()
+        self._checked_unknown = False
 
     async def run_once(self) -> int:
         """Take each unfinished item as far as it goes. Returns how many stages completed."""
         stage = self._table.c.stage
         async with self._db.connect() as conn:
-            pending = (
-                (
-                    await conn.execute(
-                        select(self._pk)
-                        .where(stage.in_(self._handlers))
-                        .order_by(self._pk)
-                        .limit(BATCH_SIZE)
-                    )
-                )
-                .scalars()
-                .all()
-            )
-            unknown = (
-                (
-                    await conn.execute(
-                        select(stage).distinct().where(stage.not_in([*FINAL, *self._handlers]))
-                    )
-                )
-                .scalars()
-                .all()
-            )
-        for name in set(unknown) - self._unknown_seen:
-            self._unknown_seen.add(name)
-            log.warning("%s has items at unknown stage %r; leaving them", self._table, name)
+            query = select(self._pk).where(stage.in_(self._handlers)).order_by(self._pk)
+            pending = (await conn.execute(query.limit(BATCH_SIZE))).scalars().all()
+            if not self._checked_unknown:
+                await self._log_unknown_stages(conn)
         completed = 0
         for item_id in pending:
             while await self._step(item_id):
                 completed += 1
         return completed
+
+    async def _log_unknown_stages(self, conn: AsyncConnection) -> None:
+        stage = self._table.c.stage
+        query = select(stage).distinct().where(stage.not_in([*FINAL, *self._handlers]))
+        for name in (await conn.execute(query)).scalars():
+            log.warning("%s has items at unknown stage %r; leaving them", self._table, name)
+        self._checked_unknown = True
 
     async def _step(self, item_id: Any) -> bool:
         """Run the item's current stage once. Returns whether it completed."""
@@ -129,7 +120,8 @@ class StageRunner:
                     .values(stage=self._next[stage], attempts=0, error=None)
                 )
         except Exception as exc:
-            reason = f"{stage}: {type(exc).__name__}: {exc}"
+            raise_if_cancelling()  # interrupted, not failed: the attempt is already counted
+            reason = f"{stage}: {error_text(exc)}"
             log.warning("%s %s attempt %d failed: %s", table.fullname, item_id, attempt, reason)
             if attempt >= self._max_attempts:
                 await self._fail(item_id, reason)
