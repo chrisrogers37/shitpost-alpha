@@ -40,14 +40,13 @@ def recorded_posts() -> dict[str, list[Post]]:
     }
 
 
-def replay_embedder(model_dir: Path | None = None) -> Embedder:
-    """The real model when its files are in `model_dir`, else the stub."""
-    if model_dir is not None:
-        try:
-            return OnnxEmbedder(load_pin(), model_dir)
-        except ModelMissing:
-            pass
-    return StubEmbedder()
+def replay_embedder(model_dir: Path) -> Embedder:
+    """The real model when its files are in `model_dir` (after `fetch-model`), else the
+    stub."""
+    try:
+        return OnnxEmbedder(load_pin(), model_dir)
+    except ModelMissing:
+        return StubEmbedder()
 
 
 @dataclass
@@ -58,7 +57,6 @@ class Replayed:
     feed: str
     stage: str
     scored: Scored | None
-    delivered: bool = False
 
 
 @dataclass
@@ -106,16 +104,14 @@ async def replay(
             feed_of.setdefault(post.key, feed)
 
     scored: dict[str, Scored] = {}
-    delivered: set[str] = set()
 
     def observe(result: Scored) -> None:
         scored[result.key] = result
         if deliver is not None:
             deliver(result)
-            delivered.add(result.key)
 
     picker = AiPicker(config, clients) if clients and config else None
-    scorer = Scorer(current_rules(), embedder, picker, config, CountsAll(), observe)
+    scorer = Scorer(current_rules(), embedder, picker, CountsAll(), observe)
     runner = StageRunner(db, signals, [Stage(SCORE, scorer.handle)], max_attempts=3)
     while await runner.run_once():
         pass
@@ -127,9 +123,6 @@ async def replay(
             ))).all()
         )  # fmt: skip
     return Replay(
-        [
-            Replayed(key, feed, stages[key], scored.get(key), key in delivered)
-            for key, feed in feed_of.items()
-        ],
+        [Replayed(key, feed, stages[key], scored.get(key)) for key, feed in feed_of.items()],
         store_seconds,
     )

@@ -12,7 +12,8 @@ precision/samples.csv:
   found the name (the rules' cashtags, tickers and names, and the AI's explicit links, are
   explicit; the AI's implied links are implied), recall by the label's kind.
 
---window-start splits the window group at a later start (B2 may move it). --spot-check
+--window-start splits the window group at a later start, a New York date like the rest of
+the engine's days (B2 may move it). --spot-check
 writes each post's id, text, labels and the pickers' output for reading by hand; it holds
 post text, so it goes outside the repo.
 """
@@ -24,7 +25,7 @@ import math
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from engine.db import make_engine
 from engine.extract.ai import current_ai_config
 from engine.extract.rules import current_rules
+from engine.market.instruments import NEW_YORK
 from engine.settings import Settings
 from engine.tables import extractions, instruments, signal_mentions, signals
 
@@ -194,7 +196,7 @@ async def measure(settings: Settings, window_start: date | None, spot_check: Pat
         raise SystemExit(f"{len(missing)} labelled posts aren't in this database")
 
     if window_start is not None:
-        start = datetime.combine(window_start, datetime.min.time(), UTC)
+        start = datetime.combine(window_start, datetime.min.time(), NEW_YORK)
         for key, group in list(groups.items()):
             if group == "window" and posts[key].posted_at < start:
                 groups[key] = f"window before {window_start}"

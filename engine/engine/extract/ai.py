@@ -11,13 +11,15 @@ Each call has a deadline (15 s). A model that errs, answers invalid JSON or miss
 deadline counts as failed: with one failed the other two must agree, with two or more
 failed the post takes the rules' answer and is marked ai_fallback. Batch runs retry rate
 limits and server errors with back-off; a deadline is never retried, since live it would
-be missed.
+be missed. An error no retry can fix (a bad key, a model id the provider doesn't know)
+is marked fatal, and `ai-pick` stops on it.
 """
 
 import asyncio
 import hashlib
 import json
 import logging
+import os
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
@@ -40,6 +42,7 @@ from engine.extract.rules import (
     RulesFileChanged,
     RulesPick,
     post_date,
+    unique_names,
 )
 from engine.market.instruments import COINS, STOCK_SYMBOL, AssetClass, normalize_alias
 from engine.settings import Settings
@@ -60,6 +63,14 @@ INDEX_FUNDS = frozenset({"SPY", "QQQ", "DIA", "IWM", "VOO", "IVV", "VTI", "RSP"}
 """Broad index funds: never a named instrument (SPY and QQQ come from the market link)."""
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504, 529})
 PER_MILLION = Decimal(1_000_000)
+SDK_HEADER_VARIABLES = (
+    "OPENAI_ORG_ID",
+    "OPENAI_PROJECT_ID",
+    "OPENAI_CUSTOM_HEADERS",
+    "ANTHROPIC_CUSTOM_HEADERS",
+)
+"""Read by the SDKs from the environment and sent as headers, to xAI too: the engine
+refuses to build a client while any is set."""
 
 
 class NotReady(RuntimeError):
@@ -68,6 +79,15 @@ class NotReady(RuntimeError):
 
 class InvalidAnswer(ValueError):
     """A model's answer isn't the JSON the schema asks for."""
+
+
+class FatalAnswer(RuntimeError):
+    """A model failed in a way no retry can fix (a bad key, an unknown model id)."""
+
+
+class CountCheckFailed(RuntimeError):
+    """Alpaca couldn't say whether a new ticker counts (keys missing, an error after
+    retries): the name is kept unmapped and the paid answers are still recorded."""
 
 
 # --- the version ---------------------------------------------------------------------
@@ -95,7 +115,6 @@ class Price:
 
 @dataclass(frozen=True)
 class ModelSpec:
-    provider: Provider
     model: str | None
     """A dated snapshot, never an alias. None until chosen (B2)."""
     price: Price | None
@@ -173,7 +192,7 @@ def load_ai_config(manifest: Path = MANIFEST) -> AiConfig:
         instructions=texts[data["prompt"]].strip(),
         schema=config["schema"],
         models={
-            name: ModelSpec(name, spec["model"], _price(spec.get("prices")), spec["temperature"])
+            name: ModelSpec(spec["model"], _price(spec.get("prices")), spec["temperature"])
             for name, spec in ((name, config["models"][name]) for name in PROVIDERS)
         },
         max_output_tokens=int(settings["max_output_tokens"]),
@@ -202,13 +221,15 @@ def current_ai_config() -> AiConfig:
 @dataclass(frozen=True)
 class Reply:
     """A provider's answer: its response body (never the request or its headers), the
-    text the model wrote and the tokens it billed. input_tokens includes cached ones."""
+    text the model wrote and the tokens it billed. input_tokens includes cached ones.
+    `problem` says why a billed reply can't be used (cut off, no content)."""
 
     body: dict[str, Any]
     text: str
     input_tokens: int
     cached_input_tokens: int
     output_tokens: int
+    problem: str | None = None
 
 
 class Client(Protocol):
@@ -242,7 +263,8 @@ class OpenAIChat:
             base_url=BASE_URLS[provider],
             timeout=timeout,
             max_retries=0,
-            http_client=http_client,
+            # A redirect is refused rather than followed with the key.
+            http_client=http_client or openai.DefaultAsyncHttpxClient(follow_redirects=False),
         )
 
     async def ask(
@@ -265,23 +287,23 @@ class OpenAIChat:
                 else openai.omit
             ),
         )
-        body = response.model_dump(mode="json")
         choice = response.choices[0] if response.choices else None
+        problem = None
         if choice is None or choice.message.content is None:
-            refusal = choice.message.refusal if choice else None
-            raise InvalidAnswer(f"no content (refusal: {refusal!r})")
-        if choice.finish_reason != "stop":
-            raise InvalidAnswer(f"stopped early: {choice.finish_reason}")
+            problem = f"no content (refusal: {choice.message.refusal if choice else None!r})"
+        elif choice.finish_reason != "stop":
+            problem = f"stopped early: {choice.finish_reason}"
         usage = response.usage
         cached = 0
         if usage and usage.prompt_tokens_details and usage.prompt_tokens_details.cached_tokens:
             cached = usage.prompt_tokens_details.cached_tokens
         return Reply(
-            body=body,
-            text=choice.message.content,
+            body=response.model_dump(mode="json"),
+            text=(choice.message.content if choice else None) or "",
             input_tokens=usage.prompt_tokens if usage else 0,
             cached_input_tokens=cached,
             output_tokens=usage.completion_tokens if usage else 0,
+            problem=problem,
         )
 
 
@@ -307,7 +329,8 @@ class AnthropicMessages:
             base_url=BASE_URLS["anthropic"],
             timeout=timeout,
             max_retries=0,
-            http_client=http_client,
+            # The SDK's default follows a redirect to any host with x-api-key still set.
+            http_client=http_client or anthropic.DefaultAsyncHttpxClient(follow_redirects=False),
         )
 
     async def ask(
@@ -328,25 +351,26 @@ class AnthropicMessages:
                 else anthropic.omit
             ),
         )
-        body = response.model_dump(mode="json")
-        if response.stop_reason != "end_turn":
-            raise InvalidAnswer(f"stopped early: {response.stop_reason}")
-        text = "".join(block.text for block in response.content if block.type == "text")
         usage = response.usage
         cached = usage.cache_read_input_tokens or 0
         written = usage.cache_creation_input_tokens or 0
         return Reply(
-            body=body,
-            text=text,
+            body=response.model_dump(mode="json"),
+            text="".join(block.text for block in response.content if block.type == "text"),
             input_tokens=usage.input_tokens + cached + written,
             cached_input_tokens=cached,
             output_tokens=usage.output_tokens,
+            problem=None
+            if response.stop_reason == "end_turn"
+            else f"stopped early: {response.stop_reason}",
         )
 
 
 def build_clients(settings: Settings, config: AiConfig) -> dict[str, Client]:
     """A client for each provider whose ENGINE_ key is set and whose model is pinned.
     Without keys this is empty and nothing is built."""
+    if found := [name for name in SDK_HEADER_VARIABLES if os.environ.get(name) is not None]:
+        raise NotReady(f"{', '.join(found)} set: the SDKs would send it to every provider")
     clients: dict[str, Client] = {}
     keys = settings.ai_keys
     for provider in PROVIDERS:
@@ -370,6 +394,22 @@ def scrubbed(text: str, secrets: Sequence[str]) -> str:
         if secret:
             text = text.replace(secret, "[key]")
     return text
+
+
+FATAL = (
+    openai.AuthenticationError,
+    openai.PermissionDeniedError,
+    openai.NotFoundError,
+    openai.BadRequestError,
+    openai.UnprocessableEntityError,
+    anthropic.AuthenticationError,
+    anthropic.PermissionDeniedError,
+    anthropic.NotFoundError,
+    anthropic.BadRequestError,
+    anthropic.UnprocessableEntityError,
+)
+"""Errors no retry can fix: a wrong or revoked key, a model id the provider doesn't
+know, a request it refuses. Every post would fail the same way."""
 
 
 def _retryable(exc: BaseException) -> bool:
@@ -403,6 +443,9 @@ class ModelAnswer:
     items: tuple[Item, ...] = ()
     error: str | None = None
     cost: Decimal | None = None
+    """Whenever a reply was billed, valid or not."""
+    fatal: bool = False
+    """The error is one no retry can fix (FATAL)."""
 
     @property
     def ok(self) -> bool:
@@ -458,46 +501,62 @@ async def ask_model(
     clock: Clock = _now,
     backoff_seconds: float = 2.0,
 ) -> ModelAnswer:
-    """One model's answer to one post. Never raises: a failure is the answer's error."""
+    """One model's answer to one post. Never raises: a failure is the answer's error. A
+    billed reply keeps its body, tokens and cost even when it can't be used."""
     started = clock()
     attempt = 0
+    fatal = False
     while True:
         try:
             async with asyncio.timeout(config.timeout_seconds):
                 reply = await client.ask(
                     config.instructions, user, config.schema, config.max_output_tokens
                 )
-            market_link, items = parse_answer(
-                reply.text, config.max_instruments, config.why_max_chars
-            )
         except TimeoutError:
             error = f"timeout after {config.timeout_seconds:g} s"
-        except InvalidAnswer as exc:
-            error = f"invalid answer: {exc}"
         except Exception as exc:
             if attempt < retries and _retryable(exc):
                 attempt += 1
                 await asyncio.sleep(backoff_seconds * 2 ** (attempt - 1))
                 continue
             error = scrubbed(f"{type(exc).__name__}: {exc}", secrets)
+            fatal = isinstance(exc, FATAL)
         else:
-            price = config.models[client.provider].price
-            tokens = (reply.input_tokens, reply.cached_input_tokens, reply.output_tokens)
-            cost = price.cost(*tokens) if price is not None else None
-            finished = clock()
-            return ModelAnswer(
-                client.provider, client.model, started, finished, reply, market_link, tuple(items),
-                cost=cost,
-            )  # fmt: skip
+            return _answered(client, config, reply, started, clock())
         log.warning("%s (%s) failed: %s", client.provider, client.model, error)
-        return ModelAnswer(client.provider, client.model, started, clock(), error=error)
+        return ModelAnswer(
+            client.provider, client.model, started, clock(), error=error, fatal=fatal
+        )
+
+
+def _answered(
+    client: Client, config: AiConfig, reply: Reply, started: datetime, finished: datetime
+) -> ModelAnswer:
+    price = config.models[client.provider].price
+    tokens = (reply.input_tokens, reply.cached_input_tokens, reply.output_tokens)
+    cost = price.cost(*tokens) if price is not None else None
+    try:
+        if reply.problem:
+            raise InvalidAnswer(reply.problem)
+        market_link, items = parse_answer(reply.text, config.max_instruments, config.why_max_chars)
+    except InvalidAnswer as exc:
+        error = f"invalid answer: {exc}"
+        log.warning("%s (%s) failed: %s", client.provider, client.model, error)
+        return ModelAnswer(
+            client.provider, client.model, started, finished, reply, error=error, cost=cost
+        )
+    return ModelAnswer(
+        client.provider, client.model, started, finished, reply, market_link, tuple(items),
+        cost=cost,
+    )  # fmt: skip
 
 
 # --- mapping names to instruments --------------------------------------------------------
 
-NewTicker = Callable[[str, str, AssetClass, datetime], Awaitable[Listed | None]]
-"""Adds a ticker that isn't an instrument yet if it counts at the post's time: (ticker,
-name, asset class, post time) -> the new instrument, or None if it doesn't count."""
+NewTicker = Callable[[str, AssetClass, datetime], Awaitable[Listed | None]]
+"""Checks with Alpaca that a ticker counts at the post's time (PR 3's rule) and returns its
+instrument, adding it if it isn't one yet: (ticker, asset class, post time) -> the
+instrument, or None if it doesn't count. Raises CountCheckFailed when Alpaca can't say."""
 
 
 async def map_item(
@@ -529,20 +588,28 @@ async def map_item(
     if item.asset != "coin" and not STOCK_SYMBOL.fullmatch(ticker):
         return unmapped("not_a_us_ticker")
     instrument_id = book.ticker(ticker, on)
-    if instrument_id is not None:
-        if not book.rules.collisions.mention_counts(ticker, cashtag=False) and (
-            instrument_id not in named
-        ):
+    if instrument_id is None and book.knows_ticker(ticker):
+        return unmapped("not_listed_then")  # an instrument's ticker, but not on that day
+    collision = not book.rules.collisions.mention_counts(ticker, cashtag=False)
+    if instrument_id is not None and instrument_id in book.reviewed:
+        if collision and instrument_id not in named:
             return unmapped("collision_without_name")
         return mapped(instrument_id)
+    # A ticker no rules version has reviewed: it counts only if Alpaca says it does on
+    # the post's day, whether or not an earlier post made it an instrument.
     if add_new is None:
-        return unmapped("not_an_instrument")
-    if not book.rules.collisions.mention_counts(ticker, cashtag=False):
+        return unmapped("not_an_instrument" if instrument_id is None else "not_checked")
+    if collision:
         return unmapped("collision_without_name")
-    listed = await add_new(ticker, item.name, item.asset, posted_at)
+    try:
+        listed = await add_new(ticker, item.asset, posted_at)
+    except CountCheckFailed as exc:
+        log.warning("%s: %s", ticker, exc)
+        return unmapped("count_check_failed")
     if listed is None:
         return unmapped("does_not_count")
-    book.add(listed)
+    if instrument_id is None:
+        book.add(listed)
     return mapped(listed.id)
 
 
@@ -608,7 +675,7 @@ def vote(
                 by_instrument.setdefault(mention.instrument_id, []).append(mention)
             else:
                 by_name.setdefault(mention.normalized, []).append(mention)
-    mentions = []
+    mentions: list[Mention] = []
     for instrument_id, named in by_instrument.items():
         explicit = sum(m.found_by == "ai_explicit" for m in named)
         first = named[0]
@@ -631,7 +698,10 @@ def vote(
                 models=len(named),
             )
         )  # fmt: skip
-    return Vote(market_link, tuple(mentions), len(ok), fallback=False)
+    # One mention per name: a model that gave a counted name without its ticker must not
+    # replace the counted mention with its unmapped one.
+    mentions.sort(key=lambda m: (not m.counted, m.instrument_id is None, -(m.models or 0)))
+    return Vote(market_link, unique_names(mentions), len(ok), fallback=False)
 
 
 # --- one post ------------------------------------------------------------------------------
@@ -712,15 +782,19 @@ class AiPick:
 class AiPicker:
     config: AiConfig
     clients: dict[str, Client]
-    secrets: Sequence[str] = field(default_factory=tuple)
+    secrets: Sequence[str] = field(default_factory=tuple, repr=False)
     clock: Clock = _now
 
     @classmethod
-    def from_settings(cls, settings: Settings, config: AiConfig) -> "AiPicker | None":
-        """None (the AI picker is off) when no ENGINE_ AI key is set."""
+    def from_settings(cls, settings: Settings, config: AiConfig) -> "AiPicker":
+        """The picker with all three models. NotReady says why there is none: the version
+        isn't complete, or a key is missing (with fewer than three models every post
+        would fall back or need the two to agree, and still be paid for)."""
+        if problems := config.problems():
+            raise NotReady(f"AI picker version {config.version} isn't ready: {'; '.join(problems)}")
         clients = build_clients(settings, config)
-        if not clients:
-            return None
+        if missing := [f"ENGINE_{p.upper()}_KEY" for p in PROVIDERS if p not in clients]:
+            raise NotReady(f"not set: {', '.join(missing)}")
         return cls(config, clients, tuple(settings.ai_keys.values()))
 
     async def pick(
@@ -756,7 +830,7 @@ class AiPicker:
         mapped: dict[str, tuple[Mention, ...]] = {}
         for answer in answers:
             if answer.ok:
-                mapped[answer.provider] = tuple(
+                mapped[answer.provider] = unique_names(
                     [await map_item(book, item, posted_at, add_new) for item in answer.items]
                 )
         result = vote(answers, mapped, rules)

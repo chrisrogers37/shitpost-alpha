@@ -5,9 +5,10 @@ picker's answers and vote. Then the post moves to `done` (PR 6 adds the alert st
 History never goes through this stage: `python -m engine extract`, `embed` and `ai-pick`
 process it in batch.
 
-The model files are loaded when the worker starts. If they are missing the worker fails
-with a clear error (and the operator message every failed worker sends), and posts wait at
-`score` until a deploy with the files picks them up.
+The model files and the names are checked when the worker starts. If the files are
+missing or `sync-names` hasn't run, the worker fails with a clear error (and the operator
+message every failed worker sends), and posts wait at `score` until a fixed deploy picks
+them up.
 """
 
 import asyncio
@@ -19,17 +20,28 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+import httpx
 from sqlalchemy import Row, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from engine.extract.ai import AiConfig, AiPick, AiPicker, NewTicker, PostText, current_ai_config
+from engine.extract.ai import (
+    AiConfig,
+    AiPick,
+    AiPicker,
+    CountCheckFailed,
+    FatalAnswer,
+    NewTicker,
+    NotReady,
+    PostText,
+    current_ai_config,
+)
 from engine.extract.names import load_book
 from engine.extract.records import record, rules_extraction
-from engine.extract.rules import Listed, Rules, RulesPick, current_rules, pick
+from engine.extract.rules import Listed, NameBook, Rules, RulesPick, current_rules, pick
 from engine.extract.similarity import Embedded, Embedder, load_embedder, text_hash
 from engine.feeds.store import SCORE
-from engine.market.alpaca import Alpaca
+from engine.market.alpaca import Alpaca, AlpacaError
 from engine.market.instruments import AssetClass, DoesNotCount, Listings, add_instrument
 from engine.registry import EngineContext, WorkerFunc
 from engine.settings import Settings
@@ -41,13 +53,20 @@ log = logging.getLogger(__name__)
 
 
 def new_ticker_adder(conn: AsyncConnection, listings: Listings) -> NewTicker:
-    """Adds a ticker an AI model named if it counts at the post's time (PR 3's rule)."""
+    """Checks a ticker an AI model named counts at the post's time (PR 3's rule), and adds
+    it if it isn't an instrument yet. The new instrument's name is its ticker: a model's
+    name can be a description ("US steel makers"), and the web reads this table."""
 
-    async def add(ticker: str, name: str, asset: AssetClass, at: datetime) -> Listed | None:
+    async def add(ticker: str, asset: AssetClass, at: datetime) -> Listed | None:
         try:
-            added = await add_instrument(conn, listings, ticker, name, asset, at)
+            if not await listings.counts(ticker, asset, at):
+                return None
+            added = await add_instrument(conn, listings, ticker, ticker.upper(), asset, at)
         except DoesNotCount:
             return None
+        except (AlpacaError, httpx.HTTPError) as exc:
+            problem = f"{type(exc).__name__}: {exc}"
+            raise CountCheckFailed(f"couldn't check it counts: {problem}") from exc
         return Listed(added.id, added.symbol, added.name, added.asset_class)
 
     return add
@@ -71,6 +90,17 @@ async def store_embedding(
     )
 
 
+async def record_rules(
+    conn: AsyncConnection, book: NameBook, key: str, words: str, posted_at: datetime
+) -> RulesPick:
+    """The rules' answer for one post, recorded (once per rules version)."""
+    started = datetime.now(UTC)
+    rules_pick = pick(book, words, posted_at)
+    finished = datetime.now(UTC)
+    await record(conn, key, posted_at, rules_extraction(rules_pick, started, finished))
+    return rules_pick
+
+
 async def quoted_words(conn: AsyncConnection, row: Row[Any]) -> str | None:
     """The words of the post a quote points to, when the engine has that post."""
     if row.kind != "quote" or not row.points_to:
@@ -84,20 +114,23 @@ async def quoted_words(conn: AsyncConnection, row: Row[Any]) -> str | None:
 async def record_ai(
     conn: AsyncConnection,
     row: Row[Any],
-    rules: Rules,
-    config: AiConfig,
+    book: NameBook,
+    post: PostText,
     ai: AiPicker,
     rules_pick: RulesPick,
     add_new: NewTicker | None,
     *,
     run: int = 1,
     retries: int = 0,
+    stop_on_fatal: bool = False,
 ) -> AiPick:
-    """Ask the AI picker about one post and record its answers and vote."""
-    book = await load_book(conn, rules)
-    post = PostText(normalize(row.text), await quoted_words(conn, row))
+    """Ask the AI picker about one post and record its answers and vote. With
+    `stop_on_fatal`, an error no retry can fix raises FatalAnswer before anything is
+    recorded, so a fixed rerun asks that post again."""
     answer = await ai.pick(book, post, row.posted_at, rules_pick, add_new, retries=retries)
-    for extraction in answer.extractions(book, config, run):
+    if stop_on_fatal and (fatal := [a for a in answer.answers if a.fatal]):
+        raise FatalAnswer("; ".join(f"{a.provider} ({a.model}): {a.error}" for a in fatal))
+    for extraction in answer.extractions(book, ai.config, run):
         await record(conn, row.key, row.posted_at, extraction)
     return answer
 
@@ -118,7 +151,6 @@ class Scorer:
     rules: Rules
     embedder: Embedder
     ai: AiPicker | None = None
-    ai_config: AiConfig | None = None
     listings: Listings | None = None
     observe: Callable[[Scored], None] | None = None
     """Called with each post's outputs after its stage work (the replay harness)."""
@@ -128,10 +160,8 @@ class Scorer:
         seconds: dict[str, float] = {}
         clock = time.perf_counter()
 
-        started = datetime.now(UTC)
-        book = await load_book(conn, self.rules)
-        rules_pick = pick(book, row.text, row.posted_at)
-        await record(conn, row.key, row.posted_at, rules_extraction(rules_pick, started, started))
+        book = await load_book(conn, self.rules, check=False)  # checked at worker start
+        rules_pick = await record_rules(conn, book, row.key, row.text, row.posted_at)
         seconds["rules"], clock = time.perf_counter() - clock, time.perf_counter()
 
         words = normalize(row.text)
@@ -141,35 +171,30 @@ class Scorer:
         seconds["embedding"], clock = time.perf_counter() - clock, time.perf_counter()
 
         ai_pick = None
-        if self.ai is not None and self.ai_config is not None:
+        if self.ai is not None:
             adder = new_ticker_adder(conn, self.listings) if self.listings else None
-            ai_pick = await record_ai(
-                conn, row, self.rules, self.ai_config, self.ai, rules_pick, adder
-            )
+            post = PostText(words, await quoted_words(conn, row))
+            ai_pick = await record_ai(conn, row, book, post, self.ai, rules_pick, adder)
             seconds["ai"] = time.perf_counter() - clock
         if self.observe:
             self.observe(Scored(row.key, rules_pick, bool(words), ai_pick, seconds))
 
 
-def live_ai(settings: Settings) -> tuple[AiPicker | None, AiConfig | None]:
-    """The AI picker for the live stage: off unless ENGINE_AI_LIVE is on and keys are set."""
+def live_ai(settings: Settings, config: AiConfig | None = None) -> AiPicker | None:
+    """The AI picker for the live stage: off unless ENGINE_AI_LIVE is on and the version
+    and all three keys are ready."""
     if not settings.ai_live:
-        return None, None
-    config = current_ai_config()
-    if problems := config.problems():
-        log.warning("ENGINE_AI_LIVE is on but AI picker version %d isn't ready: %s; AI off",
-                    config.version, "; ".join(problems))  # fmt: skip
-        return None, None
-    picker = AiPicker.from_settings(settings, config)
-    if picker is None:
-        log.warning("ENGINE_AI_LIVE is on but no ENGINE_ AI key is set; the AI picker is off")
-        return None, None
-    return picker, config
+        return None
+    try:
+        return AiPicker.from_settings(settings, config or current_ai_config())
+    except NotReady as exc:
+        log.warning("ENGINE_AI_LIVE is on but the AI picker is off: %s", exc)
+        return None
 
 
 def score_worker(
     embedder_loader: Callable[[Settings], Embedder] = load_embedder,
-    ai_loader: Callable[[Settings], tuple[AiPicker | None, AiConfig | None]] = live_ai,
+    ai_loader: Callable[[Settings], AiPicker | None] = live_ai,
     observe: Callable[[Scored], None] | None = None,
 ) -> WorkerFunc:
     """The worker build_registry() registers. Tests pass stub loaders."""
@@ -177,12 +202,15 @@ def score_worker(
     async def run(ctx: EngineContext) -> None:
         settings = ctx.settings
         embedder = await asyncio.to_thread(embedder_loader, settings)  # ModelMissing: fail here
-        ai, config = ai_loader(settings)
+        rules = current_rules()
+        async with ctx.db.connect() as conn:
+            await load_book(conn, rules)  # NamesNotSynced: fail here, not on every post
+        ai = ai_loader(settings)
         async with AsyncExitStack() as stack:
             listings = None
             if ai is not None and settings.alpaca_keys is not None:
                 listings = Listings(await stack.enter_async_context(Alpaca(settings)))
-            scorer = Scorer(current_rules(), embedder, ai, config, listings, observe)
+            scorer = Scorer(rules, embedder, ai, listings, observe)
             runner = StageRunner(
                 ctx.db, signals, [Stage(SCORE, scorer.handle)], max_attempts=settings.max_attempts
             )

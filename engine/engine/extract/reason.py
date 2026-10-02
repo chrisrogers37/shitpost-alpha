@@ -2,8 +2,9 @@
 the instruments it names. One designated model writes it (ai.json's "reason"; by default
 the pinned Anthropic model). It decides nothing: the alert is already decided when it is
 asked. A rule check rejects a line that states a direction, a price, a target or advice,
-or that is too long; on a rejection, an error or a 15 s timeout there is no line and the
-alert goes out without one. PR 6 calls it."""
+a number the post doesn't have, or that is too long. It fails closed: on a rejection, an
+error, a cut-off reply or a 15 s timeout there is no line and the alert goes out without
+one. PR 6 calls it."""
 
 import asyncio
 import logging
@@ -20,15 +21,20 @@ DIRECTION = re.compile(
     r"gain\w*|lose[sr]?|losing|loss\w*|climb\w*|sink\w*|sank|slump\w*|spik\w*|boost\w*|"
     r"hurt\w*|lift\w*|weigh\w*|rebound\w*|outperform\w*|underperform\w*|target\w*|"
     r"recommend\w*|advi[cs]e\w*|should|opportunit\w*|positive|negative|"
+    r"up|down|higher|lower|increas\w*|decreas\w*|rais\w*|doubl\w*|halv\w*|benefit\w*|"
+    r"declin\w*|pressur\w*|headwind\w*|tailwind\w*|strengthen\w*|weaken\w*|outpac\w*|"
+    r"(?:good|bad|great|terrible)\s+(?:news\s+)?for|watch|investors?|"
     r"(?:stock|share)\s+prices?|price\s+target\w*)\b",
     re.IGNORECASE,
 )
 """Words that state a direction, a price, a target or advice."""
 MONEY_OR_PERCENT = re.compile(r"[$%€£]|\bpercent\b|\bbps\b", re.IGNORECASE)
+NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
 
 
-def check_reason(line: str, max_chars: int) -> str | None:
-    """Why `line` is rejected, or None if it passes."""
+def check_reason(line: str, max_chars: int, words: str) -> str | None:
+    """Why `line` is rejected, or None if it passes. `words` is the post: a number the
+    line has must be one the post has (a price or a level the model made up is not)."""
     if not line:
         return "empty"
     if "\n" in line or "\r" in line:
@@ -39,6 +45,8 @@ def check_reason(line: str, max_chars: int) -> str | None:
         return f"states a direction, price, target or advice: {found.group(0)!r}"
     if found := MONEY_OR_PERCENT.search(line):
         return f"states an amount: {found.group(0)!r}"
+    if made_up := set(NUMBER.findall(line)) - set(NUMBER.findall(words)):
+        return f"states a number the post doesn't have: {', '.join(sorted(made_up))}"
     return None
 
 
@@ -68,8 +76,11 @@ async def reason_line(
     except Exception as exc:
         log.warning("reason line: %s", scrubbed(f"{type(exc).__name__}: {exc}", secrets))
         return None
+    if reply.problem:
+        log.warning("reason line: %s", reply.problem)
+        return None
     line = reply.text.strip()
-    if problem := check_reason(line, spec.max_chars):
+    if problem := check_reason(line, spec.max_chars, words):
         log.warning("reason line rejected (%s): %r", problem, line)
         return None
     return line

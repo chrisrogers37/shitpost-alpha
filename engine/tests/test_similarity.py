@@ -58,11 +58,19 @@ def test_matching_excludes_the_post_itself_and_later_posts() -> None:
     assert scores == sorted(scores, reverse=True)
 
 
+def test_a_post_made_at_the_same_moment_is_not_a_match() -> None:
+    vectors = unit_rows(3)
+    index = Similarity(["a", "b", "c"], [T0, T0 + timedelta(hours=1), T0], vectors)
+    found = index.similar("new", vectors[0], before=T0 + timedelta(hours=1), min_score=-1.0)
+    assert {m.key for m in found} == {"a", "c"}
+    assert index.similar("new", vectors[0], before=T0, min_score=-1.0) == []
+
+
 def test_matching_returns_at_most_50_best_first() -> None:
     vectors = unit_rows(300)
     index = Similarity([f"k{n}" for n in range(300)], [T0] * 300, vectors)
     query = vectors[7]
-    found = index.similar("new", query, before=T0 + timedelta(seconds=1))
+    found = index.similar("new", query, before=T0 + timedelta(seconds=1), min_score=-1.0)
     expected = np.argsort(-(vectors @ query), kind="stable")[:50]
     assert [m.key for m in found] == [f"k{n}" for n in expected]
     assert found[0].key == "k7" and found[0].score == pytest.approx(1.0, abs=1e-5)
@@ -74,7 +82,7 @@ def test_matching_applies_the_threshold() -> None:
     found = index.similar("new", vectors[0], before=T0 + timedelta(1), min_score=0.6)
     assert found and all(m.score >= 0.6 for m in found)
     assert len(found) == min(50, int(((vectors @ vectors[0]) >= 0.6).sum()))
-    assert Similarity([], [], np.zeros((0, 8))).similar("x", vectors[0], before=T0) == []
+    assert Similarity([], [], np.zeros((0, 8))).similar("x", vectors[0], T0, 0.0) == []
 
 
 def test_matching_40k_vectors_takes_well_under_100_ms() -> None:
@@ -83,11 +91,11 @@ def test_matching_40k_vectors_takes_well_under_100_ms() -> None:
     times = [T0 + timedelta(minutes=n) for n in range(count)]
     index = Similarity([f"k{n}" for n in range(count)], times, vectors)
     query = vectors[123]
-    index.similar("k123", query, before=times[-1])  # warm up
+    index.similar("k123", query, before=times[-1], min_score=-1.0)  # warm up
     timings = []
     for _ in range(5):
         started = time.perf_counter()
-        found = index.similar("k123", query, before=times[-1], k=50)
+        found = index.similar("k123", query, before=times[-1], min_score=-1.0)
         timings.append(time.perf_counter() - started)
     assert len(found) == 50
     assert min(timings) < 0.1, f"best of five took {min(timings) * 1000:.0f} ms"
@@ -134,6 +142,7 @@ def hugging_face(files: dict[str, bytes], asked: list[str]) -> httpx.MockTranspo
 
     def route(request: httpx.Request) -> httpx.Response:
         asked.append(str(request.url))
+        assert request.headers["user-agent"].startswith("shitpost-alpha")
         path = request.url.path
         if request.url.host == "huggingface.co":
             name = path.split("/resolve/abc123/", 1)[1]

@@ -3,7 +3,7 @@ counts" check, and a quick way to fill the name tables."""
 
 import hashlib
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -22,17 +22,23 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 class CountsAll(Listings):
-    """Every stock counts, except those in `not_listed` (no Alpaca calls)."""
+    """Every stock counts, except those in `not_listed` and those in `listed_from` before
+    that time (no Alpaca calls). `asked` keeps each (symbol, time) asked about."""
 
-    def __init__(self, not_listed: Sequence[str] = ()) -> None:
+    def __init__(
+        self, not_listed: Sequence[str] = (), listed_from: Mapping[str, datetime] | None = None
+    ) -> None:
         self.not_listed = {s.upper() for s in not_listed}
-        self.asked: list[str] = []
+        self.listed_from = dict(listed_from or {})
+        self.asked: list[tuple[str, datetime]] = []
 
     async def counts(self, symbol: str, asset_class: AssetClass, at: datetime) -> bool:
-        self.asked.append(symbol.upper())
+        symbol = symbol.upper()
+        self.asked.append((symbol, at))
         if asset_class == "coin":
-            return symbol.upper() in ("BTC", "ETH")
-        return symbol.upper() not in self.not_listed
+            return symbol in ("BTC", "ETH")
+        since = self.listed_from.get(symbol)
+        return symbol not in self.not_listed and (since is None or at >= since)
 
 
 async def sync_names(db: AsyncEngine) -> None:
@@ -85,6 +91,7 @@ class StubClient:
     fail: Exception | None = None
     delay: float = 0.0
     output_tokens: int = 100
+    problem: str | None = None
     asked: list[str] = field(default_factory=list)
 
     async def ask(
@@ -100,7 +107,10 @@ class StubClient:
         words = user.removeprefix("Post:\n").split("\n\nQuoted post:\n")[0]
         text = self.answers.get(words, self.default)
         body = {"id": "stub", "content": text}
-        return Reply(body, text, 1000, cached_input_tokens=0, output_tokens=self.output_tokens)
+        return Reply(
+            body, text, 1000, cached_input_tokens=0, output_tokens=self.output_tokens,
+            problem=self.problem,
+        )  # fmt: skip
 
 
 def stub_clients(**answers: dict[str, str]) -> dict[str, Client]:
@@ -118,6 +128,6 @@ def ready_config(**changes: Any) -> AiConfig:
     base = current_ai_config()
     price = Price(Decimal(2), Decimal("0.5"), Decimal(8), date(2026, 10, 2))
     models: dict[str, ModelSpec] = {
-        name: ModelSpec(name, f"{name}-test-2025", price, 0.0) for name in PROVIDERS
+        name: ModelSpec(f"{name}-test-2025", price, 0.0) for name in PROVIDERS
     }
     return replace(base, models=models, **changes)

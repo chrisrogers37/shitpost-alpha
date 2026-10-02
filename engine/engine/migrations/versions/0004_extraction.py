@@ -84,6 +84,14 @@ def upgrade() -> None:
         ["instrument_id", "posted_at"],
         schema="engine",
     )
+    # The score stage polls for unfinished signals every second; most rows are done.
+    op.create_index(
+        "signals_unfinished_idx",
+        "signals",
+        ["key"],
+        schema="engine",
+        postgresql_where=sa.text("stage NOT IN ('done', 'error')"),
+    )
     op.create_table(
         "signal_embeddings",
         sa.Column("signal_key", sa.Text, sa.ForeignKey("engine.signals.key"), nullable=False),
@@ -103,6 +111,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("signal_embeddings", schema="engine")
+    op.drop_index("signals_unfinished_idx", table_name="signals", schema="engine")
     op.drop_index(
         "signal_mentions_instrument_id_posted_at_idx", table_name="signal_mentions", schema="engine"
     )

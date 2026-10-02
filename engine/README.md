@@ -181,18 +181,26 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
   `market/collisions.json`) are pinned by SHA-256 in `extract/rules.json` with one version
   number; changing any of them means bumping the version and the hashes, or loading
   refuses. Collision tickers (`BA`, `SPY`, ...) count only as a cashtag or through a name.
+  A bare ticker counts only for an instrument a rules version reviewed (aliases.json's and
+  the seeded SPY, QQQ, BTC, ETH); one the AI added counts only as a cashtag until then.
   Name and old-ticker dates come from the database, so run `sync-names` after changing
   aliases.json. A post's date is its New York date.
 - **AI picker** (`engine/extract/ai.py`): the same post to three pinned models (OpenAI,
   xAI, Anthropic) side by side; a name or a market link counts when two agree, and with
   fewer than two answers the rules stand in (`ai_fallback`). Its prompt, schema and
   models are pinned the same way in `extract/ai.json`. Keys only from
-  `ENGINE_OPENAI_KEY`, `ENGINE_XAI_KEY` and `ENGINE_ANTHROPIC_KEY`: no key, no client.
-  Live posts go to it only with `ENGINE_AI_LIVE=true`. `ai-pick` prints the projected
-  cost first, refuses a run over `--max-usd` and stops once a run has cost more.
+  `ENGINE_OPENAI_KEY`, `ENGINE_XAI_KEY` and `ENGINE_ANTHROPIC_KEY`, and it needs all
+  three. Clients never follow a redirect; `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID`,
+  `OPENAI_CUSTOM_HEADERS` and `ANTHROPIC_CUSTOM_HEADERS` must not be set (the SDKs would
+  send them to every provider). A ticker no rules version reviewed counts only if Alpaca
+  says it counts on the post's day, so `ai-pick` without Alpaca keys leaves such names
+  unmapped. Live posts go to it only with `ENGINE_AI_LIVE=true`. `ai-pick` prints the
+  projected cost first, refuses a run over `--max-usd` (this run) or `--max-total-usd`
+  (everything recorded so far), stops once either is passed, stops with the post
+  unrecorded on a bad key or an unknown model, and runs one at a time.
 - **Reason line** (`engine/extract/reason.py`): one line of at most 120 characters on why
-  a post may matter, checked so it states no direction, price, target or advice. PR 6
-  calls it.
+  a post may matter, checked so it states no direction, price, target or advice and no
+  number the post doesn't have. PR 6 calls it.
 - **Similarity** (`engine/extract/similarity.py`): BAAI/bge-small-en-v1.5 from its ONNX
   file on the CPU (onnxruntime and tokenizers, no torch), pinned in `extract/model.json`
   and downloaded with `fetch-model` into `ENGINE_MODEL_DIR` (from huggingface.co and
@@ -201,8 +209,8 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
   set by reading pairs (`scripts/match_rule.py`) and must be read again for a new model.
 - **Live stage**: the `score` worker gives each new text post its rules answer, mentions,
   vector and, with the AI on, the three answers and the vote, then moves it to `done`.
-  It loads the model when it starts and fails clearly (posts wait at `score`) if the
-  files aren't there. History never goes through this stage.
+  It loads the model and checks the names are synced when it starts, and fails clearly
+  (posts wait at `score`) if either isn't so. History never goes through this stage.
 
 Labels and samples for measuring the pickers are in `precision/`
 (`scripts/precision.py` scores them; `scripts/history_report.py` sums the rules over all

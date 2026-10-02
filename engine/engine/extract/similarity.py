@@ -26,6 +26,7 @@ import numpy.typing as npt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from engine.http_client import USER_AGENT
 from engine.settings import Settings
 from engine.tables import signal_embeddings, signals
 
@@ -184,8 +185,13 @@ def fetch_model(
         raise ModelMissing(f"the similarity model isn't pinned yet: {'; '.join(problems)}")
     directory = pin.directory(settings.model_dir)
     hosts: set[str] = set()
+    # Not make_client: the hub redirects every file to its CDN (no key is sent), and the
+    # model is a large download, so it takes the CNN archive's download timeout.
     with httpx.Client(
-        follow_redirects=True, timeout=settings.cnn_download_timeout_seconds, transport=transport
+        headers={"User-Agent": USER_AGENT},
+        follow_redirects=True,
+        timeout=settings.cnn_download_timeout_seconds,
+        transport=transport,
     ) as client:
         for path, digest in pin.files.items():
             target = directory / path
@@ -238,10 +244,11 @@ class Similarity:
         self.vectors = np.ascontiguousarray(vectors, dtype=np.float32)
 
     def similar(
-        self, key: str, vector: Vector, before: datetime, k: int = 50, min_score: float = 0.0
+        self, key: str, vector: Vector, before: datetime, min_score: float, k: int = 50
     ) -> list[Match]:
         """Up to `k` posts made before `before` scoring at least `min_score` against
-        `vector`, best first. The post itself (`key`) is never one of them."""
+        `vector`, best first. The post itself (`key`) is never one of them. Callers pass
+        the match rule's threshold and its 50; only the pair-reading script asks for more."""
         if not len(self.keys):
             return []
         scores = self.vectors @ np.asarray(vector, dtype=np.float32)

@@ -6,7 +6,6 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection
 
@@ -85,6 +84,9 @@ async def record(
     ).scalar()
     if extraction_id is None or answer.run != 1 or not answer.mentions:
         return extraction_id
+    names = [m.normalized for m in answer.mentions]
+    if len(set(names)) != len(names):
+        raise ValueError(f"{answer.method} answer for {signal_key} names one thing twice: {names}")
     rows = [
         {
             "extraction_id": extraction_id,
@@ -99,21 +101,7 @@ async def record(
             "counted": m.counted,
             "posted_at": posted_at,
         }
-        for m in {m.normalized: m for m in answer.mentions}.values()
+        for m in answer.mentions
     ]
     await conn.execute(insert(signal_mentions).values(rows))
     return extraction_id
-
-
-async def has_extraction(
-    conn: AsyncConnection, signal_key: str, method: str, version: int, run: int = 1
-) -> bool:
-    found = await conn.execute(
-        select(extractions.c.id).where(
-            extractions.c.signal_key == signal_key,
-            extractions.c.method == method,
-            extractions.c.version == version,
-            extractions.c.run == run,
-        )
-    )
-    return found.first() is not None

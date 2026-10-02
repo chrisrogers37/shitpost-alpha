@@ -6,26 +6,32 @@ import time
 from collections.abc import Callable, Sequence
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from datetime import time as day_time
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import Row, and_, exists, func, or_, select
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from engine.db import make_engine
 from engine.extract.ai import (
     AiConfig,
     AiPicker,
+    FatalAnswer,
     NotReady,
     PostText,
     current_ai_config,
 )
 from engine.extract.names import load_book
-from engine.extract.records import record, rules_extraction
-from engine.extract.rules import current_rules, pick
-from engine.extract.score import new_ticker_adder, quoted_words, record_ai, store_embedding
+from engine.extract.rules import Rules, current_rules
+from engine.extract.score import (
+    new_ticker_adder,
+    quoted_words,
+    record_ai,
+    record_rules,
+    store_embedding,
+)
 from engine.extract.similarity import Embedder, load_embedder
 from engine.market.alpaca import Alpaca
 from engine.market.instruments import NEW_YORK, Listings
@@ -69,9 +75,7 @@ async def run_extract(settings: Settings, say: Say = print) -> int:
         for start in range(0, len(todo), CHUNK):
             async with db.begin() as conn:
                 for row in todo[start : start + CHUNK]:
-                    now = datetime.now(UTC)
-                    answer = rules_extraction(pick(book, row.text, row.posted_at), now, now)
-                    await record(conn, row.key, row.posted_at, answer)
+                    await record_rules(conn, book, row.key, row.text, row.posted_at)
                     done += 1
             say(f"rules v{rules.version}: {done:,} of {len(todo):,} posts")
     finally:
@@ -166,8 +170,15 @@ async def project_cost(
         ).one()
         output = Decimal(recorded[1]) if recorded[0] >= 20 else Decimal(ASSUMED_OUTPUT_TOKENS)
         cost = (input_tokens * price.input + len(posts) * output * price.output) / Decimal(10**6)
-        projected[provider] = cost.quantize(Decimal("0.01"))
+        projected[provider] = cost
     return Projection(projected)
+
+
+def dollars(amount: Decimal) -> str:
+    """For printing: cents, and a cost under a cent shown as under a cent."""
+    if 0 < amount < Decimal("0.01"):
+        return "under $0.01"
+    return f"${amount.quantize(Decimal('0.01'))}"
 
 
 async def spent(conn: AsyncConnection) -> Decimal:
@@ -197,7 +208,11 @@ class Selection:
 async def select_posts(
     conn: AsyncConnection, chosen: Selection, version: int, run: int
 ) -> Sequence[Row[Any]]:
+    """The chosen text posts without an answer for this version and run. A rerun (run 2)
+    asks only posts that have run 1's answer, so the two can be compared."""
     query = select(signals).where(TEXT_POSTS, _lacks("ai:vote", version, run))
+    if run != 1:
+        query = query.where(~_lacks("ai:vote", version, 1))
     if chosen.keys is not None:
         query = query.where(signals.c.key.in_(chosen.keys))
     if chosen.start is not None:
@@ -207,76 +222,142 @@ async def select_posts(
     return (await conn.execute(query.order_by(signals.c.posted_at))).all()
 
 
+AI_PICK_LOCK = 4_042_001
+"""The Postgres advisory lock one `ai-pick` holds for its run: two at once would both pay
+for the same posts, and the second's answers would be dropped unrecorded."""
+
+
+async def other_prompt(conn: AsyncConnection, config: AiConfig) -> bool:
+    """Whether this version already has answers recorded with other files (a prompt,
+    schema or model changed without raising the version)."""
+    found = await conn.execute(
+        select(extractions.c.id)
+        .where(
+            extractions.c.method == "ai:vote",
+            extractions.c.version == config.version,
+            extractions.c.result["picker_hash"].astext != config.hash,
+        )
+        .limit(1)
+    )
+    return found.first() is not None
+
+
 async def run_ai_pick(
     settings: Settings,
     chosen: Selection,
     *,
     max_usd: Decimal,
+    max_total_usd: Decimal | None = None,
     run: int = 1,
     say: Say = print,
     picker: AiPicker | None = None,
     listings: Listings | None = None,
 ) -> int:
     """`python -m engine ai-pick`: the AI picker over chosen posts. It prints the
-    projected cost first and refuses a run projected over `max_usd`. A ticker a model
-    names that isn't in the book yet is checked with Alpaca (`listings`) and added if it
-    counts."""
+    projected cost first and refuses a run projected over `max_usd`, or over
+    `max_total_usd` with what was spent before; it stops once the run passes either. A
+    ticker a model names that no rules version reviewed is checked with Alpaca
+    (`listings`) and added if it counts; without Alpaca keys such names stay unmapped.
+    An error no retry can fix (a bad key) stops the run with that post unrecorded."""
     if chosen.keys is None and chosen.start is None:
         say("choose posts: --keys or --from (and --to)")
         return 2
-    config = current_ai_config() if picker is None else picker.config
     if picker is None:
-        if problems := config.problems():
-            say(f"AI picker version {config.version} isn't ready: {'; '.join(problems)}")
+        try:
+            picker = AiPicker.from_settings(settings, current_ai_config())
+        except NotReady as exc:
+            say(f"the AI picker is off: {exc}")
             return 2
-        picker = AiPicker.from_settings(settings, config)
-        if picker is None:
-            say("no ENGINE_ AI key is set; the AI picker is off")
-            return 2
-    rules = current_rules()
     db = make_engine(settings.db_url)
     try:
-        async with db.connect() as conn:
-            rows = await select_posts(conn, chosen, config.version, run)
-            texts = [PostText(normalize(r.text), await quoted_words(conn, r)) for r in rows]
-            asked = [t for t in texts if t.words]
-            projection = await project_cost(conn, config, asked, list(picker.clients))
-            so_far = await spent(conn)
-        lines = ", ".join(f"{p} ${c}" for p, c in projection.by_provider.items())
-        say(
-            f"{len(rows):,} posts ({len(rows) - len(asked):,} without words, not asked); "
-            f"projected ${projection.total} ({lines}); spent so far ${so_far}"
-        )
-        if projection.total > max_usd:
-            say(f"refused: projected ${projection.total} is over --max-usd {max_usd}")
-            return 1
-        if not rows:
-            return 0
-        cost = Decimal(0)
-        async with AsyncExitStack() as stack:
-            if listings is None:
-                listings = Listings(await stack.enter_async_context(Alpaca(settings)))
-            for n, row in enumerate(rows, 1):
-                async with db.begin() as conn:
-                    book = await load_book(conn, rules)
-                    rules_pick = pick(book, row.text, row.posted_at)
-                    now = datetime.now(UTC)
-                    ruled = rules_extraction(rules_pick, now, now)
-                    await record(conn, row.key, row.posted_at, ruled)
-                    answer = await record_ai(
-                        conn, row, rules, config, picker, rules_pick,
-                        new_ticker_adder(conn, listings), run=run, retries=3,
-                    )  # fmt: skip
-                cost += sum((a.cost for a in answer.answers if a.cost), Decimal(0))
-                if n % 25 == 0 or n == len(rows):
-                    say(f"{n:,} of {len(rows):,} posts; this run ${cost}")
-                if cost > max_usd:
-                    say(f"stopped after {n:,} posts: this run cost ${cost}, over --max-usd")
-                    return 1
-        async with db.connect() as conn:
-            say(f"spent so far ${await spent(conn)}")
+        async with db.connect() as lock:
+            held = (await lock.execute(select(func.pg_try_advisory_lock(AI_PICK_LOCK)))).scalar()
+            await lock.commit()
+            if not held:
+                say("another ai-pick is running; wait for it to finish")
+                return 1
+            limits = (max_usd, max_total_usd)
+            return await _ai_pick(
+                db, settings, chosen, picker, current_rules(), limits, run, say, listings
+            )
     finally:
         await db.dispose()
+
+
+async def _ai_pick(
+    db: AsyncEngine,
+    settings: Settings,
+    chosen: Selection,
+    picker: AiPicker,
+    rules: Rules,
+    limits: tuple[Decimal, Decimal | None],
+    run: int,
+    say: Say,
+    listings: Listings | None,
+) -> int:
+    config = picker.config
+    max_usd, max_total_usd = limits
+    async with db.connect() as conn:
+        if await other_prompt(conn, config):
+            say(
+                f"AI picker version {config.version} has answers recorded with other files; "
+                "raise the version in ai.json"
+            )
+            return 2
+        rows = await select_posts(conn, chosen, config.version, run)
+        texts = [PostText(normalize(r.text), await quoted_words(conn, r)) for r in rows]
+        asked = [t for t in texts if t.words]
+        projection = await project_cost(conn, config, asked, list(picker.clients))
+        so_far = await spent(conn)
+    if chosen.keys is not None and len(rows) < len(chosen.keys):
+        say(
+            f"{len(chosen.keys) - len(rows):,} of the {len(chosen.keys):,} keys are skipped: "
+            "not stored, not a text post, already answered"
+            + (" or without a run-1 answer" if run != 1 else "")
+        )
+    lines = ", ".join(f"{p} {dollars(c)}" for p, c in projection.by_provider.items())
+    say(
+        f"{len(rows):,} posts ({len(rows) - len(asked):,} without words, not asked); "
+        f"projected {dollars(projection.total)} ({lines}); spent so far {dollars(so_far)}"
+    )
+    if projection.total > max_usd:
+        say(f"refused: projected {dollars(projection.total)} is over --max-usd {max_usd}")
+        return 1
+    if max_total_usd is not None and so_far + projection.total > max_total_usd:
+        say(f"refused: spent so far plus projected is over --max-total-usd {max_total_usd}")
+        return 1
+    if not rows:
+        return 0
+    cost = Decimal(0)
+    async with AsyncExitStack() as stack:
+        if listings is None and settings.alpaca_keys is not None:
+            listings = Listings(await stack.enter_async_context(Alpaca(settings)))
+        if listings is None:
+            say("no Alpaca keys: tickers no rules version reviewed stay unmapped")
+        for n, (row, post) in enumerate(zip(rows, texts, strict=True), 1):
+            try:
+                async with db.begin() as conn:
+                    book = await load_book(conn, rules)
+                    rules_pick = await record_rules(conn, book, row.key, row.text, row.posted_at)
+                    adder = new_ticker_adder(conn, listings) if listings else None
+                    answer = await record_ai(
+                        conn, row, book, post, picker, rules_pick, adder, run=run, retries=3,
+                        stop_on_fatal=True,
+                    )  # fmt: skip
+            except FatalAnswer as exc:
+                say(f"stopped at {row.key}, not recorded: {exc}")
+                return 1
+            cost += sum((a.cost for a in answer.answers if a.cost), Decimal(0))
+            if n % 25 == 0 or n == len(rows):
+                say(f"{n:,} of {len(rows):,} posts; this run ${cost}")
+            if cost > max_usd:
+                say(f"stopped after {n:,} posts: this run cost ${cost}, over --max-usd")
+                return 1
+            if max_total_usd is not None and so_far + cost > max_total_usd:
+                say(f"stopped after {n:,} posts: spent ${so_far + cost}, over --max-total-usd")
+                return 1
+    async with db.connect() as conn:
+        say(f"spent so far ${await spent(conn)}")
     return 0
 
 

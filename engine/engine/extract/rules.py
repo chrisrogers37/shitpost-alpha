@@ -36,6 +36,10 @@ from engine.text import normalize
 PACKAGE_DIR = Path(__file__).parent.parent
 MANIFEST = Path(__file__).with_name("rules.json")
 OTHER = "other"
+SEEDED = frozenset({"SPY", "QQQ", "BTC", "ETH"})
+"""The instruments migration 0003 adds. With aliases.json's, they are the instruments
+whose tickers were read for bare-word use when the rules were set (SPY is on the
+collision list)."""
 
 FoundBy = Literal["cashtag", "ticker", "alias", "ai_explicit", "ai_implied"]
 
@@ -281,6 +285,15 @@ class Mention:
     """AI only: how many models named it."""
 
 
+def unique_names(mentions: Sequence[Mention]) -> tuple[Mention, ...]:
+    """The first mention of each normalised name (one row per name is all
+    signal_mentions holds), so put the one to keep first."""
+    kept: dict[str, Mention] = {}
+    for mention in mentions:
+        kept.setdefault(mention.normalized, mention)
+    return tuple(kept.values())
+
+
 @dataclass
 class NameBook:
     """Every way the rules can name an instrument, from the database and the rules files."""
@@ -291,6 +304,10 @@ class NameBook:
     names: dict[str, list[Held]] = field(default_factory=dict)
     excepts: dict[int, Phrases] = field(default_factory=dict)
     name_pattern: re.Pattern[str] | None = None
+    reviewed: frozenset[int] = frozenset()
+    """Instruments in aliases.json or SEEDED: their tickers were read for bare-word use
+    and their dates set. Any other instrument (one an AI model named) counts in the rules
+    only by cashtag, and in AI mapping only after Alpaca says it counts on the post's day."""
 
     @classmethod
     def build(
@@ -324,12 +341,19 @@ class NameBook:
             if spec.excepts and (holder := by_symbol.get(spec.symbol)):
                 book.excepts[holder.id] = Phrases.of(spec.excepts)
         book.name_pattern = _phrase_pattern(book.names)
+        reviewed = SEEDED | {spec.symbol for spec in rules.aliases}
+        book.reviewed = frozenset(i.id for i in instruments if i.symbol in reviewed)
         return book
 
     def add(self, listed: Listed) -> None:
-        """An instrument added after the book was built (a new ticker the AI named)."""
+        """An instrument added after the book was built (a new ticker the AI named). It
+        isn't reviewed, so each use is checked with Alpaca for its post's day."""
         self.instruments[listed.id] = listed
         self.tickers.setdefault(listed.symbol, []).append(Held(listed.id, None, None))
+
+    def knows_ticker(self, ticker: str) -> bool:
+        """Whether this ticker is, or was, any instrument's on some day."""
+        return ticker.upper() in self.tickers
 
     def check_synced(self) -> None:
         """Raise NamesNotSynced if a name in aliases.json isn't in the book."""
@@ -364,14 +388,6 @@ class NameBook:
                 return held.instrument_id
         return None
 
-    def names_of(self, instrument_id: int, on: date) -> set[str]:
-        return {
-            name
-            for name, holds in self.names.items()
-            for held in holds
-            if held.instrument_id == instrument_id and _holds(on, held.valid_from, held.valid_to)
-        }
-
 
 CASHTAG = re.compile(r"(?<![\w$])\$([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)(?!\w|-\w)")
 BARE_TICKER = re.compile(r"(?<![\w$.\-])([A-Z]{2,5}(?:\.[A-Z]{1,2})?)(?!\w|-\w)")
@@ -402,7 +418,8 @@ def find_names(book: NameBook, words: str, on: date) -> list[Mention]:
         ticker = match.group(1)
         if not book.rules.collisions.mention_counts(ticker, cashtag=False):
             continue
-        if (instrument_id := book.ticker(ticker, on)) is not None:
+        instrument_id = book.ticker(ticker, on)
+        if instrument_id is not None and instrument_id in book.reviewed:
             add(
                 Mention(
                     name=ticker,

@@ -30,6 +30,7 @@ from sqlalchemy import (
     Uuid,
     func,
     literal_column,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -127,6 +128,7 @@ signals = Table(
     CheckConstraint(_one_of("kind", SIGNAL_KINDS), name="signals_kind_check"),
     CheckConstraint(_one_of("not_scored", NOT_SCORED), name="signals_not_scored_check"),
     Index("signals_source_id_posted_at_idx", "source_id", "posted_at"),
+    Index("signals_unfinished_idx", "key", postgresql_where=text("stage NOT IN ('done', 'error')")),
     Index(
         "signals_text_search_idx",
         func.to_tsvector(literal_column("'english'::regconfig"), literal_column("text")),

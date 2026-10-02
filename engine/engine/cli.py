@@ -7,7 +7,7 @@ import signal
 import sys
 from collections.abc import Sequence
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import httpx
@@ -57,7 +57,14 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
     ai_pick.add_argument(
         "--run", type=int, default=1, choices=(1, 2), help="2: a stability rerun, kept apart"
     )
-    ai_pick.add_argument("--max-usd", type=Decimal, default=Decimal(5))
+    ai_pick.add_argument(
+        "--max-usd", type=_dollars, default=Decimal(5), help="stop this run past this spend"
+    )
+    ai_pick.add_argument(
+        "--max-total-usd",
+        type=_dollars,
+        help="stop past this spend by every AI answer recorded so far, this run included",
+    )
     commands.add_parser(
         "review-list", help="names the AI vote counted that the rules missed, for review"
     )
@@ -94,6 +101,17 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
         return 1
 
 
+def _dollars(text: str) -> Decimal:
+    """A spend limit: a finite amount of 0 or more."""
+    try:
+        amount = Decimal(text)
+    except InvalidOperation:
+        amount = Decimal("NaN")
+    if not amount.is_finite() or amount < 0:
+        raise argparse.ArgumentTypeError(f"not an amount of 0 or more: {text!r}")
+    return amount
+
+
 def _variable(loc: tuple[int | str, ...]) -> str:
     """The environment variable a settings error is about. A field read under its own
     name (ALPACA_API_SECRET_KEY) is located at that name, in capitals."""
@@ -113,32 +131,50 @@ EXTRACT_COMMANDS = ("sync-names", "extract", "fetch-model", "embed", "ai-pick", 
 
 
 def _extract_command(args: argparse.Namespace, settings: Settings) -> int:
+    """The extraction commands. Expected operator errors (names not synced, a changed
+    rules file, Alpaca refusing, a failed download, a missing keys file) print one line."""
     from engine.extract import batch, names, similarity
+    from engine.extract.rules import NamesNotSynced, RulesFileChanged
+    from engine.market.alpaca import AlpacaError
 
-    if args.command == "sync-names":
-        return asyncio.run(names.run_sync_names(settings))
-    if args.command == "extract":
-        return asyncio.run(batch.run_extract(settings))
     try:
+        if args.command == "sync-names":
+            return asyncio.run(names.run_sync_names(settings))
+        if args.command == "extract":
+            return asyncio.run(batch.run_extract(settings))
         if args.command == "fetch-model":
             hosts = similarity.fetch_model(settings)
             print(f"downloaded through: {', '.join(sorted(hosts)) or 'nothing new'}")
             return 0
         if args.command == "embed":
             return asyncio.run(batch.run_embed(settings))
-    except similarity.ModelMissing as exc:
+        if args.command == "review-list":
+            return asyncio.run(batch.run_review_list(settings))
+        chosen = batch.Selection(_keys(args.keys), args.start, args.end)
+        return asyncio.run(
+            batch.run_ai_pick(
+                settings,
+                chosen,
+                max_usd=args.max_usd,
+                max_total_usd=args.max_total_usd,
+                run=args.run,
+            )
+        )
+    except (similarity.ModelMissing, NamesNotSynced, RulesFileChanged, AlpacaError) as exc:
         print(exc, file=sys.stderr)
         return 1
-    except httpx.HTTPError as exc:  # the download: a refused host, a 404, a dropped line
-        print(f"model download failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+    except httpx.HTTPError as exc:  # a refused host, a 404, a dropped line
+        print(f"{args.command} failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
-    if args.command == "review-list":
-        return asyncio.run(batch.run_review_list(settings))
-    keys = None
-    if args.keys:
-        keys = [line.strip() for line in args.keys.read_text("utf-8").splitlines() if line.strip()]
-    chosen = batch.Selection(keys, args.start, args.end)
-    return asyncio.run(batch.run_ai_pick(settings, chosen, max_usd=args.max_usd, run=args.run))
+    except OSError as exc:  # the --keys file
+        print(f"{args.command} failed: {exc}", file=sys.stderr)
+        return 1
+
+
+def _keys(path: Path | None) -> list[str] | None:
+    if path is None:
+        return None
+    return [line.strip() for line in path.read_text("utf-8").splitlines() if line.strip()]
 
 
 async def _run(settings: Settings, registry: Registry) -> None:
