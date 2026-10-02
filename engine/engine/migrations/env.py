@@ -5,12 +5,12 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
 from engine.db import sqlalchemy_url
-from engine.migrate import VERSION_TABLE_SCHEMA, include_name
+from engine.migrate import VERSION_TABLE_SCHEMA, include_name, pin_search_path
 from engine.settings import Settings
 from engine.tables import metadata
 
-url = context.config.attributes.get("url") or Settings().database_url
-connectable = create_engine(sqlalchemy_url(url), poolclass=NullPool)
+url = context.config.attributes.get("url") or Settings().db_url
+connectable = pin_search_path(create_engine(sqlalchemy_url(url), poolclass=NullPool))
 
 with connectable.connect() as connection:
     # alembic_version lives in the engine schema, so the schema must exist first.
@@ -24,4 +24,6 @@ with connectable.connect() as connection:
         include_name=include_name,
     )
     with context.begin_transaction():
+        # Again inside the transaction: a transaction-mode pooler drops session settings.
+        connection.execute(text("SET LOCAL search_path TO public"))
         context.run_migrations()

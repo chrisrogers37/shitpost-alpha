@@ -3,7 +3,8 @@
 import logging
 
 
-def configure_logging(level: int = logging.INFO) -> None:
+def configure_logging() -> None:
+    """Log INFO and up to stderr, one line per record."""
     logging.basicConfig(
-        level=level, format="%(asctime)s %(levelname)s %(name)s: %(message)s", force=True
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s", force=True
     )

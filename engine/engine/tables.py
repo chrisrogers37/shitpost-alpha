@@ -24,6 +24,9 @@ SCHEMAS = ("engine", "prices", "app")
 
 metadata = MetaData()
 
+# One row. stream_id is made by the first migration and never changes. started_at,
+# lease_holder and code_version describe the last holder, even after it stops;
+# last_heartbeat_at (written every renew interval while holding) shows whether it is alive.
 engine_meta = Table(
     "engine_meta",
     metadata,

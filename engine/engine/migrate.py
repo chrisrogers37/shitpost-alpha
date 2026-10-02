@@ -3,10 +3,11 @@
 import logging
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Engine, event, text
 
 from engine.db import make_sync_engine
 from engine.tables import SCHEMAS
@@ -22,7 +23,28 @@ def include_name(name: str | None, type_: str, parent_names: object) -> bool:
     return type_ != "schema" or name in SCHEMAS
 
 
+def pin_search_path(engine: Engine) -> Engine:
+    """Resolve unqualified names in `public` only, on every connection of `engine`.
+
+    With a role named like a schema (say `engine`), "$user" would put that schema first: a
+    table created without a schema would land there, readable by the web role, and
+    autogenerate would misreport the engine's tables. This runs before the dialect reads
+    the default schema.
+    """
+
+    @event.listens_for(engine, "connect", insert=True)
+    def set_search_path(dbapi_connection: Any, connection_record: Any) -> None:
+        autocommit = dbapi_connection.autocommit
+        dbapi_connection.autocommit = True
+        with dbapi_connection.cursor() as cursor:
+            cursor.execute("SET search_path TO public")
+        dbapi_connection.autocommit = autocommit
+
+    return engine
+
+
 def alembic_config(url: str) -> Config:
+    """Alembic config for the engine's migrations, independent of the working directory."""
     config = Config()
     config.set_main_option("script_location", str(MIGRATIONS))
     config.attributes["url"] = url
@@ -43,6 +65,7 @@ ALLOWED_PRIVILEGES = {"USAGE", "SELECT", "INSERT", "UPDATE", "DELETE"}
 
 
 def migrate(url: str, web_role: str) -> None:
+    """Upgrade the database to the latest revision, then apply WEB_GRANTS."""
     command.upgrade(alembic_config(url), "head")
     engine = make_sync_engine(url)
     try:
@@ -71,6 +94,7 @@ def grant_web_role(conn: Connection, role: str, grants: dict[str, str] = WEB_GRA
 
 
 def grant_statements(quote: Callable[[str], str], role: str, grants: dict[str, str]) -> list[str]:
+    """The GRANT statements for `grants`. Rejects privileges outside ALLOWED_PRIVILEGES."""
     statements = []
     for target, privileges in grants.items():
         names = {p.strip().upper() for p in privileges.split(",")}

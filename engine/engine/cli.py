@@ -23,6 +23,7 @@ STATUS_FIELDS = ("stream_id", "started_at", "last_heartbeat_at", "lease_holder",
 
 
 def main(argv: Sequence[str] | None = None, registry: Registry | None = None) -> int:
+    """Run one command. `registry` replaces build_registry() for `run` (tests use it)."""
     parser = argparse.ArgumentParser(prog="python -m engine")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("migrate", help="upgrade the engine database to the latest schema")
@@ -43,7 +44,7 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
         return 2
 
     if args.command == "migrate":
-        migrate(settings.database_url, settings.web_role)
+        migrate(settings.db_url, settings.web_role)
         return 0
     if args.command == "run":
         asyncio.run(_run(settings, registry or build_registry()))
@@ -60,7 +61,7 @@ async def _run(settings: Settings, registry: Registry) -> None:
 
 
 async def _status(settings: Settings) -> int:
-    db = make_engine(settings.database_url)
+    db = make_engine(settings.db_url)
     try:
         async with db.connect() as conn:
             meta = (await conn.execute(select(engine_meta))).one_or_none()
