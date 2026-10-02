@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Signal engine foundation (engine PR 1)** - New `engine/` package, separate from the old code, with its own `pyproject.toml`, tests and CI.
   - `python -m engine migrate | run | status`; settings come from `ENGINE_*` variables (`ENGINE_DATABASE_URL`, never `DATABASE_URL`).
-  - One Alembic history with three schemas: `engine` (web role reads), `prices` (engine only), `app` (later plans). Tables `engine.engine_meta` (fixed `stream_id` + status), `engine.engine_lease`, `engine.job_runs`. Grants to `ENGINE_WEB_ROLE` run on every migrate, only if the role exists.
+  - One Alembic history with three schemas: `engine` (web role reads), `prices` (engine only), `app` (later plans). Tables `engine.engine_meta` (fixed `stream_id` + status), `engine.engine_lease`, `engine.job_runs`. The web role's access is one declarative map (`WEB_GRANTS`: `engine` read-only, `app` USAGE only, nothing on `prices`, never CREATE), applied on every migrate and only if `ENGINE_WEB_ROLE` exists.
   - One copy at a time: a database-clock lease (renew 10 s, expiry 30 s); only the holder runs workers and jobs, and it stops both at once if the lease is lost. SIGTERM releases the lease for a fast handover.
   - Daily jobs at New York times, logged in `job_runs`; a missed run is caught up once; failed or interrupted runs retry up to 3 times, then one operator message. Heavy jobs run in a separate process.
   - Crash-safe per-item stage runner: stage and attempt count stored with each item, resumes after a restart, final error state with its reason and one operator message after 3 attempts.

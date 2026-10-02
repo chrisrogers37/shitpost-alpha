@@ -17,8 +17,9 @@ Settings are `ENGINE_*` variables; see `engine/settings.py`.
 ## Database
 
 Three schemas: `engine` (the web role may read it), `prices` (engine only) and `app`
-(tables other plans add; each PR grants the web role what its table needs). Grants run on
-every migrate and only if the role in `ENGINE_WEB_ROLE` (default `web`) exists.
+(tables other plans add). The web role's access is the `WEB_GRANTS` map in
+`engine/migrate.py`: a PR that adds a table the web app needs adds a line there. Grants
+run on every migrate and only if the role in `ENGINE_WEB_ROLE` (default `web`) exists.
 
 Migrations add first and remove later: old and new copies overlap during a deploy, so a
 migration must keep the previous release working. New revision:
