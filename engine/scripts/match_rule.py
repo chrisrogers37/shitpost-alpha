@@ -1,8 +1,8 @@
 """Set the match rule by reading (PR 4, B1). Run from engine/ on a database with the
 history embedded (`python -m engine embed`):
 
-    python scripts/match_rule.py pairs --reading FILE   # draw the pairs to read
-    python scripts/match_rule.py table                   # score precision/match-labels.csv
+    python -m scripts.match_rule pairs --reading FILE   # draw the pairs to read
+    python -m scripts.match_rule table                   # score precision/match-labels.csv
 
 `pairs` takes the 30 posts of set `match` in precision/samples.csv and, for each, the
 earlier posts scoring in each band (0.90 and up, 0.85-0.90, 0.80-0.85, 0.75-0.80,

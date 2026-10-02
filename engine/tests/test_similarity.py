@@ -211,6 +211,12 @@ def test_a_match_rule_set_for_another_model_is_refused(tmp_path: Path) -> None:
     assert load_match_rule(path).threshold == 0.8
 
 
+def test_the_shipped_match_rule_is_v1_for_the_pinned_model() -> None:
+    rule = load_match_rule()
+    assert (rule.version, rule.model_version, rule.max_matches) == (1, REAL.version, 50)
+    assert 0.7 <= rule.threshold < 1
+
+
 async def test_the_index_loads_every_stored_vector_with_its_post_time(db: AsyncEngine) -> None:
     from engine.extract.score import store_embedding
     from engine.feeds.posts import Post

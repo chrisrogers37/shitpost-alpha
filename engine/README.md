@@ -195,8 +195,10 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
   calls it.
 - **Similarity** (`engine/extract/similarity.py`): BAAI/bge-small-en-v1.5 from its ONNX
   file on the CPU (onnxruntime and tokenizers, no torch), pinned in `extract/model.json`
-  and downloaded with `fetch-model` into `ENGINE_MODEL_DIR`. Matching keeps all vectors in
-  one numpy matrix.
+  and downloaded with `fetch-model` into `ENGINE_MODEL_DIR` (from huggingface.co and
+  us.aws.cdn.hf.co). Matching keeps all vectors in one numpy matrix. Match rule v1
+  (`extract/match_rule.json`): a past post is similar at 0.85 or more, at most 50; it was
+  set by reading pairs (`scripts/match_rule.py`) and must be read again for a new model.
 - **Live stage**: the `score` worker gives each new text post its rules answer, mentions,
   vector and, with the AI on, the three answers and the vote, then moves it to `done`.
   It loads the model when it starts and fails clearly (posts wait at `score`) if the
