@@ -80,8 +80,7 @@ The project uses a delightfully themed directory structure that's both logical, 
 - **`shitvault/`** - Secure data storage and S3 processing
 - **`shitposts/`** - Content harvesting and monitoring
 - **`shitpost_ai/`** - AI analysis and LLM integration
-- **`frontend/`** - React + TypeScript web dashboard
-- **`api/`** - FastAPI backend serving the React frontend
+- **`engine/engine/web/`** - Website and public read API (`python -m engine web`)
 
 ```
 shitpost_alpha/
@@ -115,19 +114,7 @@ shitpost_alpha/
 │   ├── shitpost_analyzer.py # Analysis orchestrator
 │   ├── compare_cli.py      # Multi-provider comparison CLI
 │   └── cli.py              # Analysis CLI utilities
-├── api/                    # FastAPI backend
-│   ├── main.py             # App entry point, CORS, static files
-│   ├── routers/            # Endpoint routers (feed, prices, telegram)
-│   ├── queries/            # Database query layer
-│   ├── schemas/            # Pydantic response models
-│   └── dependencies.py     # Shared DB session helpers
-├── frontend/               # React 19 + TypeScript + Vite
-│   ├── src/
-│   │   ├── pages/          # FeedPage (single-post-at-a-time)
-│   │   ├── components/     # ShitpostCard, PriceChart, MetricBubbles, etc.
-│   │   ├── api/            # TanStack Query hooks & client
-│   │   └── styles/         # Theme configuration
-│   └── dist/               # Built production assets
+├── engine/engine/web/      # Website + public read API (/api/v1, /healthz)
 ├── notifications/          # Alert dispatch & Telegram bot
 │   ├── alert_engine.py     # Alert check-and-dispatch loop
 │   ├── dispatcher.py       # Multi-channel delivery
