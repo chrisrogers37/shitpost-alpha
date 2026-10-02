@@ -11,7 +11,8 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from engine.extract.rules import Mention, RulesPick
-from engine.feeds.store import without_nuls
+from engine.feeds.posts import storable
+from engine.feeds.store import storable_payload
 from engine.tables import extractions, signal_mentions
 
 
@@ -64,15 +65,15 @@ async def record(
         "model": answer.model,
         "started_at": answer.started_at,
         "finished_at": answer.finished_at,
-        "response": without_nuls(answer.response),
-        "result": without_nuls(answer.result),
+        "response": storable_payload(answer.response),
+        "result": storable_payload(answer.result),
         "market_link": answer.market_link,
         "topic": answer.topic,
         "input_tokens": answer.input_tokens,
         "cached_input_tokens": answer.cached_input_tokens,
         "output_tokens": answer.output_tokens,
         "cost_usd": answer.cost_usd,
-        "error": answer.error and answer.error.replace("\x00", ""),
+        "error": answer.error and storable(answer.error),
     }
     extraction_id: int | None = (
         await conn.execute(
@@ -88,8 +89,8 @@ async def record(
         {
             "extraction_id": extraction_id,
             "signal_key": signal_key,
-            "name": without_nuls(m.name),
-            "normalized": without_nuls(m.normalized),
+            "name": storable(m.name),
+            "normalized": storable(m.normalized),
             "ticker": m.ticker,
             "instrument_id": m.instrument_id,
             "unmapped": m.unmapped,

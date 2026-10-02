@@ -181,6 +181,16 @@ async def test_a_429_waits_until_the_reset_alpaca_names(
     assert waits == [pytest.approx(wait, abs=1)]  # at least the setting, at most a minute
 
 
+async def test_a_5xx_backs_off_even_when_it_names_a_rate_limit_reset(waits: list[float]) -> None:
+    fake = FakeAlpaca()
+    reset = str(int(time.time()) + 50)
+    fake.route = lambda request: httpx.Response(503, headers={"X-RateLimit-Reset": reset})
+    async with fake.client(market_settings(alpaca_backoff_seconds=2)) as alpaca:
+        with pytest.raises(AlpacaError, match="HTTP 503"):
+            await alpaca.coin_bars("BTC/USD", "1Day", START, END)
+    assert waits == [2, 4, 8, 16]
+
+
 async def test_a_request_that_httpx_refuses_is_not_tried_again(waits: list[float]) -> None:
     fake = FakeAlpaca()
 
@@ -340,6 +350,29 @@ async def test_a_key_httpx_refuses_never_reaches_an_error_a_line_or_a_log(
     assert not [text for text in shown if SECRET in text]
 
 
+async def test_an_answer_quoting_a_key_never_reaches_an_error_or_a_line(
+    migrated: Settings,
+) -> None:
+    """A proxy or error page in between could echo the request's headers back."""
+
+    def echo(request: httpx.Request) -> httpx.Response:
+        sent = {name: request.headers[name] for name in ("APCA-API-KEY-ID", "APCA-API-SECRET-KEY")}
+        return httpx.Response(403, text=f"forbidden: {sent!r}")
+
+    fake = FakeAlpaca()
+    fake.route = echo
+    async with fake.client(market_settings()) as alpaca:
+        with pytest.raises(AlpacaError) as failed:
+            await alpaca.stock_bars("SPY", "1Day", START, END)
+    assert "HTTP 403" in str(failed.value) and "[key]" in str(failed.value)
+    lines: list[str] = []
+    transport = httpx.MockTransport(fake.handle)
+    assert await run_backfill(market_settings(migrated), lines.append, transport) == 1
+    assert all("failed: AlpacaError" in line for line in lines[:4])
+    shown = [str(failed.value), *lines]
+    assert not [text for text in shown if KEY_ID in text or SECRET in text]
+
+
 async def test_coin_symbols_map_to_dollar_pairs() -> None:
     assert alpaca_symbol("BTC", "coin") == "BTC/USD"
     assert alpaca_symbol("AAPL", "stock") == "AAPL"
@@ -373,6 +406,8 @@ async def test_without_keys_stock_calls_fail_clearly_and_coin_calls_work() -> No
         httpx.Response(200, json={"bars": {"SPY": [{"t": "2024-01-02T00:00:00-05:00"}]}}),
         httpx.Response(200, content=b"<html>"),
         httpx.Response(404),
+        httpx.Response(200, json={"bars": {}, "next_page_token": ["t1"]}),
+        httpx.Response(200, json={"bars": {}, "next_page_token": 2}),
     ],
 )
 async def test_an_unexpected_answer_fails(answer: httpx.Response) -> None:
@@ -420,6 +455,15 @@ async def test_a_cached_minute_window_makes_no_second_call(tmp_path: Path) -> No
     assert cache.path(spy, start, end).relative_to(tmp_path).parts[:2] == ("spy", "all")
     btc = instrument("btc", "coin")
     assert cache.path(btc, start, end).relative_to(tmp_path).parts[:2] == ("btc", "raw")
+
+
+async def test_a_minute_window_without_a_timezone_is_refused(tmp_path: Path) -> None:
+    naive = datetime(2024, 7, 9, 14, 0)  # the host's local time would be a guess
+    async with FakeAlpaca().client(market_settings()) as alpaca:
+        with pytest.raises(ValueError, match="no timezone"):
+            await MinuteCache(tmp_path).bars(
+                alpaca, instrument("spy", "etf"), naive, naive + timedelta(minutes=29)
+            )
 
 
 @pytest.mark.parametrize("content", ["", '{"fetched_at": "2024-07', "[]", '{"bars": []}'])

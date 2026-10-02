@@ -79,8 +79,7 @@ async def run_engine(settings: Settings, registry: Registry, stop: asyncio.Event
             else:
                 await _wait(stop, settings.lease_renew_seconds)
     finally:
-        with suppress(SQLAlchemyError, OSError):
-            await lease.release()
+        await lease.release()
         await db.dispose()
         await lease_db.dispose()
         log.info("engine copy %s stopped", lease.holder)
@@ -110,8 +109,7 @@ async def _hold(
         delay = await streak.failed(exc)
     finally:
         healthy.cancel()  # before the back-off: waiting it out is not running healthily
-    with suppress(SQLAlchemyError, OSError):
-        await lease.release()
+    await lease.release()
     await _wait(stop, delay)
 
 

@@ -6,7 +6,9 @@ from datetime import UTC, datetime, time, timedelta
 
 import psycopg
 import pytest
+from pydantic import SecretStr
 from sqlalchemy import func, insert, select, update
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from engine import runtime
@@ -312,13 +314,16 @@ async def test_a_lock_on_the_status_row_does_not_stall_the_lease(
     registry.register_worker("delivery", worker)
     async with running(migrated, registry):
         ours = await wait_for_holder(db)
-        with psycopg.connect(migrated.db_url) as locker:  # e.g. a slow migration
-            locker.execute("UPDATE engine.engine_meta SET code_version = code_version")
-            before = await lease_expiry(db)
+        # Async, with a lock timeout: a sync connection would block the event loop while
+        # it waits for a heartbeat's row lock, and that heartbeat could never commit.
+        async with await psycopg.AsyncConnection.connect(migrated.db_url) as locker:
+            await locker.execute("SET lock_timeout = '5s'")
+            await locker.execute("UPDATE engine.engine_meta SET code_version = code_version")
+            before = await lease_expiry(db)  # e.g. a slow migration holds the row from here
             await asyncio.sleep(3 * migrated.lease_ttl_seconds)
             assert await lease_holder(db) == ours
             assert await lease_expiry(db) > before
-            locker.rollback()
+            await locker.rollback()
     assert worker.started == 1  # never stepped down
 
 
@@ -339,3 +344,36 @@ async def test_stop_interrupts_an_acquire_blocked_on_the_lease_row(migrated: Set
         done, _ = await asyncio.wait({engine}, timeout=1.0)
         stuck.rollback()
     assert done
+
+
+async def test_a_copy_stopped_while_the_database_never_answers_stops_at_once(
+    migrated: Settings,
+) -> None:
+    with helpers.silent_port() as port:
+        url = make_url(migrated.db_url).set(host="127.0.0.1", port=port)
+        silent = migrated.model_copy(
+            update={"database_url": SecretStr(url.render_as_string(hide_password=False))}
+        )
+        stop = asyncio.Event()
+        engine = asyncio.create_task(run_engine(silent, Registry(), stop))
+        await asyncio.sleep(1.0)  # its connection attempts hang
+        stop.set()
+        done, _ = await asyncio.wait({engine}, timeout=1.0)
+    assert done
+
+
+async def test_cancelling_the_copy_works_when_its_work_turns_the_cancel_into_an_error(
+    migrated: Settings, db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class Stalls(Scheduler):
+        async def run(self) -> None:
+            await helpers.stall_then_fail_on_cancel()
+
+    monkeypatch.setattr(runtime, "Scheduler", Stalls)
+    engine = asyncio.create_task(run_engine(migrated, Registry(), asyncio.Event()))
+    await wait_for_holder(db)
+    engine.cancel()
+    done, _ = await asyncio.wait({engine}, timeout=2.0)
+    if not done:
+        await helpers.cancel_wedged()
+    assert done and engine.cancelled()

@@ -258,7 +258,8 @@ async def change_symbol(
 ) -> None:
     """A ticker change taking effect on `on`: the symbol changes, the slug stays, and the
     old ticker becomes an alias from the previous change (if any) to the day before.
-    Running it again with the same new symbol only corrects that day."""
+    Running it again with the same new symbol only corrects that day; a symbol replaced
+    the day it was set (a typo) held no day, so it leaves no alias."""
     current = (
         await conn.execute(
             select(instruments.c.symbol, instruments.c.asset_class).where(
@@ -296,13 +297,16 @@ async def change_symbol(
     ).scalar()
     if holder is not None:
         raise ValueError(f"{new_symbol} is already the symbol of {holder}")
+    since = None if previous is None else previous.valid_to + timedelta(days=1)
+    if since is not None and on < since:
+        raise ValueError(f"{on} is before {current.symbol} became the symbol, on {since}")
     await conn.execute(
         update(instruments)
         .where(instruments.c.id == instrument_id)
         .values(symbol=new_symbol, alpaca_symbol=alpaca_symbol(new_symbol, current.asset_class))
     )
-    since = None if previous is None else previous.valid_to + timedelta(days=1)
-    await add_alias(conn, instrument_id, current.symbol, "old_ticker", since, day_before)
+    if since is None or since <= day_before:
+        await add_alias(conn, instrument_id, current.symbol, "old_ticker", since, day_before)
 
 
 async def resolve_alias(conn: AsyncConnection, alias: str, on: date) -> list[Instrument]:

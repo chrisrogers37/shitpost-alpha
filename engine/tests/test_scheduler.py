@@ -1,16 +1,16 @@
 import asyncio
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, time, timedelta
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 import pytest
 from sqlalchemy import insert, select
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
-from engine.db import db_now
+from engine.db import db_now, make_engine
 from engine.registry import EngineContext, JobContext, Registry
 from engine.scheduler import NEW_YORK, HeavyJobError, Scheduler, latest_slot, run_in_process
 from engine.settings import Settings
@@ -196,11 +196,20 @@ async def test_a_new_slot_closes_older_runs_that_never_finished(
     assert len(operator_notices(caplog, "job_failed")) == 1
 
 
-class FlakyBegin:
-    """Test-only: an engine whose Nth begin() fails once, like a database blip."""
+async def connection_reset() -> NoReturn:
+    raise OperationalError("begin", {}, Exception("connection reset"))
 
-    def __init__(self, db: AsyncEngine, fail_on: int) -> None:
-        self._db, self._fail_on, self.calls = db, fail_on, 0
+
+class FlakyBegin:
+    """Test-only: an engine whose Nth begin() runs `failure` instead, once."""
+
+    def __init__(
+        self,
+        db: AsyncEngine,
+        fail_on: int,
+        failure: Callable[[], Awaitable[NoReturn]] = connection_reset,
+    ) -> None:
+        self._db, self._fail_on, self._failure, self.calls = db, fail_on, failure, 0
 
     def connect(self) -> Any:
         return self._db.connect()
@@ -209,7 +218,7 @@ class FlakyBegin:
     async def begin(self) -> AsyncIterator[AsyncConnection]:
         self.calls += 1
         if self.calls == self._fail_on:
-            raise OperationalError("begin", {}, Exception("connection reset"))
+            await self._failure()
         async with self._db.begin() as conn:
             yield conn
 
@@ -222,6 +231,86 @@ async def test_a_database_error_while_recording_a_result_is_retried(
     await one_pass(Scheduler(ctx, daily(job).jobs.values()))
     assert len(job.slots) == 1
     assert await runs(db) == [(await latest(db), "succeeded", 1, None)]
+
+
+async def test_a_busy_pool_while_recording_a_result_does_not_rerun_the_job(
+    migrated: Settings, db: AsyncEngine
+) -> None:
+    small = make_engine(migrated.db_url, pool_size=1, max_overflow=0, pool_timeout=0.3)
+    calls, busy = 0, asyncio.Event()
+
+    async def job(ctx: JobContext) -> None:
+        nonlocal calls
+        calls += 1
+        busy.set()  # e.g. a worker's long transaction takes the pool's connection
+        await asyncio.sleep(0.05)  # and gets it before the result is written
+
+    async def hog() -> None:
+        await busy.wait()
+        async with small.connect():
+            await asyncio.sleep(1.0)  # longer than the pool's checkout timeout
+
+    registry = Registry()
+    registry.register_job("daily", MIDNIGHT, job)
+    hogger = asyncio.create_task(hog())
+    runner = asyncio.create_task(
+        Scheduler(EngineContext(migrated, small), registry.jobs.values()).run()
+    )
+    await asyncio.sleep(2.0)
+    runner.cancel()
+    await asyncio.gather(runner, hogger, return_exceptions=True)
+    await small.dispose()
+    assert calls == 1
+    assert await runs(db) == [(await latest(db), "succeeded", 1, None)]
+
+
+async def test_a_result_no_retry_can_write_leaves_the_run_to_count_as_interrupted(
+    migrated: Settings, db: AsyncEngine
+) -> None:
+    async def violates_a_check() -> NoReturn:
+        raise IntegrityError("UPDATE", {}, Exception("violates check constraint"))
+
+    job = Calls()
+    flaky = FlakyBegin(db, fail_on=2, failure=violates_a_check)
+    await one_pass(
+        Scheduler(EngineContext(migrated, cast(AsyncEngine, flaky)), daily(job).jobs.values())
+    )
+    assert len(job.slots) == 1
+    assert await runs(db) == [(await latest(db), "running", 1, None)]
+
+
+async def test_cancelling_the_scheduler_while_it_records_a_result_works(
+    migrated: Settings, db: AsyncEngine
+) -> None:
+    job = Calls()
+    flaky = FlakyBegin(db, fail_on=2, failure=helpers.stall_then_fail_on_cancel)
+    ctx = EngineContext(migrated, cast(AsyncEngine, flaky))
+    runner = asyncio.create_task(Scheduler(ctx, daily(job).jobs.values()).run())
+    await asyncio.sleep(0.3)  # the job ran; writing its result stalls
+    runner.cancel()
+    done, _ = await asyncio.wait({runner}, timeout=2.0)
+    if not done:
+        await helpers.cancel_wedged()
+    assert done and runner.cancelled() and len(job.slots) == 1
+    assert await runs(db) == [(await latest(db), "running", 1, None)]
+
+
+async def test_a_job_that_turns_its_cancellation_into_an_error_is_left_running(
+    migrated: Settings, db: AsyncEngine
+) -> None:
+    async def stalls(ctx: JobContext) -> None:
+        await helpers.stall_then_fail_on_cancel()
+
+    registry = Registry()
+    registry.register_job("daily", MIDNIGHT, stalls)
+    runner = asyncio.create_task(scheduler(migrated, db, registry).run())
+    await asyncio.sleep(0.3)
+    runner.cancel()
+    done, _ = await asyncio.wait({runner}, timeout=2.0)
+    if not done:
+        await helpers.cancel_wedged()
+    assert done
+    assert await runs(db) == [(await latest(db), "running", 1, None)]  # interrupted, not failed
 
 
 async def test_heavy_job_runs_in_another_process(migrated: Settings, db: AsyncEngine) -> None:
@@ -264,17 +353,19 @@ async def test_cancelling_a_heavy_job_kills_its_process(
         os.kill(pid, 0)
 
 
-async def test_an_error_text_with_a_nul_byte_is_still_recorded(
+async def test_an_error_text_postgres_would_reject_is_still_recorded(
     migrated: Settings, db: AsyncEngine
 ) -> None:
-    async def nul(ctx: JobContext) -> None:
-        raise RuntimeError("upstream sent b\x00d data")
+    async def bad_text(ctx: JobContext) -> None:
+        lone_surrogate = b"\xff".decode("utf-8", "surrogateescape")
+        raise RuntimeError(f"upstream sent b\x00d data {lone_surrogate}")
 
     registry = Registry()
-    registry.register_job("daily", MIDNIGHT, nul)
+    registry.register_job("daily", MIDNIGHT, bad_text)
     await one_pass(scheduler(migrated, db, registry))
     [(_, status, attempts, error)] = await runs(db)
-    assert (status, attempts, error) == ("retry", 1, "RuntimeError: upstream sent bd data")
+    assert (status, attempts) == ("retry", 1)
+    assert error == "RuntimeError: upstream sent bd data \\udcff"
 
 
 async def test_cancelling_the_scheduler_works_when_the_driver_turns_it_into_an_error(

@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import ClassVar
 
 import httpx
@@ -20,6 +20,10 @@ log = logging.getLogger(__name__)
 
 UNEXPECTED = (ValueError, KeyError, TypeError, AttributeError)
 """What parsing or mapping an answer of an unexpected shape raises."""
+
+FUTURE_SLACK = timedelta(days=1)
+"""A post dated further ahead than this has a broken id: it is skipped, so it can't move a
+feed's catch-up mark past every later gap."""
 
 
 class FeedBlocked(Exception):
@@ -139,10 +143,13 @@ class Feed(ABC):
         posts: list[Post] = []
         skipped: list[str] = []
         total = 0
+        horizon = datetime.now(UTC) + FUTURE_SLACK
         for item in items:
             total += 1
             try:
                 post = mapper(item)
+                if post is not None and post.posted_at > horizon:
+                    raise ValueError(f"post {post.status_id} is dated {post.posted_at:%Y-%m-%d}")
             except UNEXPECTED as exc:
                 skipped.append(repr(exc))
                 continue

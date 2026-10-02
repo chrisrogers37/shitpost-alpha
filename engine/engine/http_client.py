@@ -12,7 +12,7 @@ SECRET_HEADERS = frozenset({"x-api-key", "apca-api-key-id", "apca-api-secret-key
 """Request headers that carry a key (lowercase). Their values never reach error text."""
 
 KEEPALIVE_SECONDS = 75.0
-"""Longer than any poll interval (60 s), so a feed polled on time reuses its connection."""
+"""Longer than the 15 s and 60 s poll intervals, so those feeds reuse their connection."""
 
 
 def _engine_version() -> str:
@@ -35,20 +35,26 @@ def make_client(
     return httpx.AsyncClient(
         headers={"User-Agent": USER_AGENT},
         timeout=settings.http_timeout_seconds,
-        limits=httpx.Limits(keepalive_expiry=KEEPALIVE_SECONDS),
+        limits=httpx.Limits(  # httpx's default caps, which a Limits without them drops
+            max_connections=100, max_keepalive_connections=20, keepalive_expiry=KEEPALIVE_SECONDS
+        ),
         follow_redirects=False,
         transport=transport,
     )
 
 
-def request_error_text(exc: httpx.HTTPError, *sent: Mapping[str, str]) -> str:
-    """`exc` as text for logs, status rows and operator messages, with the value of every
-    key header in `sent` (the client's headers, the request's) blanked out: httpx's
-    protocol errors quote a header value they refuse."""
-    text = f"{type(exc).__name__}: {exc}"
+def scrub(text: str, *sent: Mapping[str, str]) -> str:
+    """`text` with the value of every key header in `sent` (the client's headers, the
+    request's) blanked out, as bytes and as text."""
     for headers in sent:
         for name, value in headers.items():
             if name.lower() in SECRET_HEADERS and (key := value.strip()):
-                for shown in (repr(key.encode())[2:-1], key):  # as bytes, then as text
+                for shown in (repr(key.encode())[2:-1], key):
                     text = text.replace(shown, "[key]")
     return text
+
+
+def request_error_text(exc: httpx.HTTPError, *sent: Mapping[str, str]) -> str:
+    """`exc` as text for logs, status rows and operator messages, scrubbed of the keys
+    in `sent`: httpx's protocol errors quote a header value they refuse."""
+    return scrub(f"{type(exc).__name__}: {exc}", *sent)

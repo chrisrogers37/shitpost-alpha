@@ -1,7 +1,8 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, tzinfo
 
 import pytest
 
+import engine.market.calendar as calendar_module
 from engine.market.calendar import (
     is_open,
     is_session,
@@ -65,3 +66,18 @@ def test_next_open() -> None:
     assert next_open(monday) == monday
     assert next_open(utc(2024, 7, 15, 13, 31)) == utc(2024, 7, 16, 13, 30)
     assert next_open(utc(2024, 7, 3, 21)) == utc(2024, 7, 5, 13, 30)  # over a holiday
+
+
+def test_a_process_that_runs_into_a_new_year_builds_the_calendar_again(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    year = datetime.now(UTC).year + 1
+    assert is_session(date(year, 7, 1))  # built to the end of next year
+
+    class NextYear(datetime):
+        @classmethod
+        def now(cls, tz: tzinfo | None = None) -> "NextYear":
+            return cls(year, 1, 2, tzinfo=tz)
+
+    monkeypatch.setattr(calendar_module, "datetime", NextYear)
+    assert session_on_or_after(utc(year, 12, 31, 23)).year == year + 1

@@ -3,9 +3,11 @@
 Stock prices are adjusted for splits and dividends ('all'), so every earlier bar changes
 when a split or dividend lands. The backfill refetches the last 14 days each run, and if
 any of those differs from what is stored, it refetches the stock's whole history and drops
-any stored day the new answer lacks: the table never mixes two adjustment bases. Each whole
-fetch sets the instrument's rebased_at. Coin prices are raw, so a coin close that moved is
-a correction, written over in place.
+any stored day the new answer lacks: the table never mixes two adjustment bases. A whole
+answer that is empty or lacks more than a few stored days fails the instrument and changes
+nothing, so the next run tries again (later runs look back only 14 days, so days deleted
+then would never come back). Each whole fetch sets the instrument's rebased_at. Coin prices
+are raw, so a coin close that moved is a correction, written over in place.
 
 Minute bars are cached per window as files under ENGINE_BARS_CACHE_DIR, so a rerun makes
 no calls. A file fetched before its instrument's rebased_at is on an older basis than the
@@ -29,7 +31,7 @@ from typing import Any
 import httpx
 from sqlalchemy import ColumnElement, delete, func, select, tuple_, update
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from engine.db import error_text, make_engine, raise_if_cancelling
@@ -45,6 +47,12 @@ OVERLAP = timedelta(days=14)
 """Stored daily bars each backfill fetches again, to notice a new split or dividend."""
 SAME = 1e-9
 """Relative difference under which a refetched close is the stored one."""
+MOST_DAYS_DROPPED = 5
+"""Stored days a whole refetch may lack (Alpaca correcting its history). More fails."""
+
+
+class ShortHistory(AlpacaError):
+    """A whole refetch that lacks too much of the stored history to replace it."""
 
 
 def feed_of(instrument: Instrument) -> str:
@@ -150,8 +158,8 @@ async def backfill_daily(db: AsyncEngine, alpaca: Alpaca, instrument: Instrument
         log.info("%s: stored bars changed (a split or dividend); fetching all", instrument.slug)
         bars = await _final_daily(alpaca, instrument, HISTORY_START, now)
     async with db.begin() as conn:
+        removed = await _remove_days_not_in(conn, instrument, bars) if refetched else 0
         written = await upsert_bars(conn, instrument, "1Day", bars)
-        removed = await _remove_days_not_in(conn, instrument, bars) if refetched and bars else 0
         if last is None or refetched:  # the host clock, as the minute cache's fetch times use
             await conn.execute(
                 update(instruments).where(instruments.c.id == instrument.id).values(rebased_at=now)
@@ -179,13 +187,20 @@ async def backfill_daily(db: AsyncEngine, alpaca: Alpaca, instrument: Instrument
 async def _remove_days_not_in(
     conn: AsyncConnection, instrument: Instrument, bars: Sequence[Bar]
 ) -> int:
-    """After a whole fetch: stored days the new answer lacks are on the old basis."""
+    """After a whole fetch: stored days the new answer lacks are on the old basis. Raises
+    ShortHistory, rolling the transaction back, if it lacks more than MOST_DAYS_DROPPED of
+    them (an empty answer lacks them all)."""
     gone = await conn.execute(
         delete(market_bars)
         .where(_daily(instrument), market_bars.c.bar_start.not_in([bar.start for bar in bars]))
         .returning(market_bars.c.bar_start)
     )
     removed = len(gone.all())
+    if removed > MOST_DAYS_DROPPED:
+        raise ShortHistory(
+            f"the whole history lacks {removed:,} stored days (at most "
+            f"{MOST_DAYS_DROPPED} is a correction); nothing changed"
+        )
     if removed:
         log.warning("%s: removed %d daily bars Alpaca no longer serves", instrument.slug, removed)
     return removed
@@ -248,13 +263,23 @@ async def run_backfill(
                 except (AlpacaError, SQLAlchemyError) as exc:
                     raise_if_cancelling()
                     failed += 1
-                    say(f"{instrument.slug}: failed: {error_text(exc, 500)}")
+                    say(f"{instrument.slug}: failed: {_failure(exc)}")
                     continue
                 say(done.line())
     finally:
         await db.dispose()
     say(f"{len(listed) - failed} of {len(listed)} instruments backfilled")
     return 1 if failed else 0
+
+
+def _failure(exc: AlpacaError | SQLAlchemyError) -> str:
+    """A failure for the operator's line. A database error shows only the first line of
+    the driver's message, as the CLI does, not the statement and its parameters."""
+    if isinstance(exc, AlpacaError):
+        return error_text(exc, 500)
+    cause = exc.orig if isinstance(exc, DBAPIError) and exc.orig else exc
+    first = str(cause).partition("\n")[0]
+    return f"{type(exc).__name__}: {first}"
 
 
 class MinuteCache:
@@ -290,6 +315,8 @@ class MinuteCache:
 
 
 def _minute(at: datetime) -> datetime:
+    if at.tzinfo is None:  # astimezone would read it as the host's local time
+        raise ValueError(f"{at} has no timezone")
     return at.astimezone(UTC).replace(second=0, microsecond=0)
 
 

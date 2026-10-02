@@ -24,6 +24,8 @@ class Collisions:
 
 
 def parse_collisions(text: str) -> Collisions:
+    """The list from collisions.json's text, refused unless its version is a positive
+    integer and its symbols are uppercase tickers, sorted and unique."""
     data = json.loads(text)
     version, symbols = data["version"], data["symbols"]
     if not isinstance(version, int) or version < 1:
@@ -38,4 +40,5 @@ def parse_collisions(text: str) -> Collisions:
 
 @cache
 def load_collisions(path: Path = COLLISIONS_FILE) -> Collisions:
+    """The list in `path` (collisions.json), read once."""
     return parse_collisions(path.read_text("utf-8"))

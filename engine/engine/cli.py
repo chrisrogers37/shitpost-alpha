@@ -67,10 +67,7 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
         settings = Settings()
     except ValidationError as exc:
         # Print field names and messages only: the error's input values can hold the URL.
-        problems = "; ".join(
-            f"ENGINE_{'_'.join(map(str, e['loc'])).upper() or 'SETTINGS'}: {e['msg']}"
-            for e in exc.errors()
-        )
+        problems = "; ".join(f"{_variable(e['loc'])}: {e['msg']}" for e in exc.errors())
         print(f"invalid engine settings: {problems}", file=sys.stderr)
         return 2
 
@@ -92,10 +89,19 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
             return _extract_command(args, settings)
         return asyncio.run(_status(settings))
     except OperationalError as exc:
-        # The driver's first line names the host and user, never the password.
-        reason = str(exc.orig or exc).splitlines()[0]
-        print(f"could not reach the engine database: {reason}", file=sys.stderr)
+        # One line from the driver. It names the host and user; it shows part of the
+        # password only if the URL is malformed (an unescaped "@" in the password).
+        reason = (str(exc.orig or exc).splitlines() or [type(exc).__name__])[0]
+        what = "could not reach" if reason.startswith("connection") else "error from"
+        print(f"{what} the engine database: {reason}", file=sys.stderr)
         return 1
+
+
+def _variable(loc: tuple[int | str, ...]) -> str:
+    """The environment variable a settings error is about. A field read under its own
+    name (ALPACA_API_SECRET_KEY) is located at that name, in capitals."""
+    name = "_".join(map(str, loc))
+    return name if name.isupper() else f"ENGINE_{name.upper() or 'SETTINGS'}"
 
 
 EXTRACT_COMMANDS = ("sync-names", "extract", "fetch-model", "embed", "ai-pick", "review-list")
