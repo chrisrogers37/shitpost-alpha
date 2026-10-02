@@ -1,5 +1,5 @@
-"""History in batch: extract, embed, ai-pick (and its cost guard) and review-list; and the
-reason line's check."""
+"""History in batch: extract, embed, ai-pick (and its cost guard) and review-list; and how
+the reason line is asked (its check: test_reason_corpus.py)."""
 
 import logging
 from dataclasses import dataclass
@@ -24,7 +24,7 @@ from engine.extract.batch import (
     run_embed,
     run_extract,
 )
-from engine.extract.reason import check_reason, reason_line
+from engine.extract.reason import reason_line
 from engine.extract.rules import current_rules
 from engine.extract.score import Scorer
 from engine.feeds.posts import Post
@@ -436,48 +436,6 @@ async def test_a_stability_rerun_asks_only_posts_with_a_first_answer(
 
 
 # --- the reason line ---------------------------------------------------------------------------
-
-
-POST = "Nvidia will build 4 chip plants in Arizona, a 500 billion dollar investment"
-
-
-@pytest.mark.parametrize(
-    ("line", "problem"),
-    [
-        ("Names Nvidia's plans to build chip plants in Arizona", None),
-        ("Names Nvidia's 4 chip plants and its 500 billion dollar plan", None),
-        ("", "empty"),
-        ("Two\nlines", "more than one line"),
-        ("x" * 121, "121 characters, over 120"),
-        ("Nvidia shares could rise on this", "direction"),
-        ("Buy Apple", "direction"),
-        ("A $500 billion plan", "amount"),
-        ("Tariffs of 25 percent on steel", "amount"),
-        ("You should look at Apple", "direction"),
-        ("Steel tariffs could send Nucor higher", "direction"),
-        ("Export curbs may push Nvidia lower", "direction"),
-        ("Tariff relief could drive Ford up", "direction"),
-        ("Drug price cuts may push Pfizer down", "direction"),
-        ("New tariffs benefit US steel makers like Nucor", "direction"),
-        ("Boeing orders may increase after the trade deal", "direction"),
-        ("Chip export ban could cause Nvidia sales to decline", "direction"),
-        ("Puts pressure on Apple's China supply chain", "direction"),
-        ("A tailwind for Lockheed Martin and Northrop Grumman", "direction"),
-        ("A headwind for Apple", "direction"),
-        ("Bad news for Pfizer and Merck", "direction"),
-        ("Strengthens the case for owning Exxon", "direction"),
-        ("Expect Nvidia to outpace rivals", "direction"),
-        ("Investors may want to watch Boeing", "direction"),
-        ("Apple at 200 after the tariff news", "number the post doesn't have: 200"),
-        ("Nvidia's 5 new plants", "number the post doesn't have: 5"),
-        ("American Eagle benefits from its ad", "direction"),
-        ("Imports harming the auto industry", "direction"),
-        ("Names steel under the Harmonized Tariff Schedule", None),
-    ],
-)
-def test_the_reason_line_check(line: str, problem: str | None) -> None:
-    found = check_reason(line, 120, POST)
-    assert (found is None) if problem is None else (problem in (found or "")), found
 
 
 async def test_a_reason_line_that_fails_its_check_or_errors_is_dropped(
