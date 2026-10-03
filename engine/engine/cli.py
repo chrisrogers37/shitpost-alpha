@@ -12,7 +12,7 @@ from pydantic_settings import BaseSettings
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
-from engine.db import db_now, make_engine
+from engine.db import db_now, first_line, make_engine
 from engine.feeds.history import run_import
 from engine.feeds.status import status_lines
 from engine.lease import LEASE_NAME
@@ -114,9 +114,8 @@ def serve_web(settings: WebSettings) -> None:
 
 
 def database_error_line(exc: OperationalError) -> str:
-    """One line from the driver. It names the host and user; it shows part of the password
-    only if the URL is malformed (an unescaped "@" in the password)."""
-    reason = (str(exc.orig or exc).splitlines() or [type(exc).__name__])[0]
+    """One line from the driver (see first_line)."""
+    reason = first_line(exc) or type(exc).__name__
     unreachable = reason.startswith(("connection", "failed to resolve host"))
     return f"{'could not reach' if unreachable else 'error from'} the engine database: {reason}"
 

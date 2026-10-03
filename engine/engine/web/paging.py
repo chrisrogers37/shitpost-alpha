@@ -8,10 +8,10 @@ import base64
 import binascii
 import json
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Query
-from pydantic import BaseModel, Field
+from fastapi import Depends, Query
 
 from engine.web.errors import ApiError
 from engine.web.models import ApiModel, ApiResponse
@@ -50,18 +50,28 @@ def decode_cursor(cursor: str, size: int) -> SortKey:
     return tuple(key)
 
 
-class PageQuery(BaseModel):
+@dataclass(frozen=True)
+class PageQuery:
     """?before=<cursor>&limit=. Take it as a `page: PageParams` parameter."""
 
-    before: str | None = Field(default=None, max_length=200)
-    limit: int = Field(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT)
+    before: str | None
+    limit: int
 
     def before_key(self, size: int) -> SortKey | None:
         """The decoded `before` cursor, or None for the first page."""
         return None if self.before is None else decode_cursor(self.before, size)
 
 
-PageParams = Annotated[PageQuery, Query()]
+def _page_query(
+    before: Annotated[str | None, Query(max_length=200)] = None,
+    limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
+) -> PageQuery:
+    return PageQuery(before, limit)
+
+
+PageParams = Annotated[PageQuery, Depends(_page_query)]
+"""A dependency, not a query model: FastAPI reads a query model's fields only when it is a
+route's only query parameter, and a list route usually takes filters too."""
 
 
 def take_page[RowT](

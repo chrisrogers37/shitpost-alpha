@@ -11,7 +11,9 @@ POSTGRES_DRIVERS = ("postgres", "postgresql", "postgresql+psycopg")
 class WebSettings(BaseSettings):
     """Everything the web process reads. It never reads the engine's ENGINE_* settings."""
 
-    model_config = SettingsConfigDict(env_prefix="WEB_", frozen=True, populate_by_name=True)
+    model_config = SettingsConfigDict(
+        env_prefix="WEB_", frozen=True, populate_by_name=True, hide_input_in_errors=True
+    )
 
     database_url: SecretStr = Field(min_length=1)
     """The web role's URL: reads what `migrate` grants it (WEB_GRANTS), nothing else. Use
@@ -31,7 +33,7 @@ class WebSettings(BaseSettings):
     this many entries from the right, so entries a visitor sends (on the left) never count."""
 
     pool_size: int = Field(default=5, ge=1)
-    """Database connections the process keeps open at most."""
+    """Database connections the API keeps open at most; /healthz keeps one more of its own."""
 
     port: int = Field(default=8000, ge=1, le=65535, validation_alias="PORT")
     """Port to listen on; Railway sets PORT."""
@@ -39,12 +41,18 @@ class WebSettings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def _is_postgres_url(cls, url: SecretStr) -> SecretStr:
+        # Never echo the value: it has the password.
+        raw = url.get_secret_value()
         try:
-            driver = make_url(url.get_secret_value()).drivername
+            parsed = make_url(raw)
         except (ArgumentError, ValueError):  # not a URL, or a port that isn't a number
-            driver = None
-        if driver not in POSTGRES_DRIVERS:
-            raise ValueError("not a postgresql:// URL")  # never echo the value: it has the password
+            parsed = None
+        if parsed is None or parsed.drivername not in POSTGRES_DRIVERS:
+            raise ValueError("not a postgresql:// URL")
+        # An "@" only ends the user and password. Another would put the password's tail in
+        # the host or database name, which the driver's errors (and so the logs) show.
+        if raw.count("@") > (0 if parsed.username is None else 1):
+            raise ValueError('write an "@" in the password as %40')
         return url
 
     @property

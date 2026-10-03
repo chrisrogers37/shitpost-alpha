@@ -48,6 +48,7 @@ def create_app(settings: WebSettings, routers: Sequence[ApiRouter] = API_ROUTERS
     for router in routers:
         if not isinstance(router, ApiRouter):  # its routes could return anything
             raise TypeError("create_app mounts ApiRouters only")
+        router.check()  # whatever way its routes were added
         app.include_router(router, prefix=API_PREFIX)
 
     buckets = TokenBuckets(settings.rate_limit_per_minute, settings.rate_limit_burst)

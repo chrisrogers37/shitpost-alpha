@@ -34,7 +34,7 @@ class ProbeRoutes:
 
     def __init__(self) -> None:
         self.clock = FakeClock()
-        self.cache = ResponseCache(ttl=5, clock=self.clock)
+        self.cache = ResponseCache[Probe](ttl=5, clock=self.clock)
         self.builds = 0
         self.router = router = ApiRouter(prefix="/test")
 
@@ -53,17 +53,17 @@ class ProbeRoutes:
             raise ApiError("not_found", "No such thing")
 
         @router.get("/numbers", response_model=Page[Number])
-        async def numbers(stream_id: StreamId, page: PageParams) -> Page[Number]:
+        async def numbers(stream_id: StreamId, page: PageParams, odd: bool = False) -> Page[Number]:
             key = page.before_key(1)
-            rows = [n for n in NUMBERS if key is None or n < key[0]][: page.limit + 1]
-            items, next_before = take_page(rows, page.limit, lambda n: (n,))
+            rows = [n for n in NUMBERS if (key is None or n < key[0]) and (n % 2 or not odd)]
+            items, next_before = take_page(rows[: page.limit + 1], page.limit, lambda n: (n,))
             numbers = [Number(n=n) for n in items]
             return Page[Number](stream_id=stream_id, items=numbers, next_before=next_before)
 
         @router.get("/cached", response_model=Probe)
         async def cached(
-            request: Request, db: Db, stream_id: StreamId, fail: bool = False
-        ) -> Response:
+            request: Request, response: Response, db: Db, stream_id: StreamId, fail: bool = False
+        ) -> Probe:
             async def build() -> Probe:
                 self.builds += 1
                 if fail:
@@ -72,4 +72,4 @@ class ProbeRoutes:
                     await conn.execute(text("SELECT 1"))
                 return Probe(stream_id=stream_id, answer=self.builds)
 
-            return await self.cache.respond(request, build)
+            return await self.cache.get(request, response, build)

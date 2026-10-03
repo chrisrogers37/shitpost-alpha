@@ -30,10 +30,12 @@ psycopg waits on a host that accepts and never answers for over two minutes (130
 measured). A URL's own `connect_timeout` wins; this one overrides PGCONNECT_TIMEOUT."""
 
 
-def make_engine(url: str, **pool: Any) -> AsyncEngine:
-    """Async engine (psycopg 3) for the engine database. `pool` sets pool options."""
+def make_engine(url: str, *, connect_timeout: int | None = None, **pool: Any) -> AsyncEngine:
+    """Async engine (psycopg 3) for the engine database. `pool` sets pool options, and
+    `connect_timeout` replaces CONNECT_TIMEOUT_SECONDS."""
+    connect_args = _connect_args(url, connect_timeout)
     return create_async_engine(
-        sqlalchemy_url(url), pool_pre_ping=True, connect_args=_connect_args(url), **pool
+        sqlalchemy_url(url), pool_pre_ping=True, connect_args=connect_args, **pool
     )
 
 
@@ -44,10 +46,10 @@ def make_sync_engine(url: str, **pool: Any) -> Engine:
     )
 
 
-def _connect_args(url: str) -> dict[str, Any]:
+def _connect_args(url: str, timeout: int | None = None) -> dict[str, Any]:
     if "connect_timeout" in make_url(url).query:
         return {}
-    return {"connect_timeout": CONNECT_TIMEOUT_SECONDS}
+    return {"connect_timeout": CONNECT_TIMEOUT_SECONDS if timeout is None else timeout}
 
 
 async def db_now(conn: AsyncConnection) -> datetime:
@@ -75,6 +77,13 @@ def raise_if_cancelling() -> None:
     task = asyncio.current_task()
     if task is not None and task.cancelling():
         raise asyncio.CancelledError
+
+
+def first_line(exc: BaseException) -> str:
+    """The first line of a database error in the driver's words (SQLAlchemy keeps the
+    driver's error as `orig`), or "". It names the host and user, and shows part of the
+    password only if the URL is malformed (an unescaped "@" in the password)."""
+    return (str(getattr(exc, "orig", None) or exc).splitlines() or [""])[0]
 
 
 def error_text(exc: BaseException, limit: int = 2000) -> str:

@@ -5,25 +5,29 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+ALIASES = ("alias", "validation_alias", "serialization_alias")
+
 
 class ApiModel(BaseModel):
-    """Anything /api/v1 returns, whole or nested. It lists its fields: a row or dict with
-    a field the model doesn't name fails validation instead of passing through. Fields go
-    out under their own names: aliases are refused, so the schema, a cached body and a
-    route's own body all have one shape."""
+    """Anything /api/v1 returns, whole or nested. It sends exactly the fields it lists,
+    under their own names, so the schema shows every field: a row or dict with a field the
+    model doesn't name fails validation instead of passing through, and a subclass may not
+    allow extra fields, take aliases (computed fields' included) or replace the model's
+    serializer."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     @classmethod
     def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
         super().__pydantic_init_subclass__(**kwargs)
-        aliased = [
-            name
-            for name, field in cls.model_fields.items()
-            if field.alias or field.validation_alias or field.serialization_alias
-        ]
+        fields = list(cls.model_fields.items()) + list(cls.model_computed_fields.items())
+        aliased = [n for n, field in fields if any(getattr(field, a, None) for a in ALIASES)]
         if aliased or cls.model_config.get("alias_generator"):
             raise TypeError(f"{cls.__name__}: API models take no aliases {aliased}")
+        if cls.model_config.get("extra") != "forbid":
+            raise TypeError(f"{cls.__name__}: API models forbid extra fields")
+        if cls.__pydantic_decorators__.model_serializers:
+            raise TypeError(f"{cls.__name__}: API models keep pydantic's serializer")
 
 
 class ApiResponse(ApiModel):

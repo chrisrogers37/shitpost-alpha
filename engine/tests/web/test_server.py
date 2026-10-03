@@ -10,11 +10,13 @@ from pathlib import Path
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from engine import cli as engine_cli
 from engine.web.settings import WebSettings
 
 PROJECT = Path(__file__).resolve().parent.parent.parent
+ESCAPE_AT = 'write an "@" in the password as %40'
 
 
 @pytest.fixture
@@ -23,6 +25,12 @@ def no_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         if name.startswith(("ENGINE_", "WEB_")) or name == "PORT":
             monkeypatch.delenv(name)
     monkeypatch.setattr(engine_cli, "configure_logging", lambda: None)  # keep pytest's
+
+
+@pytest.fixture
+def not_served(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Settings the test expects refused fail it instead of serving on 0.0.0.0."""
+    monkeypatch.setattr(engine_cli, "serve_web", lambda _: pytest.fail("served"))
 
 
 @pytest.mark.usefixtures("no_settings")
@@ -36,7 +44,7 @@ def test_web_reads_only_web_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     assert [(s.db_url, s.port) for s in served] == [("postgresql://web:pw@db.example/engine", 8123)]
 
 
-@pytest.mark.usefixtures("no_settings")
+@pytest.mark.usefixtures("no_settings", "not_served")
 def test_bad_web_settings_are_a_clear_error(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -50,7 +58,7 @@ def test_bad_web_settings_are_a_clear_error(
     assert "secret" not in err
 
 
-@pytest.mark.usefixtures("no_settings")
+@pytest.mark.usefixtures("no_settings", "not_served")
 @pytest.mark.parametrize(
     "url",
     [
@@ -67,6 +75,40 @@ def test_a_bad_database_url_is_one_line_without_the_password(
     assert engine_cli.main(["web"]) == 2
     err = capsys.readouterr().err
     assert err == "invalid web settings: WEB_DATABASE_URL: Value error, not a postgresql:// URL\n"
+
+
+@pytest.mark.usefixtures("no_settings", "not_served")
+@pytest.mark.parametrize(
+    "url",
+    [
+        "postgresql://web:hunter@tail@127.0.0.1/engine",  # the tail would be the host
+        "postgresql://web:hunter@tail/x@127.0.0.1/engine",  # or the host and database
+        "postgresql://webhunter/x@127.0.0.1/engine",  # no ":", so no user and password
+    ],
+)
+def test_an_unescaped_at_in_the_password_is_refused(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], url: str
+) -> None:
+    monkeypatch.setenv("WEB_DATABASE_URL", url)
+    assert engine_cli.main(["web"]) == 2
+    err = capsys.readouterr().err
+    assert err == f"invalid web settings: WEB_DATABASE_URL: Value error, {ESCAPE_AT}\n"
+    WebSettings(database_url="postgresql://web:hunter%40tail@127.0.0.1/engine")  # escaped
+
+
+@pytest.mark.usefixtures("no_settings")
+def test_a_settings_error_never_shows_the_url() -> None:
+    with pytest.raises(ValidationError) as caught:
+        WebSettings(database_url="mysql://web:secret@db.example/engine")
+    assert "secret" not in str(caught.value)
+
+
+@pytest.mark.usefixtures("no_settings")
+def test_the_defaults_are_the_briefs() -> None:
+    settings = WebSettings(database_url="postgresql://unused")
+    assert (settings.rate_limit_per_minute, settings.rate_limit_burst) == (120, 30)
+    assert (settings.client_ip_header, settings.trusted_hops) == ("X-Real-IP", 1)
+    assert (settings.pool_size, settings.port) == (5, 8000)
 
 
 def free_port() -> int:

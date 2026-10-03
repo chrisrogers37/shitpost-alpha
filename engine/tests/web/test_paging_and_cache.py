@@ -1,14 +1,16 @@
 import uuid
 
 import pytest
-from fastapi import Request
+from fastapi import Request, Response
 
 from engine.web.cache import MAX_ENTRIES, ResponseCache
+from engine.web.deps import StreamId
 from engine.web.errors import ApiError
 from engine.web.models import ApiResponse
 from engine.web.paging import decode_cursor, encode_cursor, take_page
+from engine.web.router import ApiRouter
 from tests.web.conftest import MakeClient
-from tests.web.routes import FakeClock, ProbeRoutes
+from tests.web.routes import FakeClock, Probe, ProbeRoutes
 
 
 def test_a_cursor_round_trips_and_is_url_safe() -> None:
@@ -61,6 +63,25 @@ async def test_a_list_pages_through_every_row(make_client: MakeClient) -> None:
     assert len(default["items"]) == 20
 
 
+async def test_paging_works_beside_a_filter(make_client: MakeClient) -> None:
+    client = make_client(ProbeRoutes().router)
+    first = (await client.get("/api/v1/test/numbers", params={"odd": "true", "limit": 3})).json()
+    assert [item["n"] for item in first["items"]] == [49, 47, 45]
+    params = {"odd": "true", "limit": 3, "before": first["next_before"]}
+    second = (await client.get("/api/v1/test/numbers", params=params)).json()
+    assert [item["n"] for item in second["items"]] == [43, 41, 39]
+    bad = await client.get("/api/v1/test/numbers", params={"odd": "true", "limit": 0})
+    assert bad.status_code == 400 and bad.json()["error"]["message"].startswith("limit: ")
+
+    schema = (await client.get("/api/v1/openapi.json")).json()
+    parameters = schema["paths"]["/api/v1/test/numbers"]["get"]["parameters"]
+    assert sorted((p["name"], p["required"]) for p in parameters) == [
+        ("before", False),
+        ("limit", False),
+        ("odd", False),
+    ]
+
+
 @pytest.mark.parametrize(
     "params",
     [{"limit": 0}, {"limit": 101}, {"limit": "x"}, {"before": "nope"}, {"before": "x" * 201}],
@@ -108,12 +129,33 @@ async def test_the_cache_keeps_only_200s(make_client: MakeClient) -> None:
 
 
 async def test_the_cache_stays_bounded() -> None:
-    cache = ResponseCache(ttl=5, clock=FakeClock())
+    cache = ResponseCache[ApiResponse](ttl=5, clock=FakeClock())
 
     async def build() -> ApiResponse:
         return ApiResponse(stream_id=uuid.uuid4())
 
     for n in range(MAX_ENTRIES + 100):
         scope = {"type": "http", "path": "/api/v1/x", "query_string": f"n={n}".encode()}
-        await cache.respond(Request(scope | {"headers": []}), build)
+        await cache.get(Request(scope | {"headers": []}), Response(), build)
     assert len(cache) == MAX_ENTRIES
+
+
+async def test_a_cached_body_goes_out_as_the_routes_model(make_client: MakeClient) -> None:
+    class Detail(Probe):  # more than the route declares
+        close_price: float
+
+    cache = ResponseCache[Probe](ttl=5)
+    router = ApiRouter()
+
+    @router.get("/detail")
+    async def detail(request: Request, response: Response, stream_id: StreamId) -> Probe:
+        async def build() -> Probe:
+            return Detail(stream_id=stream_id, answer=1, close_price=187.23)
+
+        return await cache.get(request, response, build)
+
+    client = make_client(router)
+    for _ in range(2):  # built, then kept
+        response = await client.get("/api/v1/detail")
+        assert set(response.json()) == {"stream_id", "answer"}
+        assert response.headers["cache-control"] == "public, max-age=5"

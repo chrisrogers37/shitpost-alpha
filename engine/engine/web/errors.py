@@ -8,12 +8,12 @@ from typing import Literal
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
-from pydantic import BaseModel
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from starlette.exceptions import HTTPException
 
-from engine.web.db import failure_line
+from engine.web.db import WrongRole, failure_line
+from engine.web.models import ApiModel
 
 log = logging.getLogger(__name__)
 
@@ -28,12 +28,12 @@ STATUS: dict[ErrorCode, int] = {
 }
 
 
-class ErrorDetail(BaseModel):
+class ErrorDetail(ApiModel):
     code: ErrorCode
     message: str
 
 
-class ErrorBody(BaseModel):
+class ErrorBody(ApiModel):
     """The body of every error under /api/."""
 
     error: ErrorDetail
@@ -102,6 +102,7 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(OperationalError)  # refused, lost, timed out
     @app.exception_handler(PoolTimeoutError)  # every connection busy
+    @app.exception_handler(WrongRole)  # the role holds more than WEB_GRANTS
     async def unavailable(request: Request, exc: Exception) -> Response:
         log.warning("database unavailable on %s: %s", request.url.path, failure_line(exc))
         return error_response(request.url.path, "unavailable", "The database is unavailable")

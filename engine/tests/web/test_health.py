@@ -3,9 +3,11 @@ import time
 from typing import Any
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event, text
 from sqlalchemy.engine import make_url
 
+from engine.web.app import create_app
 from engine.web.db import make_web_engine
 from engine.web.deps import Db, StreamId
 from engine.web.health import FRESH_SECONDS, HealthProbe
@@ -19,10 +21,13 @@ from tests.web.routes import FakeClock, Probe, ProbeRoutes
 
 
 async def test_healthz_answers_ok(make_client: MakeClient) -> None:
-    response = await make_client().get("/healthz")
+    client = make_client()
+    response = await client.get("/healthz")
     assert (response.status_code, response.json()) == (200, {"ok": True})
     assert response.headers["cache-control"] == "no-store"
     assert_security_headers(response)
+    head = await client.head("/healthz")  # uptime checkers often send HEAD
+    assert (head.status_code, head.content, head.headers["cache-control"]) == (200, b"", "no-store")
 
 
 async def test_a_refused_database_is_a_503(
@@ -82,6 +87,19 @@ async def test_healthz_answers_within_2s_when_its_connection_goes_silent(
             response = await client.get("/healthz")
             assert response.status_code == 503
             assert 1.9 < time.monotonic() - started < 2.5
+
+
+async def test_shutdown_never_waits_out_psycopgs_cancel(web_url: str) -> None:
+    async with db_proxy(web_url) as proxy:
+        app = create_app(WebSettings(database_url=proxy.url))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            assert (await client.get("/healthz")).status_code == 200
+            proxy.go_silent()
+            await asyncio.sleep(FRESH_SECONDS)
+            assert (await client.get("/healthz")).status_code == 503  # the query winds down
+        started = time.monotonic()
+        await app.state.web.close()  # psycopg's own wind-down would take 10 s
+        assert time.monotonic() - started < 1.5
 
 
 async def test_callers_share_one_query_and_reuse_its_answer_for_a_second(

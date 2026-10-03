@@ -1,6 +1,8 @@
 """GET /healthz: whether the database answers. Railway's health check and the engine's
 outside check call it. It is never rate limited, so it has its own connection and runs one
-query at a time however many call: a flood of it never reaches the API's pool."""
+query at a time however many call: a flood of it never reaches the API's pool. That
+connection checks the role when it opens (make_web_engine), so a role that holds more
+than WEB_GRANTS reads as unhealthy too."""
 
 import asyncio
 import logging
@@ -56,17 +58,21 @@ class HealthProbe:
             self._answered_at = self._clock()
 
     async def close(self) -> None:
-        if self._query is not None and not self._query.done():
+        """Stop a query still running, then close the connection. psycopg answers a cancel
+        by winding the query down for up to 10 s; a second cancel cuts that short."""
+        for _ in range(2):
+            if self._query is None or self._query.done():
+                break
             self._query.cancel()
-            await asyncio.wait({self._query})
+            await asyncio.wait({self._query}, timeout=1)
         await self.db.dispose()
 
 
 def health_router(probe: HealthProbe) -> APIRouter:
     router = APIRouter()
 
-    @router.get("/healthz", include_in_schema=False)
-    async def healthz() -> JSONResponse:
+    @router.api_route("/healthz", methods=["GET", "HEAD"], include_in_schema=False)
+    async def healthz() -> JSONResponse:  # uptime checkers often send HEAD
         """{"ok": true} (200) if the database answered SELECT 1 within 2 s, else
         {"ok": false} (503)."""
         ok = await probe.ok()

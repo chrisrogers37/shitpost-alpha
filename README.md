@@ -210,6 +210,7 @@ For detailed version history and recent improvements, see [CHANGELOG.md](CHANGEL
 - [x] **Automated Updates** - Railway cron every 15 minutes for price fetching and outcome calculation
 
 ### Phase 3: Dashboard & Visualization ✅ **COMPLETED**
+_This dashboard (`frontend/` and `api/`) was removed in site D0; the new website is built in `engine/engine/web/`._
 - [x] **React + FastAPI Frontend** - Single-post feed with prediction outcomes and price charts
 - [x] **TradingView Charts** - Candlestick/volume charts with post timestamp markers
 - [x] **Outcome Tracking** - T+1/3/7/30 return bubbles with P&L and correctness
@@ -222,7 +223,7 @@ For detailed version history and recent improvements, see [CHANGELOG.md](CHANGEL
 - [x] **Telegram Bot** - Real-time prediction alerts with subscriber commands
 - [x] **Alert Rules Engine** - Confidence threshold, asset filters, per-subscriber preferences
 - [x] **Subscriber Management** - Multi-tenant subscription via Telegram
-- [x] **Browser Alerts** - Dashboard alert panel with localStorage preferences
+- [x] **Browser Alerts** - Dashboard alert panel with localStorage preferences (removed with the dashboard)
 - [x] **Production Deployment** - Railway cron every 2 minutes, webhook endpoint, health check
 
 ### Phase 5: System Evolution ✅ **COMPLETED**

@@ -1,11 +1,21 @@
 import logging
 import uuid
+from typing import cast
 
 import psycopg
 import pytest
-from fastapi import APIRouter
-from pydantic import BaseModel, ConfigDict, Field
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse, Response
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    computed_field,
+    model_serializer,
+)
 from pydantic.alias_generators import to_camel
+from starlette.routing import Route
 
 from engine.web.app import create_app
 from engine.web.db import make_web_engine
@@ -161,6 +171,32 @@ def test_every_api_route_must_declare_an_api_response() -> None:
         create_app(NO_DATABASE, [APIRouter()])  # type: ignore[list-item]
 
 
+def test_every_api_route_returns_its_model() -> None:
+    router = ApiRouter()
+    with pytest.raises(TypeError, match="declared to return an ApiResponse"):
+
+        @router.get("/raw", response_model=Probe)
+        async def raw() -> JSONResponse:  # a Response goes out unchecked
+            return JSONResponse({"close_price": 187.23})
+
+    with pytest.raises(TypeError, match="declared to return an ApiResponse"):
+
+        @router.get("/row", response_model=Probe)
+        async def row() -> dict[str, object]:
+            return {"close_price": 187.23}
+
+    assert router.routes == []
+
+    async def plain(request: Request) -> Response:
+        return JSONResponse({"close_price": 187.23})
+
+    added = ApiRouter()
+    added.add_route("/plain", plain)
+    for unchecked in (added, ApiRouter(routes=[Route("/plain", plain)])):
+        with pytest.raises(TypeError, match=r"/plain: .* add_api_route"):
+            create_app(NO_DATABASE, [unchecked])
+
+
 def test_every_api_route_is_in_the_schema() -> None:
     router = ApiRouter()
     with pytest.raises(TypeError, match="must be in the schema"):
@@ -174,7 +210,7 @@ def test_every_api_route_is_in_the_schema() -> None:
     assert router.routes == []
 
 
-def test_api_models_take_no_aliases() -> None:
+def test_api_models_send_their_fields_as_listed() -> None:
     for field in (
         Field(alias="c"),
         Field(serialization_alias="c"),
@@ -191,13 +227,37 @@ def test_api_models_take_no_aliases() -> None:
             model_config = ConfigDict(alias_generator=to_camel)
             public_id: str
 
+    with pytest.raises(TypeError, match="no aliases"):
+
+        class Computed(ApiModel):
+            cents: int
+
+            @computed_field(alias="px")  # type: ignore[prop-decorator]
+            @property
+            def close_price(self) -> float:
+                return self.cents / 100
+
+    with pytest.raises(TypeError, match="forbid extra fields"):
+
+        class Loose(ApiModel):
+            model_config = ConfigDict(extra="allow")
+
+    with pytest.raises(TypeError, match="keep pydantic's serializer"):
+
+        class Serialized(ApiModel):
+            cents: int
+
+            @model_serializer(mode="wrap")
+            def _out(self, handler: SerializerFunctionWrapHandler) -> dict[str, object]:
+                return {**handler(self), "close_price": self.cents / 100}
+
 
 async def test_a_row_with_unlisted_fields_never_passes_through(make_client: MakeClient) -> None:
     router = ApiRouter()
 
     @router.get("/row", response_model=Probe)
-    async def row() -> dict[str, object]:
-        return {"stream_id": str(uuid.uuid4()), "answer": 1, "close_price": 1.0}
+    async def row() -> Probe:  # passes a row through, as a careless route might
+        return cast(Probe, {"stream_id": str(uuid.uuid4()), "answer": 1, "close_price": 1.0})
 
     response = await make_client(router).get("/api/v1/row")
     assert response.status_code == 500

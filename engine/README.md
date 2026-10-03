@@ -211,10 +211,13 @@ then grants it `WEB_GRANTS`):
 
     CREATE ROLE web LOGIN PASSWORD '<new password>';
 
-Not a role made in Neon's console: those can carry more than a plain role. At startup the
-process checks its role and refuses to serve (exit 3) if it is a superuser, can create
-roles or databases, bypasses row security, is a member of `pg_read_all_data` or can use
-the `prices` schema. If the database can't be reached then, it logs a warning and serves.
+Not a role made in Neon's console: those can carry more than a plain role. Every
+connection the process opens checks its role first, and none is used if the role is a
+superuser, can create roles or databases, bypasses row security, is a member of
+`pg_read_all_data` or can use the `prices` schema. At startup that stops the process
+(exit 3). If the database can't be reached at startup, or doesn't answer within 5 s (plus
+up to 10 s while psycopg cancels the query), it logs a warning and serves; a wrong role
+then makes the API and `/healthz` answer 503 once the database is back.
 
 Railway settings for its service:
 
@@ -227,7 +230,9 @@ Railway settings for its service:
   so the engine service names `/engine/railway.json` and this one names nothing.
 - Variables: `WEB_DATABASE_URL`, the engine database as the web role
   (`postgresql://web:...`), on Neon's direct (unpooled) endpoint. A transaction pooler
-  would drop each connection's 5 s statement timeout.
+  would drop each connection's 5 s statement timeout. Write an `@` in the password as
+  `%40`: the process refuses a URL with any other `@`, as the driver's errors would log
+  the rest of the password.
 - Keep Railway's CDN off for this service: behind it, `X-Real-IP` holds the CDN's address,
   so every visitor would share a rate-limit bucket.
 
@@ -238,10 +243,11 @@ Other settings (`engine/web/settings.py`) have defaults: `WEB_RATE_LIMIT_PER_MIN
 3 s (a `connect_timeout` in the URL wins), a statement after 5 s, and a request waiting
 for a free connection after 5 s: each is a 503.
 
-`/healthz` means "the database answers": `{"ok": true}` (200) if `SELECT 1` answered
-within 2 s, else `{"ok": false}` (503), never cached and never rate limited. It has its
-own connection, not one of the API's, so a busy API doesn't fail it and a flood of it
-doesn't slow the API: callers share one query at a time, and an answer is reused for 1 s.
+`/healthz` (GET or HEAD) means "the database answers": `{"ok": true}` (200) if
+`SELECT 1` answered within 2 s, else `{"ok": false}` (503), never cached and never rate
+limited. It has its own connection, not one of the API's, so a busy API doesn't fail it
+and a flood of it doesn't slow the API: callers share one query at a time, and an answer
+is reused for 1 s. That connection checks the role too, so a wrong role reads as a 503.
 
 The access log has method, path, status and duration, never the visitor's address.
 
@@ -267,35 +273,40 @@ stop and look before the site goes public.
 
 Every route under `/api/v1` follows these rules; each has a small module in `engine/web/`.
 
-- **Explicit fields** (`models.py`, `router.py`). Routes are defined on an `ApiRouter`,
-  which refuses a route whose `response_model` isn't an `ApiResponse` and a route left
-  out of the schema; `create_app` takes only `ApiRouter`s. Models list their fields and
-  forbid others, so a row or dict never passes through as is, and take no aliases, so a
-  field goes out under its own name.
+- **Explicit fields** (`models.py`, `router.py`). Routes are defined on an `ApiRouter`
+  with its method decorators. A route declares an `ApiResponse` as its return type and
+  returns one, which FastAPI checks against the model (a `Response` it returned would go
+  out unchecked, so that is refused), and it is in the schema. `ApiRouter` refuses a
+  route that breaks this, and `create_app` takes only `ApiRouter`s and checks every route
+  of each, however it was added. Models list their fields and forbid others, so a row or
+  dict never passes through as is; they take no aliases (computed fields' included) and
+  keep pydantic's serializer, so a field goes out under its own name.
 - **stream_id** (`stream.py`, `deps.py`). Every successful JSON body carries `stream_id`
   at the top level, from `engine.engine_meta`, read at most once a minute. Take it as a
   `StreamId` parameter. A new value means the database was rebuilt.
 - **Lists** (`paging.py`). A list is `Page[Item]`: `{stream_id, items, next_before}`. It
   takes `?before=<cursor>&limit=` (`limit` 1 to 100, default 20). The cursor is opaque:
   URL-safe base64 of the sort key, a list of integers. A bad `limit` or cursor is a 400.
-  Take it as a `page: PageParams` parameter; the route fetches `limit + 1` rows below
-  `page.before_key(n)` and calls `take_page`.
+  Take it as a `page: PageParams` parameter, beside the route's own filters; the route
+  fetches `limit + 1` rows below `page.before_key(n)` and calls `take_page`.
 - **Errors** (`errors.py`). Under `/api/`, every error is
   `{"error": {"code": ..., "message": ...}}`, including unknown paths (a trailing slash
   is one: there are no redirects). Raise `ApiError(code, message)` from a route.
 
   | Code | Status |
   |---|---|
-  | `bad_request` | 400 (also a wrong method: 405, with `Allow`) |
+  | `bad_request` | 400 (also a wrong method, HEAD included: 405, with `Allow`) |
   | `not_found` | 404 |
   | `rate_limited` | 429, with `Retry-After` |
-  | `unavailable` | 503, when the database is down or every connection is busy |
+  | `unavailable` | 503, when the database is down, every connection is busy or the role is wrong |
   | `internal` | 500; the traceback goes to the log only |
 
   Outside `/api/` the same statuses are plain text.
-- **Cache** (`cache.py`). `ResponseCache(ttl).respond(request, build)` serves a GET from
-  memory for `ttl` seconds, keyed by path and query string (at most 256 entries), and
-  sends `Cache-Control: public, max-age=<seconds left>`. Only 200s are kept.
+- **Cache** (`cache.py`). `ResponseCache[Body](ttl).get(request, response, build)`, with
+  the route's `request` and `response` parameters, gives the body kept for this path and
+  query string, or a new one from `build`, for `ttl` seconds (at most 256 entries), and
+  sets `Cache-Control: public, max-age=<seconds left>`. The route returns that body, so
+  FastAPI checks it like any other. Only 200s are kept.
 - **CORS** (`policy.py`). Any origin may GET `/api/v1/*`:
   `Access-Control-Allow-Origin: *`, no credentials, and `Retry-After` readable.
   Other methods get no CORS headers.
@@ -303,8 +314,10 @@ Every route under `/api/v1` follows these rules; each has a small module in `eng
   `Content-Security-Policy`, `Strict-Transport-Security: max-age=31536000`,
   `X-Content-Type-Options: nosniff` and `Referrer-Policy: strict-origin-when-cross-origin`.
 - **No prices.** No response field may be a price (`tests/web/test_no_prices.py` walks
-  the OpenAPI schema for price-like names, plurals included; public output is % moves
-  only). The web role can't read `prices` either, and the process checks that at startup.
+  the OpenAPI schema for price-like names, plurals included, and refuses objects that
+  don't list their keys: a dict field, an `Any`, a nested model that isn't an
+  `ApiModel`; public output is % moves only). The web role can't read `prices` either,
+  and every connection checks that.
 
 The schema is at `/api/v1/openapi.json`, the one body under `/api/v1` without
 `stream_id`; it documents the error shape as each route's 4XX and 5XX. The docs pages
