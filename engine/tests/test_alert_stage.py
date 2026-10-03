@@ -429,8 +429,7 @@ async def test_a_challenger_record_the_public_check_refuses_holds_up_nothing(
     (alerted,) = await run.post(live())
     assert alerted.alert is not None and alerted.challenger is None
     assert await count(db, alerts) == 1 and await count(db, challenger_calls) == 0
-    (notice,) = operator_notices(caplog, "challenger_not_public")
-    assert "median_move: refused" in notice
+    assert "not recorded: calls[].evidence.median_move: refused" in caplog.text
 
 
 async def test_the_reason_line_gets_only_the_instruments_the_post_names(

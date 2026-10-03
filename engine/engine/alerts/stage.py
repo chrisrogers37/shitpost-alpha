@@ -43,7 +43,6 @@ from engine.extract.rules import OTHER
 from engine.market import calendar
 from engine.market.instruments import Instrument as Listed
 from engine.market.instruments import all_instruments
-from engine.notify import notify_operator
 from engine.tables import (
     alerts,
     challenger_calls,
@@ -323,15 +322,14 @@ class Alerter:
     ) -> list[Call] | None:
         """The challenger's calls, judged against its own passing pairs and its own sends,
         stored apart. A retried stage writes nothing more. Calls the public check refuses
-        aren't recorded (one operator message), and the alert goes ahead without them."""
+        aren't recorded (logged), and the alert goes ahead without them."""
         picker = self.send_rule.challenger
         ids = {d.target.instrument.id for d in drafted}
         recent = await recently_sent(conn, challenger_calls.c.created_at, at, ids)
         decided = decide(drafted, self.send_rule.passing[picker], at, send_until, recent)
         calls = [call.model_dump(mode="json") for call in decided.calls]
         if problems := check_public({"calls": calls}):
-            refused = "; ".join(problems)
-            await notify_operator("challenger_not_public", f"{key}: not recorded: {refused}")
+            log.warning("challenger calls on %s not recorded: %s", key, "; ".join(problems))
             return None
         await conn.execute(
             insert(challenger_calls)
