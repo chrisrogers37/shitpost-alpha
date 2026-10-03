@@ -204,7 +204,7 @@ async def test_the_stage_drafts_the_evidence_as_of_the_alert_time_or_now_if_earl
     """Through the stage. A post seen 70 minutes late counts neither a window that closed
     after its alert time nor a post made after it. A post 10 seconds old is drafted as of
     the database clock: a window closing 90 seconds from now isn't counted, though it
-    closes before the post's alert time; the two that closed an hour ago are."""
+    closes before the post's alert time; the two that closed before it are."""
     late, fresh = live(minutes_ago=70, low=1), live(minutes_ago=10 / 60, low=2)
     vector = stub_vector(WORDS)
     async with db.begin() as conn:
@@ -650,27 +650,39 @@ async def test_the_moves_filler_waits_while_a_sample_is_being_built(
     migrated: Settings, db: AsyncEngine, history: History
 ) -> None:
     """build-moves writes a sample one instrument at a time. While a new day's sample grows
-    (here SPY first, then the rest), the filler starts no build beside it, and once the
-    sample holds still nothing is left for it."""
+    (SPY first, then the rest), the filler starts no build beside it, however many
+    instruments it still lacks; once the sample holds still, nothing is left for it."""
     await LiveRun(db).post(live())  # calls on SPY, QQQ, BTC, AAPL and NVDA
     async with db.begin() as conn:
         ids = [await slug_id(conn, slug) for slug in ("spy", "qqq", "btc", "aapl", "nvda")]
         for i in ids:  # the day before: every one built
             await plant_baselines(conn, i, "1h", 0.0, data_to=date(2026, 9, 30))
-        await plant_baselines(conn, ids[0], "1h", 0.0, data_to=date(2026, 10, 1))
     builds: list[list[int]] = []
+    looked, go = asyncio.Event(), asyncio.Queue[None]()
 
     async def build(settings: Settings, day: date, due: Sequence[int]) -> None:
         builds.append(list(due))
 
-    fast = market_settings(migrated, fill_moves_tick_seconds=0.1)
-    tasks = [asyncio.ensure_future(fill_worker(build)(EngineContext(fast, db)))]
-    try:
-        for i in ids[1:]:  # the other build goes on writing, an instrument per 0.05 s
-            await asyncio.sleep(0.05)
-            async with db.begin() as conn:
+    async def tick(seconds: float) -> None:  # one look done; wait to be stepped
+        looked.set()
+        await go.get()
+
+    async def write_then_look(*slugs: int) -> None:
+        async with db.begin() as conn:
+            for i in slugs:
                 await plant_baselines(conn, i, "1h", 0.0, data_to=date(2026, 10, 1))
-        await asyncio.sleep(0.5)  # several ticks with the sample holding still
+        looked.clear()
+        go.put_nowait(None)
+        await asyncio.wait_for(looked.wait(), 10)
+
+    worker = fill_worker(build, tick)(EngineContext(market_settings(migrated), db))
+    tasks = [asyncio.ensure_future(worker)]
+    try:
+        await asyncio.wait_for(looked.wait(), 10)  # the first look: the old sample, all built
+        await write_then_look(ids[0])  # the new day's build has written SPY
+        await write_then_look(ids[1])  # ... then QQQ: still growing
+        await write_then_look(*ids[2:])  # ... then the rest
+        await write_then_look()  # held still: nothing missing
     finally:
         await stop(tasks)
     assert builds == []

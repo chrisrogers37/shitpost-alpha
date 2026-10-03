@@ -82,8 +82,11 @@ async def build_in_process(settings: Settings, data_to: date, ids: Sequence[int]
     await run_in_process(job, settings, datetime.now(UTC))
 
 
-def fill_worker(build: Build = build_in_process) -> WorkerFunc:
-    """The worker build_registry() registers. Tests pass a stub build."""
+def fill_worker(
+    build: Build = build_in_process, tick: Callable[[float], Awaitable[None]] = asyncio.sleep
+) -> WorkerFunc:
+    """The worker build_registry() registers. Tests pass a stub build, and a tick they
+    step by hand."""
 
     async def run(ctx: EngineContext) -> None:
         settings = ctx.settings
@@ -100,7 +103,7 @@ def fill_worker(build: Build = build_in_process) -> WorkerFunc:
                 if due:
                     await _fill(ctx, build, sample.data_to, due, tried)
             seen = (sample.data_to, sample.built) if sample is not None else None
-            await asyncio.sleep(settings.fill_moves_tick_seconds)
+            await tick(settings.fill_moves_tick_seconds)
 
     return run
 
