@@ -13,7 +13,13 @@ Run from this directory, with `ENGINE_DATABASE_URL` set (never the old `DATABASE
     python -m engine status    # the status row, the lease, each feed's state, signals by stage
     python -m engine import-history   # past posts: CC0 archive copy, then CNN's live file
     python -m engine backfill-bars    # every instrument's missing daily bars from Alpaca
-    python -m engine web       # serve the website's API (reads WEB_* settings, never ENGINE_*)
+    python -m engine sync-names       # aliases.json's instruments and names into the database
+    python -m engine extract          # the rules picker over every text post (per rules version)
+    python -m engine fetch-model      # download the pinned similarity model files
+    python -m engine embed            # a similarity vector for every text post (per model version)
+    python -m engine ai-pick --from 2025-11-01 --to 2025-11-30 --max-usd 5   # or --keys FILE
+    python -m engine review-list      # names the AI vote counted that the rules missed
+    python -m engine web              # serve the website's API (WEB_* settings, never ENGINE_*)
 
 Settings are `ENGINE_*` variables; see `engine/settings.py`. New database connections
 give up after 10 s per address the host resolves to; a `connect_timeout` in the URL wins.
@@ -163,6 +169,81 @@ everything else is Alpaca's answer.
 
 The same answers show that stock daily bars start at midnight New York time, coin daily
 bars at midnight UTC, and that a bar starting exactly at a request's `end` is included.
+
+## Extraction and similarity
+
+Each text post gets a topic, a market link (yes or no) and the instruments it names, from
+two pickers, and a similarity vector. Everything is recorded in `engine.extractions` (one
+row per post, method, version and run; never overwritten), `engine.signal_mentions` (the
+names, mapped to instruments or kept with why not) and `engine.signal_embeddings`.
+
+- **Rules picker** (`engine/extract/rules.py`): cashtags, bare tickers, company names and
+  topic words. Its files (`extract/topics.json`, `extract/aliases.json`,
+  `market/collisions.json`) are pinned by SHA-256 in `extract/rules.json` with one version
+  number; changing any of them means bumping the version and the hashes, or loading
+  refuses. Collision tickers (`BA`, `SPY`, ...) count only as a cashtag or through a name.
+  A bare ticker counts only for an instrument a rules version reviewed (aliases.json's and
+  the seeded SPY, QQQ, BTC, ETH); one the AI added counts only as a cashtag until then.
+  Name and old-ticker dates come from the database, so run `sync-names` after changing
+  aliases.json. A post's date is its New York date.
+- **AI picker** (`engine/extract/ai.py`): the same post to two pinned models side by
+  side, OpenAI's `gpt-4.1-2025-04-14` and Anthropic's `claude-haiku-4-5-20251001`; a
+  name or a market link counts only when both make it, and if either fails (an error, an
+  invalid answer or more than 15 s) the rules stand in (`ai_fallback`). Its prompt,
+  schema, models and window start (2025-11-01, three months after Haiku's July 2025
+  cutoff) are pinned the same way in `extract/ai.json` as version 1, which is frozen:
+  the engine refuses its files if they change. What the code sends each provider from
+  them (the URL, the body, and the headers that pick an API version or a beta; never the
+  key) is pinned by a golden test (`tests/fixtures/ai/v1_requests.json`), so changing
+  that is a new version too. The prices (`extract/ai_models.json`) and the reason line
+  (`extract/reason.json`, its own version) sit outside it, so either can change without a
+  new picker version. Keys only from `ENGINE_OPENAI_KEY` and `ENGINE_ANTHROPIC_KEY`, and
+  it needs both. Clients never follow a redirect; `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID`,
+  `OPENAI_CUSTOM_HEADERS` and `ANTHROPIC_CUSTOM_HEADERS` must not be set (the SDKs would
+  add them to every request). A ticker no rules version reviewed counts only if Alpaca
+  says it counts on the post's day, so `ai-pick` without Alpaca keys leaves such names
+  unmapped. Live posts go to it only with `ENGINE_AI_LIVE=true`. `ai-pick` prints the
+  projected cost first, refuses a run over `--max-usd` (this run) or `--max-total-usd`
+  (everything recorded so far; no default, so pass what's left of the budget), stops once
+  either is passed, and stops with the post unrecorded on a bad key, an unknown model or
+  an empty OpenAI balance. One run at a time holds the `ai-pick` lease row (not an
+  advisory lock, so `ENGINE_DATABASE_URL` may be Neon's pooled endpoint), renewed before
+  each post; a killed run's hold lapses 10 minutes after its last post. A post slowed past
+  that by Alpaca's retries could let a run started meanwhile pay for that one post again.
+- **Reason line** (`engine/extract/reason.py`): one line of at most 120 characters on why
+  a post may matter, checked so it states no direction, price, target or advice and no
+  number the post doesn't have. PR 6 calls it.
+- **Similarity** (`engine/extract/similarity.py`): BAAI/bge-small-en-v1.5 from its ONNX
+  file on the CPU (onnxruntime and tokenizers, no torch), pinned in `extract/model.json`
+  and downloaded with `fetch-model` into `ENGINE_MODEL_DIR` (from huggingface.co and
+  us.aws.cdn.hf.co). Each vector records the model version: the commit plus a digest of
+  the rest of the pin (files, pooling, token limit, size), so changing any of it means
+  embedding again. Loading the model also embeds the pin's `check` text, a typical post
+  with punctuation, an accent and a word that splits into pieces, and refuses an
+  onnxruntime or tokenizers release, or a changed tokenizer, that moves its vector. When
+  the runtime isn't the one the check was made with (`made_with` in `model.json`), the
+  error names those versions to install. When it is, the error names both causes: code
+  that tokenizes or embeds changed, which leaves stored vectors stale too (fix the code,
+  or change the pin and embed again), or a `check` that is out of date (record it again
+  whenever the pin changes). It sits outside the version digest, so
+  recording it doesn't change the version. `embed` batches posts by length (at most 64,
+  and at most about 64 posts of 128 tokens once padded), which keeps the history run near
+  1.2 GB. Matching keeps all vectors in one numpy matrix. Match rule v1
+  (`extract/match_rule.json`): a past post is similar at 0.85 or more, at most 50; it was
+  set by reading pairs (`scripts/match_rule.py`), a test ties 0.85 to the committed
+  labels, and it must be read again for a new model version. `python -m scripts.match_rule
+  coverage` prints how often it matches across the history.
+- **Live stage**: the `score` worker gives each new text post its rules answer, mentions,
+  vector and, with the AI on, the two answers and the vote, then moves it to `done`.
+  It loads the model and checks the names are synced when it starts, and fails clearly
+  (posts wait at `score`) if either isn't so. With `ENGINE_AI_LIVE=true` it also fails
+  at start if the AI picker's frozen files changed or answers were recorded under the
+  version with other files; missing keys or an unready version only switch the AI off,
+  with a warning. History never goes through this stage.
+
+Labels and samples for measuring the pickers are in `precision/`
+(`scripts/precision.py` scores them; `scripts/history_report.py` sums the rules over all
+history).
 
 ## Database
 

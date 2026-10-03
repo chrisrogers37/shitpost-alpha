@@ -1,0 +1,20 @@
+{
+  "about": "The similarity model, pinned: the Hugging Face repo, its commit and each file's SHA-256 (model.onnx's matches the hub's LFS hash; the others were hashed from a download at this commit on 2 Oct 2026). `python -m engine fetch-model` downloads these into ENGINE_MODEL_DIR (outside the repo) and refuses a mismatch; model files are never committed. pooling: the repo's 1_Pooling/config.json (CLS). Changing anything here but `check` changes the model version recorded with every vector. `check` is a typical post (curly quotes, a dash, an accent, capitals, a word that splits into pieces) and the first values of its vector from these files, with the onnxruntime and tokenizers versions that made them in `made_with`; loading the model refuses a runtime or tokenizer that moves them, so record `check` again whenever anything else here changes.",
+  "repo": "BAAI/bge-small-en-v1.5",
+  "license": "MIT",
+  "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+  "files": {
+    "onnx/model.onnx": "828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35",
+    "tokenizer.json": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
+    "config.json": "094f8e891b932f2000c92cfc663bac4c62069f5d8af5b5278c4306aef3084750",
+    "1_Pooling/config.json": "d1caf60c96f5fba2157c0c26b76d80818fad6cf0b8eb5e73ec372ff9818eba5c"
+  },
+  "pooling": "cls",
+  "max_tokens": 512,
+  "dims": 384,
+  "check": {
+    "text": "We’re putting 25% TARIFFS on Chinese steel — José’s steelworkers will LOVE it!!!",
+    "first": [-0.0459, 0.0641, -0.0161, 0.0269, 0.0341, -0.0148],
+    "made_with": {"onnxruntime": "1.30.0", "tokenizers": "0.23.2"}
+  }
+}

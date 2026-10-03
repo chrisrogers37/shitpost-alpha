@@ -1,0 +1,104 @@
+{
+  "about": "The rules picker's topics. A post gets the first topic whose rules match, in this order (market topics first), else other. A rule is a word or phrase matched case-insensitively on word boundaries in the post's words (links removed); a trailing * matches any ending. A post matching any 'none' phrase skips that topic. 'names': the topic also matches when the post names a counted instrument. Drafted from 400 posts read on 2 Oct 2026; part of the rules version (rules.json).",
+  "topics": [
+    {
+      "id": "trade",
+      "name": "Trade and tariffs",
+      "description": "Tariffs, trade deals and talks, trade deficits, imports and exports, export controls.",
+      "market": true,
+      "any": ["tariff*", "trade deal*", "trade deficit*", "trade war*", "trade barrier*", "trade agreement*", "trade talks", "trade negotiation*", "trade policy", "trade policies", "unfair trade", "international trade", "reciprocal", "liberation day", "usmca", "nafta", "imports", "exports", "export control*", "duties"],
+      "none": ["endorse*"]
+    },
+    {
+      "id": "fed_rates",
+      "name": "The Fed and interest rates",
+      "description": "The Federal Reserve, its chair, rate cuts, mortgage rates and bond yields.",
+      "market": true,
+      "any": ["the fed", "federal reserve", "fed chair*", "powell", "interest rate*", "rate cut*", "cut rates", "cut the rate", "lower the rate", "lower rates", "mortgage rate*", "yields", "treasury yield*", "basis points"],
+      "none": ["endorse*"]
+    },
+    {
+      "id": "crypto",
+      "name": "Crypto",
+      "description": "Bitcoin, ether, stablecoins, crypto policy and meme coins.",
+      "market": true,
+      "any": ["bitcoin", "ethereum", "ether", "crypto*", "stablecoin*", "digital asset*", "cbdc", "blockchain", "meme coin*", "memecoin*", "$trump"],
+      "none": ["endorse*"]
+    },
+    {
+      "id": "energy",
+      "name": "Energy and oil",
+      "description": "Oil, gas and gasoline prices, drilling, pipelines, LNG, coal, wind, power plants and shipping lanes for energy.",
+      "market": true,
+      "any": ["oil", "crude", "petroleum", "drilling", "drill baby drill", "fracking", "pipeline*", "gasoline", "gas price*", "price of gas", "natural gas", "lng", "opec", "barrels", "per barrel", "refiner*", "energy price*", "energy cost*", "electricity", "coal", "windmill*", "wind farm*", "solar", "nuclear power", "power plant*", "keystone", "hormuz", "tanker*"],
+      "none": ["endorse*"]
+    },
+    {
+      "id": "taxes_budget",
+      "name": "Taxes, spending and debt",
+      "description": "Tax cuts and rises, the budget bills, spending, the debt ceiling, shutdowns and payments to the public.",
+      "market": true,
+      "any": ["tax", "taxes", "tax cut*", "tax break*", "tax rate*", "capital gains", "irs", "big beautiful bill", "budget", "spending bill", "spending cut*", "debt ceiling", "national debt", "default", "shutdown", "appropriations", "reconciliation", "rebate*", "stimulus", "trump dividend", "tariff dividend"],
+      "none": ["endorse*"]
+    },
+    {
+      "id": "economy",
+      "name": "The economy and markets",
+      "description": "The stock market, jobs numbers, inflation and prices, growth, recession and the housing market.",
+      "market": true,
+      "any": ["stock market*", "the market", "markets", "dow", "dow jones", "s&p", "nasdaq", "401k", "401-k", "401(k)", "all-time high*", "all time high*", "record high*", "inflation", "recession", "depression", "gdp", "jobs report", "jobs numbers", "job numbers", "unemployment", "adp", "consumer confidence", "prices", "cost of living", "affordability", "economy", "economic", "bidenomics", "housing market", "home prices", "wall street"],
+      "none": ["endorse*"]
+    },
+    {
+      "id": "companies",
+      "name": "Companies, industries and deals",
+      "description": "Named companies and their products, investments and factories, deals, industries (chips, steel, autos, drugs, defense, banks).",
+      "market": true,
+      "names": true,
+      "any": ["company", "companies", "corporation*", "ceo", "ceos", "shareholder*", "buyback*", "dividends", "merger*", "acquisition*", "antitrust", "invest", "invests", "investing", "invested", "investment*", "investor*", "factory", "factories", "manufactur*", "semiconductor*", "chips act", "steel", "aluminum", "copper", "automaker*", "auto industry", "car companies", "drug price*", "prescription drug*", "pharmaceutical*", "most favored nation", "defense contractor*", "big tech", "tech companies", "airline*", "banks", "banking", "insurance companies"],
+      "none": ["endorse*"]
+    },
+    {
+      "id": "war",
+      "name": "War, peace and sanctions",
+      "description": "Wars and military action, ceasefires and peace deals, sanctions, nuclear programs, hostages abroad.",
+      "market": true,
+      "any": ["war", "wars", "ceasefire", "cease fire", "peace deal*", "peace agreement*", "peace accord*", "peace summit", "sanction*", "missile*", "bombing", "bombed", "bombs", "airstrike*", "air strike*", "military strike*", "military operation*", "nuclear weapon*", "nuclear program", "enrichment", "troops", "invaded", "blockade", "warship*", "aircraft carrier*", "navy"],
+      "none": ["endorse*", "hoax", "collusion", "witch hunt", "culture war", "war room", "war on"]
+    },
+    {
+      "id": "elections",
+      "name": "Elections and campaigns",
+      "description": "Elections, voting and ballots, polls, primaries, endorsements, rallies and the campaign.",
+      "market": false,
+      "any": ["election*", "elect", "elected", "vote", "votes", "voting", "voter*", "ballot*", "poll", "polls", "polling", "primary", "primaries", "endorse*", "campaign*", "rally", "rallies", "caucus*", "candidate*", "midterm*", "re-election", "debate*", "swing state*", "mail-in", "redistricting", "maga2024"]
+    },
+    {
+      "id": "courts",
+      "name": "Courts and investigations",
+      "description": "Judges and courts, prosecutions and trials, the DOJ and FBI, lawsuits, impeachment, investigations.",
+      "market": false,
+      "any": ["judge*", "court*", "prosecut*", "indict*", "trial", "trials", "jury", "witch hunt", "doj", "fbi", "attorney general", "lawsuit*", "sue", "sued", "suing", "lawfare", "impeach*", "subpoena*", "hoax", "special counsel", "special prosecutor", "jack smith", "bragg", "letitia", "epstein", "pardon*", "grand jury", "gag order", "investigation*"]
+    },
+    {
+      "id": "border_crime",
+      "name": "Border, immigration and crime",
+      "description": "The border, illegal immigration and deportations, ICE, cartels and drugs, crime and policing.",
+      "market": false,
+      "any": ["border*", "immigra*", "illegal alien*", "illegals", "migrant*", "deport*", "ice", "cartel*", "fentanyl", "sanctuary", "crime", "crimes", "criminal aliens", "national guard", "police", "murder*"]
+    },
+    {
+      "id": "media",
+      "name": "The media",
+      "description": "News outlets and their reporters, ratings and interviews.",
+      "market": false,
+      "any": ["fake news", "media", "cnn", "msnbc", "nbc", "abc", "cbs", "fox", "foxnews", "fox news", "newsmax", "new york times", "washington post", "wall street journal", "ratings", "anchor*", "reporter*", "60 minutes", "interview*", "newspaper*", "podcast*", "journalist*"]
+    },
+    {
+      "id": "other",
+      "name": "Other",
+      "description": "Anything else: thanks, appointments, personal news, culture, sports.",
+      "market": false
+    }
+  ]
+}

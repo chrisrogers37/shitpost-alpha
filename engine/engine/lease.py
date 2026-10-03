@@ -1,5 +1,8 @@
 """One copy at a time: a row in engine.engine_lease decides which copy works.
 
+Each lease is a row by name: the engine's ("engine"), and ai-pick's ("ai-pick"), which a
+run renews before each post with acquire() instead of keep().
+
 Railway overlaps the old and new copies on each deploy. A copy takes the lease when it is
 free or expired, renews it every `renew` seconds, and the row expires `ttl` seconds after
 the last renewal. All lease times come from the database clock.
@@ -15,6 +18,9 @@ transaction elsewhere can't hold a copy up past those points.
 
 import asyncio
 import logging
+import os
+import secrets
+import socket
 from datetime import timedelta
 from typing import NoReturn
 
@@ -31,15 +37,23 @@ log = logging.getLogger(__name__)
 LEASE_NAME = "engine"
 
 
+def holder_id() -> str:
+    """A name for this copy, unique per process: host, pid and a random suffix."""
+    return f"{socket.gethostname()}:{os.getpid()}:{secrets.token_hex(3)}"
+
+
 class LeaseLost(Exception):
     """This copy no longer holds the lease and must stop working."""
 
 
 class Lease:
-    """The engine lease, as seen by one copy (`holder`)."""
+    """A lease (`name`), as seen by one copy (`holder`)."""
 
-    def __init__(self, db: AsyncEngine, holder: str, *, ttl: float, renew: float) -> None:
+    def __init__(
+        self, db: AsyncEngine, holder: str, *, ttl: float, renew: float, name: str = LEASE_NAME
+    ) -> None:
         self.holder = holder
+        self.name = name
         self._db = db
         self._ttl = ttl
         self._renew = renew
@@ -91,7 +105,7 @@ class Lease:
                     await self._bound_statements(conn)
                     await conn.execute(
                         delete(engine_lease).where(
-                            engine_lease.c.name == LEASE_NAME, engine_lease.c.holder == self.holder
+                            engine_lease.c.name == self.name, engine_lease.c.holder == self.holder
                         )
                     )
         except (SQLAlchemyError, OSError, TimeoutError) as exc:
@@ -111,7 +125,7 @@ class Lease:
         started = asyncio.get_running_loop().time()
         now = func.now()
         take = insert(engine_lease).values(
-            name=LEASE_NAME,
+            name=self.name,
             holder=self.holder,
             acquired_at=now,
             expires_at=now + timedelta(seconds=self._ttl),

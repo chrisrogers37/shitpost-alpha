@@ -1,7 +1,7 @@
 """Plug-in points: the daily jobs and long-running workers the lease holder runs.
 
 Other plans add theirs in build_registry(): delivery workers (notification plan), the
-live loop (PR 2), daily jobs.
+live loop (PR 2), the score stage (PR 4), daily jobs.
 """
 
 import pickle
@@ -74,8 +74,10 @@ class Registry:
 
 def build_registry() -> Registry:
     """The engine's jobs and workers. Later PRs register theirs here."""
-    from engine.feeds.live import feeds_worker  # the feeds import this module
+    from engine.extract.score import score_worker  # these import this module
+    from engine.feeds.live import feeds_worker
 
     registry = Registry()
     registry.register_worker("feeds", feeds_worker())
+    registry.register_worker("score", score_worker())
     return registry

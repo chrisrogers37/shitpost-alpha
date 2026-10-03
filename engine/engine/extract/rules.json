@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "about": "The rules picker's version. It covers the files below, each pinned by its SHA-256: edit any of them and the engine refuses to load the rules until this file has the new hash; raise the version with it. Every rules extraction records the version. Version 1 is frozen at the end of PR 4.",
+  "files": {
+    "extract/topics.json": "7c831f065d37fd489ad077fd4cde23732408f9e09e192cdd706416e339f2e2bd",
+    "extract/aliases.json": "b27178a168b67827b6c8faf33dd78fc0e0a7dede0cd275ae4c528898ba3d3789",
+    "market/collisions.json": "b24110cb741991fc8cb9f9070825d45e2290b9e96f700e0c8bbe114471a35a9e"
+  }
+}
