@@ -4,6 +4,7 @@ import gc
 import os
 import secrets
 from collections.abc import AsyncIterator, Callable, Iterator
+from pathlib import Path
 
 import psycopg
 import pytest
@@ -63,9 +64,12 @@ def make_role(database_url: str) -> Iterator[Callable[..., str]]:
 
 
 @pytest.fixture
-def settings(database_url: str) -> Settings:
+def settings(database_url: str, tmp_path: Path) -> Settings:
     return Settings(
         database_url=database_url,
+        alpaca_key_id=None,  # never the session's real keys
+        alpaca_secret_key=None,
+        bars_cache_dir=tmp_path / "bars",
         web_role=f"absent_{secrets.token_hex(4)}",
         code_version="test",
         lease_renew_seconds=0.2,

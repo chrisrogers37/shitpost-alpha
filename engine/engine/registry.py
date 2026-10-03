@@ -74,4 +74,8 @@ class Registry:
 
 def build_registry() -> Registry:
     """The engine's jobs and workers. Later PRs register theirs here."""
-    return Registry()
+    from engine.feeds.live import feeds_worker  # the feeds import this module
+
+    registry = Registry()
+    registry.register_worker("feeds", feeds_worker())
+    return registry

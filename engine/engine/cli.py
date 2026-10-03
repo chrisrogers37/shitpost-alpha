@@ -1,4 +1,5 @@
-"""Command line: `python -m engine migrate | run | status | web`."""
+"""Command line: `python -m engine migrate | run | status | import-history | backfill-bars`
+and `python -m engine web`."""
 
 import argparse
 import asyncio
@@ -12,6 +13,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
 from engine.db import db_now, make_engine
+from engine.feeds.history import run_import
+from engine.feeds.status import status_lines
 from engine.lease import LEASE_NAME
 from engine.logs import configure_logging
 from engine.migrate import migrate
@@ -31,6 +34,12 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
     commands.add_parser("migrate", help="upgrade the engine database to the latest schema")
     commands.add_parser("run", help="run the engine; one copy at a time holds the lease")
     commands.add_parser("status", help="print the engine status row")
+    commands.add_parser(
+        "import-history", help="import Trump's past posts (CC0 archive, then CNN's live file)"
+    )
+    commands.add_parser(
+        "backfill-bars", help="fetch every instrument's missing daily bars from Alpaca"
+    )
     commands.add_parser("web", help="serve the website and its API (WEB_* settings only)")
     args = parser.parse_args(argv)
 
@@ -52,6 +61,13 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
         if args.command == "migrate":
             migrate(settings.db_url, settings.web_role)
             return 0
+        if args.command == "import-history":
+            asyncio.run(run_import(settings))
+            return 0
+        if args.command == "backfill-bars":
+            from engine.market.bars import run_backfill  # pandas loads only for this command
+
+            return asyncio.run(run_backfill(settings))
         return asyncio.run(_status(settings))
     except OperationalError as exc:
         print(database_error_line(exc), file=sys.stderr)
@@ -71,8 +87,10 @@ def load_settings[S: BaseSettings](cls: type[S], what: str) -> S | None:
 
 
 def _variable(prefix: str, loc: tuple[int | str, ...]) -> str:
+    """The environment variable a settings error is about. A field read under its own
+    name (PORT, ALPACA_API_SECRET_KEY) is located at that name, in capitals."""
     name = "_".join(map(str, loc))
-    if name.isupper():  # an alias, already the variable's full name (PORT)
+    if name.isupper():
         return name
     return f"{prefix}{name.upper() or 'SETTINGS'}"
 
@@ -120,6 +138,7 @@ async def _status(settings: Settings) -> int:
                 await conn.execute(select(engine_lease).where(engine_lease.c.name == LEASE_NAME))
             ).one_or_none()
             now = await db_now(conn)
+            feeds = await status_lines(conn)
     except ProgrammingError:
         meta = None
     finally:
@@ -134,4 +153,6 @@ async def _status(settings: Settings) -> int:
     else:
         left = (lease.expires_at - now).total_seconds()
         print(f"lease: held by {lease.holder}, expires in {left:.0f}s")
+    for line in feeds:
+        print(line)
     return 0

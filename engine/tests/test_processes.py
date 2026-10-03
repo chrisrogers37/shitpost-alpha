@@ -12,6 +12,7 @@ from typing import IO, NoReturn
 
 import psycopg
 import pytest
+from pydantic import SecretStr
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -26,8 +27,22 @@ PROJECT = Path(__file__).resolve().parent.parent
 def env(settings: Settings, **overrides: str) -> dict[str, str]:
     """This environment without ENGINE_* variables, plus `settings` as ENGINE_* variables."""
     base = {k: v for k, v in os.environ.items() if not k.startswith("ENGINE_")}
-    fields = settings.model_dump() | {"database_url": settings.db_url}
-    return base | {f"ENGINE_{k.upper()}": str(v) for k, v in fields.items()} | overrides
+    return base | {f"ENGINE_{k.upper()}": env_value(v) for k, v in env_fields(settings)} | overrides
+
+
+def env_fields(settings: Settings) -> Iterator[tuple[str, object]]:
+    for name in Settings.model_fields:
+        value = getattr(settings, name)
+        if value is not None:
+            yield name, value
+
+
+def env_value(value: object) -> str:
+    if isinstance(value, SecretStr):
+        return value.get_secret_value()
+    if isinstance(value, frozenset):
+        return ",".join(sorted(value))
+    return str(value)
 
 
 def cli(environ: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
@@ -152,6 +167,9 @@ def test_migrate_and_status_commands(settings: Settings) -> None:
     (stream_id,) = query(settings.db_url, "SELECT stream_id::text FROM engine.engine_meta")[0]
     assert f"stream_id: {stream_id}" in status.stdout
     assert "lease: free" in status.stdout
+    assert "feed direct: not polled yet" in status.stdout
+    assert "feeds: not dark" in status.stdout
+    assert "signals by stage: none yet" in status.stdout
 
 
 def test_bad_settings_are_a_clear_error_that_never_prints_the_url(settings: Settings) -> None:
@@ -176,6 +194,20 @@ def test_bad_settings_are_a_clear_error_that_never_prints_the_url(settings: Sett
     assert result.returncode == 2
     assert "lease_ttl_seconds must be at least" in result.stderr
     assert settings.db_url not in result.stderr + result.stdout
+
+    # A field read under Alpaca's own name is named that way, and its value never shown.
+    result = cli(env(settings, ALPACA_API_SECRET_KEY="two words"), "status")
+    assert result.returncode == 2
+    assert "invalid engine settings: ALPACA_API_SECRET_KEY: " in result.stderr
+    assert "two words" not in result.stderr + result.stdout
+
+
+def test_the_cli_loads_pandas_only_for_the_commands_that_use_it() -> None:
+    code = "import sys, engine.cli; print('pandas' in sys.modules)"
+    loaded = subprocess.run(
+        [sys.executable, "-c", code], cwd=PROJECT, capture_output=True, text=True, timeout=60
+    )
+    assert loaded.stdout.strip() == "False", loaded.stderr
 
 
 @pytest.mark.parametrize("command", ["status", "migrate"])
