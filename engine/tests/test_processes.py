@@ -6,9 +6,10 @@ import socket
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import IO, NoReturn
+from typing import IO, NoReturn, Protocol
 
 import psycopg
 import pytest
@@ -18,8 +19,11 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from engine import cli as engine_cli
+from engine.feeds.store import store_posts, trump_source_id
 from engine.settings import Settings
 from tests import helpers
+from tests.alert_helpers import a_post
+from tests.extract_helpers import sync_names
 
 PROJECT = Path(__file__).resolve().parent.parent
 
@@ -56,15 +60,24 @@ def cli(environ: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]
     )
 
 
+class Spawn(Protocol):
+    def __call__(
+        self, environ: dict[str, str], probe: str = "tests.probe_engine"
+    ) -> subprocess.Popen[bytes]: ...
+
+
 @pytest.fixture
-def spawn(tmp_path: Path) -> Iterator[Callable[[dict[str, str]], subprocess.Popen[bytes]]]:
-    """Start engine copies with a probe job (tests/probe_engine.py); kill leftovers after."""
+def spawn(tmp_path: Path) -> Iterator[Spawn]:
+    """Start engine copies of a probe (tests/probe_engine.py: a job and a worker that record
+    their pid) logging to copy<n>.log; kill leftovers after."""
     started: list[tuple[subprocess.Popen[bytes], IO[bytes]]] = []
 
-    def start(environ: dict[str, str]) -> subprocess.Popen[bytes]:
+    def start(
+        environ: dict[str, str], probe: str = "tests.probe_engine"
+    ) -> subprocess.Popen[bytes]:
         log = (tmp_path / f"copy{len(started)}.log").open("wb")
         process = subprocess.Popen(
-            [sys.executable, "-m", "tests.probe_engine"],
+            [sys.executable, "-m", probe],
             cwd=PROJECT,
             env=environ,
             stdout=log,
@@ -115,7 +128,7 @@ async def probe_db(migrated: Settings, db: AsyncEngine) -> Settings:
 
 
 def test_one_of_two_copies_works_and_the_other_takes_over_after_kill_9(
-    probe_db: Settings, spawn: Callable[[dict[str, str]], subprocess.Popen[bytes]]
+    probe_db: Settings, spawn: Spawn
 ) -> None:
     url = probe_db.db_url
     copies = {p.pid: p for p in (spawn(env(probe_db)), spawn(env(probe_db)))}
@@ -142,7 +155,7 @@ def test_one_of_two_copies_works_and_the_other_takes_over_after_kill_9(
 
 
 def test_sigterm_hands_the_lease_over_without_waiting_for_expiry(
-    probe_db: Settings, spawn: Callable[[dict[str, str]], subprocess.Popen[bytes]]
+    probe_db: Settings, spawn: Spawn
 ) -> None:
     url = probe_db.db_url
     slow = env(probe_db, ENGINE_LEASE_RENEW_SECONDS="0.5", ENGINE_LEASE_TTL_SECONDS="30")
@@ -155,6 +168,87 @@ def test_sigterm_hands_the_lease_over_without_waiting_for_expiry(
     first.send_signal(signal.SIGTERM)
     assert first.wait(timeout=10) == 0
     assert wait_for(lambda: holder_pid(url) == second.pid, timeout=5)  # well under the 30 s TTL
+
+
+PROBE_ALERTS = "tests.probe_alerts"
+LIVE_WORDS = "Apple and $NVDA are building big plants in America"
+SLOW_LEASE = {"ENGINE_LEASE_RENEW_SECONDS": "0.5", "ENGINE_LEASE_TTL_SECONDS": "5"}
+"""A lease a copy keeps through a slow second on a busy machine: the tests' usual one
+lapses 0.8 s after a renewal, and a copy that loses it hands its posts to the other."""
+
+
+@pytest.fixture
+async def alert_db(migrated: Settings, db: AsyncEngine) -> Settings:
+    await sync_names(db)
+    return migrated
+
+
+async def store_live_posts(db: AsyncEngine, numbers: range) -> list[str]:
+    """Live posts with a market link (they name Apple and Nvidia), waiting at `score`."""
+    now = datetime.now(UTC)
+    posts = [a_post(now - timedelta(minutes=1), f"{LIVE_WORDS} ({n})", n + 1) for n in numbers]
+    async with db.begin() as conn:
+        await store_posts(conn, await trump_source_id(conn), "trumpstruth", posts)
+    return [post.key for post in posts]
+
+
+def lease_takers(logs: Path) -> int:
+    """How many copies have logged taking the lease."""
+    return sum("lease acquired" in path.read_text() for path in logs.glob("copy*.log"))
+
+
+def done(url: str, keys: Sequence[str]) -> bool:
+    stages = {str(key): stage for key, stage in query(url, "SELECT key, stage FROM engine.signals")}
+    return all(stages[key] == "done" for key in keys)
+
+
+async def test_kill_9_in_the_alert_stage_then_a_restart_leaves_one_alert(
+    alert_db: Settings, db: AsyncEngine, spawn: Spawn, tmp_path: Path
+) -> None:
+    url = alert_db.db_url
+    (key,) = await store_live_posts(db, range(1))
+    marker = tmp_path / "in-alert-stage"
+    hung = spawn(env(alert_db, PROBE_HANG_FILE=str(marker), **SLOW_LEASE), PROBE_ALERTS)
+    wait_for(lambda: marker.is_file() and marker.read_text() == key, timeout=60)
+    # Its alert and revision 1 are written, not committed: kill -9 the copy there.
+    hung.send_signal(signal.SIGKILL)
+    hung.wait()
+    assert query(url, "SELECT count(*) FROM engine.alerts") == [(0,)]
+    assert query(url, f"SELECT stage, attempts FROM engine.signals WHERE key = '{key}'") == [
+        ("alert", 1)
+    ]
+
+    spawn(env(alert_db, **SLOW_LEASE), PROBE_ALERTS)  # the restart
+    wait_for(lambda: done(url, [key]), timeout=60)
+    assert query(url, "SELECT signal_key FROM engine.alerts") == [(key,)]
+    assert query(url, "SELECT seq, revision, kind FROM engine.alert_revisions") == [
+        (1, 1, "created")
+    ]
+
+
+async def test_two_copies_make_one_alert_per_post_across_a_takeover(
+    alert_db: Settings, db: AsyncEngine, spawn: Spawn, tmp_path: Path
+) -> None:
+    url = alert_db.db_url
+    first = await store_live_posts(db, range(3))
+    copies = {
+        p.pid: p for p in (spawn(env(alert_db, **SLOW_LEASE), PROBE_ALERTS) for _ in range(2))
+    }
+    wait_for(lambda: done(url, first), timeout=60)
+    holder = holder_pid(url)
+    assert holder in copies
+    assert lease_takers(tmp_path) == 1  # the other copy only waited
+
+    copies[holder].send_signal(signal.SIGKILL)
+    copies[holder].wait()
+    later = await store_live_posts(db, range(3, 6))
+    wait_for(lambda: done(url, later), timeout=60)
+    (other,) = set(copies) - {holder}
+    assert holder_pid(url) == other
+    alerted = query(url, "SELECT signal_key FROM engine.alerts")
+    assert sorted(str(key) for (key,) in alerted) == sorted(first + later)
+    revisions = query(url, "SELECT seq, revision FROM engine.alert_revisions ORDER BY seq")
+    assert revisions == [(seq, 1) for seq in range(1, 7)]
 
 
 def test_migrate_and_status_commands(settings: Settings) -> None:
