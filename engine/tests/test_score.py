@@ -1,4 +1,4 @@
-"""The records tables and the live `score` stage, and the replay harness."""
+"""The records tables and the live `score` stage (tests/test_replay.py replays both stages)."""
 
 import asyncio
 import logging
@@ -17,17 +17,16 @@ from engine.extract.ai import AiPicker
 from engine.extract.names import load_book
 from engine.extract.records import Extraction, record, rules_extraction
 from engine.extract.rules import Mention, NamesNotSynced, RulesFileChanged, current_rules, pick
-from engine.extract.score import Scorer, live_ai, score_worker, store_embedding
+from engine.extract.score import Scorer, live_ai, store_embedding
 from engine.extract.similarity import Embedded, ModelMissing
 from engine.feeds.posts import Post
 from engine.feeds.store import SCORE, store_posts, trump_source_id
+from engine.pipeline import signals_worker
 from engine.registry import EngineContext, build_registry
 from engine.settings import Settings
 from engine.tables import extractions, signal_embeddings, signal_mentions, signals
 from tests.extract_helpers import StubClient, StubEmbedder, answer, ready_config, sync_names
 from tests.feeds_helpers import status_id_at
-from tests.replay import recorded_posts, replay, replay_embedder
-from tests.test_similarity import REAL_DIR
 
 WHEN = datetime(2026, 3, 2, 15, tzinfo=UTC)
 APPLE_POST = "Apple and $NVDA are building big plants in America"
@@ -57,7 +56,7 @@ async def stage_of(db: AsyncEngine, key: str) -> str:
 async def run_worker_until_done(
     settings: Settings, db: AsyncEngine, key: str, **loaders: Any
 ) -> None:
-    worker = asyncio.ensure_future(score_worker(**loaders)(EngineContext(settings, db)))
+    worker = asyncio.ensure_future(signals_worker(**loaders)(EngineContext(settings, db)))
     try:
         async with asyncio.timeout(10):
             while await stage_of(db, key) != "done":
@@ -180,8 +179,8 @@ async def test_one_vector_per_post_and_model_version(db: AsyncEngine) -> None:
 # --- the stage -------------------------------------------------------------------------------
 
 
-def test_the_registry_runs_the_score_stage() -> None:
-    assert "score" in build_registry().workers
+def test_the_registry_runs_the_live_stages_and_the_moves_filler() -> None:
+    assert {"signals", "fill-moves"} <= set(build_registry().workers)
 
 
 async def test_a_new_text_post_ends_at_done_with_rules_mentions_and_embedding(
@@ -282,7 +281,7 @@ async def test_missing_model_files_stop_the_worker_and_posts_wait_at_score(
     await store(db, post)
     with pytest.raises(ModelMissing):
         async with asyncio.timeout(10):
-            await score_worker()(EngineContext(migrated, db))
+            await signals_worker()(EngineContext(migrated, db))
     assert await stage_of(db, post.key) == SCORE
 
 
@@ -293,7 +292,7 @@ async def test_unsynced_names_stop_the_worker_and_posts_wait_at_score(
     await store(db, post)
     with pytest.raises(NamesNotSynced, match="sync-names"):
         async with asyncio.timeout(10):
-            await score_worker(embedder_loader=lambda s: StubEmbedder())(
+            await signals_worker(embedder_loader=lambda s: StubEmbedder())(
                 EngineContext(migrated, db)
             )
     assert await stage_of(db, post.key) == SCORE
@@ -324,40 +323,5 @@ async def test_ai_answers_recorded_with_other_files_stop_the_worker(
     await store(db, second)
     with pytest.raises(RulesFileChanged, match="AI picker version 1 has answers recorded"):
         async with asyncio.timeout(10):
-            await score_worker(**loaders)(EngineContext(migrated, db))
+            await signals_worker(**loaders)(EngineContext(migrated, db))
     assert await stage_of(db, second.key) == SCORE
-
-
-# --- the replay harness ------------------------------------------------------------------------
-
-
-async def test_the_replay_harness_runs_recorded_posts(db: AsyncEngine) -> None:
-    await sync_names(db)
-    feeds = recorded_posts()
-    assert all(feeds.values())
-    delivered: list[str] = []
-    clients = {p: StubClient(p, default=answer(False)) for p in ("openai", "anthropic")}
-    result = await replay(
-        db, feeds, embedder=replay_embedder(REAL_DIR), clients=clients, config=ready_config(),  # type: ignore[arg-type]
-        deliver=lambda scored: delivered.append(scored.key),
-    )  # fmt: skip
-    assert result.posts and all(post.stage == "done" for post in result.posts)
-    scored = [post for post in result.posts if post.scored]
-    unscored = {post.key for post in result.posts if not post.scored}
-    assert scored and sorted(delivered) == sorted(post.key for post in scored)
-    async with db.connect() as conn:
-        not_scored = set(
-            (
-                await conn.execute(select(signals.c.key).where(signals.c.not_scored.is_not(None)))
-            ).scalars()
-        )
-        votes = (
-            await conn.execute(select(func.count()).where(extractions.c.method == "ai:vote"))
-        ).scalar()
-    assert unscored == not_scored
-    assert votes == len(scored)
-    for post in scored:
-        assert post.scored is not None
-        assert {"rules", "embedding", "ai"} <= set(post.scored.seconds)
-    report = result.report()
-    assert len(report) == len(feeds) + len(result.posts)

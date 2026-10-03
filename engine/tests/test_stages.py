@@ -189,3 +189,28 @@ async def test_an_error_text_postgres_would_reject_is_still_recorded(
     row = await item(db)
     assert (row.stage, row.attempts) == ("first", 1)
     assert row.error == "first: ValueError: half an emoji \\ud83d and a  from the feed"
+
+
+async def test_after_commit_runs_once_the_stage_commits_and_its_error_is_only_logged(
+    db: AsyncEngine, table: Table, caplog: pytest.LogCaptureFixture
+) -> None:
+    recorder = Recorder()
+    recorder.failures["second"] = 1
+    rang: list[str] = []
+
+    def ring() -> None:
+        rang.append("rung")
+        raise RuntimeError("the hook broke")
+
+    second = recorder.handler("second")
+    stages = StageRunner(
+        db,
+        items,
+        [recorder.handler("first"), Stage("second", second.handler, ring)],
+        max_attempts=3,
+    )
+    await stages.run_once()  # second fails once: nothing committed, so no call
+    assert rang == [] and (await item(db)).stage == "second"
+    assert await stages.run_once() == 1
+    assert rang == ["rung"] and (await item(db)).stage == DONE  # the hook can't undo it
+    assert "after second committed" in caplog.text

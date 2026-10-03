@@ -117,7 +117,7 @@ def test_prices_and_the_reason_line_change_without_a_new_picker_version(
     picker_files = json.loads(MANIFEST.read_text("utf-8"))["files"]
     reason_files = json.loads(REASON_MANIFEST.read_text("utf-8"))["files"]
     assert not set(picker_files) & set(reason_files)
-    assert config.reason == load_reason() and config.reason.version == 1
+    assert config.reason == load_reason() and config.reason.version == 2
 
 
 def test_cost_counts_cached_input_apart() -> None:

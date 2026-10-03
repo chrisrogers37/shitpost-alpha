@@ -45,6 +45,7 @@ engine = [
     "market/collisions.json",
     "extract/*.json",
     "extract/prompts/*.md",
+    "alerts/*.json",
 ]
 
 [tool.ruff]

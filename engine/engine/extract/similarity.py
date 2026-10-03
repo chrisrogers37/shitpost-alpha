@@ -255,6 +255,14 @@ class Similarity:
         self.times = np.array([t.timestamp() for t in posted_at], dtype=np.float64)
         self.vectors = np.ascontiguousarray(vectors, dtype=np.float32)
 
+    def add(self, key: str, posted_at: datetime, vector: Vector) -> None:
+        """One more post, for the live pool, which grows as posts are scored. It copies
+        the matrix: a few milliseconds at tens of thousands of posts."""
+        row = np.asarray(vector, dtype=np.float32)[np.newaxis, :]
+        self.keys = np.append(self.keys, np.array([key], dtype=object))
+        self.times = np.append(self.times, posted_at.timestamp())
+        self.vectors = np.concatenate([self.vectors, row]) if len(self.vectors) else row
+
     def similar(
         self, key: str, vector: Vector, before: datetime, min_score: float, k: int = 50
     ) -> list[Match]:

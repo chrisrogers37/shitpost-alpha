@@ -50,6 +50,9 @@ class Stage:
 
     name: str
     handler: StageHandler
+    after_commit: Callable[[], None] | None = None
+    """Called once the handler's transaction has committed (the alert stage rings the
+    wake hook). It can't undo the stage: an error in it is logged."""
 
 
 class StageRunner:
@@ -65,6 +68,7 @@ class StageRunner:
         self._db = db
         self._table = table
         self._handlers = {stage.name: stage.handler for stage in stages}
+        self._after = {stage.name: stage.after_commit for stage in stages}
         self._next = dict(zip(names, [*names[1:], DONE], strict=True))
         self._max_attempts = max_attempts
         self._checked_unknown = False
@@ -129,6 +133,11 @@ class StageRunner:
                 async with self._db.begin() as conn:
                     await conn.execute(update(table).where(where).values(error=reason))
             return False
+        if (after := self._after[stage]) is not None:
+            try:
+                after()
+            except Exception:
+                log.exception("%s %s: after %s committed", table.fullname, item_id, stage)
         return True
 
     async def _fail(self, item_id: Any, reason: str) -> None:

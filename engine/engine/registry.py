@@ -1,7 +1,7 @@
 """Plug-in points: the daily jobs and long-running workers the lease holder runs.
 
 Other plans add theirs in build_registry(): delivery workers (notification plan), the
-live loop (PR 2), the score stage (PR 4), daily jobs.
+live loop (PR 2), the score and alert stages (PRs 4 and 6), daily jobs.
 """
 
 import pickle
@@ -11,15 +11,18 @@ from datetime import datetime, time
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from engine.alerts.wake import Wake
 from engine.settings import Settings
 
 
 @dataclass(frozen=True)
 class EngineContext:
-    """What workers and jobs get: the settings and the shared database engine."""
+    """What workers and jobs get: the settings, the shared database engine and the wake
+    hook, which rings after each alert commits (engine/alerts/wake.py)."""
 
     settings: Settings
     db: AsyncEngine
+    wake: Wake = field(default_factory=Wake, kw_only=True)
 
 
 @dataclass(frozen=True)
@@ -74,10 +77,12 @@ class Registry:
 
 def build_registry() -> Registry:
     """The engine's jobs and workers. Later PRs register theirs here."""
-    from engine.extract.score import score_worker  # these import this module
+    from engine.alerts.fill import fill_worker  # these import this module
     from engine.feeds.live import feeds_worker
+    from engine.pipeline import signals_worker
 
     registry = Registry()
     registry.register_worker("feeds", feeds_worker())
-    registry.register_worker("score", score_worker())
+    registry.register_worker("signals", signals_worker())
+    registry.register_worker("fill-moves", fill_worker())
     return registry

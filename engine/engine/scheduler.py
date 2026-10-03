@@ -179,7 +179,7 @@ class Scheduler:
             if job.heavy:
                 await run_in_process(job.func, settings, slot)
             else:
-                await job.func(JobContext(settings, self._ctx.db, slot))
+                await job.func(JobContext(settings, self._ctx.db, slot, wake=self._ctx.wake))
         except Exception as exc:
             raise_if_cancelling()  # interrupted, not failed: the row stays "running"
             error = error_text(exc)
