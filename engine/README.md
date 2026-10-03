@@ -192,23 +192,23 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
   schema, models and window start (2025-11-01, three months after Haiku's July 2025
   cutoff) are pinned the same way in `extract/ai.json` as version 1, which is frozen:
   the engine refuses its files if they change. What the code sends each provider from
-  them is pinned by a golden test (`tests/fixtures/ai/v1_requests.json`), so changing
-  that is a new version too. The prices (`extract/ai_models.json`) and
-  the reason line (`extract/reason.json`, its own version) sit outside it, so either can
-  change without a new picker version. Keys only from
-  `ENGINE_OPENAI_KEY` and `ENGINE_ANTHROPIC_KEY`, and it needs both. Clients never follow
-  a redirect; `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID`, `OPENAI_CUSTOM_HEADERS` and
-  `ANTHROPIC_CUSTOM_HEADERS` must not be set (the SDKs would add them to every
-  request). A ticker no rules version reviewed counts only if Alpaca says it counts on
-  the post's day, so `ai-pick` without Alpaca keys leaves such names unmapped. Live posts
-  go to it only with `ENGINE_AI_LIVE=true`. `ai-pick` prints the projected cost first,
-  refuses a run over `--max-usd` (this run) or `--max-total-usd` (everything recorded so
-  far; no default, so pass what's left of the budget), stops once either is passed, and
-  stops with the post unrecorded on a bad key, an unknown model or an empty OpenAI
-  balance. One run at a time holds the `ai-pick` lease row (not an advisory lock, so
-  `ENGINE_DATABASE_URL` may be Neon's pooled endpoint), renewed before each post; a
-  killed run's hold lapses 10 minutes after its last post. A post slowed past that by
-  Alpaca's retries could let a run started meanwhile pay for that one post again.
+  them (the URL, the body, and the headers that pick an API version or a beta; never the
+  key) is pinned by a golden test (`tests/fixtures/ai/v1_requests.json`), so changing
+  that is a new version too. The prices (`extract/ai_models.json`) and the reason line
+  (`extract/reason.json`, its own version) sit outside it, so either can change without a
+  new picker version. Keys only from `ENGINE_OPENAI_KEY` and `ENGINE_ANTHROPIC_KEY`, and
+  it needs both. Clients never follow a redirect; `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID`,
+  `OPENAI_CUSTOM_HEADERS` and `ANTHROPIC_CUSTOM_HEADERS` must not be set (the SDKs would
+  add them to every request). A ticker no rules version reviewed counts only if Alpaca
+  says it counts on the post's day, so `ai-pick` without Alpaca keys leaves such names
+  unmapped. Live posts go to it only with `ENGINE_AI_LIVE=true`. `ai-pick` prints the
+  projected cost first, refuses a run over `--max-usd` (this run) or `--max-total-usd`
+  (everything recorded so far; no default, so pass what's left of the budget), stops once
+  either is passed, and stops with the post unrecorded on a bad key, an unknown model or
+  an empty OpenAI balance. One run at a time holds the `ai-pick` lease row (not an
+  advisory lock, so `ENGINE_DATABASE_URL` may be Neon's pooled endpoint), renewed before
+  each post; a killed run's hold lapses 10 minutes after its last post. A post slowed past
+  that by Alpaca's retries could let a run started meanwhile pay for that one post again.
 - **Reason line** (`engine/extract/reason.py`): one line of at most 120 characters on why
   a post may matter, checked so it states no direction, price, target or advice and no
   number the post doesn't have. PR 6 calls it.
@@ -217,14 +217,19 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
   and downloaded with `fetch-model` into `ENGINE_MODEL_DIR` (from huggingface.co and
   us.aws.cdn.hf.co). Each vector records the model version: the commit plus a digest of
   the rest of the pin (files, pooling, token limit, size), so changing any of it means
-  embedding again. Loading the model also embeds the pin's `check` text and refuses an
-  onnxruntime or tokenizers release that moves its vector. `embed` batches posts by length (at most 64, and at most about 64
-  posts of 128 tokens once padded), which keeps the history run near 1.2 GB.
-  Matching keeps all vectors in one numpy matrix. Match rule v1
+  embedding again. Loading the model also embeds the pin's `check` text, a typical post
+  with punctuation, an accent and a word that splits into pieces, and refuses an
+  onnxruntime or tokenizers release, or a changed tokenizer, that moves its vector. When
+  the runtime isn't the one the check was made with (`made_with` in `model.json`), the
+  error names those versions to install; when it is, the error says `check` is out of
+  date: record it again whenever the pin changes. It sits outside the version digest, so
+  recording it doesn't change the version. `embed` batches posts by length (at most 64,
+  and at most about 64 posts of 128 tokens once padded), which keeps the history run near
+  1.2 GB. Matching keeps all vectors in one numpy matrix. Match rule v1
   (`extract/match_rule.json`): a past post is similar at 0.85 or more, at most 50; it was
   set by reading pairs (`scripts/match_rule.py`), a test ties 0.85 to the committed
-  labels, and it must be read again for a new model version. `python -m
-  scripts.match_rule coverage` prints how often it matches across the history.
+  labels, and it must be read again for a new model version. `python -m scripts.match_rule
+  coverage` prints how often it matches across the history.
 - **Live stage**: the `score` worker gives each new text post its rules answer, mentions,
   vector and, with the AI on, the two answers and the vote, then moves it to `done`.
   It loads the model and checks the names are synced when it starts, and fails clearly

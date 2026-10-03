@@ -1,5 +1,5 @@
 {
-  "about": "The similarity model, pinned: the Hugging Face repo, its commit and each file's SHA-256 (model.onnx's matches the hub's LFS hash; the others were hashed from a download at this commit on 2 Oct 2026). `python -m engine fetch-model` downloads these into ENGINE_MODEL_DIR (outside the repo) and refuses a mismatch; model files are never committed. pooling: the repo's 1_Pooling/config.json (CLS). Changing anything here but `check` changes the model version recorded with every vector. `check` is a text and the first values of its vector from these files, made with onnxruntime 1.30.0 and tokenizers 0.23.2; loading the model refuses a runtime or tokenizer that moves them.",
+  "about": "The similarity model, pinned: the Hugging Face repo, its commit and each file's SHA-256 (model.onnx's matches the hub's LFS hash; the others were hashed from a download at this commit on 2 Oct 2026). `python -m engine fetch-model` downloads these into ENGINE_MODEL_DIR (outside the repo) and refuses a mismatch; model files are never committed. pooling: the repo's 1_Pooling/config.json (CLS). Changing anything here but `check` changes the model version recorded with every vector. `check` is a typical post (curly quotes, a dash, an accent, capitals, a word that splits into pieces) and the first values of its vector from these files, with the onnxruntime and tokenizers versions that made them in `made_with`; loading the model refuses a runtime or tokenizer that moves them, so record `check` again whenever anything else here changes.",
   "repo": "BAAI/bge-small-en-v1.5",
   "license": "MIT",
   "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
@@ -13,7 +13,8 @@
   "max_tokens": 512,
   "dims": 384,
   "check": {
-    "text": "We will put big tariffs on Chinese steel to protect American workers",
-    "first": [-0.0720, 0.0076, -0.0272, 0.0465, 0.0500, 0.0316]
+    "text": "We’re putting 25% TARIFFS on Chinese steel — José’s steelworkers will LOVE it!!!",
+    "first": [-0.0459, 0.0641, -0.0161, 0.0269, 0.0341, -0.0148],
+    "made_with": {"onnxruntime": "1.30.0", "tokenizers": "0.23.2"}
   }
 }

@@ -190,7 +190,13 @@ async def test_anthropic_answer_through_the_sdk(monkeypatch: pytest.MonkeyPatch)
 
 V1_REQUESTS = FIXTURES / "ai" / "v1_requests.json"
 """What version 1 sends each provider for one post with a quoted post: the request the
-recorded answers were made with. A change to it is a change to the version."""
+recorded answers were made with, as its URL, its body and the headers in PINNED_HEADERS. A
+change to it is a change to the version."""
+
+PINNED_HEADERS = ("anthropic-version", "anthropic-beta", "openai-beta", "content-type")
+"""The request headers the golden test records: those that choose an API version or a beta
+feature, and the body's type. Never the key's (`authorization`, `x-api-key`); the SDKs' own
+`user-agent` and `x-stainless-*` change with their release and the machine."""
 
 
 async def v1_requests(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
@@ -198,18 +204,20 @@ async def v1_requests(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> di
     provider's request as sent through its SDK."""
     sent: dict[str, Any] = {}
 
-    def answered(provider: str, url: str, content: bytes, fixture: str) -> dict[str, Any]:
-        sent[provider] = {"url": url, "body": json.loads(content)}
+    def answered(
+        provider: str, request: httpx.Request | httpx2.Request, fixture: str
+    ) -> dict[str, Any]:
+        headers = {k: v for k, v in request.headers.items() if k in PINNED_HEADERS}
+        url, body = str(request.url), json.loads(request.content)
+        sent[provider] = {"url": url, "headers": headers, "body": body}
         return ai_fixture(fixture)
 
     def openai_route(request: httpx.Request) -> httpx.Response:
-        body = answered("openai", str(request.url), request.content,
-                        "openai_chat_completion.unverified.json")  # fmt: skip
+        body = answered("openai", request, "openai_chat_completion.unverified.json")
         return httpx.Response(200, json=body)
 
     def anthropic_route(request: httpx2.Request) -> httpx2.Response:
-        body = answered("anthropic", str(request.url), request.content,
-                        "anthropic_message.unverified.json")  # fmt: skip
+        body = answered("anthropic", request, "anthropic_message.unverified.json")
         return httpx2.Response(200, json=body)
 
     import anthropic
@@ -234,7 +242,9 @@ async def test_version_1_sends_each_provider_the_pinned_request(
     settings: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     sent = await v1_requests(settings, monkeypatch)
-    assert sent == json.loads(V1_REQUESTS.read_text("utf-8"))
+    pinned = V1_REQUESTS.read_text("utf-8")
+    assert sent == json.loads(pinned)
+    assert not any(key in pinned for key in ALL_KEYS.values())  # headers, but never a key
 
 
 async def test_keys_never_reach_errors_or_logs(caplog: pytest.LogCaptureFixture) -> None:

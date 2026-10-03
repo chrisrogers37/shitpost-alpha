@@ -13,11 +13,11 @@ Matching keeps every vector in one numpy matrix: no vector database.
 import hashlib
 import json
 import tempfile
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, NamedTuple, Protocol
 from urllib.parse import urlsplit
 
 import httpx
@@ -39,6 +39,18 @@ class ModelMissing(RuntimeError):
     """The model's files aren't in ENGINE_MODEL_DIR, or don't match the pins."""
 
 
+class Check(NamedTuple):
+    """What loading the model checks: a typical post and the first values of the vector
+    the pinned files make for it. A new onnxruntime or tokenizers release can change
+    vectors silently, and so can a tokenizer that splits, strips or cases differently."""
+
+    text: str
+    first: tuple[float, ...]
+    """Written to 4 places (see CHECK_TOLERANCE)."""
+    made_with: Mapping[str, str]
+    """The onnxruntime and tokenizers versions `first` was made with."""
+
+
 @dataclass(frozen=True)
 class ModelPin:
     repo: str
@@ -48,9 +60,9 @@ class ModelPin:
     pooling: str
     max_tokens: int
     dims: int
-    check: tuple[str, tuple[float, ...]] | None = None
-    """A text and the first values of its vector from the pinned files, checked when the
-    model loads: a new onnxruntime or tokenizers release can change vectors silently."""
+    check: Check | None = None
+    """Checked when the model loads. Outside `version`: it says whether this runtime makes
+    the pinned files' vectors, not which files they are."""
 
     @property
     def version(self) -> str:
@@ -75,6 +87,7 @@ class ModelPin:
 
 def load_pin(path: Path = PIN_FILE) -> ModelPin:
     data = json.loads(path.read_text("utf-8"))
+    recorded = data.get("check")
     return ModelPin(
         repo=data["repo"],
         revision=data["revision"],
@@ -82,7 +95,9 @@ def load_pin(path: Path = PIN_FILE) -> ModelPin:
         pooling=data["pooling"],
         max_tokens=int(data["max_tokens"]),
         dims=int(data["dims"]),
-        check=(data["check"]["text"], tuple(data["check"]["first"])) if "check" in data else None,
+        check=Check(recorded["text"], tuple(recorded["first"]), dict(recorded["made_with"]))
+        if recorded
+        else None,
     )
 
 
@@ -123,7 +138,48 @@ def normalized(rows: npt.NDArray[Any]) -> Vector:
 
 
 CHECK_TOLERANCE = 2e-4
-"""The check vector's values are written to 4 places."""
+"""How far a value of the check vector may be from its pin. The pins are written to 4
+places (up to 5e-5 off) and a runtime adds a little float noise; the tokenizer changes the
+tests simulate move values by 0.02 or more. A test holds the constant between 1e-4 and
+5e-4."""
+
+
+def runtime_versions() -> dict[str, str]:
+    """The onnxruntime and tokenizers that make vectors here."""
+    import onnxruntime  # loads only where vectors are made
+    import tokenizers
+
+    return {"onnxruntime": onnxruntime.__version__, "tokenizers": tokenizers.__version__}
+
+
+def _named(versions: Mapping[str, str]) -> str:
+    return " and ".join(f"{name} {version}" for name, version in versions.items())
+
+
+def _shown(values: Iterable[float]) -> str:
+    return "[" + ", ".join(f"{value:.4f}" for value in values) + "]"
+
+
+def verify_check(check: Check, vector: Vector) -> None:
+    """Refuse the vector a model made for `check.text` unless its first values are the
+    check's, and say what to do. Another runtime than the one the check was made with
+    means installing that one; the same runtime moving the values means `check` itself is
+    out of date for the pinned files."""
+    first = vector[: len(check.first)]
+    if np.allclose(first, check.first, atol=CHECK_TOLERANCE, rtol=0):
+        return
+    runtime = runtime_versions()
+    if runtime != check.made_with:
+        install = " ".join(f"{name}=={version}" for name, version in check.made_with.items())
+        raise ModelMissing(
+            f"the similarity model's check vector moved: this is {_named(runtime)}, not the "
+            f"versions its vectors were made with; install {install}"
+        )
+    raise ModelMissing(
+        f"the similarity model's check vector moved, though this is the {_named(runtime)} it "
+        "was made with: model.json's `check` is out of date for its pinned files, which give "
+        f"{_shown(first)} for its text, not {_shown(check.first)}; record `check` again"
+    )
 
 
 class OnnxEmbedder:
@@ -158,20 +214,8 @@ class OnnxEmbedder:
         )
         self.inputs = {item.name for item in self.session.get_inputs()}
         if pin.check is not None:
-            self._check(*pin.check)
-
-    def _check(self, text: str, first: tuple[float, ...]) -> None:
-        """Refuse a runtime or tokenizer that no longer makes the pinned files' vectors."""
-        import onnxruntime
-        import tokenizers
-
-        (made,) = self.embed([text])
-        if not np.allclose(made.vector[: len(first)], first, atol=CHECK_TOLERANCE, rtol=0):
-            raise ModelMissing(
-                f"the similarity model's check vector moved with onnxruntime "
-                f"{onnxruntime.__version__} and tokenizers {tokenizers.__version__}: install "
-                "the versions this model version's vectors were made with"
-            )
+            (made,) = self.embed([pin.check.text])
+            verify_check(pin.check, made.vector)
 
     def embed(self, texts: Sequence[str]) -> list[Embedded]:
         if not texts:

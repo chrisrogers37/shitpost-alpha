@@ -44,6 +44,7 @@ from tests.extract_helpers import (
     StubEmbedder,
     answer,
     ready_config,
+    stub_clients,
     sync_names,
 )
 from tests.feeds_helpers import status_id_at
@@ -212,10 +213,9 @@ async def test_review_list_shows_names_the_vote_counted_that_the_rules_missed(
         "openai": {TEXTS[1]: nvidia, TEXTS[0]: answer(True, conair, jaguar)},
         "anthropic": {TEXTS[1]: nvidia, TEXTS[0]: answer(True, conair)},
     }
-    clients: dict[str, Client] = {p: StubClient(p, answers=said[p]) for p in PROVIDERS}
     await run_ai_pick(
         migrated, chosen, max_usd=Decimal(5), say=lambda line: None,
-        picker=AiPicker(ready_config(), clients), listings=CountsAll(),
+        picker=AiPicker(ready_config(), stub_clients(**said)), listings=CountsAll(),
     )  # fmt: skip
     async with db.connect() as conn:
         lines = await review_list(conn, 1, ready_config().version)

@@ -1,6 +1,10 @@
 {
   "anthropic": {
     "url": "https://api.anthropic.com/v1/messages",
+    "headers": {
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json"
+    },
     "body": {
       "max_tokens": 800,
       "messages": [
@@ -77,6 +81,9 @@
   },
   "openai": {
     "url": "https://api.openai.com/v1/chat/completions",
+    "headers": {
+      "content-type": "application/json"
+    },
     "body": {
       "messages": [
         {
