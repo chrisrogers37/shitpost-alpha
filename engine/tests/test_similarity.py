@@ -6,6 +6,7 @@ import json
 import os
 import time
 from collections.abc import Iterator
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -233,9 +234,19 @@ def test_the_real_model_is_deterministic_normalised_and_ranks_a_paraphrase_first
     assert post.vector @ paraphrase.vector > post.vector @ unrelated.vector
     (long,) = model.embed(["tariffs " * 1000])
     assert long.truncated and not post.truncated
+    assert len(model.tokenizer.encode("tariffs " * 1000).ids) == REAL.max_tokens
     # The CLS vector of the pinned files (catches a pooling, tokenizer or feed change).
     golden = [-0.0720, 0.0076, -0.0272, 0.0465, 0.0500, 0.0316]
     assert post.vector[:6] == pytest.approx(golden, abs=2e-4)
+    assert REAL.check == (texts[0], tuple(golden))  # what loading checks
+
+
+@needs_real_model
+def test_a_runtime_that_moves_the_check_vector_is_refused() -> None:
+    assert REAL.check is not None
+    moved = replace(REAL, check=(REAL.check[0], (0.5, *REAL.check[1][1:])))
+    with pytest.raises(ModelMissing, match=r"check vector moved with onnxruntime \S+ and"):
+        OnnxEmbedder(moved, REAL_DIR)
 
 
 # --- the match rule and the stored index ------------------------------------------------------

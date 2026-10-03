@@ -1,10 +1,12 @@
 """The records tables and the live `score` stage, and the replay harness."""
 
 import asyncio
+import json
 import logging
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -207,6 +209,21 @@ KEYS = {
     "openai_key": SecretStr("sk-test-0000-DO-NOT-LOG"),
     "anthropic_key": SecretStr("sk-ant-test-0000-DO-NOT-LOG"),
 }
+
+
+def test_the_live_stage_stops_on_a_frozen_version_whose_files_changed(
+    migrated: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Not a warning and rules-only posts: the worker fails at start, like other_files."""
+    from engine.extract import score
+    from engine.extract.ai import MANIFEST, load_ai_config
+
+    changed = tmp_path / MANIFEST.name
+    changed.write_text(json.dumps(json.loads(MANIFEST.read_text("utf-8")) | {"frozen": "0" * 64}))
+    monkeypatch.setattr(score, "current_ai_config", lambda: load_ai_config(changed))
+    with pytest.raises(RulesFileChanged, match="frozen"):
+        live_ai(migrated.model_copy(update=KEYS | {"ai_live": True}))
+    assert live_ai(migrated.model_copy(update=KEYS)) is None  # off: nothing is loaded
 
 
 async def test_the_ai_is_off_unless_engine_ai_live_is_on(

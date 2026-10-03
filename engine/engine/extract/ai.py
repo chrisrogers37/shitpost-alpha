@@ -199,8 +199,8 @@ def _pinned(manifest: Path) -> tuple[dict[str, Any], dict[str, str], str]:
     pinned = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()
     if data.get("frozen", pinned) != pinned:
         raise RulesFileChanged(
-            f"version {data['version']} in {manifest.name} is frozen and its files changed: "
-            "a frozen version never changes, so raise the version"
+            f"'frozen' in {manifest.name} doesn't match version {data['version']}'s files: a "
+            "frozen version never changes, so raise the version and remove or replace 'frozen'"
         )
     return data, texts, pinned
 

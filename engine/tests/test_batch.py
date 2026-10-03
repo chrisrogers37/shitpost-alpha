@@ -205,9 +205,17 @@ async def test_review_list_shows_names_the_vote_counted_that_the_rules_missed(
     await sync_names(db)
     await store_history(db)
     chosen = Selection(start=WHEN.date(), end=WHEN.date())
+    nvidia = answer(True, ("Nvidia", "NVDA", "stock", "implied"))
+    conair = ("Conair", None, "stock", "implied")
+    jaguar = ("Jaguar", None, "stock", "implied")  # one model only: not listed
+    said = {
+        "openai": {TEXTS[1]: nvidia, TEXTS[0]: answer(True, conair, jaguar)},
+        "anthropic": {TEXTS[1]: nvidia, TEXTS[0]: answer(True, conair)},
+    }
+    clients: dict[str, Client] = {p: StubClient(p, answers=said[p]) for p in PROVIDERS}
     await run_ai_pick(
-        migrated, chosen, max_usd=Decimal(5), say=lambda line: None, picker=stub_picker(),
-        listings=CountsAll(),
+        migrated, chosen, max_usd=Decimal(5), say=lambda line: None,
+        picker=AiPicker(ready_config(), clients), listings=CountsAll(),
     )  # fmt: skip
     async with db.connect() as conn:
         lines = await review_list(conn, 1, ready_config().version)
@@ -215,6 +223,7 @@ async def test_review_list_shows_names_the_vote_counted_that_the_rules_missed(
         "rules v1 missed, AI v1 vote counted:",
         "  NVDA   'nvidia' (ai_implied): 1 posts",
         "named by both models, not mapped:",
+        "  'conair' - (no_ticker): 1 posts",
     ]
 
 
@@ -355,6 +364,25 @@ async def test_only_one_ai_pick_runs_at_a_time(migrated: Settings, db: AsyncEngi
         picker=stub_picker(), listings=CountsAll(),
     )  # fmt: skip
     assert done == 0 and await count(db, engine_lease) == 0  # given up at the end
+
+
+async def test_ai_pick_and_the_engine_hold_separate_leases(
+    migrated: Settings, db: AsyncEngine
+) -> None:
+    """An ai-pick run on the engine's host never takes the engine's row, nor waits on it."""
+    await sync_names(db)
+    posts = await store_history(db)
+    engine = Lease(db, "the engine", ttl=30, renew=10)  # the runtime's, by its default name
+    assert await engine.acquire()
+    done = await run_ai_pick(
+        migrated, Selection(keys=[posts[0].key]), max_usd=Decimal(5), say=lambda line: None,
+        picker=stub_picker(), listings=CountsAll(),
+    )  # fmt: skip
+    assert done == 0
+    async with db.connect() as conn:
+        held = dict((await conn.execute(select(engine_lease.c.name, engine_lease.c.holder))).all())
+    assert held == {"engine": "the engine"}  # and the run gave its own row back
+    await engine.release()
 
 
 @dataclass

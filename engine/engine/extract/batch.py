@@ -245,9 +245,10 @@ AI_PICK_LEASE = "ai-pick"
 AI_PICK_LEASE_SECONDS = 600.0
 """One `ai-pick` at a time holds this lease row: two at once would both pay for the same
 posts, and the second's answers would be dropped unrecorded. A row, not an advisory lock,
-so it holds behind a transaction-mode pooler. The run renews it before each post, which
-takes at most about 75 s (four 15 s attempts per model), so it lapses only after a run is
-killed."""
+so it holds behind a transaction-mode pooler. The run renews it before each post. A
+post's AI calls take at most about 75 s (four 15 s attempts per model), but Alpaca's
+retries on new tickers can stretch one past the lease, and a run started then could pay
+for that one post again (under a cent). Otherwise it lapses only after a run is killed."""
 
 
 async def run_ai_pick(

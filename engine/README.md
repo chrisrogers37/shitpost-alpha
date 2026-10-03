@@ -191,7 +191,9 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
   invalid answer or more than 15 s) the rules stand in (`ai_fallback`). Its prompt,
   schema, models and window start (2025-11-01, three months after Haiku's July 2025
   cutoff) are pinned the same way in `extract/ai.json` as version 1, which is frozen:
-  the engine refuses its files if they change. The prices (`extract/ai_models.json`) and
+  the engine refuses its files if they change. What the code sends each provider from
+  them is pinned by a golden test (`tests/fixtures/ai/v1_requests.json`), so changing
+  that is a new version too. The prices (`extract/ai_models.json`) and
   the reason line (`extract/reason.json`, its own version) sit outside it, so either can
   change without a new picker version. Keys only from
   `ENGINE_OPENAI_KEY` and `ENGINE_ANTHROPIC_KEY`, and it needs both. Clients never follow
@@ -204,8 +206,9 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
   far; no default, so pass what's left of the budget), stops once either is passed, and
   stops with the post unrecorded on a bad key, an unknown model or an empty OpenAI
   balance. One run at a time holds the `ai-pick` lease row (not an advisory lock, so
-  `ENGINE_DATABASE_URL` may be Neon's pooled endpoint); a killed run's hold lapses 10
-  minutes after its last post.
+  `ENGINE_DATABASE_URL` may be Neon's pooled endpoint), renewed before each post; a
+  killed run's hold lapses 10 minutes after its last post. A post slowed past that by
+  Alpaca's retries could let a run started meanwhile pay for that one post again.
 - **Reason line** (`engine/extract/reason.py`): one line of at most 120 characters on why
   a post may matter, checked so it states no direction, price, target or advice and no
   number the post doesn't have. PR 6 calls it.
@@ -214,7 +217,8 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
   and downloaded with `fetch-model` into `ENGINE_MODEL_DIR` (from huggingface.co and
   us.aws.cdn.hf.co). Each vector records the model version: the commit plus a digest of
   the rest of the pin (files, pooling, token limit, size), so changing any of it means
-  embedding again. `embed` batches posts by length (at most 64, and at most about 64
+  embedding again. Loading the model also embeds the pin's `check` text and refuses an
+  onnxruntime or tokenizers release that moves its vector. `embed` batches posts by length (at most 64, and at most about 64
   posts of 128 tokens once padded), which keeps the history run near 1.2 GB.
   Matching keeps all vectors in one numpy matrix. Match rule v1
   (`extract/match_rule.json`): a past post is similar at 0.85 or more, at most 50; it was
@@ -224,7 +228,10 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
 - **Live stage**: the `score` worker gives each new text post its rules answer, mentions,
   vector and, with the AI on, the two answers and the vote, then moves it to `done`.
   It loads the model and checks the names are synced when it starts, and fails clearly
-  (posts wait at `score`) if either isn't so. History never goes through this stage.
+  (posts wait at `score`) if either isn't so. With `ENGINE_AI_LIVE=true` it also fails
+  at start if the AI picker's frozen files changed or answers were recorded under the
+  version with other files; missing keys or an unready version only switch the AI off,
+  with a warning. History never goes through this stage.
 
 Labels and samples for measuring the pickers are in `precision/`
 (`scripts/precision.py` scores them; `scripts/history_report.py` sums the rules over all

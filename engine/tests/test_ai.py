@@ -131,6 +131,8 @@ def test_an_answer_is_checked_field_by_field() -> None:
     assert link and items == [Item("Nvidia", "NVDA", "stock", "explicit", "names Nvidia")]
     many = answer(False, *[(f"Co {n}", None, "stock", "implied") for n in range(10)])
     assert len(parse_answer(many, 8, 100)[1]) == 8
+    wordy = answer(True, ("N" * 150, "NVDA", "stock", "explicit"))
+    assert [len(i.why) for i in parse_answer(wordy, 8, 100)[1]] == [100]  # "names N..." cut
     for bad in (
         "not json",
         '{"market_link": "yes", "instruments": []}',
@@ -184,6 +186,55 @@ async def test_anthropic_answer_through_the_sdk(monkeypatch: pytest.MonkeyPatch)
     body = json.loads(sent[0].content)
     assert body["temperature"] == 0
     assert body["output_config"]["format"]["type"] == "json_schema"
+
+
+V1_REQUESTS = FIXTURES / "ai" / "v1_requests.json"
+"""What version 1 sends each provider for one post with a quoted post: the request the
+recorded answers were made with. A change to it is a change to the version."""
+
+
+async def v1_requests(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """The picker, built as in production from the shipped version, asked once; each
+    provider's request as sent through its SDK."""
+    sent: dict[str, Any] = {}
+
+    def answered(provider: str, url: str, content: bytes, fixture: str) -> dict[str, Any]:
+        sent[provider] = {"url": url, "body": json.loads(content)}
+        return ai_fixture(fixture)
+
+    def openai_route(request: httpx.Request) -> httpx.Response:
+        body = answered("openai", str(request.url), request.content,
+                        "openai_chat_completion.unverified.json")  # fmt: skip
+        return httpx.Response(200, json=body)
+
+    def anthropic_route(request: httpx2.Request) -> httpx2.Response:
+        body = answered("anthropic", str(request.url), request.content,
+                        "anthropic_message.unverified.json")  # fmt: skip
+        return httpx2.Response(200, json=body)
+
+    import anthropic
+    import openai
+
+    monkeypatch.setattr(
+        openai, "DefaultAsyncHttpxClient",
+        lambda **kw: httpx.AsyncClient(transport=httpx.MockTransport(openai_route), **kw),
+    )  # fmt: skip
+    monkeypatch.setattr(
+        anthropic, "DefaultAsyncHttpxClient",
+        lambda **kw: httpx2.AsyncClient(transport=httpx2.MockTransport(anthropic_route), **kw),
+    )  # fmt: skip
+    picker = AiPicker.from_settings(with_keys(settings, **ALL_KEYS), current_ai_config())
+    words = "Nvidia will build its new chip plants in Arizona. Great for American workers!"
+    post = PostText(words, "Tariffs on foreign chips are coming soon.")
+    await picker.pick(BOOK, post, WHEN, pick(BOOK, words, WHEN), None)
+    return sent
+
+
+async def test_version_1_sends_each_provider_the_pinned_request(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sent = await v1_requests(settings, monkeypatch)
+    assert sent == json.loads(V1_REQUESTS.read_text("utf-8"))
 
 
 async def test_keys_never_reach_errors_or_logs(caplog: pytest.LogCaptureFixture) -> None:
@@ -599,16 +650,15 @@ async def test_errors_no_retry_can_fix_are_fatal_and_not_retried() -> None:
         assert len(client.asked) == (1 if fatal else 3), error
 
 
-async def test_openai_out_of_credit_is_fatal_and_not_retried() -> None:
+@pytest.mark.parametrize(
+    ("code", "kind"),
+    [("insufficient_quota", "insufficient_quota"), (None, "insufficient_quota"),
+     ("insufficient_quota", "requests")],
+)  # fmt: skip
+async def test_openai_out_of_credit_is_fatal_and_not_retried(code: str | None, kind: str) -> None:
     """OpenAI answers an empty balance with a 429, which a wait can't lift."""
-    quota = {
-        "error": {
-            "message": "You exceeded your current quota, please check your plan.",
-            "type": "insufficient_quota",
-            "param": None,
-            "code": "insufficient_quota",
-        }
-    }
+    message = "You exceeded your current quota, please check your plan."
+    quota = {"error": {"message": message, "type": kind, "param": None, "code": code}}
     calls: list[httpx.Request] = []
 
     def route(request: httpx.Request) -> httpx.Response:

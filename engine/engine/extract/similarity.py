@@ -48,6 +48,9 @@ class ModelPin:
     pooling: str
     max_tokens: int
     dims: int
+    check: tuple[str, tuple[float, ...]] | None = None
+    """A text and the first values of its vector from the pinned files, checked when the
+    model loads: a new onnxruntime or tokenizers release can change vectors silently."""
 
     @property
     def version(self) -> str:
@@ -79,6 +82,7 @@ def load_pin(path: Path = PIN_FILE) -> ModelPin:
         pooling=data["pooling"],
         max_tokens=int(data["max_tokens"]),
         dims=int(data["dims"]),
+        check=(data["check"]["text"], tuple(data["check"]["first"])) if "check" in data else None,
     )
 
 
@@ -118,6 +122,10 @@ def normalized(rows: npt.NDArray[Any]) -> Vector:
     return result
 
 
+CHECK_TOLERANCE = 2e-4
+"""The check vector's values are written to 4 places."""
+
+
 class OnnxEmbedder:
     """The pinned model on the CPU."""
 
@@ -149,6 +157,21 @@ class OnnxEmbedder:
             str(directory / "onnx" / "model.onnx"), providers=["CPUExecutionProvider"]
         )
         self.inputs = {item.name for item in self.session.get_inputs()}
+        if pin.check is not None:
+            self._check(*pin.check)
+
+    def _check(self, text: str, first: tuple[float, ...]) -> None:
+        """Refuse a runtime or tokenizer that no longer makes the pinned files' vectors."""
+        import onnxruntime
+        import tokenizers
+
+        (made,) = self.embed([text])
+        if not np.allclose(made.vector[: len(first)], first, atol=CHECK_TOLERANCE, rtol=0):
+            raise ModelMissing(
+                f"the similarity model's check vector moved with onnxruntime "
+                f"{onnxruntime.__version__} and tokenizers {tokenizers.__version__}: install "
+                "the versions this model version's vectors were made with"
+            )
 
     def embed(self, texts: Sequence[str]) -> list[Embedded]:
         if not texts:
