@@ -12,9 +12,10 @@ from typing import Any, get_args, get_origin
 import pytest
 from pydantic import BaseModel
 
-from engine.alerts.model import AlertV1
-from engine.alerts.public import PUBLIC_FIELDS, check_public
+from engine.alerts.model import EXCERPT_CHARS, AlertV1
+from engine.alerts.public import PUBLIC_FIELDS, check_public, quote
 from tests.alert_helpers import sample_alert
+from tests.replay import recorded_posts
 
 ALLOWLIST = {
     "format": "text",
@@ -81,6 +82,22 @@ def model_fields(model: type[BaseModel], path: str = "") -> set[str]:
     return found
 
 
+MESSAGES = {
+    "not a public field",
+    "not true or false",
+    "not a count",
+    "not a number",
+    "outside -100 to 300, so taken for a price",
+    "has more than 2 decimals",
+    "not an ISO time",
+    "a time without its offset",
+    "has a link other than our signal page",
+    "has a price-like number",
+}
+"""Every problem the check states. None holds the refused value: a problem can end up in
+engine.signals.error, which the web role reads."""
+
+
 def doc(**changes: Any) -> dict[str, Any]:
     return sample_alert(**changes).model_dump(mode="json")
 
@@ -133,6 +150,7 @@ def test_a_price_like_number_or_a_foreign_link_fails(change: dict[str, Any], pro
             changed[key] = value
     problems = check_public(changed)
     assert len(problems) == 1 and problem in problems[0], problems
+    assert problems[0].split(": ", 1)[1] in MESSAGES  # the field and what's wrong, no value
 
 
 def test_our_own_signal_page_and_percentages_are_fine() -> None:
@@ -143,3 +161,50 @@ def test_our_own_signal_page_and_percentages_are_fine() -> None:
 
 def test_the_post_may_quote_amounts_but_not_links() -> None:
     assert check_public(doc(excerpt="$500 Billion and 2.5% more!")) == []
+
+
+LINKS = [
+    "youtu.be/abc123",
+    "example.ru",
+    "nyti.ms/3abc",
+    "foo.xyz/page",
+    "cnn.it/abc",
+    "amzn.to/abc",
+    "rumble.com/v1abc",
+    "Truth.Social/@realDonaldTrump",
+    "https://www.whitehouse.gov/briefings",
+    "www.example.org",
+]
+
+
+@pytest.mark.parametrize("link", LINKS)
+def test_a_link_under_any_domain_is_quoted_out_and_refused(link: str) -> None:
+    """Telegram and X link these whatever the top-level domain: a quote drops them, and
+    the check refuses one in any field."""
+    words = f"Watch {link} now"
+    assert quote(words) == "Watch now"
+    assert check_public(doc(excerpt=words)) == ["excerpt: has a link other than our signal page"]
+    assert check_public(doc(reason=words)) == ["reason: has a link other than our signal page"]
+
+
+def test_quotes_keep_words_that_are_not_links_and_always_pass() -> None:
+    kept = "U.S. and E.U. officials met at 9 a.m., e.g. on Jan. 15, in D.C. on BRK.B"
+    assert quote(kept) == kept
+    posts = [post.text for feed in recorded_posts().values() for post in feed]
+    long = " ".join(["Tremendous"] * 40) + " see youtu.be/x"
+    for words in [*posts, long, *(f"Watch {link} now" for link in LINKS)]:
+        quoted = quote(words)
+        assert len(quoted) <= EXCERPT_CHARS
+        assert check_public(doc(excerpt=quoted)) == [], quoted
+
+
+def test_an_empty_list_or_object_passes_only_under_the_alerts_own_names() -> None:
+    assert check_public(doc() | {"prices": []}) == ["prices: not a public field"]
+    assert check_public(doc() | {"entry": {}}) == ["entry: not a public field"]
+    assert check_public(doc() | {"minute_series": [[], []]}) == [
+        "minute_series[]: not a public field",
+        "minute_series[]: not a public field",
+    ]
+    no_examples = doc()
+    no_examples["calls"][0]["evidence"]["examples"] = []
+    assert check_public(no_examples) == [] and check_public(doc() | {"calls": []}) == []

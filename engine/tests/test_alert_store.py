@@ -2,16 +2,21 @@
 change cursor, and the recent sends rule 6 reads."""
 
 import asyncio
+import time
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
+from typing import Any
 
 import pytest
 from sqlalchemy import Executable, delete, func, select, text, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
+import engine.alerts.store as store_module
 from engine.alerts.model import AlertV1
 from engine.alerts.store import (
     NotPublic,
+    SeqBusy,
     add_revision,
     read_changes,
     recently_sent,
@@ -141,7 +146,7 @@ async def test_writers_commit_in_seq_order_and_a_reader_never_sees_a_gap(db: Asy
     following = asyncio.create_task(reader())
     await asyncio.gather(*(writer(alert_id, REVISIONS // WRITERS) for alert_id in written))
     done.set()
-    await following
+    await asyncio.wait_for(following, 60)  # a has_more that never ends fails, not hangs
     assert [seq for seq, _ in seen] == list(range(1, first + REVISIONS + 1))
     times = [at for _, at in seen]
     assert times == sorted(times)
@@ -169,6 +174,80 @@ async def test_the_cursor_carries_the_stream_id_and_pages(db: AsyncEngine) -> No
     with pytest.raises(ValueError, match="limit"):
         async with db.connect() as conn:
             await read_changes(conn, 0, limit=0)
+    with pytest.raises(ValueError, match="after"):  # else has_more would stay true for good
+        async with db.connect() as conn:
+            await read_changes(conn, -1)
+
+
+async def test_a_page_ending_at_the_head_has_no_more(db: AsyncEngine) -> None:
+    for n in (1, 2, 3):
+        await an_alert(db, n)
+    async with db.connect() as conn:
+        page = await read_changes(conn, 0, limit=3)
+        short = await read_changes(conn, 0, limit=2)
+    assert [r.seq for r in page.revisions] == [1, 2, 3] and page.head == 3
+    assert not page.has_more and short.has_more
+
+
+class Interleaved:
+    """Test-only: wraps a connection and runs `hook` (another connection commits) right
+    after its nth statement."""
+
+    def __init__(self, conn: AsyncConnection, nth: int, hook: Callable[[], Awaitable[Any]]) -> None:
+        self.conn, self.nth, self.hook, self.calls = conn, nth, hook, 0
+
+    async def execute(self, *args: Any, **kwargs: Any) -> Any:
+        result = await self.conn.execute(*args, **kwargs)
+        self.calls += 1
+        if self.calls == self.nth:
+            await self.hook()
+        return result
+
+
+async def test_a_revision_committed_after_the_head_was_read_waits_for_the_next_read(
+    db: AsyncEngine,
+) -> None:
+    """read_changes reads the head (its 2nd statement), then only revisions up to it: one
+    committed in between comes with the next call, so head, has_more and the page agree."""
+    await an_alert(db, 1)
+    async with db.connect() as conn:
+        changes = await read_changes(Interleaved(conn, 2, lambda: an_alert(db, 2)), 0)  # type: ignore[arg-type]
+        again = await read_changes(conn, 1)
+    assert (changes.head, [r.seq for r in changes.revisions], changes.has_more) == (1, [1], False)
+    assert (again.head, [r.seq for r in again.revisions]) == (2, [2])
+
+
+async def test_a_writer_waits_for_the_seq_lock_only_so_long(
+    db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(store_module, "SEQ_WAIT", timedelta(seconds=0.3))
+    async with db.connect() as holder:
+        held = await holder.begin()
+        await take_seq(holder)
+        started = time.monotonic()
+        with pytest.raises(SeqBusy, match="seq lock"):
+            async with db.begin() as conn:
+                await take_seq(conn)
+        assert time.monotonic() - started < 5
+        await held.rollback()
+
+
+async def test_a_holder_of_the_seq_lock_that_stalls_is_cut_off(
+    db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A copy that stalls (or loses its network) inside the locked section: the database
+    ends its session after SEQ_IDLE, so the next writer gets the seq instead of waiting
+    until TCP keepalive gives up."""
+    monkeypatch.setattr(store_module, "SEQ_IDLE", timedelta(seconds=0.5))
+    async with db.connect() as holder:
+        await holder.begin()
+        await take_seq(holder)  # seq 1, then it stalls
+        started = time.monotonic()
+        async with db.begin() as conn:
+            taken = await take_seq(conn)
+        assert taken.seq == 1 and time.monotonic() - started < 10  # the stalled one rolled back
+        with pytest.raises(DBAPIError):
+            await holder.execute(select(1))
 
 
 @pytest.mark.parametrize(("minutes", "burst"), [(29, True), (31, False), (30, False)])
