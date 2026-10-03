@@ -210,9 +210,13 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
   balance. One run at a time holds the `ai-pick` lease row (not an advisory lock, so
   `ENGINE_DATABASE_URL` may be Neon's pooled endpoint); a killed run's hold lapses 10
   minutes after its last post.
-- **Reason line** (`engine/extract/reason.py`): one line of at most 120 characters on why
-  a post may matter, checked so it states no direction, price, target or advice and no
-  number the post doesn't have. PR 6 calls it.
+- **Reason line** (`engine/extract/reason.py`, version 2 in `extract/reason.json`): one
+  line of at most 120 characters on why a post may matter, written by the Anthropic model
+  when the AI is live. A check drops a line with a direction, outcome, price, target or
+  advice word, any amount, a link, or a number neither the post nor the instruments'
+  names have (thousands commas ignored); `tests/test_reason_corpus.py` measures every
+  change to the word lists against lines that must fail and lines that must pass. The
+  alert stage calls it; it decides nothing, and fails closed (no line).
 - **Similarity** (`engine/extract/similarity.py`): BAAI/bge-small-en-v1.5 from its ONNX
   file on the CPU (onnxruntime and tokenizers, no torch), pinned in `extract/model.json`
   and downloaded with `fetch-model` into `ENGINE_MODEL_DIR` (from huggingface.co and
@@ -225,10 +229,11 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
   set by reading pairs (`scripts/match_rule.py`), a test ties 0.85 to the committed
   labels, and it must be read again for a new model version. `python -m
   scripts.match_rule coverage` prints how often it matches across the history.
-- **Live stage**: the `score` worker gives each new text post its rules answer, mentions,
-  vector and, with the AI on, the two answers and the vote, then moves it to `done`.
-  It loads the model and checks the names are synced when it starts, and fails clearly
-  (posts wait at `score`) if either isn't so. History never goes through this stage.
+- **Live stage**: the `score` stage gives each new text post its rules answer, mentions,
+  vector and, with the AI on, the two answers and the vote, then moves it to `alert`
+  (see Alerts); the `signals` worker (`engine/pipeline.py`) runs both. It loads the model
+  and checks the names are synced when it starts, and fails clearly (posts wait at
+  `score`) if either isn't so. History never goes through this stage.
 
 Labels and samples for measuring the pickers are in `precision/`
 (`scripts/precision.py` scores them; `scripts/history_report.py` sums the rules over all
@@ -261,9 +266,9 @@ before any run on real data and never edited after one (a change is a new versio
   the minute cache for SPY, QQQ, BTC, ETH, XLE and every company a picker counted (from
   2022-02-01), then writes `engine.signal_moves` (every text post's % moves per
   instrument and entry rule, no prices) and `engine.random_baselines`, one instrument
-  per transaction: rerun it to resume, and a second run changes nothing. PR 6 reads both
-  tables; PR 7 runs it on Railway, since nothing travels from the sandbox. `DAY` must be
-  a New York day that has ended.
+  per transaction: rerun it to resume, and a second run changes nothing. Live alerts read
+  both tables; PR 7 runs it on Railway, since nothing travels from the sandbox. `DAY`
+  must be a New York day that has ended.
 - **`backtest`** (`run.py`, `report.py`): reads the stored answers, the vectors, the
   cache (no Alpaca client at all) and the baselines, writes `reports/backtest-v1.json`
   (numbers, keys sorted, floats rounded) and `.md` (made from the JSON), and records the
@@ -273,6 +278,86 @@ before any run on real data and never edited after one (a change is a new versio
   rule v1's reading (`precision/match-labels.csv`) next to the same shares weighted by
   the matches the rule serves the read posts (`reading.py`). `--divergent-days FILE`
   (PR 3's cross-check output) also prints BTC without those days, for the sandbox only.
+
+## Alerts
+
+`engine/alerts/` turns each scored post into one public alert (alert.v1), sent or FYI by
+the send rule, with similar-post evidence, and keeps every change as an insert-only
+revision on one change cursor. Nothing here sends: delivery workers follow the cursor.
+
+- **The `alert` stage** (`stage.py`), after `score` in the `signals` worker. The picker in
+  use (`send_rule.json`) makes the alert when it found a market link: one call per pair
+  of the send rule (SPY, QQQ and BTC for any market link, and each company it counted),
+  their evidence, the reason line when the AI is live, and send rule v1's decision. The
+  alert and its revision 1 commit with the post's move to `done`, under the seq lock
+  whose time is the alert time, and the wake hook rings after the commit. A crash leaves
+  no alert or exactly one: a second alert for a post is refused. A post without a market
+  link gets no alert. The picker not in use, the challenger, gets the same calls and
+  evidence in `engine.challenger_calls`, judged against its own passing pairs and its own
+  sends: never sent and never on the cursor (PR 7 grades them).
+- **alert.v1** (`model.py`), kept on `engine.alerts.doc` with the columns queries filter
+  on, and word for word in revision 1: the post's short `public_id` (8 URL-safe
+  characters on `engine.signals.public_id`, which the database gives every post; the page
+  is /s/<public_id>), the signal key, post and alert times, `send_until` (the post plus 15
+  minutes), an excerpt of 200 characters or fewer without links, the topic, the picker
+  and send rule versions, the reason line or null, `market_open`, `disposition` (`sent`
+  or `fyi`) with `fyi_reason`, the call it leads with, the instruments (slug, symbol,
+  asset class, market open; never a venue) and one call per pair: instrument, window,
+  direction, whether the pair passed Gate 0, sent or the first rule it failed, and its
+  evidence. % moves, counts, times, flags and text only: no price, no entry price, no
+  minute series and no link but our own signal page.
+- **The public-format check** (`public.py`, pinned by `tests/test_public_format.py`, the
+  test the outlets and the site rely on): every field an alert may carry, with its unit
+  (percent, count, time, flag, text or quote). Any other field, a price-like number or a
+  link other than our signal page fails, and nothing that fails is written. A new field
+  goes into both lists on purpose.
+- **Evidence** (`evidence.py`), Gate 0 v1's method on live posts: PR 4's `similar()` with
+  match rule v1 over earlier text posts, keeping those whose window had closed by then
+  and that have a judged move in `signal_moves`, best first, at most 50; then the
+  backtest's verdict (direction, rules 3 and 4) against `random_baselines`, and the latest
+  backtest run's hit rate for the pair (labelled backtest). The vectors stay in memory:
+  loaded when the worker starts, each new post added as it passes the stage. Per call:
+  matches and match days, the share that moved its way, the median move and the median
+  against the benchmark, the random-time median, the backtest hit rate, a low-sample
+  flag, up to three examples and one line ("Like 14 past posts: SPY fell after 64% of
+  them within 1 hour (median -0.4% vs random 0.0%)").
+- **Send rule v1** (`rule.py`; the data in `send_rule.json`): a call is sent when its pair
+  is listed as passing Gate 0 for the picker in use, its matches fall on at least 10
+  days, at least 60% of them moved one way and their median beat the random-time median
+  by more than 20 bp that way (net of the benchmark for a company), the alert time is at
+  or before `send_until`, and nothing was sent on its instrument in the 30 minutes
+  before. Otherwise it is FYI with the first rule it fails: `no_passing_pair`,
+  `few_matches`, `not_better_than_random`, `late` or `burst`. An alert is sent when any of
+  its calls is, else FYI with the furthest reason. Version 1 lists no passing pairs and
+  the rules picker, so every alert is FYI `no_passing_pair` (research mode). After Gate 0
+  and with Chris's OK, listing pairs under `passing` (and naming the picker Gate 0 chose)
+  switches sends on; raise `version` with any change. The worker refuses a file that
+  names the AI picker while the AI is off, or calls on an unknown instrument.
+- **Revisions and the change cursor** (`store.py`). `engine.alert_revisions` is
+  insert-only: a trigger refuses UPDATE, DELETE and TRUNCATE. Revision 1 is the alert's
+  creation; later ones are results (PR 7) and corrections. Each takes the next `seq` from
+  `engine.alert_seq`, whose row stays locked until its transaction ends, and reads its
+  time after, so `seq` order is commit order and time order, with no gap a reader can
+  see. `read_changes(conn, after, limit=100)` returns the revisions after a bookmark, up
+  to the head it read first, with the database's `stream_id` (`engine_meta`), `head` and
+  `has_more`. Each outlet, the API and the site keep their own bookmark; another stream
+  id means another database, and the bookmark is void.
+- **The wake hook and the pause** (`wake.py`). `EngineContext.wake` rings after each
+  `alert` stage commits. A delivery worker registered with `register_worker` waits for
+  it or for `ENGINE_DELIVERY_POLL_SECONDS` (30), so every outlet gets an alert at the same
+  moment and a missed ring costs one poll. `ENGINE_SENDS_PAUSED=true` pauses all sends:
+  workers read it through `sends_paused`, and scoring and alerts carry on. Settings are
+  read at start, so a change takes a restart (Railway redeploys on a variable change).
+- **The moves filler** (`fill.py`, the `fill-moves` worker; needs Alpaca's keys). A
+  company first named live has no stored moves, so its calls are FYI `few_matches`. Every
+  `ENGINE_FILL_MOVES_TICK_SECONDS` (300) it runs `build-moves` in a process of its own for
+  just the instruments alerts and challenger calls are on that the latest sample hasn't
+  built (`run_build_moves(only=...)`). A failed build is tried again after
+  `ENGINE_FILL_MOVES_RETRY_SECONDS` (3600), with one operator message per instrument; an
+  instrument with no prices in the sample waits for the next sample.
+- Tables (migration 0006, add-only): `signals.public_id`, `engine.alerts` (one per post),
+  `engine.alert_revisions`, `engine.alert_seq` (one row) and `engine.challenger_calls`.
+  The web role reads them all (`engine.*`).
 
 ## Database
 
@@ -306,6 +391,9 @@ In `engine/registry.py`, `build_registry()`:
 
 `engine.notify.notify_operator(kind, text)` only logs for now.
 
+A delivery worker gets `EngineContext.wake`, which rings after each alert commits, and
+reads `engine.alerts.wake.sends_paused(settings)` (see Alerts).
+
 `engine.stages.StageRunner` moves rows of a table with `stage_columns()` through named
 stages, with `ENGINE_MAX_ATTEMPTS` attempts per stage before the final `error` state.
 Rows at a stage this copy doesn't know are left alone (a newer copy may know it).
@@ -317,3 +405,6 @@ Rows at a stage this copy doesn't know are left alone (a newer copy may know it)
     ruff check . && ruff format --check . && mypy
 
 Tests create and drop their own databases on the `DEV_DATABASE_URL` server.
+`REPLAY_HISTORY_POSTS=16000 pytest tests/test_replay.py -s` replays the recorded posts
+through `score` and `alert` against a history of that size and prints each post's timings
+(with the real model when `fetch-model` has run).
