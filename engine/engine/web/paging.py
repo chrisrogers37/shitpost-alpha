@@ -62,7 +62,7 @@ class PageQuery:
         return None if self.before is None else decode_cursor(self.before, size)
 
 
-def _page_query(
+async def _page_query(  # async: FastAPI runs a plain def in a worker thread
     before: Annotated[str | None, Query(max_length=200)] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
 ) -> PageQuery:

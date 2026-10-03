@@ -65,18 +65,14 @@ def make_web_engine(settings: WebSettings, pool_size: int | None = None) -> Asyn
 
 
 def _on_connect(dbapi_connection: Any, connection_record: Any) -> None:
-    try:
-        cursor = dbapi_connection.cursor()
-        cursor.execute(f"SET statement_timeout = '{STATEMENT_TIMEOUT_SECONDS}s'")
-        cursor.execute(ROLE_CHECK)
-        extra: list[str] = cursor.fetchone()[0]
-        cursor.close()
-        dbapi_connection.commit()  # else the pool's first rollback would undo the SET
-        if extra:
-            raise WrongRole(extra)
-    except BaseException:
-        dbapi_connection.close()  # older SQLAlchemy (2.0.30) leaves it open when this fails
-        raise
+    cursor = dbapi_connection.cursor()
+    cursor.execute(f"SET statement_timeout = '{STATEMENT_TIMEOUT_SECONDS}s'")
+    cursor.execute(ROLE_CHECK)
+    extra: list[str] = cursor.fetchone()[0]
+    cursor.close()
+    dbapi_connection.commit()  # else the pool's first rollback would undo the SET
+    if extra:
+        raise WrongRole(extra)  # SQLAlchemy (2.0.53 and later) closes the connection
 
 
 def failure_line(exc: BaseException) -> str:

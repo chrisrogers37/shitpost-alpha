@@ -11,12 +11,13 @@ from pathlib import Path
 import httpx
 import pytest
 from pydantic import ValidationError
+from sqlalchemy.engine import make_url
 
 from engine import cli as engine_cli
 from engine.web.settings import WebSettings
 
 PROJECT = Path(__file__).resolve().parent.parent.parent
-ESCAPE_AT = 'write an "@" in the password as %40'
+ESCAPE_AT = 'write each "@" in the URL as %40, except the one before the host'
 
 
 @pytest.fixture
@@ -84,16 +85,18 @@ def test_a_bad_database_url_is_one_line_without_the_password(
         "postgresql://web:hunter@tail@127.0.0.1/engine",  # the tail would be the host
         "postgresql://web:hunter@tail/x@127.0.0.1/engine",  # or the host and database
         "postgresql://webhunter/x@127.0.0.1/engine",  # no ":", so no user and password
+        "postgresql://web:pw@127.0.0.1/engine?application_name=web@railway",  # harmless here
     ],
 )
-def test_an_unescaped_at_in_the_password_is_refused(
+def test_an_at_other_than_the_one_before_the_host_is_refused(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], url: str
 ) -> None:
     monkeypatch.setenv("WEB_DATABASE_URL", url)
     assert engine_cli.main(["web"]) == 2
     err = capsys.readouterr().err
     assert err == f"invalid web settings: WEB_DATABASE_URL: Value error, {ESCAPE_AT}\n"
-    WebSettings(database_url="postgresql://web:hunter%40tail@127.0.0.1/engine")  # escaped
+    escaped = "postgresql://web:hunter%40tail@127.0.0.1/engine?application_name=web%40railway"
+    assert make_url(WebSettings(database_url=escaped).db_url).password == "hunter@tail"
 
 
 @pytest.mark.usefixtures("no_settings")

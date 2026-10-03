@@ -49,10 +49,11 @@ class WebSettings(BaseSettings):
             parsed = None
         if parsed is None or parsed.drivername not in POSTGRES_DRIVERS:
             raise ValueError("not a postgresql:// URL")
-        # An "@" only ends the user and password. Another would put the password's tail in
-        # the host or database name, which the driver's errors (and so the logs) show.
+        # An "@" only ends the user and password. Another, if it was in the password, would
+        # put the password's tail in the host or database name, which the driver's errors
+        # (and so the logs) show; anywhere else it is safe to write as %40 too.
         if raw.count("@") > (0 if parsed.username is None else 1):
-            raise ValueError('write an "@" in the password as %40')
+            raise ValueError('write each "@" in the URL as %40, except the one before the host')
         return url
 
     @property

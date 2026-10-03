@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import cast
+from typing import Annotated, Any, cast
 
 import psycopg
 import pytest
@@ -10,15 +10,21 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    PlainSerializer,
     SerializerFunctionWrapHandler,
+    WithJsonSchema,
+    WrapSerializer,
     computed_field,
+    field_serializer,
     model_serializer,
 )
 from pydantic.alias_generators import to_camel
+from pydantic.json_schema import SkipJsonSchema
 from starlette.routing import Route
 
 from engine.web.app import create_app
 from engine.web.db import make_web_engine
+from engine.web.deps import StreamId
 from engine.web.models import ApiModel, ApiResponse
 from engine.web.router import ApiRouter
 from engine.web.settings import WebSettings
@@ -185,16 +191,68 @@ def test_every_api_route_returns_its_model() -> None:
         async def row() -> dict[str, object]:
             return {"close_price": 187.23}
 
+    with pytest.raises(TypeError, match="not a stream"):
+
+        @router.get("/stream", response_model=Probe)
+        async def stream() -> Probe:  # type: ignore[misc]  # FastAPI streams what it yields
+            yield {"close_price": 187.23}
+
+    for documented in ({"responses": {200: {"model": Probe}}}, {"openapi_extra": {"x": 1}}):
+        with pytest.raises(TypeError, match="documents its model and errors only"):
+
+            @router.get("/documented", **documented)
+            async def other() -> Probe:  # the schema would show another body than it sends
+                return Probe(stream_id=uuid.uuid4(), answer=1)
+
     assert router.routes == []
 
+
+def test_an_api_router_takes_no_other_kind_of_route() -> None:
     async def plain(request: Request) -> Response:
         return JSONResponse({"close_price": 187.23})
 
-    added = ApiRouter()
-    added.add_route("/plain", plain)
-    for unchecked in (added, ApiRouter(routes=[Route("/plain", plain)])):
-        with pytest.raises(TypeError, match=r"/plain: .* add_api_route"):
-            create_app(NO_DATABASE, [unchecked])
+    router = ApiRouter()
+    for add in (
+        lambda: router.add_route("/plain", plain),
+        lambda: router.route("/plain")(plain),
+        lambda: router.mount("/static", app=plain),
+        lambda: router.host("example.com", app=plain),
+        lambda: router.add_websocket_route("/ws", plain),
+        lambda: router.add_api_websocket_route("/ws", plain),
+        lambda: router.frontend("/", directory="."),
+        lambda: ApiRouter(routes=[Route("/plain", plain)]),
+    ):
+        with pytest.raises(TypeError, match="takes only routes added with add_api_route"):
+            add()
+    assert router.routes == []
+
+
+async def test_an_api_router_can_include_another(make_client: MakeClient) -> None:
+    inner = ApiRouter(prefix="/inner")
+
+    @inner.get("/ok")
+    async def ok(stream_id: StreamId) -> Probe:
+        return Probe(stream_id=stream_id, answer=1)
+
+    outer = ApiRouter()
+    outer.include_router(inner)
+    client = make_client(outer)
+    response = await client.get("/api/v1/inner/ok")
+    assert (response.status_code, response.json()["answer"]) == (200, 1)
+    paths = (await client.get("/api/v1/openapi.json")).json()["paths"]
+    assert set(paths) == {"/api/v1/inner/ok"}
+
+    # FastAPI 0.137 and later serve whatever routes an included router has when a request
+    # comes, so a route added after create_app goes live: it is checked as it is added.
+    with pytest.raises(TypeError, match="declared to return an ApiResponse"):
+
+        @inner.get("/raw", response_model=Probe)
+        async def raw() -> JSONResponse:
+            return JSONResponse({"close_price": 187.23})
+
+    assert (await client.get("/api/v1/inner/raw")).status_code == 404
+    with pytest.raises(TypeError, match="errors only"):
+        outer.include_router(ApiRouter(), responses={200: {"model": Probe}})
 
 
 def test_every_api_route_is_in_the_schema() -> None:
@@ -207,6 +265,8 @@ def test_every_api_route_is_in_the_schema() -> None:
         )
     with pytest.raises(TypeError, match="must be in the schema"):
         router.include_router(ApiRouter(), include_in_schema=False)
+    with pytest.raises(TypeError, match="must be in the schema"):
+        ApiRouter(include_in_schema=False).include_router(ApiRouter())
     assert router.routes == []
 
 
@@ -250,6 +310,70 @@ def test_api_models_send_their_fields_as_listed() -> None:
             @model_serializer(mode="wrap")
             def _out(self, handler: SerializerFunctionWrapHandler) -> dict[str, object]:
                 return {**handler(self), "close_price": self.cents / 100}
+
+
+type Cents = Annotated[int, PlainSerializer(lambda v: {"close_price": v / 100})]
+
+
+def test_api_models_keep_pydantics_serializers_and_schema() -> None:
+    with pytest.raises(TypeError, match="serializers and schema"):
+
+        class Skipped(ApiResponse):
+            close_price: SkipJsonSchema[float]  # sent, but left out of the schema
+
+    with pytest.raises(TypeError, match="serializers and schema"):
+
+        class Relabelled(ApiResponse):
+            moves: Annotated[dict[str, float], WithJsonSchema({"type": "integer"})]
+
+    with pytest.raises(TypeError, match="serializers and schema"):
+
+        class Wrapped(ApiResponse):
+            cents: Annotated[int, WrapSerializer(lambda v, handler: handler(v))]
+
+    with pytest.raises(TypeError, match="serializers and schema"):
+
+        class Nested(ApiResponse):
+            cents: list[Cents]  # a marker inside a type, through a type alias
+
+    with pytest.raises(TypeError, match="serializers and schema"):
+
+        class FieldSerialized(ApiResponse):
+            cents: int
+
+            @field_serializer("cents")
+            def _cents(self, cents: int) -> int:
+                return cents
+
+    for config in (
+        ConfigDict(json_schema_extra={"properties": {}}),
+        ConfigDict(json_schema_mode_override="validation"),
+        ConfigDict(json_encoders={int: str}),
+    ):
+        with pytest.raises(TypeError, match="serializers and schema"):
+
+            class Configured(ApiResponse):
+                model_config = config
+
+    with pytest.raises(TypeError, match="serializers and schema"):
+
+        class FieldExtra(ApiResponse):
+            moves: dict[str, float] = Field(json_schema_extra={"type": "integer"})
+
+    with pytest.raises(TypeError, match="serializers and schema"):
+
+        class OwnSchema(ApiResponse):
+            @classmethod
+            def __get_pydantic_json_schema__(cls, schema: Any, handler: Any) -> Any:
+                return handler(schema)
+
+    class Plain(BaseModel):  # its own rules: an extra key, a serializer
+        n: int
+
+    with pytest.raises(TypeError, match="nest only ApiModels"):
+
+        class Holder(ApiResponse):
+            plains: list[Plain] | None
 
 
 async def test_a_row_with_unlisted_fields_never_passes_through(make_client: MakeClient) -> None:

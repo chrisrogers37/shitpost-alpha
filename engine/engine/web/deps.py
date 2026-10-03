@@ -29,7 +29,7 @@ def web_state(request: Request) -> WebState:
     return state
 
 
-def _db(request: Request) -> AsyncEngine:
+async def _db(request: Request) -> AsyncEngine:  # async: no worker thread
     return web_state(request).db
 
 

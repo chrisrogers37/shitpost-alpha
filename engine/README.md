@@ -311,9 +311,9 @@ Railway settings for its service:
   so the engine service names `/engine/railway.json` and this one names nothing.
 - Variables: `WEB_DATABASE_URL`, the engine database as the web role
   (`postgresql://web:...`), on Neon's direct (unpooled) endpoint. A transaction pooler
-  would drop each connection's 5 s statement timeout. Write an `@` in the password as
-  `%40`: the process refuses a URL with any other `@`, as the driver's errors would log
-  the rest of the password.
+  would drop each connection's 5 s statement timeout. Write each `@` in the URL as `%40`,
+  except the one before the host: the process refuses any other, as an unescaped `@` in
+  the password would put its tail in the host name, which the driver's errors log.
 - Keep Railway's CDN off for this service: behind it, `X-Real-IP` holds the CDN's address,
   so every visitor would share a rate-limit bucket.
 
@@ -356,12 +356,16 @@ Every route under `/api/v1` follows these rules; each has a small module in `eng
 
 - **Explicit fields** (`models.py`, `router.py`). Routes are defined on an `ApiRouter`
   with its method decorators. A route declares an `ApiResponse` as its return type and
-  returns one, which FastAPI checks against the model (a `Response` it returned would go
-  out unchecked, so that is refused), and it is in the schema. `ApiRouter` refuses a
-  route that breaks this, and `create_app` takes only `ApiRouter`s and checks every route
-  of each, however it was added. Models list their fields and forbid others, so a row or
-  dict never passes through as is; they take no aliases (computed fields' included) and
-  keep pydantic's serializer, so a field goes out under its own name.
+  returns one, which FastAPI checks against the model (a `Response` or a stream would go
+  out unchecked, so those are refused); it is in the schema and documents only errors
+  besides its model. `ApiRouter` checks each route as it is added and takes no other
+  kind (`add_route`, `mount` and the like are refused), so one can include another, and
+  `create_app` takes only `ApiRouter`s. Models list their fields and forbid others, so a
+  row or dict never passes through as is. They nest only `ApiModel`s, take no aliases,
+  and refuse the pydantic features that serialize a value their own way or change its
+  schema (custom serializers, `json_schema_extra`, `WithJsonSchema`, `SkipJsonSchema` and
+  the others `ApiModel` lists). A custom type's own pydantic hooks aren't checked: keep
+  fields to plain types.
 - **stream_id** (`stream.py`, `deps.py`). Every successful JSON body carries `stream_id`
   at the top level, from `engine.engine_meta`, read at most once a minute. Take it as a
   `StreamId` parameter. A new value means the database was rebuilt.
@@ -396,9 +400,9 @@ Every route under `/api/v1` follows these rules; each has a small module in `eng
   `X-Content-Type-Options: nosniff` and `Referrer-Policy: strict-origin-when-cross-origin`.
 - **No prices.** No response field may be a price (`tests/web/test_no_prices.py` walks
   the OpenAPI schema for price-like names, plurals included, and refuses objects that
-  don't list their keys: a dict field, an `Any`, a nested model that isn't an
-  `ApiModel`; public output is % moves only). The web role can't read `prices` either,
-  and every connection checks that.
+  don't list their keys, such as a dict field or an `Any`; public output is % moves
+  only). The rules above keep the schema to what is sent. The web role can't read
+  `prices` either, and every connection checks that.
 
 The schema is at `/api/v1/openapi.json`, the one body under `/api/v1` without
 `stream_id`; it documents the error shape as each route's 4XX and 5XX. The docs pages

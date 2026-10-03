@@ -1,18 +1,20 @@
 """No API response may carry a price: public output is % moves only, never raw prices.
 
 The walk reads every field name in every route's response schemas, and refuses an object
-whose keys the schema doesn't list (a dict, an Any, a model that allows extra fields), as
-a price could hide under such a key. The API sends what the schema shows: ApiRouter takes
-only routes that declare and return an ApiResponse and are in the schema (create_app
-checks every route), FastAPI checks each returned body against the route's model (a
-cached body too, as the route returns it), and ApiModel forbids extra fields, aliases and
-custom model serializers. test_api_conventions.py tests those rules."""
+whose keys the schema doesn't list (a dict, an Any), as a price could hide under such a
+key. The schema shows what the API sends as far as these rules reach (tested in
+test_api_conventions.py): ApiRouter takes only routes that declare and return an
+ApiResponse, are in the schema and document only errors besides it, and no other kind of
+route; FastAPI checks each returned body against the route's model (a cached body too, as
+the route returns it); and ApiModel refuses extra fields, aliases, nested models that
+aren't ApiModels, and the pydantic features that serialize a value their own way or change
+its schema. A custom type's own pydantic hooks are not checked."""
 
 import re
 from typing import Any
 
 from fastapi import FastAPI
-from pydantic import BaseModel, computed_field
+from pydantic import computed_field
 
 from engine.web.app import create_app
 from engine.web.models import ApiModel, ApiResponse
@@ -140,14 +142,10 @@ def test_the_check_catches_a_price_field() -> None:
 
 
 def test_the_check_catches_an_object_that_does_not_list_its_keys() -> None:
-    class Loose(BaseModel):  # not an ApiModel: extra keys are ignored, not refused
-        n: int
-
     class Open(ApiResponse):
         by_ticker: dict[str, float]  # the keys are data: {"close": 187.23} would pass
         anything: Any
         maybe: list[Any] | None
-        loose: Loose
 
     router = ApiRouter()
 
@@ -156,4 +154,4 @@ def test_the_check_catches_an_object_that_does_not_list_its_keys() -> None:
         raise NotImplementedError
 
     _, open_objects = walk_responses(create_app(NO_DATABASE, [router]))
-    assert open_objects == {"Open.by_ticker", "Open.anything", "Open.maybe", "Loose"}
+    assert open_objects == {"Open.by_ticker", "Open.anything", "Open.maybe"}
