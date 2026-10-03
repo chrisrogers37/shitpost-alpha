@@ -1,4 +1,4 @@
-"""The records tables and the live `score` stage, and the replay harness."""
+"""The records tables and the live `score` stage (tests/test_replay.py replays both stages)."""
 
 import asyncio
 import logging
@@ -27,8 +27,6 @@ from engine.settings import Settings
 from engine.tables import extractions, signal_embeddings, signal_mentions, signals
 from tests.extract_helpers import StubClient, StubEmbedder, answer, ready_config, sync_names
 from tests.feeds_helpers import status_id_at
-from tests.replay import recorded_posts, replay, replay_embedder
-from tests.test_similarity import REAL_DIR
 
 WHEN = datetime(2026, 3, 2, 15, tzinfo=UTC)
 APPLE_POST = "Apple and $NVDA are building big plants in America"
@@ -327,38 +325,3 @@ async def test_ai_answers_recorded_with_other_files_stop_the_worker(
         async with asyncio.timeout(10):
             await signals_worker(**loaders)(EngineContext(migrated, db))
     assert await stage_of(db, second.key) == SCORE
-
-
-# --- the replay harness ------------------------------------------------------------------------
-
-
-async def test_the_replay_harness_runs_recorded_posts(db: AsyncEngine) -> None:
-    await sync_names(db)
-    feeds = recorded_posts()
-    assert all(feeds.values())
-    delivered: list[str] = []
-    clients = {p: StubClient(p, default=answer(False)) for p in ("openai", "anthropic")}
-    result = await replay(
-        db, feeds, embedder=replay_embedder(REAL_DIR), clients=clients, config=ready_config(),  # type: ignore[arg-type]
-        deliver=lambda scored: delivered.append(scored.key),
-    )  # fmt: skip
-    assert result.posts and all(post.stage == "done" for post in result.posts)
-    scored = [post for post in result.posts if post.scored]
-    unscored = {post.key for post in result.posts if not post.scored}
-    assert scored and sorted(delivered) == sorted(post.key for post in scored)
-    async with db.connect() as conn:
-        not_scored = set(
-            (
-                await conn.execute(select(signals.c.key).where(signals.c.not_scored.is_not(None)))
-            ).scalars()
-        )
-        votes = (
-            await conn.execute(select(func.count()).where(extractions.c.method == "ai:vote"))
-        ).scalar()
-    assert unscored == not_scored
-    assert votes == len(scored)
-    for post in scored:
-        assert post.scored is not None
-        assert {"rules", "embedding", "ai"} <= set(post.scored.seconds)
-    report = result.report()
-    assert len(report) == len(feeds) + len(result.posts)
