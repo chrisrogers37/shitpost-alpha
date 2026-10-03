@@ -10,6 +10,7 @@ sends), and posts wait where they are until a fixed deploy picks them up.
 import asyncio
 from collections.abc import Callable
 from contextlib import AsyncExitStack
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
@@ -22,6 +23,7 @@ from engine.extract.rules import RulesFileChanged, current_rules
 from engine.extract.score import Scored, Scorer, live_ai, other_files
 from engine.extract.similarity import Embedder, load_embedder, load_match_rule
 from engine.feeds.store import SCORE
+from engine.market import calendar
 from engine.market.alpaca import Alpaca
 from engine.market.instruments import Listings
 from engine.registry import EngineContext, WorkerFunc
@@ -42,6 +44,7 @@ def signals_worker(
     async def run(ctx: EngineContext) -> None:
         settings = ctx.settings
         embedder = await asyncio.to_thread(embedder_loader, settings)  # ModelMissing: fail here
+        await asyncio.to_thread(calendar.is_open, datetime.now(UTC))  # built here, off the loop
         rules, ai, rule = current_rules(), ai_loader(settings), send_rule()
         match = load_match_rule()
         if rule.picker == "ai" and ai is None:

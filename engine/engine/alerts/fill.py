@@ -4,8 +4,9 @@ latest sample (random_baselines' newest data_to) hasn't built, and runs PR 5's
 build-moves for just those, in a process of its own, off the live path.
 
 It needs Alpaca's keys, and does nothing before the sample is built (PR 7's fill). An
-instrument whose build fails is tried again after ENGINE_FILL_MOVES_RETRY_SECONDS, with
-one operator message per instrument.
+instrument whose build fails is tried again after ENGINE_FILL_MOVES_RETRY_SECONDS, with one
+operator message until it is built. One a build passes over without failing has no prices
+in the sample (a company listed after it): it waits for the next sample.
 """
 
 import asyncio
@@ -13,11 +14,13 @@ import functools
 import logging
 import time
 from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 
 from sqlalchemy import func, select, union
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from engine.db import raise_if_cancelling
 from engine.notify import notify_operator
 from engine.registry import EngineContext, JobContext, WorkerFunc
 from engine.scheduler import run_in_process
@@ -69,27 +72,58 @@ def fill_worker(build: Build = build_in_process) -> WorkerFunc:
         if settings.alpaca_keys is None:
             log.warning("moves filler: no Alpaca keys, so new companies' moves aren't filled")
             return
-        failed_at: dict[int, float] = {}
+        tried = Tried()
         while True:
             async with ctx.db.connect() as conn:
                 data_to, missing = await unfilled(conn)
-            retry = time.monotonic() - settings.fill_moves_retry_seconds
-            due = [i for i in missing if failed_at.get(i, retry) <= retry]
-            if data_to is not None and due:
-                try:
-                    await build(settings, data_to, due)
-                except Exception as exc:
-                    log.warning("moves filler: %s", exc)
-                    async with ctx.db.connect() as conn:
-                        still = set((await unfilled(conn))[1])
-                    for i in sorted(still & set(due)):
-                        if i not in failed_at:
-                            await notify_operator(
-                                "moves_fill_failed",
-                                f"build-moves for instrument {i} failed; trying again "
-                                f"in {settings.fill_moves_retry_seconds:g}s: {exc}",
-                            )
-                        failed_at[i] = time.monotonic()
+            if data_to is not None:
+                retry = time.monotonic() - settings.fill_moves_retry_seconds
+                if due := [i for i in missing if tried.due(i, data_to, retry)]:
+                    await _fill(ctx, build, data_to, due, tried)
             await asyncio.sleep(settings.fill_moves_tick_seconds)
 
     return run
+
+
+@dataclass
+class Tried:
+    """What the filler has tried and won't try again yet."""
+
+    empty: set[tuple[int, date]] = field(default_factory=set)
+    """(instrument, sample) pairs a build passed over without failing: no prices in it."""
+    failed_at: dict[int, float] = field(default_factory=dict)
+    """Instruments whose last build failed, by when; each has had its one message."""
+
+    def due(self, instrument_id: int, data_to: date, retry: float) -> bool:
+        if (instrument_id, data_to) in self.empty:
+            return False
+        return self.failed_at.get(instrument_id, retry) <= retry
+
+
+async def _fill(
+    ctx: EngineContext, build: Build, data_to: date, due: Sequence[int], tried: Tried
+) -> None:
+    """Build `due` once, then sort out what it left unbuilt."""
+    error: Exception | None = None
+    try:
+        await build(ctx.settings, data_to, due)
+    except Exception as exc:
+        raise_if_cancelling()
+        log.warning("moves filler: %s", exc)
+        error = exc
+    async with ctx.db.connect() as conn:
+        still = set((await unfilled(conn))[1]) & set(due)
+    for i in sorted(still):
+        if error is None:
+            log.info("moves filler: instrument %d has no prices in the sample to %s", i, data_to)
+            tried.empty.add((i, data_to))
+            continue
+        if i not in tried.failed_at:
+            await notify_operator(
+                "moves_fill_failed",
+                f"build-moves for instrument {i} failed; trying again in "
+                f"{ctx.settings.fill_moves_retry_seconds:g}s: {error}",
+            )
+        tried.failed_at[i] = time.monotonic()
+    for i in set(due) - still:
+        tried.failed_at.pop(i, None)

@@ -236,7 +236,7 @@ class Evidencer:
             ),
             backtest_days=backtest[1] if backtest else None,
             low_sample=match_days < gate.MIN_MATCH_DAYS,
-            text=line(instrument, window, direction, judged, raw, baseline, net, benchmark),
+            text=line(instrument, window, direction, judged, baseline, net, benchmark),
             examples=[
                 Example(
                     public_id=posts[key].public_id,
@@ -269,7 +269,8 @@ def _blocked(reason: str | None, match_days: int) -> FyiReason | None:
 
 
 def _percent(fraction: float) -> float:
-    return round(fraction * 100, 2)
+    """A fraction as a percent with 2 decimals (never -0.0)."""
+    return round(fraction * 100, 2) + 0.0
 
 
 def judged_net(instrument: Instrument) -> bool:
@@ -314,7 +315,6 @@ def line(
     window: str,
     direction: int,
     judged: Any,
-    raw: Any,
     baseline: float | None,
     net: bool,
     benchmark: Instrument | None,
@@ -326,7 +326,7 @@ def line(
         return f"No similar past posts with a known move {when} yet"
     posts = f"Like {len(judged)} past post{'s' if len(judged) != 1 else ''}"
     if not direction:
-        return f"{posts}: {instrument.symbol} rose after as many as fell {when}"
+        return f"{posts}: as many saw {instrument.symbol} rise as fall {when}"
     share = float((judged * direction > 0).mean()) * 100
     moved = "rose" if direction > 0 else "fell"
     median = signed(float(np.median(judged)) * 100)

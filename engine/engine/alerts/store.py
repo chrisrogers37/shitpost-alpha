@@ -156,32 +156,33 @@ class Changes:
     stream_id: UUID
     """The database's stream id (engine_meta): a bookmark from another stream is void."""
     revisions: list[Revision]
-    """Revisions after the bookmark, in seq order."""
+    """Revisions after the bookmark, up to `head`, in seq order."""
     head: int
-    """The latest seq committed (0 before the first)."""
+    """The latest seq committed when the read began (0 before the first)."""
     has_more: bool
-    """More revisions follow the last one returned."""
+    """More revisions up to `head` follow the last one returned."""
 
 
 async def read_changes(conn: AsyncConnection, after: int, limit: int = 100) -> Changes:
-    """Revisions with seq above `after`, oldest first, at most `limit`."""
+    """Revisions with seq above `after` and at most the head, oldest first, at most
+    `limit`. The head is read first: every seq up to it has committed (there are no
+    gaps), so `head`, `has_more` and the revisions agree, whatever commits meanwhile."""
     if limit < 1:
         raise ValueError("limit must be at least 1")
-    found = (
-        await conn.execute(
-            select(alert_revisions, alerts.c.public_id)
-            .join(alerts, alerts.c.id == alert_revisions.c.alert_id)
-            .where(alert_revisions.c.seq > after)
-            .order_by(alert_revisions.c.seq)
-            .limit(limit + 1)
-        )
-    ).all()
     stream_id: UUID = (await conn.execute(select(engine_meta.c.stream_id))).scalar_one()
     head: int = (
         await conn.execute(select(func.coalesce(func.max(alert_revisions.c.seq), 0)))
     ).scalar_one()
+    found = await conn.execute(
+        select(alert_revisions, alerts.c.public_id)
+        .join(alerts, alerts.c.id == alert_revisions.c.alert_id)
+        .where(alert_revisions.c.seq > after, alert_revisions.c.seq <= head)
+        .order_by(alert_revisions.c.seq)
+        .limit(limit)
+    )
     revisions = [
         Revision(r.seq, r.alert_id, r.public_id, r.revision, r.kind, r.created_at, r.doc)
-        for r in found[:limit]
+        for r in found
     ]
-    return Changes(stream_id, revisions, head, len(found) > limit)
+    last = revisions[-1].seq if revisions else after
+    return Changes(stream_id, revisions, head, last < head)

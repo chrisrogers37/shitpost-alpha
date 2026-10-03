@@ -26,11 +26,14 @@ class Example(Strict):
     """A similar past post and how this call's instrument moved after it."""
 
     public_id: str
+    """The past post's own short id (its page is /s/<public_id>)."""
     posted_at: AwareDatetime
     excerpt: str = Field(max_length=EXCERPT_CHARS)
+    """Its words, links removed."""
     move: float
+    """The instrument's move over the call's window after that post."""
     vs_benchmark: float | None
-    """The move net of beta times the benchmark; None for an instrument without one."""
+    """The move net of beta times the benchmark; None without one (or without a beta)."""
 
 
 class Evidence(Strict):
@@ -39,24 +42,34 @@ class Evidence(Strict):
     had closed by the alert, at most 50."""
 
     matches: int = Field(ge=0)
+    """Similar past posts with a known move, at most 50."""
     match_days: int = Field(ge=0)
     """The matches' New York dates, counted once each (send rule v1's rule 3)."""
     share_in_direction: float | None = Field(ge=0, le=100)
-    """The share of matches that moved the call's way; None without a direction."""
+    """The share of matches that moved the call's way, judged as rule 4 judges (net of the
+    benchmark for a company or ETH); None without a direction."""
     median_move: float | None
+    """The matches' median move; None without matches."""
     median_vs_benchmark: float | None
+    """Their median move net of beta times the benchmark; None without one."""
     benchmark: str | None
     """The benchmark's slug: spy for stocks and ETFs, btc for ETH; None for SPY and BTC."""
     random_median: float | None
-    """The median at 100 random times per past post in the post's weekday and hour, judged
-    as rule 4 judges (net of the benchmark for a company or ETH)."""
+    """The instrument's median move over the window at random times in this post's New York
+    weekday and hour (engine.random_baselines), judged as rule 4 judges; None without a
+    stored baseline."""
     backtest_hit_rate: float | None = Field(ge=0, le=100)
-    """Gate 0's hit rate for this pair and picker: the backtest's, not live results."""
+    """Gate 0's hit rate for this pair and picker in the latest backtest run (the share of
+    its days the call was right): the backtest's, not live results. None before a run."""
     backtest_days: int | None = Field(ge=0)
+    """The days that hit rate is over."""
     low_sample: bool
     """Fewer match days than rule 3 needs."""
     text: str
+    """The evidence in one line, e.g. "Like 14 past posts: SPY fell after 64% of them
+    within 1 hour (median -0.4% vs random 0.0%)"."""
     examples: list[Example] = Field(max_length=3)
+    """The best matches, best first."""
 
 
 class Call(Strict):
