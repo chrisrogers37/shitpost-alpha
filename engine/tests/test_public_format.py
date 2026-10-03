@@ -109,8 +109,8 @@ def test_any_other_field_fails() -> None:
 @pytest.mark.parametrize(
     ("change", "problem"),
     [
-        ({"calls": {"evidence": {"median_move": 431.27}}}, "no percentage (a price?)"),
-        ({"calls": {"evidence": {"median_move": 4321.0}}}, "no percentage (a price?)"),
+        ({"calls": {"evidence": {"median_move": 431.27}}}, "taken for a price"),
+        ({"calls": {"evidence": {"median_move": 4321.0}}}, "taken for a price"),
         ({"calls": {"evidence": {"median_move": -0.4213}}}, "more than 2 decimals"),
         ({"calls": {"evidence": {"text": "SPY fell to $512 after them"}}}, "price-like"),
         ({"calls": {"evidence": {"text": "SPY closed at 512.30"}}}, "price-like"),
