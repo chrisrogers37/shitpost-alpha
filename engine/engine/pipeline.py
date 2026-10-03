@@ -2,9 +2,10 @@
 `score` (engine/extract/score.py), then `alert` (engine/alerts/stage.py), then done.
 
 What both stages need is checked when the worker starts: the model files, the names, the
-AI picker's files when it is live, the send rule's picker and instruments. If anything is
-wrong the worker fails with a clear error (and the operator message every failed worker
-sends), and posts wait where they are until a fixed deploy picks them up.
+AI picker's files when it is live, and the send rule's picker and its calls' instruments
+and windows. If anything is wrong the worker fails with a clear error (and the operator
+message every failed worker sends), and posts wait where they are until a fixed deploy
+picks them up.
 """
 
 import asyncio
@@ -15,7 +16,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 
 from engine.alerts.evidence import Evidencer, LivePool
-from engine.alerts.send_rule import BadSendRule, SendRule, current_send_rule
+from engine.alerts.send_rule import BadSendRule, SendRule, check_calls, current_send_rule
 from engine.alerts.stage import ALERT, Alerted, Alerter
 from engine.extract.ai import AiPicker
 from engine.extract.names import load_book
@@ -53,9 +54,8 @@ def signals_worker(
             await load_book(conn, rules)  # NamesNotSynced: fail here, not on every post
             if ai is not None and (problem := await other_files(conn, ai.config)):
                 raise RulesFileChanged(problem)
-            slugs = set((await conn.execute(select(instruments.c.slug))).scalars())
-            if missing := {p.instrument for p in rule.calls} - slugs - {"company"}:
-                raise BadSendRule(f"send_rule.json calls on unknown instruments: {missing}")
+            listed = await conn.execute(select(instruments.c.slug, instruments.c.asset_class))
+            check_calls(rule, {slug: asset_class for slug, asset_class in listed})
             pool = await LivePool.load(conn, embedder.version)
         async with AsyncExitStack() as stack:
             listings = None

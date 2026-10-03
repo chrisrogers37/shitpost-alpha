@@ -2,14 +2,20 @@
 outlets) that follow the change cursor (engine/alerts/store.py read_changes).
 
 A delivery worker is registered with Registry.register_worker and gets the engine
-context, whose `wake` rings after each alert stage commits. It waits for the next ring or
-the poll interval, whichever comes first, so a missed ring costs at most one interval:
+context, whose `wake` rings after each alert stage commits. It reads until it has caught
+up, then waits for the next ring or the poll interval, whichever comes first, so a missed
+ring costs at most one interval:
 
     seen = ctx.wake.rung
     while True:
+        more = False
         if not sends_paused(ctx.settings):
-            ...  # read_changes after the bookmark, decide, advance the bookmark
-        seen = await ctx.wake.wait(seen, ctx.settings.delivery_poll_seconds)
+            async with ctx.db.connect() as conn:
+                changes = await read_changes(conn, bookmark)
+            ...  # decide each revision in turn, advancing the bookmark after each
+            more = changes.has_more  # a page short of the head: read on at once
+        if not more:
+            seen = await ctx.wake.wait(seen, ctx.settings.delivery_poll_seconds)
 
 Every worker gets the same ring at the same moment: there is no paid-first delay.
 """

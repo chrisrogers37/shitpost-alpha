@@ -3,10 +3,13 @@ few_matches. This worker finds the instruments alerts and challenger calls are o
 latest sample (random_baselines' newest data_to) hasn't built, and runs PR 5's
 build-moves for just those, in a process of its own, off the live path.
 
-It needs Alpaca's keys, and does nothing before the sample is built (PR 7's fill). An
-instrument whose build fails is tried again after ENGINE_FILL_MOVES_RETRY_SECONDS, with one
-operator message until it is built. One a build passes over without failing has no prices
-in the sample (a company listed after it): it waits for the next sample.
+It needs Alpaca's keys, and does nothing before the sample is built (PR 7's fill). It
+waits while the sample is still being written (build-moves writes it one instrument at a
+time, so its count of built instruments grows), and builds only once the count has held
+still for a tick: never a second build-moves beside one under way. An instrument whose
+build fails is tried again after ENGINE_FILL_MOVES_RETRY_SECONDS, with one operator
+message until it is built. One a build passes over without failing has no prices in the
+sample (a company listed after it): it waits for the next sample.
 """
 
 import asyncio
@@ -32,23 +35,38 @@ log = logging.getLogger(__name__)
 Build = Callable[[Settings, date, Sequence[int]], Awaitable[None]]
 
 
-async def unfilled(conn: AsyncConnection) -> tuple[date | None, list[int]]:
-    """The latest sample's end, and the instruments alerts or challenger calls are on that
-    it hasn't built (none before the sample is built)."""
+@dataclass(frozen=True)
+class Sample:
+    """The latest sample and what it lacks."""
+
+    data_to: date
+    """random_baselines' newest data_to."""
+    built: int
+    """How many instruments it has: a count still growing means a build is writing it."""
+    missing: list[int]
+    """The instruments alerts or challenger calls are on that it hasn't built."""
+
+
+async def unfilled(conn: AsyncConnection) -> Sample | None:
+    """The latest sample, or None before one is built."""
     data_to: date | None = (
         await conn.execute(select(func.max(random_baselines.c.data_to)))
     ).scalar()
     if data_to is None:
-        return None, []
+        return None
+    rb = random_baselines
+    built = select(rb.c.instrument_id).where(rb.c.data_to == data_to).distinct().subquery()
+    count: int = (await conn.execute(select(func.count()).select_from(built))).scalar_one()
     named = union(
         select(func.unnest(alerts.c.instrument_ids).label("id")),
         select(func.unnest(challenger_calls.c.instrument_ids).label("id")),
     ).subquery()
-    built = select(random_baselines.c.instrument_id).where(random_baselines.c.data_to == data_to)
     rows = await conn.execute(
-        select(named.c.id).where(named.c.id.not_in(built)).order_by(named.c.id)
+        select(named.c.id)
+        .where(named.c.id.not_in(select(built.c.instrument_id)))
+        .order_by(named.c.id)
     )
-    return data_to, list(rows.scalars())
+    return Sample(data_to, count, list(rows.scalars()))
 
 
 async def build_moves_job(ctx: JobContext, data_to: date, ids: tuple[int, ...]) -> None:
@@ -72,14 +90,16 @@ def fill_worker(build: Build = build_in_process) -> WorkerFunc:
         if settings.alpaca_keys is None:
             log.warning("moves filler: no Alpaca keys, so new companies' moves aren't filled")
             return
-        tried = Tried()
+        tried, seen = Tried(), None
         while True:
             async with ctx.db.connect() as conn:
-                data_to, missing = await unfilled(conn)
-            if data_to is not None:
+                sample = await unfilled(conn)
+            if sample is not None and (sample.data_to, sample.built) == seen:  # held still
                 retry = time.monotonic() - settings.fill_moves_retry_seconds
-                if due := [i for i in missing if tried.due(i, data_to, retry)]:
-                    await _fill(ctx, build, data_to, due, tried)
+                due = [i for i in sample.missing if tried.due(i, sample.data_to, retry)]
+                if due:
+                    await _fill(ctx, build, sample.data_to, due, tried)
+            seen = (sample.data_to, sample.built) if sample is not None else None
             await asyncio.sleep(settings.fill_moves_tick_seconds)
 
     return run
@@ -112,7 +132,8 @@ async def _fill(
         log.warning("moves filler: %s", exc)
         error = exc
     async with ctx.db.connect() as conn:
-        still = set((await unfilled(conn))[1]) & set(due)
+        sample = await unfilled(conn)
+    still = set(sample.missing if sample is not None else ()) & set(due)
     for i in sorted(still):
         if error is None:
             log.info("moves filler: instrument %d has no prices in the sample to %s", i, data_to)

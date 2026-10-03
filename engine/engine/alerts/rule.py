@@ -18,20 +18,14 @@ call reached. Pure: the caller reads the clock and the recent sends under the se
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import cast
+from typing import cast, get_args
 
 from engine.alerts.evidence import Drafted
 from engine.alerts.model import Call, FyiReason, Window
 from engine.backtest.gate import Pair
 
-REASONS: tuple[FyiReason, ...] = (
-    "no_passing_pair",
-    "few_matches",
-    "not_better_than_random",
-    "late",
-    "burst",
-)
-"""In rule order: a later reason got further through the send rule."""
+REASONS: tuple[FyiReason, ...] = get_args(FyiReason)
+"""In rule order (alert.v1's FyiReason): a later reason got further through the send rule."""
 
 
 @dataclass(frozen=True)

@@ -6,13 +6,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal, cast, get_args
 
 from engine.backtest.gate import Pair
-from engine.tables import MOVE_WINDOWS, PICKERS
+from engine.backtest.moves import COIN_WINDOWS, STOCK_WINDOWS
+from engine.tables import MOVE_WINDOWS
 
 RULE_FILE = Path(__file__).with_name("send_rule.json")
 Picker = Literal["rules", "ai"]
+PICKERS: tuple[Picker, ...] = get_args(Picker)
 
 
 class BadSendRule(ValueError):
@@ -59,6 +61,19 @@ def _pair(text: str, path: Path) -> Pair:
     if not instrument or window not in MOVE_WINDOWS:
         raise BadSendRule(f"{path.name}: {text!r} isn't instrument:window")
     return Pair(instrument, window)
+
+
+def check_calls(rule: SendRule, asset_classes: Mapping[str, str]) -> None:
+    """Refuse a call on an instrument that isn't listed (`asset_classes` maps each listed
+    slug to its asset class; "company" is a stock), or on a window its asset class has no
+    moves for (btc:close, company:4h): every alert would otherwise fail on it. The worker
+    checks this when it starts."""
+    for pair in rule.calls:
+        kind = "stock" if pair.instrument == "company" else asset_classes.get(pair.instrument)
+        if kind is None:
+            raise BadSendRule(f"send_rule.json calls on an unknown instrument: {pair.instrument}")
+        if pair.window not in (COIN_WINDOWS if kind == "coin" else STOCK_WINDOWS):
+            raise BadSendRule(f"send_rule.json calls {pair.name}: no {kind} has that window")
 
 
 @cache

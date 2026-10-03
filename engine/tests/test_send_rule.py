@@ -3,19 +3,27 @@
 import json
 from datetime import timedelta
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
+from engine.alerts import evidence as evidence_module
 from engine.alerts.evidence import Drafted, Target, _blocked
-from engine.alerts.model import Evidence, FyiReason
-from engine.alerts.rule import decide
-from engine.alerts.send_rule import BadSendRule, load_send_rule
+from engine.alerts.model import AlertV1, Evidence, FyiReason
+from engine.alerts.rule import REASONS, decide
+from engine.alerts.send_rule import PICKERS, BadSendRule, Picker, check_calls, load_send_rule
+from engine.backtest import moves
 from engine.backtest.gate import GATE_PAIRS, Pair
 from engine.market.instruments import Instrument
+from engine.tables import DISPOSITIONS, FYI_REASONS
+from engine.tables import PICKERS as TABLE_PICKERS
 from tests.alert_helpers import AT
 
 SPY = Instrument(1, "spy", "SPY", "SPDR S&P 500 ETF Trust", "etf", "XNYS", "SPY", None, None)
 AAPL = Instrument(9, "aapl", "AAPL", "Apple Inc.", "stock", "XNYS", "AAPL", 1, None)
+BTC = Instrument(3, "btc", "BTC", "Bitcoin", "coin", "24/7", "BTC/USD", None, None)
+SEEDED = {"spy": "etf", "qqq": "etf", "btc": "coin"}
+"""The market instruments' asset classes, as migration 0003 seeds them."""
 SEND_UNTIL = AT + timedelta(minutes=15)
 ON_TIME = AT + timedelta(minutes=2)
 SPY_1H, SPY_CLOSE, AAPL_CLOSE = Pair("spy", "1h"), Pair("spy", "close"), Pair("company", "close")
@@ -144,10 +152,54 @@ def test_version_1_has_no_passing_pair_so_every_alert_is_fyi() -> None:
     assert rule.version == 1 and rule.picker == "rules" and rule.challenger == "ai"
     assert rule.calls == GATE_PAIRS
     assert rule.passing == {"rules": frozenset(), "ai": frozenset()}
-    calls = [drafted(pair) for pair in rule.calls]
+    calls = [drafted(pair, BTC if pair.instrument == "btc" else SPY) for pair in rule.calls]
     decided = decide(calls, rule.passing["rules"], ON_TIME, SEND_UNTIL, set())
     assert decided.disposition == "fyi" and decided.fyi_reason == "no_passing_pair"
     assert {c.fyi_reason for c in decided.calls} == {"no_passing_pair"}
+    assert not any(c.gate_passed for c in decided.calls)
+    check_calls(rule, SEEDED)  # every call's instrument has its window
+
+
+def test_a_coin_call_is_sent_only_when_its_pair_passed() -> None:
+    """Strong evidence on BTC sends nothing until a BTC pair is listed as passing."""
+    btc = drafted(Pair("btc", "1h"), BTC)
+    off = decide([btc], {SPY_1H}, ON_TIME, SEND_UNTIL, set())
+    on = decide([btc], {Pair("btc", "1h")}, ON_TIME, SEND_UNTIL, set())
+    assert (off.disposition, off.fyi_reason, off.calls[0].gate_passed) == (
+        "fyi",
+        "no_passing_pair",
+        False,
+    )
+    assert (on.disposition, on.sent_instrument_ids, on.calls[0].gate_passed) == (
+        "sent",
+        {BTC.id},
+        True,
+    )
+
+
+@pytest.mark.parametrize(
+    ("call", "problem"),
+    [
+        (Pair("btc", "close"), "btc:close: no coin has that window"),
+        (Pair("company", "4h"), "company:4h: no stock has that window"),
+        (Pair("qqq", "24h"), "qqq:24h: no etf has that window"),
+        (Pair("dia", "1h"), "unknown instrument: dia"),
+    ],
+)
+def test_calls_on_a_window_their_instrument_lacks_are_refused(call: Pair, problem: str) -> None:
+    rule = load_send_rule()
+    with pytest.raises(BadSendRule, match=problem):
+        check_calls(type(rule)(1, "rules", (Pair("spy", "1h"), call), rule.passing), SEEDED)
+
+
+def test_one_list_of_reasons_pickers_and_windows() -> None:
+    """The tables' check constraints hold the model's values, the rule's order is the
+    model's, and the line has words for every window an instrument has moves for."""
+    assert REASONS == get_args(FyiReason) == FYI_REASONS
+    assert PICKERS == get_args(Picker) == TABLE_PICKERS
+    assert get_args(AlertV1.model_fields["disposition"].annotation) == DISPOSITIONS
+    assert set(evidence_module.STOCK_WINDOWS) == set(moves.STOCK_WINDOWS)
+    assert set(evidence_module.COIN_WINDOWS) == set(moves.COIN_WINDOWS)
 
 
 @pytest.mark.parametrize(
