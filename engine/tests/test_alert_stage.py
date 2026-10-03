@@ -22,7 +22,7 @@ from engine.alerts.stage import market_open
 from engine.alerts.store import read_changes
 from engine.alerts.wake import Wake, sends_paused
 from engine.backtest.gate import Pair
-from engine.extract.ai import AiPicker
+from engine.extract.ai import AiPicker, Client
 from engine.extract.similarity import load_match_rule
 from engine.feeds.posts import Post as FeedPost
 from engine.feeds.store import store_posts, trump_source_id
@@ -395,7 +395,7 @@ async def test_the_ai_calls_only_the_companies_its_vote_counted(
     """The AI vote counts a company only when both models name it. OpenAI names Apple and
     Anthropic doesn't, so the challenger (the AI) has no Apple call; the rules counted
     Apple and Nvidia, so the alert has both."""
-    clients = {
+    clients: dict[str, Client] = {
         "openai": StubClient(
             "openai", default=answer(True, ("Apple", "AAPL", "stock", "explicit"))
         ),
