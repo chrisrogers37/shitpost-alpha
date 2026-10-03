@@ -4,6 +4,7 @@ switch, the moves filler and the worker's start checks."""
 
 import asyncio
 import dataclasses
+import pickle
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -13,7 +14,9 @@ import pytest
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+import engine.alerts.fill as fill
 import engine.alerts.stage as stage
+import engine.backtest.build as build_module
 from engine.alerts.evidence import Evidencer, LivePool, Post, Target
 from engine.alerts.fill import fill_worker, unfilled
 from engine.alerts.public import check_public
@@ -28,7 +31,7 @@ from engine.feeds.posts import Post as FeedPost
 from engine.feeds.store import store_posts, trump_source_id
 from engine.market.instruments import Instrument, all_instruments
 from engine.pipeline import signals_worker
-from engine.registry import EngineContext, WorkerFunc
+from engine.registry import EngineContext, JobContext, WorkerFunc
 from engine.settings import Settings
 from engine.tables import alert_revisions, alerts, challenger_calls, signals
 from tests.alert_helpers import (
@@ -672,6 +675,29 @@ async def test_the_moves_filler_waits_while_a_sample_is_being_built(
     finally:
         await stop(tasks)
     assert builds == []
+
+
+async def test_the_fillers_build_is_build_moves_for_its_instruments_in_a_job_process(
+    migrated: Settings, db: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The real build path short of the child process, which would call Alpaca: the job
+    pickles (a spawned process gets it that way) and runs build-moves for just these
+    instruments, and a failing build-moves fails it."""
+    ran: list[tuple[date, Any]] = []
+
+    async def in_process(job: Any, settings: Settings, slot: datetime) -> None:
+        await pickle.loads(pickle.dumps(job))(JobContext(settings, db, slot))
+
+    async def build_moves(settings: Settings, data_to: date, say: Any, only: Any = None) -> int:
+        ran.append((data_to, only))
+        return 1 if 99 in only else 0
+
+    monkeypatch.setattr(fill, "run_in_process", in_process)
+    monkeypatch.setattr(build_module, "run_build_moves", build_moves)
+    await fill.build_in_process(migrated, date(2026, 9, 30), [3, 4])
+    with pytest.raises(RuntimeError, match=r"build-moves failed for instruments \[99\]"):
+        await fill.build_in_process(migrated, date(2026, 9, 30), [99])
+    assert ran == [(date(2026, 9, 30), (3, 4)), (date(2026, 9, 30), (99,))]
 
 
 async def test_the_moves_filler_needs_alpacas_keys(
