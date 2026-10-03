@@ -1,0 +1,25 @@
+{
+  "recorded_at": "2026-10-02T19:04:00Z",
+  "request": {
+    "path": "/v2/stocks/bars",
+    "params": {
+      "symbols": "SPY",
+      "timeframe": "1Min",
+      "start": "2026-10-02T18:29:00Z",
+      "end": "2026-10-02T18:59:00Z",
+      "feed": "sip",
+      "adjustment": "all",
+      "limit": "10000"
+    }
+  },
+  "status": 403,
+  "headers": {
+    "content-type": "application/json",
+    "x-ratelimit-limit": "200",
+    "x-ratelimit-remaining": "197",
+    "x-ratelimit-reset": "1790967895"
+  },
+  "body": {
+    "message": "subscription does not permit querying recent SIP data"
+  }
+}

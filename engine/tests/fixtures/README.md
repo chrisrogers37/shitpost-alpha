@@ -22,3 +22,22 @@ calls Truth Social or ScrapeCreators):
 - `scrapecreators_posts.unverified.json`: ScrapeCreators' `{"success": true, "posts": [...]}`
   around the same five statuses.
 - `challenge.unverified.html`: a Cloudflare challenge page.
+
+Recorded from Alpaca's market data API (`data.alpaca.markets`) on 2 Oct 2026, then
+trimmed. The repo is public and Alpaca's data stays private, so every number in a bar
+(`o`, `h`, `l`, `c`, `v`, `n`, `vw`) is a stand-in of the same type (100, 101, ... by bar);
+keys, bar times, page tokens, statuses, rate-limit headers and error text are Alpaca's.
+No request headers were kept.
+
+- `alpaca_stock_bars_page1.json`, `alpaca_stock_bars_page2.json`: SPY daily bars for
+  2024-01-02 to 2024-01-04, asked with `limit=2` so the answer comes in two pages joined
+  by `next_page_token`.
+- `alpaca_coin_bars.json`: BTC/USD daily bars asked from 2024-01-02 to 2024-01-03 (two
+  bars: one starts exactly at `end`).
+- `alpaca_error.json`: the 403 body for SIP data under 15 minutes old.
+- `alpaca_claims/`: one recorded call per claim in engine/README.md ("Alpaca claims"):
+  `recorded_at`, the request's path and parameters, the status, the rate-limit headers and
+  the body. Long answers keep their first three and last two bars, with `bars_returned`
+  giving the full count. In `f_nvda_split_raw.json` each stand-in price is the matching
+  `f_nvda_split_all.json` stand-in times that day's real ratio of raw to adjusted close,
+  rounded to two places (10.03 before the split, 1.00 after).

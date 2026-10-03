@@ -1,4 +1,4 @@
-"""Command line: `python -m engine migrate | run | status | import-history`."""
+"""Command line: `python -m engine migrate | run | status | import-history | backfill-bars`."""
 
 import argparse
 import asyncio
@@ -34,6 +34,9 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
     commands.add_parser(
         "import-history", help="import Trump's past posts (CC0 archive, then CNN's live file)"
     )
+    commands.add_parser(
+        "backfill-bars", help="fetch every instrument's missing daily bars from Alpaca"
+    )
     args = parser.parse_args(argv)
 
     configure_logging()
@@ -41,10 +44,7 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
         settings = Settings()
     except ValidationError as exc:
         # Print field names and messages only: the error's input values can hold the URL.
-        problems = "; ".join(
-            f"ENGINE_{'_'.join(map(str, e['loc'])).upper() or 'SETTINGS'}: {e['msg']}"
-            for e in exc.errors()
-        )
+        problems = "; ".join(f"{_variable(e['loc'])}: {e['msg']}" for e in exc.errors())
         print(f"invalid engine settings: {problems}", file=sys.stderr)
         return 2
 
@@ -58,10 +58,21 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
         if args.command == "import-history":
             asyncio.run(run_import(settings))
             return 0
+        if args.command == "backfill-bars":
+            from engine.market.bars import run_backfill  # pandas loads only for this command
+
+            return asyncio.run(run_backfill(settings))
         return asyncio.run(_status(settings))
     except OperationalError as exc:
         print(database_error_line(exc), file=sys.stderr)
         return 1
+
+
+def _variable(loc: tuple[int | str, ...]) -> str:
+    """The environment variable a settings error is about. A field read under its own
+    name (ALPACA_API_SECRET_KEY) is located at that name, in capitals."""
+    name = "_".join(map(str, loc))
+    return name if name.isupper() else f"ENGINE_{name.upper() or 'SETTINGS'}"
 
 
 def database_error_line(exc: OperationalError) -> str:

@@ -1,5 +1,6 @@
 """Engine settings, read from ENGINE_* environment variables."""
 
+from pathlib import Path
 from typing import Annotated, Self
 
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
@@ -69,7 +70,21 @@ class Settings(BaseSettings):
     catchup_max_pages: int = Field(default=25, ge=1)
     """Pages a paged feed (direct, scrapecreators) reads back to fill one gap."""
 
-    @field_validator("scrapecreators_key", mode="before")
+    alpaca_key_id: SecretStr | None = Field(default=None, validation_alias="ALPACA_API_KEY_ID")
+    alpaca_secret_key: SecretStr | None = Field(
+        default=None, validation_alias="ALPACA_API_SECRET_KEY"
+    )
+    """Alpaca market data keys (ALPACA_API_KEY_ID, ALPACA_API_SECRET_KEY, Alpaca's own names).
+    Stock bars need them; coin bars don't."""
+    alpaca_calls_per_minute: float = Field(default=150.0, gt=0, le=200)
+    """Client-side cap on Alpaca calls, under the free plan's 200 a minute."""
+    alpaca_backoff_seconds: float = Field(default=2.0, gt=0)
+    """First wait before a retry (a 5xx, a dropped call, or a 429 that names no reset);
+    doubles each try."""
+    bars_cache_dir: Path = Path.home() / ".cache" / "shitpost-engine" / "bars"
+    """Minute-bar cache (ENGINE_BARS_CACHE_DIR), outside the repo."""
+
+    @field_validator("scrapecreators_key", "alpaca_key_id", "alpaca_secret_key", mode="before")
     @classmethod
     def _clean_keys(cls, value: object) -> object:
         """An API key as it goes in a request header: a pasted space or newline is
@@ -111,6 +126,13 @@ class Settings(BaseSettings):
         if unknown:
             raise ValueError(f"unknown feeds {sorted(unknown)}; feeds are {', '.join(FEED_NAMES)}")
         return self
+
+    @property
+    def alpaca_keys(self) -> tuple[str, str] | None:
+        """Both Alpaca keys, or None when either is missing."""
+        if self.alpaca_key_id is None or self.alpaca_secret_key is None:
+            return None
+        return self.alpaca_key_id.get_secret_value(), self.alpaca_secret_key.get_secret_value()
 
     @property
     def db_url(self) -> str:

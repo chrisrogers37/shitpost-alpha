@@ -195,6 +195,20 @@ def test_bad_settings_are_a_clear_error_that_never_prints_the_url(settings: Sett
     assert "lease_ttl_seconds must be at least" in result.stderr
     assert settings.db_url not in result.stderr + result.stdout
 
+    # A field read under Alpaca's own name is named that way, and its value never shown.
+    result = cli(env(settings, ALPACA_API_SECRET_KEY="two words"), "status")
+    assert result.returncode == 2
+    assert "invalid engine settings: ALPACA_API_SECRET_KEY: " in result.stderr
+    assert "two words" not in result.stderr + result.stdout
+
+
+def test_the_cli_loads_pandas_only_for_the_commands_that_use_it() -> None:
+    code = "import sys, engine.cli; print('pandas' in sys.modules)"
+    loaded = subprocess.run(
+        [sys.executable, "-c", code], cwd=PROJECT, capture_output=True, text=True, timeout=60
+    )
+    assert loaded.stdout.strip() == "False", loaded.stderr
+
 
 @pytest.mark.parametrize("command", ["status", "migrate"])
 def test_a_host_that_does_not_resolve_is_reported_as_unreachable(

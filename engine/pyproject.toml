@@ -9,7 +9,9 @@ description = "Always-on signal engine for shitpost-alpha"
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.13",
+    "exchange-calendars>=4.13",
     "httpx>=0.27",
+    "pandas>=3.0",
     "psycopg[binary]>=3.2",
     "pydantic-settings>=2.4",
     "sqlalchemy[asyncio]>=2.0.30",
@@ -23,12 +25,20 @@ dev = [
     "pytest-asyncio>=0.24",
     "ruff>=0.16,<0.17",
 ]
+crosscheck = [
+    "yfinance>=0.2.40",
+]
 
 [tool.setuptools.packages.find]
 include = ["engine*"]
 
 [tool.setuptools.package-data]
-engine = ["migrations/*.py", "migrations/*.mako", "migrations/versions/*.py"]
+engine = [
+    "migrations/*.py",
+    "migrations/*.mako",
+    "migrations/versions/*.py",
+    "market/collisions.json",
+]
 
 [tool.ruff]
 line-length = 100
@@ -40,8 +50,12 @@ select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.13"
 strict = true
-files = ["engine", "tests"]
+files = ["engine", "tests", "scripts"]
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["exchange_calendars", "pandas", "yfinance"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
