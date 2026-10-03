@@ -135,6 +135,23 @@ async def test_the_evidence_is_the_backtests_method_on_similar_past_posts(
     assert {c.fyi_reason for c in others} == {"no_passing_pair"}
 
 
+async def draft_spy_1h(
+    db: AsyncEngine, history: History, posted: datetime, *at: datetime
+) -> list[Any]:
+    """The spy:1h evidence of a post like WORDS made at `posted`, drafted at each `at`."""
+    async with db.connect() as conn:
+        evidencer = Evidencer(await LivePool.load(conn, StubEmbedder.version), load_match_rule())
+        listed = {i.id: i for i in await all_instruments(conn)}
+        calls: dict[Picker, list[Target]] = {
+            "rules": [Target(Pair("spy", "1h"), listed[history.spy])]
+        }
+        post = Post("ts:live", posted, stub_vector(WORDS))
+        return [
+            (await evidencer.draft(conn, post, calls, listed, when))["rules"][0].evidence
+            for when in at
+        ]
+
+
 async def test_the_pool_leaves_out_windows_that_had_not_closed_by_the_alert(
     db: AsyncEngine, history: History
 ) -> None:
@@ -144,17 +161,34 @@ async def test_the_pool_leaves_out_windows_that_had_not_closed_by_the_alert(
         await plant_move(conn, history.spy, recent, "1h", 0.01, history.now + timedelta(minutes=32))
         skipped = await plant_past(conn, history.now - timedelta(days=20), WORDS + "!", vector)
         await plant_move(conn, history.spy, skipped, "1h", None, history.now)
-    async with db.connect() as conn:
-        evidencer = Evidencer(await LivePool.load(conn, StubEmbedder.version), load_match_rule())
-        listed = {i.id: i for i in await all_instruments(conn)}
-        calls: dict[Picker, list[Target]] = {
-            "rules": [Target(Pair("spy", "1h"), listed[history.spy])]
-        }
-        post = Post("ts:live", history.now, vector)
-        now = await evidencer.draft(conn, post, calls, listed, history.now)
-        later = await evidencer.draft(conn, post, calls, listed, history.now + timedelta(hours=1))
-    assert now["rules"][0].evidence.matches == 12
-    assert later["rules"][0].evidence.matches == 13  # its window has closed by then
+    later = history.now + timedelta(hours=1)  # a post made an hour on: the window has closed
+    (now,) = await draft_spy_1h(db, history, history.now, history.now)
+    (after,) = await draft_spy_1h(db, history, later, later + timedelta(minutes=2))
+    assert (now.matches, after.matches) == (12, 13)
+
+
+async def test_the_evidence_is_as_of_the_posts_alert_time_however_late_it_is_drafted(
+    db: AsyncEngine, history: History
+) -> None:
+    """Gate 0 v1 takes a post's matches as of its alert time, the post plus 2 minutes. A
+    post drafted later (seen late through a mirror, or after an outage) gets the same: not
+    an earlier post whose window closed inside its own, nor a post made after it."""
+    posted = history.now - timedelta(hours=3)
+    vector = stub_vector(WORDS)
+    async with db.begin() as conn:
+        edge = await plant_past(conn, posted - timedelta(minutes=60), f"{WORDS} (e)", vector)
+        await plant_move(conn, history.spy, edge, "1h", -0.009, posted + timedelta(seconds=90))
+        overlap = await plant_past(conn, posted - timedelta(minutes=59), f"{WORDS} (a)", vector)
+        await plant_move(conn, history.spy, overlap, "1h", -0.009, posted + timedelta(minutes=3))
+        after = await plant_past(conn, posted + timedelta(minutes=4), f"{WORDS} (b)", vector)
+        await plant_move(conn, history.spy, after, "1h", -0.012, posted + timedelta(minutes=66))
+    drafted = await draft_spy_1h(
+        db, history, posted, *(posted + timedelta(minutes=m) for m in (1, 2, 5, 70))
+    )
+    # As of a minute after the post the edge window hadn't closed; from the alert time on,
+    # it is the 13th match, and nothing that closed (or was posted) later joins it.
+    assert [e.matches for e in drafted] == [12, 13, 13, 13]
+    assert all(x.posted_at < posted for e in drafted for x in e.examples)
 
 
 async def test_a_company_without_stored_moves_is_fyi_few_matches(

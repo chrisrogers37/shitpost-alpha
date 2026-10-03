@@ -5,6 +5,12 @@ makes the alert when it found a market link: its calls, their similar-post evide
 reason line when the AI is live, and send rule v1's decision. The other picker, the
 challenger, gets the same calls and evidence in engine.challenger_calls, never sent.
 
+A picker makes calls only on a post it gave a market link. Gate 0 counts a company pair's
+call whenever the picker counted the company (its rule 1). The rules never count one
+without a link, but the AI vote decides names and the link apart, so its live company
+calls (as challenger now, or as the picker in use after Gate 0) cover fewer posts than
+Gate 0 measured for it.
+
 The alert and its revision 1 are written in the stage's one transaction, under the seq
 lock (engine/alerts/store.py), whose time is the alert time; the wake hook rings after
 the commit. A crash leaves the post at `alert` with nothing written, and the retry writes
@@ -24,11 +30,11 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from engine.alerts.evidence import Drafted, Evidencer, Post, targets
-from engine.alerts.model import EXCERPT_CHARS, AlertV1, Call, Instrument
-from engine.alerts.public import check_public
+from engine.alerts.model import AlertV1, Call, Instrument
+from engine.alerts.public import check_public, quote
 from engine.alerts.rule import Decided, decide
 from engine.alerts.send_rule import Picker, SendRule
-from engine.alerts.store import NotPublic, recently_sent, take_seq, write_alert
+from engine.alerts.store import recently_sent, take_seq, write_alert
 from engine.alerts.wake import Wake
 from engine.backtest.evaluate import Pick
 from engine.extract.ai import AiPicker
@@ -37,6 +43,7 @@ from engine.extract.rules import OTHER
 from engine.market import calendar
 from engine.market.instruments import Instrument as Listed
 from engine.market.instruments import all_instruments
+from engine.notify import notify_operator
 from engine.tables import (
     alerts,
     challenger_calls,
@@ -45,7 +52,7 @@ from engine.tables import (
     signal_embeddings,
     signal_mentions,
 )
-from engine.text import excerpt, has_words, normalize
+from engine.text import has_words, normalize
 
 log = logging.getLogger(__name__)
 
@@ -189,7 +196,8 @@ class Alerter:
     async def _draft(
         self, conn: AsyncConnection, post: Post, found: Mapping[Picker, Answer]
     ) -> dict[Picker, list[Drafted]]:
-        """Each picker with a market link: its calls (rule 1) with their evidence."""
+        """Each picker with a market link: its calls (rule 1) with their evidence, as of the
+        post's alert time (or the database clock now, if that is earlier)."""
         listed = {i.id: i for i in await all_instruments(conn)}
         calls = {
             picker: targets(self.send_rule, answer.pick, listed)
@@ -201,13 +209,22 @@ class Alerter:
         return await self.evidencer.draft(conn, post, calls, listed, await database_time(conn))
 
     async def _reason(self, text: str, topic: str, drafted: Sequence[Drafted]) -> str | None:
+        """The reason line, given the names of the instruments the post brings in itself
+        (its companies, its topic's sector fund), not those of SPY, QQQ and BTC, which any
+        market link calls: so a line never brings up Bitcoin by itself, and "500" from
+        "S&P 500" is no number it may state. A line the public check refuses is dropped:
+        the reason line fails closed, it never holds up an alert."""
         assert self.ai is not None
-        names = list(dict.fromkeys(d.target.instrument.name for d in drafted))
+        own = (d.target.instrument.name for d in drafted if d.target.named_by_post)
         spec = self.ai.config.reason
-        return await reason_line(
-            self.ai.clients[spec.provider], self.ai.config, normalize(text), topic, names,
-            secrets=self.ai.secrets,
+        line = await reason_line(
+            self.ai.clients[spec.provider], self.ai.config, normalize(text), topic,
+            list(dict.fromkeys(own)), secrets=self.ai.secrets,
         )  # fmt: skip
+        if line is not None and (problems := check_public({"reason": line})):
+            log.warning("reason line dropped: %s", "; ".join(problems))
+            return None
+        return line
 
     async def _write(
         self,
@@ -229,9 +246,11 @@ class Alerter:
         if taken is not None:
             mine = drafted[rule.picker]
             ids = {d.target.instrument.id for d in mine}
-            recent = await recently_sent(conn, alerts, at, ids)
+            recent = await recently_sent(conn, alerts.c.alerted_at, at, ids)
             decided = decide(mine, rule.passing[rule.picker], at, send_until, recent)
-            alert = self._alert(row, found[rule.picker], decided, mine, topic, reason, at)
+            alert = self._alert(
+                row, found[rule.picker], decided, mine, topic, reason, at, send_until
+            )
             await write_alert(
                 conn,
                 alert,
@@ -261,6 +280,7 @@ class Alerter:
         topic: str,
         reason: str | None,
         at: datetime,
+        send_until: datetime,
     ) -> AlertV1:
         rule = self.send_rule
         shown = list({d.target.instrument.id: d.target.instrument for d in drafted}.values())
@@ -270,8 +290,8 @@ class Alerter:
             signal_key=row.key,
             posted_at=row.posted_at,
             alerted_at=at,
-            send_until=row.posted_at + SEND_WINDOW,
-            excerpt=excerpt(row.text, EXCERPT_CHARS),
+            send_until=send_until,
+            excerpt=quote(row.text),
             topic=topic,
             picker=f"{rule.picker} v{answer.version}",
             send_rule=f"v{rule.version}",
@@ -300,16 +320,19 @@ class Alerter:
         drafted: Sequence[Drafted],
         at: datetime,
         send_until: datetime,
-    ) -> list[Call]:
+    ) -> list[Call] | None:
         """The challenger's calls, judged against its own passing pairs and its own sends,
-        stored apart. A retried stage writes nothing more."""
+        stored apart. A retried stage writes nothing more. Calls the public check refuses
+        aren't recorded (one operator message), and the alert goes ahead without them."""
         picker = self.send_rule.challenger
         ids = {d.target.instrument.id for d in drafted}
-        recent = await recently_sent(conn, challenger_calls, at, ids)
+        recent = await recently_sent(conn, challenger_calls.c.created_at, at, ids)
         decided = decide(drafted, self.send_rule.passing[picker], at, send_until, recent)
         calls = [call.model_dump(mode="json") for call in decided.calls]
         if problems := check_public({"calls": calls}):
-            raise NotPublic("; ".join(problems))
+            refused = "; ".join(problems)
+            await notify_operator("challenger_not_public", f"{key}: not recorded: {refused}")
+            return None
         await conn.execute(
             insert(challenger_calls)
             .values(

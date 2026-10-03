@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from engine.alerts.model import AlertV1
 from engine.alerts.store import (
     NotPublic,
-    Written,
     add_revision,
     read_changes,
     recently_sent,
@@ -37,7 +36,7 @@ async def a_signal(conn: AsyncConnection, n: int) -> tuple[str, str]:
     return post.key, public_id
 
 
-async def store(conn: AsyncConnection, alert: AlertV1, sent_on: set[int] | None = None) -> Written:
+async def store(conn: AsyncConnection, alert: AlertV1, sent_on: set[int] | None = None) -> int:
     sent = {1} if sent_on is None else sent_on
     return await write_alert(
         conn,
@@ -51,7 +50,7 @@ async def store(conn: AsyncConnection, alert: AlertV1, sent_on: set[int] | None 
     )
 
 
-async def an_alert(db: AsyncEngine, n: int, **changes: object) -> Written:
+async def an_alert(db: AsyncEngine, n: int, **changes: object) -> int:
     async with db.begin() as conn:
         key, public_id = await a_signal(conn, n)
         return await store(conn, sample_alert(signal_key=key, public_id=public_id, **changes))
@@ -100,13 +99,13 @@ async def test_the_database_refuses_to_change_or_delete_a_revision(db: AsyncEngi
 
 
 async def test_revision_1_is_the_creation_and_later_ones_count_up(db: AsyncEngine) -> None:
-    written = await an_alert(db, 1)
+    alert_id = await an_alert(db, 1)
     async with db.begin() as conn:
         doc = {"format": "alert.v1"}
-        assert await add_revision(conn, written.alert_id, "result", doc, await take_seq(conn)) == 2
+        assert await add_revision(conn, alert_id, "result", doc, await take_seq(conn)) == 2
     with pytest.raises(IntegrityError, match="first_is_created"):
         async with db.begin() as conn:
-            await add_revision(conn, written.alert_id, "created", doc, await take_seq(conn))
+            await add_revision(conn, alert_id, "created", doc, await take_seq(conn))
 
 
 async def test_writers_commit_in_seq_order_and_a_reader_never_sees_a_gap(db: AsyncEngine) -> None:
@@ -140,7 +139,7 @@ async def test_writers_commit_in_seq_order_and_a_reader_never_sees_a_gap(db: Asy
             await asyncio.sleep(0)
 
     following = asyncio.create_task(reader())
-    await asyncio.gather(*(writer(w.alert_id, REVISIONS // WRITERS) for w in written))
+    await asyncio.gather(*(writer(alert_id, REVISIONS // WRITERS) for alert_id in written))
     done.set()
     await following
     assert [seq for seq, _ in seen] == list(range(1, first + REVISIONS + 1))
@@ -176,13 +175,13 @@ async def test_the_cursor_carries_the_stream_id_and_pages(db: AsyncEngine) -> No
 async def test_a_send_within_30_minutes_is_recent(
     db: AsyncEngine, minutes: int, burst: bool
 ) -> None:
-    written = await an_alert(db, 1)
+    alert_id = await an_alert(db, 1)
     async with db.connect() as conn:
         alerted_at = (
-            await conn.execute(select(alerts.c.alerted_at).where(alerts.c.id == written.alert_id))
+            await conn.execute(select(alerts.c.alerted_at).where(alerts.c.id == alert_id))
         ).scalar_one()
         at = alerted_at + timedelta(minutes=minutes)
-        recent = await recently_sent(conn, alerts, at, {1, 2})
+        recent = await recently_sent(conn, alerts.c.alerted_at, at, {1, 2})
     assert recent == ({1} if burst else set())
 
 
@@ -190,4 +189,7 @@ async def test_an_fyi_alert_is_never_a_recent_send(db: AsyncEngine) -> None:
     await an_alert(db, 1, disposition="fyi", fyi_reason="no_passing_pair")
     async with db.connect() as conn:
         at = (await conn.execute(select(alerts.c.alerted_at))).scalar_one()
-        assert await recently_sent(conn, alerts, at + timedelta(minutes=1), {1, 2}) == set()
+        assert (
+            await recently_sent(conn, alerts.c.alerted_at, at + timedelta(minutes=1), {1, 2})
+            == set()
+        )
