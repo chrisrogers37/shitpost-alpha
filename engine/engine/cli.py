@@ -1,5 +1,5 @@
 """Command line: `python -m engine migrate | run | status | import-history | backfill-bars |
-sync-names | extract | fetch-model | embed | ai-pick | review-list`."""
+sync-names | extract | fetch-model | embed | ai-pick | review-list` and `python -m engine web`."""
 
 import argparse
 import asyncio
@@ -12,10 +12,11 @@ from pathlib import Path
 
 import httpx
 from pydantic import ValidationError
+from pydantic_settings import BaseSettings
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
-from engine.db import db_now, make_engine
+from engine.db import db_now, first_line, make_engine
 from engine.feeds.history import run_import
 from engine.feeds.status import status_lines
 from engine.lease import LEASE_NAME
@@ -25,6 +26,7 @@ from engine.registry import Registry, build_registry
 from engine.runtime import run_engine
 from engine.settings import Settings
 from engine.tables import engine_lease, engine_meta
+from engine.web.settings import WebSettings
 
 STATUS_FIELDS = ("stream_id", "started_at", "last_heartbeat_at", "lease_holder", "code_version")
 
@@ -68,15 +70,18 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
     commands.add_parser(
         "review-list", help="names the AI vote counted that the rules missed, for review"
     )
+    commands.add_parser("web", help="serve the website and its API (WEB_* settings only)")
     args = parser.parse_args(argv)
 
     configure_logging()
-    try:
-        settings = Settings()
-    except ValidationError as exc:
-        # Print field names and messages only: the error's input values can hold the URL.
-        problems = "; ".join(f"{_variable(e['loc'])}: {e['msg']}" for e in exc.errors())
-        print(f"invalid engine settings: {problems}", file=sys.stderr)
+    if args.command == "web":
+        web_settings = load_settings(WebSettings, "web")
+        if web_settings is None:
+            return 2
+        serve_web(web_settings)
+        return 0
+    settings = load_settings(Settings, "engine")
+    if settings is None:
         return 2
 
     if args.command == "run":  # it retries database errors itself
@@ -101,6 +106,18 @@ def main(argv: Sequence[str] | None = None, registry: Registry | None = None) ->
         return 1
 
 
+def load_settings[S: BaseSettings](cls: type[S], what: str) -> S | None:
+    """`cls()` from the environment, or None after printing what is wrong with it."""
+    try:
+        return cls()
+    except ValidationError as exc:
+        # Print variable names and messages only: the error's input values can hold the URL.
+        prefix = cls.model_config.get("env_prefix") or ""
+        problems = "; ".join(f"{_variable(prefix, e['loc'])}: {e['msg']}" for e in exc.errors())
+        print(f"invalid {what} settings: {problems}", file=sys.stderr)
+        return None
+
+
 def _dollars(text: str) -> Decimal:
     """A spend limit: a finite amount of 0 or more."""
     try:
@@ -112,17 +129,36 @@ def _dollars(text: str) -> Decimal:
     return amount
 
 
-def _variable(loc: tuple[int | str, ...]) -> str:
+def _variable(prefix: str, loc: tuple[int | str, ...]) -> str:
     """The environment variable a settings error is about. A field read under its own
-    name (ALPACA_API_SECRET_KEY) is located at that name, in capitals."""
+    name (PORT, ALPACA_API_SECRET_KEY) is located at that name, in capitals."""
     name = "_".join(map(str, loc))
-    return name if name.isupper() else f"ENGINE_{name.upper() or 'SETTINGS'}"
+    if name.isupper():
+        return name
+    return f"{prefix}{name.upper() or 'SETTINGS'}"
+
+
+def serve_web(settings: WebSettings) -> None:
+    """One uvicorn process on 0.0.0.0:PORT. Proxy headers stay off: the rate limit reads
+    the edge's header itself. No server header; ResponsePolicy writes the access log."""
+    import uvicorn  # here, so the engine's own commands never load the web stack
+
+    from engine.web.app import create_app
+
+    uvicorn.run(
+        create_app(settings),
+        host="0.0.0.0",
+        port=settings.port,
+        proxy_headers=False,
+        server_header=False,
+        access_log=False,
+        log_config=None,  # keep configure_logging's format
+    )
 
 
 def database_error_line(exc: OperationalError) -> str:
-    """One line from the driver. It names the host and user; it shows part of the password
-    only if the URL is malformed (an unescaped "@" in the password)."""
-    reason = (str(exc.orig or exc).splitlines() or [type(exc).__name__])[0]
+    """One line from the driver (see first_line)."""
+    reason = first_line(exc) or type(exc).__name__
     unreachable = reason.startswith(("connection", "failed to resolve host"))
     return f"{'could not reach' if unreachable else 'error from'} the engine database: {reason}"
 

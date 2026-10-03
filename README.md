@@ -80,8 +80,7 @@ The project uses a delightfully themed directory structure that's both logical, 
 - **`shitvault/`** - Secure data storage and S3 processing
 - **`shitposts/`** - Content harvesting and monitoring
 - **`shitpost_ai/`** - AI analysis and LLM integration
-- **`frontend/`** - React + TypeScript web dashboard
-- **`api/`** - FastAPI backend serving the React frontend
+- **`engine/engine/web/`** - Website and public read API (`python -m engine web`)
 
 ```
 shitpost_alpha/
@@ -115,19 +114,7 @@ shitpost_alpha/
 │   ├── shitpost_analyzer.py # Analysis orchestrator
 │   ├── compare_cli.py      # Multi-provider comparison CLI
 │   └── cli.py              # Analysis CLI utilities
-├── api/                    # FastAPI backend
-│   ├── main.py             # App entry point, CORS, static files
-│   ├── routers/            # Endpoint routers (feed, prices, telegram)
-│   ├── queries/            # Database query layer
-│   ├── schemas/            # Pydantic response models
-│   └── dependencies.py     # Shared DB session helpers
-├── frontend/               # React 19 + TypeScript + Vite
-│   ├── src/
-│   │   ├── pages/          # FeedPage (single-post-at-a-time)
-│   │   ├── components/     # ShitpostCard, PriceChart, MetricBubbles, etc.
-│   │   ├── api/            # TanStack Query hooks & client
-│   │   └── styles/         # Theme configuration
-│   └── dist/               # Built production assets
+├── engine/engine/web/      # Website + public read API (/api/v1, /healthz)
 ├── notifications/          # Alert dispatch & Telegram bot
 │   ├── alert_engine.py     # Alert check-and-dispatch loop
 │   ├── dispatcher.py       # Multi-channel delivery
@@ -184,15 +171,12 @@ For comprehensive information about each component, see the detailed README file
 - Enhanced context analysis
 - Bypass functionality for unanalyzable content
 
-### 📊 Performance Dashboard
-- React 19 + TypeScript single-post feed with prediction outcomes
-- TradingView Lightweight Charts with post markers
-- Price KPIs, outcome bubbles (T+1/3/7/30), ticker selection
+### 🌐 [Website API](engine/README.md#public-api)
+- Public read API under `/api/v1`, served by `python -m engine web` (`engine/engine/web/`)
 
 ### 🔔 [Notifications](documentation/TELEGRAM_SETUP_GUIDE.md)
 - Telegram bot with subscriber management
 - Alert engine with configurable thresholds
-- Browser push alerts via dashboard
 
 ### 📈 [Market Data](documentation/MARKET_DATA_ARCHITECTURE.md)
 - Multi-provider price fetching (yfinance + Alpha Vantage)
@@ -226,6 +210,7 @@ For detailed version history and recent improvements, see [CHANGELOG.md](CHANGEL
 - [x] **Automated Updates** - Railway cron every 15 minutes for price fetching and outcome calculation
 
 ### Phase 3: Dashboard & Visualization ✅ **COMPLETED**
+_This dashboard (`frontend/` and `api/`) was removed in site D0; the new website is built in `engine/engine/web/`._
 - [x] **React + FastAPI Frontend** - Single-post feed with prediction outcomes and price charts
 - [x] **TradingView Charts** - Candlestick/volume charts with post timestamp markers
 - [x] **Outcome Tracking** - T+1/3/7/30 return bubbles with P&L and correctness
@@ -238,7 +223,7 @@ For detailed version history and recent improvements, see [CHANGELOG.md](CHANGEL
 - [x] **Telegram Bot** - Real-time prediction alerts with subscriber commands
 - [x] **Alert Rules Engine** - Confidence threshold, asset filters, per-subscriber preferences
 - [x] **Subscriber Management** - Multi-tenant subscription via Telegram
-- [x] **Browser Alerts** - Dashboard alert panel with localStorage preferences
+- [x] **Browser Alerts** - Dashboard alert panel with localStorage preferences (removed with the dashboard)
 - [x] **Production Deployment** - Railway cron every 2 minutes, webhook endpoint, health check
 
 ### Phase 5: System Evolution ✅ **COMPLETED**

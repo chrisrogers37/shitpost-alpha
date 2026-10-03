@@ -4,6 +4,7 @@ import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, time, timedelta
+from typing import Any
 
 import psycopg
 import pytest
@@ -258,7 +259,7 @@ async def stopped_within(settings: Settings, registry: Registry, seconds: float)
 async def test_stop_works_when_the_heartbeat_turns_its_cancellation_into_an_error(
     migrated: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def engines(url: str, **pool: object) -> object:
+    def engines(url: str, **pool: Any) -> object:
         real = make_engine(url, **pool)
         return real if pool else helpers.StalledDb(real)  # the lease pool works
 

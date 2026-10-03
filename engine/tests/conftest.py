@@ -40,13 +40,19 @@ def database_url() -> Iterator[str]:
 
 
 @pytest.fixture
-def make_role(database_url: str) -> Iterator[Callable[[], str]]:
-    """Creates roles on demand; drops them (and their grants in the test database) after."""
+def make_role(database_url: str) -> Iterator[Callable[..., str]]:
+    """Creates roles on demand (able to log in if given a password); drops them (and their
+    grants in the test database) after."""
     created: list[str] = []
 
-    def create() -> str:
+    def create(password: str | None = None) -> str:
         name = f"web_test_{secrets.token_hex(4)}"
-        admin(sql.SQL("CREATE ROLE {} NOLOGIN").format(sql.Identifier(name)))
+        login = (
+            sql.SQL("LOGIN PASSWORD {}").format(sql.Literal(password))
+            if password
+            else sql.SQL("NOLOGIN")
+        )
+        admin(sql.SQL("CREATE ROLE {} {}").format(sql.Identifier(name), login))
         created.append(name)
         return name
 

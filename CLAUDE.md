@@ -86,20 +86,7 @@ shitpost_alpha/
 ├── shitpost_ai/            # AI analysis engine
 │   ├── shitpost_analyzer.py  # Analysis orchestrator
 │   └── cli.py              # Analysis CLI utilities
-├── api/                    # FastAPI backend (React frontend API)
-│   ├── main.py             # App entry point, CORS, static file serving
-│   ├── routers/            # Endpoint routers (feed, prices, telegram)
-│   ├── queries/            # Database query layer
-│   ├── schemas/            # Pydantic response models
-│   └── dependencies.py     # Shared DB session helpers
-├── frontend/               # React 19 + TypeScript + Vite web dashboard
-│   ├── src/
-│   │   ├── pages/          # FeedPage (single-post-at-a-time view)
-│   │   ├── components/     # ShitpostCard, PriceChart, MetricBubbles, etc.
-│   │   ├── api/            # TanStack Query hooks & API client
-│   │   ├── styles/         # Theme configuration
-│   │   └── types/          # TypeScript interfaces
-│   └── dist/               # Built production assets
+├── engine/engine/web/      # Website + public read API (/api/v1, /healthz): `python -m engine web`
 ├── notifications/          # Alert dispatch & Telegram bot
 │   ├── alert_engine.py     # Core alert dispatch logic
 │   ├── dispatcher.py       # Multi-channel delivery (Telegram, Email, SMS)
