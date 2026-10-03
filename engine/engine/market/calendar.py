@@ -85,3 +85,12 @@ def trading_days_after(session: date, days: int) -> date:
     """The session `days` sessions after `session` (before it, for a negative number)."""
     later: date = _xnys().session_offset(_session(session), days).date()
     return later
+
+
+def schedule(first: date, last: date) -> list[tuple[date, datetime, datetime]]:
+    """Every session from `first` to `last` (both inclusive): its date, open and close."""
+    frame = _xnys().schedule.loc[pd.Timestamp(first) : pd.Timestamp(last)]
+    return [
+        (stamp.date(), _utc(row.open), _utc(row.close))
+        for stamp, row in zip(frame.index, frame.itertuples(), strict=True)
+    ]

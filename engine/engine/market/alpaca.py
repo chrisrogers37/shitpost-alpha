@@ -135,6 +135,8 @@ class Alpaca:
         self.settings = settings
         self.clock = clock
         self._keys = settings.alpaca_keys
+        self.calls = 0
+        """HTTP calls made, retries included (the backtest reports them)."""
         self._pacer = Pacer(settings.alpaca_calls_per_minute)
         self._client = make_client(settings, transport)  # no redirects: keys stay on this host
         if self._keys is not None:
@@ -215,6 +217,7 @@ class Alpaca:
         """One call, tried again after a 429, a 5xx or a network failure."""
         for attempt in range(1, TRIES + 1):
             await self._pacer.wait()
+            self.calls += 1
             try:
                 response = await self._client.get(DATA_URL + path, params=params)
             except RETRY_ERRORS as exc:

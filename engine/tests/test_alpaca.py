@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import os
 import time
@@ -10,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import numpy as np
 import pytest
 from pydantic import SecretStr, ValidationError
 
@@ -24,7 +24,7 @@ from engine.market.alpaca import (
     Pacer,
     TooRecent,
 )
-from engine.market.bars import MinuteCache, fetch_bars, run_backfill
+from engine.market.bars import CacheMiss, MinuteCache, fetch_bars, run_backfill
 from engine.market.instruments import alpaca_symbol
 from engine.settings import Settings
 from tests.feeds_helpers import fixture_bytes, fixture_json
@@ -438,52 +438,71 @@ async def test_a_cached_minute_window_makes_no_second_call(tmp_path: Path) -> No
     end = start + timedelta(minutes=29)
     fake = FakeAlpaca()
     fake.minutes["SPY"] = [minute_bar(start + timedelta(minutes=m), 550 + m) for m in range(30)]
-    cache = MinuteCache(tmp_path)
     async with fake.client(market_settings()) as alpaca:
+        cache = MinuteCache(tmp_path, alpaca)
         # Windows are whole minutes: seconds are dropped before naming and fetching.
-        first = await cache.bars(
-            alpaca, spy, start + timedelta(seconds=30), end + timedelta(0, 59.5)
-        )
-        again = await cache.bars(alpaca, spy, start, end)
+        first = await cache.series(spy, start + timedelta(seconds=30), end + timedelta(0, 59.5))
+        again = await cache.series(spy, start, end)
     assert len(fake.requests) == 1
     assert (fake.params()["start"], fake.params()["end"]) == (
         "2024-07-09T14:00:00Z",
         "2024-07-09T14:29:00Z",
     )
-    assert first == again and len(first) == 30
-    assert cache.path(spy, start + timedelta(seconds=1), end) == cache.path(spy, start, end)
-    assert cache.path(spy, start, end).relative_to(tmp_path).parts[:2] == ("spy", "all")
+    assert len(first) == 30 and first.opens[0] == 550.0 and first.closes[-1] == 579.0
+    assert all(np.array_equal(getattr(first, f), getattr(again, f)) for f in vars(first))
+    path = cache.path(spy, start, end, "all")
+    assert cache.path(spy, start + timedelta(seconds=1), end, "all") == path
+    assert path.relative_to(tmp_path).parts[:3] == ("spy", "all", "all")
     btc = instrument("btc", "coin")
-    assert cache.path(btc, start, end).relative_to(tmp_path).parts[:2] == ("btc", "raw")
+    assert cache.path(btc, start, end, "all").relative_to(tmp_path).parts[:2] == ("btc", "raw")
+
+    offline = MinuteCache(tmp_path, None)  # a rebuild: reads only
+    assert np.array_equal((await offline.series(spy, start, end)).opens, first.opens)
+    with pytest.raises(CacheMiss, match="missing"):
+        await offline.series(spy, start, end + timedelta(minutes=1))
+
+
+async def test_regular_hours_keep_only_the_session(tmp_path: Path) -> None:
+    aapl = instrument("aapl", "stock")
+    start = datetime(2024, 7, 9, 13, 0, tzinfo=UTC)  # 09:00 New York, before the open
+    fake = FakeAlpaca()
+    fake.minutes["AAPL"] = [minute_bar(start + timedelta(minutes=m), 200.0) for m in range(60)]
+    async with fake.client(market_settings()) as alpaca:
+        bars = await MinuteCache(tmp_path, alpaca).series(
+            aapl, start, start + timedelta(minutes=59), "regular"
+        )
+    assert len(bars) == 30  # 09:30 to 09:59
+    assert int(bars.minutes[0]) * 60 == datetime(2024, 7, 9, 13, 30, tzinfo=UTC).timestamp()
 
 
 async def test_a_minute_window_without_a_timezone_is_refused(tmp_path: Path) -> None:
     naive = datetime(2024, 7, 9, 14, 0)  # the host's local time would be a guess
     async with FakeAlpaca().client(market_settings()) as alpaca:
         with pytest.raises(ValueError, match="no timezone"):
-            await MinuteCache(tmp_path).bars(
-                alpaca, instrument("spy", "etf"), naive, naive + timedelta(minutes=29)
+            await MinuteCache(tmp_path, alpaca).series(
+                instrument("spy", "etf"), naive, naive + timedelta(minutes=29)
             )
 
 
-@pytest.mark.parametrize("content", ["", '{"fetched_at": "2024-07', "[]", '{"bars": []}'])
+@pytest.mark.parametrize("content", [b"", b'{"fetched_at": "2024-07', b"[]", b"PK\x03\x04junk"])
 async def test_a_cache_file_that_cannot_be_read_is_fetched_again(
-    tmp_path: Path, content: str, caplog: pytest.LogCaptureFixture
+    tmp_path: Path, content: bytes, caplog: pytest.LogCaptureFixture
 ) -> None:
     spy = instrument("spy", "etf")
     start = datetime(2024, 7, 9, 14, 0, tzinfo=UTC)
     end = start + timedelta(minutes=29)
     fake = FakeAlpaca()
     fake.minutes["SPY"] = [minute_bar(start + timedelta(minutes=m), 550 + m) for m in range(30)]
-    cache = MinuteCache(tmp_path)
-    path = cache.path(spy, start, end)
-    path.parent.mkdir(parents=True)
-    path.write_text(content)  # what a crash or a full disk could leave
     async with fake.client(market_settings()) as alpaca:
-        assert len(await cache.bars(alpaca, spy, start, end)) == 30
-        assert len(await cache.bars(alpaca, spy, start, end)) == 30
+        cache = MinuteCache(tmp_path, alpaca)
+        path = cache.path(spy, start, end, "all")
+        path.parent.mkdir(parents=True)
+        path.write_bytes(content)  # what a crash or a full disk could leave
+        assert len(await cache.series(spy, start, end)) == 30
+        assert len(await cache.series(spy, start, end)) == 30
     assert len(fake.requests) == 1  # fetched again once, then the good copy was read
-    assert len(json.loads(path.read_text())["bars"]) == 30
+    with np.load(path) as stored:
+        assert len(stored["minutes"]) == 30
     assert "can't be read" in caplog.text
 
 
@@ -497,10 +516,10 @@ async def test_a_failed_cache_write_leaves_no_file(
     start = datetime(2024, 7, 9, 14, 0, tzinfo=UTC)
     fake = FakeAlpaca()
     fake.minutes["SPY"] = [minute_bar(start, 550.0)]
-    monkeypatch.setattr(json, "dump", full_disk)
+    monkeypatch.setattr(np, "savez_compressed", full_disk)
     async with fake.client(market_settings()) as alpaca:
         with pytest.raises(OSError, match="No space"):
-            await MinuteCache(tmp_path).bars(alpaca, spy, start, start + timedelta(minutes=29))
+            await MinuteCache(tmp_path, alpaca).series(spy, start, start + timedelta(minutes=29))
     assert await asyncio.to_thread(lambda: [p for p in tmp_path.rglob("*") if p.is_file()]) == []
 
 
@@ -509,9 +528,9 @@ async def test_a_minute_window_that_may_still_change_is_not_cached(tmp_path: Pat
     start = NOW - timedelta(minutes=30)
     fake = FakeAlpaca()
     fake.minutes["BTC/USD"] = [minute_bar(start, 58_000.0)]
-    cache = MinuteCache(tmp_path)
     async with fake.client(market_settings()) as alpaca:
-        await cache.bars(alpaca, btc, start, NOW - timedelta(minutes=5))
-        await cache.bars(alpaca, btc, start, NOW - timedelta(minutes=5))
+        cache = MinuteCache(tmp_path, alpaca)
+        await cache.series(btc, start, NOW - timedelta(minutes=5))
+        await cache.series(btc, start, NOW - timedelta(minutes=5))
     assert len(fake.requests) == 2
     assert await asyncio.to_thread(os.listdir, tmp_path) == []
