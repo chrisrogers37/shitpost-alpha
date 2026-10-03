@@ -1,0 +1,39 @@
+no URL: build-moves --to 2022-03-31 | rc=2 | lines=1 | secret=no
+      invalid engine settings: ENGINE_DATABASE_URL: Field required
+unreachable: build-moves --to 2022-03-31 | rc=1 | lines=1 | secret=no
+      could not reach the engine database: connection failed: connection to server at "127.0.0.1", port 1 failed: Connection refused
+bad password: build-moves --to 2022-03-31 | rc=1 | lines=1 | secret=no
+      could not reach the engine database: connection failed: connection to server at "127.0.0.1", port 5432 failed: FATAL:  password authentication failed for user "nobody"
+unmigrated DB: build-moves --to 2022-03-31 | rc=1 | lines=145 | secret=no
+      Traceback (most recent call last):
+     File "/home/user/engine-venv-261/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1943, in _exec_single_context
+       self.dialect.do_execute(
+       ~~~~~~~~~~~~~~~~~~~~~~~^
+calls/min 999: build-moves --to 2022-03-31 | rc=2 | lines=1 | secret=no
+      invalid engine settings: ENGINE_ALPACA_CALLS_PER_MINUTE: Input should be less than or equal to 200
+no URL: backtest | rc=2 | lines=1 | secret=no
+      invalid engine settings: ENGINE_DATABASE_URL: Field required
+unreachable: backtest | rc=1 | lines=1 | secret=no
+      could not reach the engine database: connection failed: connection to server at "127.0.0.1", port 1 failed: Connection refused
+bad password: backtest | rc=1 | lines=1 | secret=no
+      could not reach the engine database: connection failed: connection to server at "127.0.0.1", port 5432 failed: FATAL:  password authentication failed for user "nobody"
+unmigrated DB: backtest | rc=1 | lines=157 | secret=no
+      Traceback (most recent call last):
+     File "/home/user/engine-venv-261/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1943, in _exec_single_context
+       self.dialect.do_execute(
+       ~~~~~~~~~~~~~~~~~~~~~~~^
+calls/min 999: backtest | rc=2 | lines=1 | secret=no
+      invalid engine settings: ENGINE_ALPACA_CALLS_PER_MINUTE: Input should be less than or equal to 200
+no URL: backtest --rebuild | rc=2 | lines=1 | secret=no
+      invalid engine settings: ENGINE_DATABASE_URL: Field required
+unreachable: backtest --rebuild | rc=1 | lines=1 | secret=no
+      could not reach the engine database: connection failed: connection to server at "127.0.0.1", port 1 failed: Connection refused
+bad password: backtest --rebuild | rc=1 | lines=1 | secret=no
+      could not reach the engine database: connection failed: connection to server at "127.0.0.1", port 5432 failed: FATAL:  password authentication failed for user "nobody"
+unmigrated DB: backtest --rebuild | rc=1 | lines=152 | secret=no
+      Traceback (most recent call last):
+     File "/home/user/engine-venv-261/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1943, in _exec_single_context
+       self.dialect.do_execute(
+       ~~~~~~~~~~~~~~~~~~~~~~~^
+calls/min 999: backtest --rebuild | rc=2 | lines=1 | secret=no
+      invalid engine settings: ENGINE_ALPACA_CALLS_PER_MINUTE: Input should be less than or equal to 200

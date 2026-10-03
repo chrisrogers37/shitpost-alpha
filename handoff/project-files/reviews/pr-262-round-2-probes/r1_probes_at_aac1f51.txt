@@ -1,0 +1,167 @@
+baseline API 0.09s; under flood API 200 in 0.62s; checker /healthz 200; flood: 9565 requests, 0 x 503, 0 x 429; new DB connections during the run: 1
+F.FFFFFFFF.F.
+/api/v1 on a silent database: 503 after 3.0s
+F..healthz on a silent database: 200 after 0.00s
+F
+=================================== FAILURES ===================================
+__ test_a_healthz_flood_from_one_visitor_starves_the_api_and_the_health_check __
+make_client = <function make_client.<locals>.make at 0x7f659ad70ae0>
+web_url = 'postgresql://web_test_9f437707:<redacted>@localhost:5432/engine_test_99e6897d'
+>       assert api.status_code == 503 or api_seconds > 1.5  # the API starves
+E       assert (200 == 503 or 0.6163370819999727 > 1.5)
+E        +  where 200 = <Response [200 OK]>.status_code
+tests/web/r2probe/test_probe_healthz_flood.py:103: AssertionError
+______________ test_plural_and_ohlcv_price_fields_pass_the_guard _______________
+web_settings = WebSettings(database_url=SecretStr('**********'), rate_limit_per_minute=120.0, rate_limit_burst=30, client_ip_header='X-Real-IP', trusted_hops=1, pool_size=5, port=8000)
+>       assert price_fields(create_app(web_settings, [router])) == set()
+E       AssertionError: assert {'asks', 'bid... 'ohlcv', ...} == set()
+E         
+E         Extra items in the left set:
+E         'closes'
+E         'prices'
+E         'volumes'
+E         'highs'
+E         'asks'...
+E         
+E         ...Full output truncated (5 lines hidden), use '-vv' to show
+tests/web/r2probe/test_probe_no_prices.py:31: AssertionError
+_____________ test_a_route_left_out_of_the_schema_is_never_walked ______________
+web_settings = WebSettings(database_url=SecretStr('**********'), rate_limit_per_minute=120.0, rate_limit_burst=30, client_ip_header='X-Real-IP', trusted_hops=1, pool_size=5, port=8000)
+make_client = <function make_client.<locals>.make at 0x7f659ac94040>
+>       @router.get("/quote", response_model=Quote, include_in_schema=False)
+tests/web/r2probe/test_probe_no_prices.py:42: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/user/engine-venv-262/lib/python3.13/site-packages/fastapi/routing.py:3084: in decorator
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+self = <engine.web.router.ApiRouter object at 0x7f659ac4a190>, path = '/quote'
+endpoint = <function test_a_route_left_out_of_the_schema_is_never_walked.<locals>.quote at 0x7f659ac96ac0>
+kwargs = {'response_model': <class 'tests.web.r2probe.test_probe_no_prices.test_a_route_left_out_of_the_schema_is_never_walked.<locals>.Quote'>, 'status_code': None, 'tags': None, 'dependencies': None, ...}
+>           raise TypeError(f"{path}: {problem}")
+E           TypeError: /quote: every /api/v1 route must be in the schema
+engine/web/router.py:25: TypeError
+________________ test_a_serialization_alias_hides_a_price_field ________________
+web_settings = WebSettings(database_url=SecretStr('**********'), rate_limit_per_minute=120.0, rate_limit_burst=30, client_ip_header='X-Real-IP', trusted_hops=1, pool_size=5, port=8000)
+>       class Quote(ApiResponse):
+tests/web/r2probe/test_probe_no_prices.py:56: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/user/engine-venv-262/lib/python3.13/site-packages/pydantic/_internal/_model_construction.py:270: in __new__
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+cls = <class 'tests.web.r2probe.test_probe_no_prices.test_a_serialization_alias_hides_a_price_field.<locals>.Quote'>
+kwargs = {}
+>           raise TypeError(f"{cls.__name__}: API models take no aliases {aliased}")
+E           TypeError: Quote: API models take no aliases ['close_price']
+engine/web/models.py:26: TypeError
+________________ test_a_trailing_slash_redirects_to_plain_http _________________
+web_url = 'postgresql://web_test_b27b578f:<redacted>@localhost:5432/engine_test_87f7320d'
+>       assert response.status_code == 307
+E       assert 404 == 307
+E        +  where 404 = <Response [404 Not Found]>.status_code
+tests/web/r2probe/test_probe_nits.py:60: AssertionError
+_____________ test_retry_after_is_hidden_from_cross_origin_scripts _____________
+make_client = <function make_client.<locals>.make at 0x7f659a016a20>
+web_url = 'postgresql://web_test_80bb96c5:<redacted>@localhost:5432/engine_test_6087d416'
+>       assert "access-control-expose-headers" not in limited.headers
+E       assert 'access-control-expose-headers' not in Headers({'retry-after': '60', 'content-length': '63', 'content-type': 'application/json', 'content-security-policy': "...'strict-origin-when-cross-origin', 'access-control-allow-origin': '*', 'access-control-expose-headers': 'Retry-After'})
+E        +  where Headers({'retry-after': '60', 'content-length': '63', 'content-type': 'application/json', 'content-security-policy': "...'strict-origin-when-cross-origin', 'access-control-allow-origin': '*', 'access-control-expose-headers': 'Retry-After'}) = <Response [429 Too Many Requests]>.headers
+tests/web/r2probe/test_probe_nits.py:76: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  engine.web.ratelimit:ratelimit.py:135 a request had no usable X-Real-IP entry (1 from the right); counting it by the socket address, which behind a proxy puts every visitor in one bucket
+_____________ test_error_log_lines_can_be_forged_through_the_path ______________
+make_client = <function make_client.<locals>.make at 0x7f659a08dda0>
+web_url = 'postgresql://web_test_eb9170c6:<redacted>@localhost:5432/engine_test_850b28c0'
+caplog = <_pytest.logging.LogCaptureFixture object at 0x7f659ae9ba10>
+>       assert any("\n2026-10-02 INFO engine: forged" in line for line in unhandled), forged
+E       AssertionError: ['unhandled error on GET /api/v1/signals/a\
+E         2026-10-02 INFO engine: forged', 'GET /api/v1/signals/a\
+E         2026-10-02 INFO engine: forged 500 24ms']
+E       assert False
+E        +  where False = any(<generator object test_error_log_lines_can_be_forged_through_the_path.<locals>.<genexpr> at 0x7f659a0e57d0>)
+tests/web/r2probe/test_probe_nits.py:94: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  engine.web.ratelimit:ratelimit.py:135 a request had no usable X-Real-IP entry (1 from the right); counting it by the socket address, which behind a proxy puts every visitor in one bucket
+ERROR    engine.web.access:policy.py:58 unhandled error on GET /api/v1/signals/a\n2026-10-02 INFO engine: forged
+Traceback (most recent call last):
+RuntimeError: boom
+INFO     engine.web.access:policy.py:65 GET /api/v1/signals/a\n2026-10-02 INFO engine: forged 500 24ms
+INFO     httpx:_client.py:1740 HTTP Request: GET http://test/api/v1/signals/a%0A2026-10-02%20INFO%20engine:%20forged "HTTP/1.1 500 Internal Server Error"
+_______ test_an_unusable_edge_value_silently_puts_everyone_in_one_bucket _______
+make_client = <function make_client.<locals>.make at 0x7f659a08e520>
+web_url = 'postgresql://web_test_12ef60d1:<redacted>@localhost:5432/engine_test_735a6c5e'
+caplog = <_pytest.logging.LogCaptureFixture object at 0x7f6599109bd0>
+>       assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+E       assert not [<LogRecord: engine.web.ratelimit, 30, /tmp/claude-0/-home-user-shitpost-alpha/aa37c4ca-915a-53be-b149-d37cd9089ba3/sc... entry (%d from the right); counting it by the socket address, which behind a proxy puts every visitor in one bucket">]
+tests/web/r2probe/test_probe_nits.py:117: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  engine.web.ratelimit:ratelimit.py:135 a request had no usable X-Real-IP entry (1 from the right); counting it by the socket address, which behind a proxy puts every visitor in one bucket
+INFO     engine.web.access:policy.py:65 GET /x 404 1ms
+INFO     httpx:_client.py:1740 HTTP Request: GET http://test/x "HTTP/1.1 404 Not Found"
+INFO     engine.web.access:policy.py:65 GET /x 404 0ms
+INFO     httpx:_client.py:1740 HTTP Request: GET http://test/x "HTTP/1.1 404 Not Found"
+INFO     engine.web.access:policy.py:65 GET /x 429 0ms
+INFO     httpx:_client.py:1740 HTTP Request: GET http://test/x "HTTP/1.1 429 Too Many Requests"
+_____________ test_a_cache_hit_near_expiry_still_says_max_age_ttl ______________
+make_client = <function make_client.<locals>.make at 0x7f659a110cc0>
+>       assert routes.builds == 1 and hit.headers["cache-control"] == "public, max-age=5"
+E       AssertionError: assert (1 == 1 and 'public, max-age=1' == 'public, max-age=5'
+E        +  where 1 = <tests.web.routes.ProbeRoutes object at 0x7f659aca02d0>.builds
+E         
+E         - public, max-age=5
+E         ?                 ^
+E         + public, max-age=1
+E         ?                 ^)
+tests/web/r2probe/test_probe_nits.py:133: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  engine.web.ratelimit:ratelimit.py:135 a request had no usable X-Real-IP entry (1 from the right); counting it by the socket address, which behind a proxy puts every visitor in one bucket
+_______________ test_a_cached_body_ignores_serialization_aliases _______________
+make_client = <function make_client.<locals>.make at 0x7f659a110fe0>
+>       class Item(ApiResponse):
+tests/web/r2probe/test_probe_nits.py:165: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/user/engine-venv-262/lib/python3.13/site-packages/pydantic/_internal/_model_construction.py:270: in __new__
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+cls = <class 'tests.web.r2probe.test_probe_nits.test_a_cached_body_ignores_serialization_aliases.<locals>.Item'>
+kwargs = {}
+>           raise TypeError(f"{cls.__name__}: API models take no aliases {aliased}")
+E           TypeError: Item: API models take no aliases ['public_id']
+engine/web/models.py:26: TypeError
+______________ test_an_api_request_waits_10s_on_a_silent_database ______________
+make_client = <function make_client.<locals>.make at 0x7f659a1956c0>
+web_url = 'postgresql://web_test_38dd0563:<redacted>@localhost:5432/engine_test_2d3530ea'
+>       assert elapsed > 9.5
+E       assert 3.0070799950003675 > 9.5
+tests/web/r2probe/test_probe_silent_db.py:27: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  engine.web.ratelimit:ratelimit.py:135 a request had no usable X-Real-IP entry (1 from the right); counting it by the socket address, which behind a proxy puts every visitor in one bucket
+WARNING  engine.web.errors:errors.py:106 database unavailable on /api/v1/test/query: OperationalError: connection timeout expired
+_________________ test_healthz_on_a_database_that_goes_silent __________________
+make_client = <function make_client.<locals>.make at 0x7f659a1094e0>
+web_url = 'postgresql://web_test_2c112e69:<redacted>@localhost:5432/engine_test_29ccb894'
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-622/test_healthz_on_a_database_tha0')
+>           assert response.status_code == 503
+E           assert 200 == 503
+E            +  where 200 = <Response [200 OK]>.status_code
+tests/web/r2probe/test_probe_hung_db.py:35: AssertionError
+==================================== PASSES ====================================
+_______________ test_a_busy_pool_is_a_503_after_the_pool_timeout _______________
+------------------------------ Captured log call -------------------------------
+WARNING  engine.web.ratelimit:ratelimit.py:135 a request had no usable X-Real-IP entry (1 from the right); counting it by the socket address, which behind a proxy puts every visitor in one bucket
+WARNING  engine.web.errors:errors.py:106 database unavailable on /api/v1/query: TimeoutError: QueuePool limit of size 1 overflow 0 reached, connection timed out, timeout 5.00 (Background on this error at: https://sqlalche.me/e/21/3o7r)
+=========================== short test summary info ============================
+PASSED tests/web/r2probe/test_probe_healthz_flood.py::test_the_same_flood_on_any_other_path_is_cut_off_at_the_burst
+PASSED tests/web/r2probe/test_probe_nits.py::test_the_cache_stays_bounded
+PASSED tests/web/r2probe/test_probe_busy_pool.py::test_a_busy_pool_is_a_503_after_the_pool_timeout
+PASSED tests/web/r2probe/test_probe_web_role.py::test_the_web_role_reads_more_than_engine_meta
+PASSED tests/web/r2probe/test_probe_web_role.py::test_nothing_checks_that_the_production_role_is_least_privilege
+FAILED tests/web/r2probe/test_probe_healthz_flood.py::test_a_healthz_flood_from_one_visitor_starves_the_api_and_the_health_check
+FAILED tests/web/r2probe/test_probe_no_prices.py::test_plural_and_ohlcv_price_fields_pass_the_guard
+FAILED tests/web/r2probe/test_probe_no_prices.py::test_a_route_left_out_of_the_schema_is_never_walked
+FAILED tests/web/r2probe/test_probe_no_prices.py::test_a_serialization_alias_hides_a_price_field
+FAILED tests/web/r2probe/test_probe_nits.py::test_a_trailing_slash_redirects_to_plain_http
+FAILED tests/web/r2probe/test_probe_nits.py::test_retry_after_is_hidden_from_cross_origin_scripts
+FAILED tests/web/r2probe/test_probe_nits.py::test_error_log_lines_can_be_forged_through_the_path
+FAILED tests/web/r2probe/test_probe_nits.py::test_an_unusable_edge_value_silently_puts_everyone_in_one_bucket
+FAILED tests/web/r2probe/test_probe_nits.py::test_a_cache_hit_near_expiry_still_says_max_age_ttl
+FAILED tests/web/r2probe/test_probe_nits.py::test_a_cached_body_ignores_serialization_aliases
+FAILED tests/web/r2probe/test_probe_silent_db.py::test_an_api_request_waits_10s_on_a_silent_database
+FAILED tests/web/r2probe/test_probe_hung_db.py::test_healthz_on_a_database_that_goes_silent
+12 failed, 5 passed in 29.45s

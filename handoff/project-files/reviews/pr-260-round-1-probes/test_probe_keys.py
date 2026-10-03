@@ -14,7 +14,7 @@ from engine.market.alpaca import Alpaca, AlpacaError
 from tests.market_helpers import market_settings
 
 FAKE_ID = "PKPROBEFAKEID00000001"
-FAKE_SECRET = "probe-fake-secret-0123456789"
+FAKE_SECRET=<redacted>
 BODY = b'{"bars": {"BTC/USD": []}, "next_page_token": null}'
 
 
