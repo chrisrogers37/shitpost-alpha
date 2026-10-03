@@ -1,0 +1,28 @@
+backtest, empty cache dir | rc=1 | lines=1 | secret=no
+      /tmp/claude-0/-home-user-shitpost-alpha/aa37c4ca-915a-53be-b149-d37cd9089ba3/scratchpad/review-263-r1/verify/run-e72ffc/emptycache/spy/all/all/20220201T0500-20220228T2359.npz is missing and this run makes no Alpaca calls: run `pyt
+backtest, cache dir is a file | rc=1 | lines=1 | secret=no
+      2026-10-02 23:57:17,565 WARNING engine.market.bars: minute cache: /tmp/claude-0/-home-user-shitpost-alpha/aa37c4ca-915a-53be-b149-d37cd9089ba3/scratchpad/review-263-r1/verify/run-e72ffc/afile/spy/all/all/20220201T0500-20220228T235
+   backtest failed: [Errno 20] Not a directory: '/tmp/claude-0/-home-user-shitpost-alpha/aa37c4ca-915a-53be-b149-d37cd9089ba3/scratchpad/review-263-r1/verify/run-e72ffc/afile/spy/all/all/20220201T0500-20220228T2359.npz'
+backtest, missing --divergent-days | rc=1 | lines=1 | secret=no
+      backtest failed: [Errno 2] No such file or directory: '/tmp/claude-0/-home-user-shitpost-alpha/aa37c4ca-915a-53be-b149-d37cd9089ba3/scratchpad/review-263-r1/verify/run-e72ffc/nope.txt'
+backtest, --out unwritable | rc=1 | lines=1 | secret=no
+      backtest failed: [Errno 2] No such file or directory: '/proc/verify263'
+backtest, bad --to | rc=2 | lines=3 | secret=no
+      usage: python -m engine backtest [-h] [--to END | --rebuild] [--out OUT]
+                                    [--divergent-days DIVERGENT_DAYS]
+   python -m engine backtest: error: argument --to: invalid fromisoformat value: '2022-13-01'
+backtest, --to with no baselines | rc=1 | lines=1 | secret=no
+      no baselines for aapl, btc, eth, qqq, spy, xle up to 2022-03-30: run `python -m engine build-moves --to 2022-03-30`
+backtest, --to and --rebuild | rc=2 | lines=3 | secret=no
+      usage: python -m engine backtest [-h] [--to END | --rebuild] [--out OUT]
+                                    [--divergent-days DIVERGENT_DAYS]
+   python -m engine backtest: error: argument --rebuild: not allowed with argument --to
+build-moves, no --to | rc=2 | lines=2 | secret=no
+      usage: python -m engine build-moves [-h] --to END
+   python -m engine build-moves: error: the following arguments are required: --to
+build-moves, --to today | rc=1 | lines=1 | secret=no
+      --to 2026-10-02 hasn't ended in New York yet; the latest is 2026-10-02
+build-moves, --to 2021-12-31 | rc=1 | lines=1 | secret=no
+      --to 2021-12-31 is before the sample starts (2022-02-01)
+build-moves, built date, no keys | rc=0 | lines=1 | secret=no
+      Alpaca calls: 0; minute cache: 18 files, 1.1 MB; signal_moves: 1,032 rows, 0.4 MB

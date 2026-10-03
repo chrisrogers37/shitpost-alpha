@@ -1,0 +1,3 @@
+BTC: 1,704 days in both; 2 over 0.5% apart (worst 1.80%)
+  2022-03-01: alpaca 1.0, yahoo 1.1
+  2022-03-15: alpaca 1.0, yahoo 1.1

@@ -1,0 +1,40 @@
+M01 caught 38 FAILED tests/test_backtest_moves.py::test_the_price_at_a_time_falls_back_to_a_close_within_five_minutes
+M02 MISSED 82 51 passed in 80.26s (0:01:20)
+M03 MISSED 72 51 passed in 70.02s (0:01:10)
+M04 caught 37 FAILED tests/test_backtest_moves.py::test_beta_is_the_slope_on_the_120_sessions_before
+M05 caught 4 FAILED tests/test_backtest_gate.py::test_the_match_pool_holds_only_windows_closed_by_the_alert
+M06 caught 4 FAILED tests/test_backtest_gate.py::test_the_match_pool_holds_only_windows_closed_by_the_alert
+M07 caught 4 FAILED tests/test_backtest_gate.py::test_rule_3_needs_matches_on_ten_different_days
+M08 caught 4 FAILED tests/test_backtest_gate.py::test_rule_4_needs_sixty_percent_one_way_and_a_median_beating_random
+M09 caught 4 FAILED tests/test_backtest_gate.py::test_rule_4_needs_sixty_percent_one_way_and_a_median_beating_random
+M10 caught 5 FAILED tests/test_backtest_gate.py::test_rule_6_keeps_one_call_per_instrument_per_30_minutes
+M11 caught 37 FAILED tests/test_backtest_stats.py::test_the_p_value_counts_draws_at_or_above_the_observed_mean
+M12 MISSED 66 51 passed in 64.46s (0:01:04)
+M13 MISSED 67 51 passed in 65.13s (0:01:05)
+M14 MISSED 63 51 passed in 61.20s (0:01:01)
+M15 MISSED 65 51 passed in 63.17s (0:01:03)
+M16 MISSED 65 51 passed in 63.08s (0:01:03)
+M17 caught 32 FAILED tests/test_backtest_stats.py::test_wilson_intervals_match_known_values
+M18 MISSED 65 51 passed in 63.38s (0:01:03)
+M19 MISSED 65 51 passed in 62.92s (0:01:02)
+M20 MISSED 66 51 passed in 64.41s (0:01:04)
+M21 caught 2 1 error in 0.61s
+M22 caught 5 FAILED tests/test_backtest_gate.py::test_a_planted_effect_is_found_and_its_pair_passes
+M23 caught 34 FAILED tests/test_backtest_moves.py::test_a_company_is_judged_net_of_beta_times_spy
+M24 MISSED 66 51 passed in 64.54s (0:01:04)
+M25 caught 43 FAILED tests/test_backtest_run.py::test_build_moves_refuses_a_day_that_has_not_ended
+M26 MISSED 65 51 passed in 63.06s (0:01:03)
+M27 MISSED 65 51 passed in 63.04s (0:01:03)
+M28 caught 32 FAILED tests/test_backtest_stats.py::test_the_live_sample_size_matches_the_formula
+M29 MISSED 65 51 passed in 62.72s (0:01:02)
+M30 caught 47 FAILED tests/test_backtest_run.py::test_writing_the_same_moves_twice_changes_nothing
+M31 MISSED 65 51 passed in 63.64s (0:01:03)
+M32 MISSED 66 51 passed in 64.61s (0:01:04)
+M33 MISSED 62 51 passed in 60.79s (0:01:00)
+M34 MISSED 66 51 passed in 63.83s (0:01:03)
+M35 MISSED 64 51 passed in 62.24s (0:01:02)
+M36 caught 43 FAILED tests/test_backtest_run.py::test_build_moves_then_backtest_then_a_rebuild_with_the_same_hash
+M37 caught 31 FAILED tests/test_backtest_gate.py::test_the_ai_picks_only_with_a_passing_pair_and_a_bigger_total
+M38 MISSED 65 51 passed in 63.78s (0:01:03)
+M39 MISSED 64 51 passed in 62.30s (0:01:02)
+M40 MISSED 64 51 passed in 62.80s (0:01:02)

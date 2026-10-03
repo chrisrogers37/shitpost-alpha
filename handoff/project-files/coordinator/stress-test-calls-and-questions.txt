@@ -1,0 +1,55 @@
+From the "Ironclad stress test" thread. Understood: no more cards or questions in my thread, and the answers come to me in words. My card 2 is still open in my thread; if Chris taps it there, I'll tell you. Answers so far: call 1 = "After PR 5" (tapped 02:38Z). In my thread I also answered Chris's question about Telegram: it's one channel the bot posts to, not a bot added to groups.
+
+Below are calls 3 to 9 and then the open questions. Each has its question, context, options with one-line consequences, and my recommendation. The findings doc is https://claude.ai/code/artifact/bcee4155-96cd-4cad-9629-f1d79a752290 (first table).
+
+CALL 3 of 9. Q: Publish the backtest report even if it shows no edge?
+Context: As written, the growth plan says "no edge = no public launch". The descriptive findings (which posts moved which tickers, how far, how often a call was right after a 3-minute delay) are useful to journalists, researchers and developers either way. The only measured accuracy so far is 42.9% on 501 old calls at 7 days, so no edge is a real possibility.
+- "Publish anyway": the report launches as research with claims sized to the result; the channel stays free; there's no paid tier.
+- "No launch": with no edge nothing is promoted, and the channel stays small.
+Recommend "Publish anyway", because it gives us an audience in both outcomes and only the paid tier needs an edge.
+
+CALL 4 of 9. Q: Keep ScrapeCreators running until CNN and trumpstruth answer about commercial use?
+Context: The engine relies on two free mirrors. The CC0 copy of CNN's archive stopped in October 2025. The live CNN file the engine reads has unknown terms (growth says they bar commercial use; earlier research found no published terms). trumpstruth publishes no terms, which is not permission. Both mirrors scrape Truth Social, so one block can take out both. The plan cancels ScrapeCreators at the cutover.
+- "Keep it": ScrapeCreators stays on at its current cost as a switchable fallback, we write to both sites before engine PR 2, and "feeds cleared" joins the paid gate.
+- "Cancel at cutover": it saves the ScrapeCreators fee, but if a mirror closes or says no, there's no fallback.
+Recommend "Keep it", because it's the only fallback with a clear right to use.
+
+CALL 5 of 9. Q: Test BTC and ETH in the backtest before building coin alerts?
+Context: Crypto is threaded through engine PRs 3, 5, 6 and 10 before any evidence. The 69% figure shows when posts land, not that they move coins. This replaces the crypto yes/no card still open in the engine thread; please tell the engine planner that this answer supersedes it.
+- "Backtest first": BTC and ETH go in the PR 5 backtest, and coin alerts are built only if it shows an edge.
+- "Build now": coin alerts are built into PR 6 alongside stocks.
+Recommend "Backtest first", because it costs nothing extra and avoids building coin plumbing that may never be used.
+
+CALL 6 of 9. Q: Book a one-hour lawyer's call before the public launch?
+Context: Several legal points are open. The plan's "Tokyo Joe, $29 a month" price anchor looks like the defendant in SEC v. Park, the case the plan cites as adverse (unverified). The paid-first option (members get alerts first) sells timing, which the plan itself says strains the publisher exclusion. Telegram's ad share may count as payment from day one and puts ads Telegram chooses beside the calls. Crypto adds commodity-adviser rules. Chris also trades the alerts himself.
+- "Call before launch": a one-hour scoping call covers the free phase, both paid options, feed rights and his own trading; no ad share; no paid-first unless the lawyer says it fits.
+- "Wait for the gate": nothing legal happens until money is about to start, and the free phase runs on unverified readings of the law.
+Recommend "Call before launch", because it's the cheapest point to learn the answer, and it shapes what the free phase may do.
+
+CALL 7 of 9. Q: Treat the lawyer and any price licence as separate approvals outside the $250?
+Context: The $250 is budgeted for about three months of the build (about $155 used). The lawyer ($500 to $1,500), a licence to show prices (unpriced) and an entity all come before the first paid dollar.
+- "Separate approvals": the $250 stays for the build, and each money-phase cost comes to Chris as its own ask, with a number, when it's due.
+- "Inside the $250": the paid phase must fit in the roughly $95 left, which likely rules out the lawyer and any licence.
+Recommend "Separate approvals", because it keeps the build budget honest and doesn't block the money path.
+
+CALL 8 of 9. Q: Approve the cut list in the findings doc?
+Context: It cuts engine PR 12, the Coinbase adapter, several tables, price streams until after the gate, the old system's record import, dashboard D2 and D4, the 1-minute chart and "All posts", N3 webhooks until the paid gate, N6 phone push, X daily results, the automated Monday scorecard (the Record page replaces it), topic pages and the audience table. Every item is in the "What to cut" table in the doc, and each deferred item has a trigger.
+- "Approve": the planners shrink their plans to match, and D1, N1 and N2 shrink to the cutover minimum.
+- "Review first": Chris names the items he wants kept, and the planners wait.
+Recommend "Approve", because nothing is lost for good, and it takes the growth and convenience work off the cutover path.
+
+CALL 9 of 9. Q: Keep the name "Shitpost Alpha" and keep the repo public?
+Context: Registering the domain and handles is the last free moment to rename. Some newsrooms, web filters and platforms filter the word, and journalists are one of the target audiences. The repo is public under MIT (checked). If it stays open, the paid tier sells the record and the running service, not the code.
+- "Keep both": no change.
+- "Rename": the growth planner proposes names before anything is registered.
+- "Go private": the repo goes private before launch, and the developer audience shrinks.
+Recommend "Keep both", since it's his brand and the open code costs us nothing.
+
+OPEN QUESTIONS (after the calls; the first one isn't a choice)
+Q-A. Two facts only Chris can check, with no choice to make. (1) In the Railway dashboard, does the variable TELEGRAM_WEBHOOK_SECRET exist on the web service? Name only; please don't have any thread call list-variables. Since PR #241 (2026-08-21), the old bot rejects /start with 403 unless it's set, so nobody new could subscribe. (2) The old subscriber count (active, silenced, blocked) comes from the read-only export already on his later list; we only need it before the cutover.
+Q-B. Q: Who is the website for first? Context: the dashboard plan builds a live trading screen, while the growth plan needs a page that turns strangers into followers. Options: "Strangers" means home is the promise, the record and follow buttons, and alerts reach Chris by Telegram anyway. "Me watching live" keeps the live-terminal design. Recommend "Strangers".
+Q-C. Q: Grade and show FYI alerts in the public record too? Context: If low-confidence (FYI) or held-back alerts are listed but never graded, the record looks cherry-picked. Options: "Grade all" means every alert is graded and shown, with FYI labelled. "Sent only" means only sent alerts count. Recommend "Grade all", because it's the honest record.
+Q-D. Q: Turn off comments on the Telegram channel? Context: A discussion group invites "what should I do?" questions, which the no-personal-advice rule bars us from answering, and it needs moderation. Options: "No comments" means a broadcast only. "Comments on" means someone moderates and every advice question goes unanswered. Recommend "No comments" for now.
+Q-E. Q: Approve the pass rule for the PR 5 edge test now, or with the revised engine plan? Context: Call 1 needs a pass rule written before the result. The draft defaults are: a few pre-chosen ticker and window pairs (topic to SPY/QQQ/BTC at 1h, close and 1 day; a named company to its stock at close and 1 day); counted after 20 bp of costs; at least 30 cases; corrected for multiple tests (BH q under 0.10); entry at the slow end of the measured feed delay (90th percentile) plus processing. Options: "With the plan" means the engine planner writes it in and Chris approves it with the revised plan, before PR 5 runs. "Now" means Chris approves these defaults today. Recommend "With the plan".
+
+When every answer is in, I'll send each planner its fix list, with your line that Chris now talks only through you, so decisions go to you as a message, not as a card in their thread.

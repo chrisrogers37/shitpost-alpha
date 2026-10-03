@@ -1,0 +1,191 @@
+diff --git a/engine/engine/backtest/report.py b/engine/engine/backtest/report.py
+index 1ebb648..03d1509 100644
+--- a/engine/engine/backtest/report.py
++++ b/engine/engine/backtest/report.py
+@@ -313,10 +313,6 @@ def _table(tests: Sequence[Mapping[str, Any]], judged: bool) -> list[str]:
+ 
+ def markdown(report: Mapping[str, Any]) -> str:
+     """The report in plain words, from the JSON alone."""
+-    data, g0, h2h = report["data"], report["gate0"], report["head_to_head"]
+-    answered = data["picker_posts"]
+-    ai = report["inputs"]["ai_picker"]
+-    passed = [t for t in g0["tests"] if t["passes"]]
+     lines = [
+         "# Backtest v1: the Gate 0 report",
+         "",
+@@ -325,23 +321,46 @@ def markdown(report: Mapping[str, Any]) -> str:
+         "direction, net of beta times the market for a company and for ETH; costs are "
+         "round trips. Every number counts New York days, not calls.",
+         "",
+-        "## Result",
++        *_result_lines(report),
++        "",
++        *_head_to_head_lines(report["head_to_head"]),
++        "",
++        *_send_lines(report),
++        "",
++        *_secondary_lines(report),
++        "## What the filters dropped and what was skipped",
++        "",
++        *_counts(report),
+         "",
++        *_burst_lines(report["bursts"]),
++        "",
++        *_reading_lines(report["match_reading"], report["inputs"]["match_rule"]),
++        "",
++        *_input_lines(report),
+     ]
++    return "\n".join(lines)
++
++
++def _result_lines(report: Mapping[str, Any]) -> list[str]:
++    data, g0 = report["data"], report["gate0"]
++    answered, ai = data["picker_posts"], report["inputs"]["ai_picker"]
++    passed = [t for t in g0["tests"] if t["passes"]]
+     if g0["passes"]:
+-        names = ", ".join(f"{PICKERS[t['picker']]} {_pair(t['pair'])}"
+-                          for t in passed)  # fmt: skip
+-        lines.append(
++        names = ", ".join(f"{PICKERS[t['picker']]} {_pair(t['pair'])}" for t in passed)
++        verdict = (
+             f"**Gate 0 passes:** {len(passed)} of {len(g0['tests'])} pairs pass ({names}). "
+             "A pass is a backtest result, before any live sample: the paid gate still needs "
+             "the live days below."
+         )
+     else:
+-        lines.append(
++        verdict = (
+             f"**Gate 0 does not pass:** none of the {len(g0['tests'])} pairs passes all five "
+             "conditions. No edge was found under Gate 0's rules."
+         )
+-    lines += [
++    return [
++        "## Result",
++        "",
++        verdict,
+         "",
+         f"Text posts from {data['from']} to {data['to']}: {data['text_posts']:,}. The rules "
+         f"picker answered {answered['rules']:,} of them; the AI picker answered "
+@@ -354,11 +373,11 @@ def markdown(report: Mapping[str, Any]) -> str:
+         "22 tests); 5, the mean over the last 12 months is above zero from at least 10 days.",
+         "",
+         *_table(g0["tests"], judged=True),
+-        "",
+-        "## Which picker picks",
+-        "",
+     ]
+-    rules_total, ai_total = h2h["total_20bp"]["rules"], h2h["total_20bp"]["ai"]
++
++
++def _head_to_head_lines(h2h: Mapping[str, Any]) -> list[str]:
++    lines = ["## Which picker picks", ""]
+     passing = h2h["passing_pairs"]
+     picks = "the AI picker picks" if h2h["picks"] == "ai" else "the rules pick"
+     if not h2h["shared_posts"]:
+@@ -368,41 +387,45 @@ def markdown(report: Mapping[str, Any]) -> str:
+         lines.append(
+             f"On the {h2h['shared_posts']:,} posts both pickers were tested on, the AI "
+             f"picker's passing pairs ({', '.join(map(_pair, passing['ai'])) or 'none'}) add "
+-            f"up to {_bp(ai_total)} after costs, and the rules' passing pairs "
+-            f"({', '.join(map(_pair, passing['rules'])) or 'none'}) to {_bp(rules_total)}: "
+-            f"**{picks}.**"
++            f"up to {_bp(h2h['total_20bp']['ai'])} after costs, and the rules' passing pairs "
++            f"({', '.join(map(_pair, passing['rules'])) or 'none'}) to "
++            f"{_bp(h2h['total_20bp']['rules'])}: **{picks}.**"
+         )
+     if passing["ai"] or passing["rules"]:
+         lines.append("The winner's figure is flattering: it is the better of two.")
+-    lines += [
+-        "",
++    return lines
++
++
++def _send_lines(report: Mapping[str, Any]) -> list[str]:
++    sends = report["sends"]
++    lines = [
+         "## Posts a year the send rule would have sent",
+         "",
+-    ]
+-    sends = report["sends"]
+-    lines += [
+         f"{sends['posts']:,} posts with a surviving call on a passing pair of the picking "
+         f"picker ({PICKERS[sends['picker']]}): {sends['per_year']:.1f} a year.",
+         "",
+         "## The live sample the paid gate needs",
+         "",
+     ]
+-    if report["live_sample"]:
+-        lines.append("Days of calls that confirm each passing pair's hit rate against 50% "
+-                     "(one-sided, 5% error, 80% power):")  # fmt: skip
+-        lines.append("")
+-        for row in report["live_sample"]:
+-            days = "not computable (hit rate not above 50%)" if row["days"] is None else (
+-                f"{row['days']:,} days"
+-            )  # fmt: skip
+-            lines.append(
+-                f"- {PICKERS[row['picker']]} {_pair(row['pair'])}: hit rate "
+-                f"{_share(row['hit_rate'])}, {days}"
+-            )
+-    else:
+-        lines.append("None: no pair passed.")
+-    lines += [
+-        "",
++    if not report["live_sample"]:
++        return [*lines, "None: no pair passed."]
++    lines += ["Days of calls that confirm each passing pair's hit rate against 50% "
++              "(one-sided, 5% error, 80% power):", ""]  # fmt: skip
++    for row in report["live_sample"]:
++        days = "not computable (hit rate not above 50%)" if row["days"] is None else (
++            f"{row['days']:,} days"
++        )  # fmt: skip
++        lines.append(
++            f"- {PICKERS[row['picker']]} {_pair(row['pair'])}: hit rate "
++            f"{_share(row['hit_rate'])}, {days}"
++        )
++    return lines
++
++
++def _secondary_lines(report: Mapping[str, Any]) -> list[str]:
++    """The views that can't pass the gate, each followed by a blank line."""
++    answered = report["data"]["picker_posts"]
++    lines = [
+         "## Also reported, never judged",
+         "",
+         "p-values here are not adjusted, and none of these can pass the gate.",
+@@ -415,25 +438,23 @@ def markdown(report: Mapping[str, Any]) -> str:
+         tests = [t for t in report["views"].get(view, []) if answered[t["picker"]]]
+         if tests:
+             lines += [f"### {title}", "", *_table(tests, judged=False), ""]
+-    lines += ["## What the filters dropped and what was skipped", "", *_counts(report), ""]
+-    lines += _burst_lines(report["bursts"])
+-    lines += ["", *_reading_lines(report["match_reading"], report["inputs"]["match_rule"])]
+-    lines += [
+-        "",
++    return lines
++
++
++def _input_lines(report: Mapping[str, Any]) -> list[str]:
++    inputs = report["inputs"]
++    ai, rules, match = inputs["ai_picker"], inputs["rules"], inputs["match_rule"]
++    return [
+         "## Inputs",
+         "",
+         f"- Gate 0 v1: `{report['gate']['sha256']}`",
+-        f"- Rules version {report['inputs']['rules']['version']}: "
+-        f"`{report['inputs']['rules']['sha256']}`",
++        f"- Rules version {rules['version']}: `{rules['sha256']}`",
+         f"- AI picker version {ai['version']}: `{ai['sha256']}`",
+-        f"- Match rule version {report['inputs']['match_rule']['version']}: "
+-        f"`{report['inputs']['match_rule']['sha256']}` (score "
+-        f"{report['inputs']['match_rule']['threshold']} or more, at most "
+-        f"{report['inputs']['match_rule']['max_matches']})",
+-        f"- Similarity model: {report['inputs']['model_version']}",
++        f"- Match rule version {match['version']}: `{match['sha256']}` (score "
++        f"{match['threshold']} or more, at most {match['max_matches']})",
++        f"- Similarity model: {inputs['model_version']}",
+         "",
+     ]
+-    return "\n".join(lines)
+ 
+ 
+ def _counts(report: Mapping[str, Any]) -> list[str]:

@@ -1,0 +1,23 @@
+{"type": "start", "at": "2026-09-30T15:05:20.557171+00:00", "sources": ["cnn", "trumpstruth"], "interval_s": 60}
+{"type": "poll", "source": "cnn", "at": "2026-09-30T15:05:20.558535+00:00", "status": 200, "ms": 1120, "bytes": 20277470, "headers": {}, "n_posts": 50}
+{"type": "poll", "source": "trumpstruth", "at": "2026-09-30T15:05:22.210253+00:00", "status": 200, "ms": 769, "bytes": 91604, "headers": {"server": "cloudflare", "cf-ray": "a434201dfb67ef50-LHR"}, "n_posts": 100}
+{"type": "poll", "source": "cnn", "at": "2026-09-30T15:06:20.559639+00:00", "status": 200, "ms": 534, "bytes": 20277470, "headers": {}, "n_posts": 50}
+{"type": "poll", "source": "trumpstruth", "at": "2026-09-30T15:06:21.333892+00:00", "status": 200, "ms": 873, "bytes": 91604, "headers": {"server": "cloudflare", "cf-ray": "a43421904f2e9b16-LHR"}, "n_posts": 100}
+{"type": "poll", "source": "cnn", "at": "2026-09-30T15:07:20.563983+00:00", "status": 200, "ms": 748, "bytes": 20277470, "headers": {}, "n_posts": 50}
+{"type": "poll", "source": "trumpstruth", "at": "2026-09-30T15:07:21.473902+00:00", "status": 200, "ms": 931, "bytes": 91604, "headers": {"server": "cloudflare", "cf-ray": "a43423086cbe6557-LHR"}, "n_posts": 100}
+{"type": "poll", "source": "cnn", "at": "2026-09-30T15:08:20.564347+00:00", "status": 200, "ms": 661, "bytes": 20277470, "headers": {}, "n_posts": 50}
+{"type": "poll", "source": "trumpstruth", "at": "2026-09-30T15:08:21.377890+00:00", "status": 200, "ms": 984, "bytes": 91604, "headers": {"server": "cloudflare", "cf-ray": "a434247f08ff4b92-CPH"}, "n_posts": 100}
+{"type": "poll", "source": "cnn", "at": "2026-09-30T15:09:20.565218+00:00", "error": "IncompleteRead: IncompleteRead(19824576 bytes read, 452894 more expected)"}
+{"type": "poll", "source": "trumpstruth", "at": "2026-09-30T15:09:21.159558+00:00", "status": 200, "ms": 885, "bytes": 91604, "headers": {"server": "cloudflare", "cf-ray": "a43425f4493394a6-LHR"}, "n_posts": 100}
+{"type": "poll", "source": "cnn", "at": "2026-09-30T15:10:20.567192+00:00", "status": 200, "ms": 638, "bytes": 20277470, "headers": {}, "n_posts": 50}
+{"type": "poll", "source": "trumpstruth", "at": "2026-09-30T15:10:21.367529+00:00", "status": 200, "ms": 740, "bytes": 91604, "headers": {"server": "cloudflare", "cf-ray": "a434276b8c88f893-DUB"}, "n_posts": 100}
+{"type": "poll", "source": "cnn", "at": "2026-09-30T15:11:20.567461+00:00", "status": 200, "ms": 866, "bytes": 20277470, "headers": {}, "n_posts": 50}
+{"type": "poll", "source": "trumpstruth", "at": "2026-09-30T15:11:21.569545+00:00", "status": 200, "ms": 528, "bytes": 91604, "headers": {"server": "cloudflare", "cf-ray": "a43428e2ff94e881-MIA"}, "n_posts": 100}
+{"type": "poll", "source": "cnn", "at": "2026-09-30T15:12:20.567765+00:00", "status": 200, "ms": 781, "bytes": 20277470, "headers": {}, "n_posts": 50}
+{"type": "poll", "source": "trumpstruth", "at": "2026-09-30T15:12:21.523621+00:00", "status": 200, "ms": 1005, "bytes": 91604, "headers": {"server": "cloudflare", "cf-ray": "a4342a5c1933cc14-LHR"}, "n_posts": 100}
+{"type": "poll", "source": "cnn", "at": "2026-09-30T15:13:20.568008+00:00", "status": 200, "ms": 874, "bytes": 20277470, "headers": {}, "n_posts": 50}
+{"type": "poll", "source": "trumpstruth", "at": "2026-09-30T15:13:21.584038+00:00", "status": 200, "ms": 998, "bytes": 91604, "headers": {"server": "cloudflare", "cf-ray": "a4342bd36ee503c3-CDG"}, "n_posts": 100}
+{"type": "poll", "source": "cnn", "at": "2026-09-30T15:14:20.568250+00:00", "error": "IncompleteRead: IncompleteRead(19879936 bytes read, 397534 more expected)"}
+{"type": "poll", "source": "trumpstruth", "at": "2026-09-30T15:14:21.590227+00:00", "status": 200, "ms": 781, "bytes": 91604, "headers": {"server": "cloudflare", "cf-ray": "a4342d49bfa2d989-MIA"}, "n_posts": 100}
+{"type": "poll", "source": "cnn", "at": "2026-09-30T15:15:20.568452+00:00", "status": 200, "ms": 875, "bytes": 20277470, "headers": {}, "n_posts": 50}
+{"type": "poll", "source": "trumpstruth", "at": "2026-09-30T15:15:21.631115+00:00", "status": 200, "ms": 980, "bytes": 91604, "headers": {"server": "cloudflare", "cf-ray": "a4342ec2293eb899-MIA"}, "n_posts": 100}

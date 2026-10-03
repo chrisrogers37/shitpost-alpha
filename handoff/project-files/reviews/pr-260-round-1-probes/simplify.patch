@@ -1,0 +1,211 @@
+diff --git a/engine/engine/market/alpaca.py b/engine/engine/market/alpaca.py
+index 0bd87e5..5783eb9 100644
+--- a/engine/engine/market/alpaca.py
++++ b/engine/engine/market/alpaca.py
+@@ -17,7 +17,7 @@ from typing import Any, Literal
+ 
+ import httpx
+ 
+-from engine.feeds.base import UNEXPECTED, USER_AGENT
++from engine.feeds.base import UNEXPECTED, make_client
+ from engine.settings import Settings
+ 
+ log = logging.getLogger(__name__)
+@@ -81,7 +81,7 @@ class Bar:
+     def to_json(self) -> dict[str, Any]:
+         """Back to Alpaca's JSON shape (for the minute cache)."""
+         return {
+-            "t": self.start.isoformat().replace("+00:00", "Z"),
++            "t": utc_text(self.start),
+             "o": self.open,
+             "h": self.high,
+             "l": self.low,
+@@ -127,14 +127,10 @@ class Alpaca:
+         self.clock = clock
+         self._keys = settings.alpaca_keys
+         self._pacer = Pacer(settings.alpaca_calls_per_minute)
+-        # No redirects: the keys must never travel to another host.
+-        self._client = httpx.AsyncClient(
+-            base_url=DATA_URL,
+-            headers={"User-Agent": USER_AGENT},
+-            timeout=settings.http_timeout_seconds,
+-            follow_redirects=False,
+-            transport=transport,
+-        )
++        self._client = make_client(settings, transport)  # no redirects: keys stay on this host
++        if self._keys is not None:
++            key_id, secret = self._keys
++            self._client.headers.update({"APCA-API-KEY-ID": key_id, "APCA-API-SECRET-KEY": secret})
+ 
+     async def __aenter__(self) -> "Alpaca":
+         return self
+@@ -207,7 +203,7 @@ class Alpaca:
+         for attempt in range(1, TRIES + 1):
+             await self._pacer.wait()
+             try:
+-                response = await self._client.get(path, params=params, headers=self._auth())
++                response = await self._client.get(DATA_URL + path, params=params)
+             except httpx.HTTPError as exc:
+                 raise AlpacaError(f"{path}: {type(exc).__name__}: {exc}") from exc
+             if response.status_code == 429:
+@@ -228,12 +224,6 @@ class Alpaca:
+             return body
+         raise AlpacaError(f"{path}: still rate limited after {TRIES} tries")
+ 
+-    def _auth(self) -> dict[str, str]:
+-        if self._keys is None:
+-            return {}
+-        key_id, secret = self._keys
+-        return {"APCA-API-KEY-ID": key_id, "APCA-API-SECRET-KEY": secret}
+-
+     def _retry_wait(self, response: httpx.Response, attempt: int) -> float:
+         """Until the reset Alpaca names (X-RateLimit-Reset, epoch seconds), else a back-off
+         doubling from the setting; never past a minute."""
+diff --git a/engine/engine/market/bars.py b/engine/engine/market/bars.py
+index b1a1f07..2c9fce9 100644
+--- a/engine/engine/market/bars.py
++++ b/engine/engine/market/bars.py
+@@ -130,19 +130,16 @@ async def backfill_daily(db: AsyncEngine, alpaca: Alpaca, instrument: Instrument
+     now = alpaca.clock()
+     async with db.connect() as conn:
+         last = await _last_daily(conn, instrument)
+-    start = HISTORY_START if last is None else last - OVERLAP
++        start = HISTORY_START if last is None else last - OVERLAP
++        stored = await _daily_closes(conn, instrument, start)
+     bars = await _final_daily(alpaca, instrument, start, now)
+-    whole, refetched = last is None, False
+-    if last is not None:
+-        async with db.connect() as conn:
+-            stored = await _daily_closes(conn, instrument, start)
+-        if any(_moved(stored.get(bar.start), bar.close) for bar in bars):
+-            log.info("%s: stored bars changed (a split or dividend); fetching all", instrument.slug)
+-            bars = await _final_daily(alpaca, instrument, HISTORY_START, now)
+-            whole = refetched = True
++    refetched = any(_moved(stored.get(bar.start), bar.close) for bar in bars)
++    if refetched:
++        log.info("%s: stored bars changed (a split or dividend); fetching all", instrument.slug)
++        bars = await _final_daily(alpaca, instrument, HISTORY_START, now)
+     async with db.begin() as conn:
+         written = await upsert_bars(conn, instrument, "1Day", bars)
+-        if whole:  # the host clock, as the minute cache's fetch times use
++        if last is None or refetched:  # the host clock, as the minute cache's fetch times use
+             await conn.execute(
+                 update(instruments).where(instruments.c.id == instrument.id).values(rebased_at=now)
+             )
+diff --git a/engine/scripts/crosscheck_yfinance.py b/engine/scripts/crosscheck_yfinance.py
+index 32a7596..4f9f0a4 100644
+--- a/engine/scripts/crosscheck_yfinance.py
++++ b/engine/scripts/crosscheck_yfinance.py
+@@ -14,24 +14,18 @@ this report and never reach anything public. Nothing in the engine imports this.
+ import asyncio
+ import math
+ from dataclasses import dataclass
+-from datetime import UTC, date, datetime, timedelta
++from datetime import UTC, date, datetime
+ from typing import Any
+ 
+ from engine.market.alpaca import SIP_DELAY, Alpaca, Bar
++from engine.market.bars import is_final_day
+ from engine.market.calendar import session_on_or_after
++from engine.market.instruments import COINS, alpaca_symbol
+ from engine.settings import Settings
+ 
+ SINCE = date(2022, 2, 1)
+ TOLERANCE = 0.005
+-CHECKS = (  # symbol, Alpaca's symbol, Yahoo's symbol
+-    ("SPY", "SPY", "SPY"),
+-    ("QQQ", "QQQ", "QQQ"),
+-    ("BTC", "BTC/USD", "BTC-USD"),
+-    ("ETH", "ETH/USD", "ETH-USD"),
+-    ("AAPL", "AAPL", "AAPL"),
+-    ("NVDA", "NVDA", "NVDA"),
+-    ("META", "META", "META"),
+-)
++CHECKS = ("SPY", "QQQ", "BTC", "ETH", "AAPL", "NVDA", "META")
+ 
+ 
+ @dataclass(frozen=True)
+@@ -72,10 +66,10 @@ async def alpaca_closes(alpaca: Alpaca, symbol: str, coin: bool) -> dict[date, f
+     start = datetime.combine(SINCE, datetime.min.time(), UTC)
+     now = alpaca.clock()
+     if coin:
+-        bars = await alpaca.coin_bars(symbol, "1Day", start, now)
++        bars = await alpaca.coin_bars(alpaca_symbol(symbol, "coin"), "1Day", start, now)
+     else:
+         bars = await alpaca.stock_bars(symbol, "1Day", start, now - SIP_DELAY)
+-    return {bar_day(bar, coin): bar.close for bar in bars if bar.start + timedelta(days=1) <= now}
++    return {bar_day(bar, coin): bar.close for bar in bars if is_final_day(bar, now)}
+ 
+ 
+ def yahoo_closes(symbol: str) -> dict[date, float]:
+@@ -92,10 +86,10 @@ def yahoo_closes(symbol: str) -> dict[date, float]:
+ async def main() -> int:
+     settings = Settings()
+     async with Alpaca(settings) as alpaca:
+-        for symbol, alpaca_symbol, yahoo_symbol in CHECKS:
+-            coin = "/" in alpaca_symbol
+-            ours = await alpaca_closes(alpaca, alpaca_symbol, coin)
+-            theirs = await asyncio.to_thread(yahoo_closes, yahoo_symbol)
++        for symbol in CHECKS:
++            coin = symbol in COINS
++            ours = await alpaca_closes(alpaca, symbol, coin)
++            theirs = await asyncio.to_thread(yahoo_closes, f"{symbol}-USD" if coin else symbol)
+             print("\n".join(compare(symbol, ours, theirs).lines()))
+     return 0
+ 
+diff --git a/engine/tests/market_helpers.py b/engine/tests/market_helpers.py
+index 76350d6..388e2a7 100644
+--- a/engine/tests/market_helpers.py
++++ b/engine/tests/market_helpers.py
+@@ -7,8 +7,8 @@ from zoneinfo import ZoneInfo
+ 
+ import httpx
+ 
+-from engine.market.alpaca import Alpaca
+-from engine.market.instruments import Instrument
++from engine.market.alpaca import Alpaca, utc_text
++from engine.market.instruments import AssetClass, Instrument, alpaca_symbol
+ from engine.settings import Settings
+ 
+ NEW_YORK = ZoneInfo("America/New_York")
+@@ -41,7 +41,7 @@ def daily_bar(day: date, close: float, *, coin: bool = False) -> dict[str, Any]:
+         else datetime.combine(day, time(0), NEW_YORK).astimezone(UTC)
+     )
+     return {
+-        "t": start.isoformat().replace("+00:00", "Z"),
++        "t": utc_text(start),
+         "o": close,
+         "h": close * 1.01,
+         "l": close * 0.99,
+@@ -53,7 +53,7 @@ def daily_bar(day: date, close: float, *, coin: bool = False) -> dict[str, Any]:
+ 
+ 
+ def minute_bar(at: datetime, close: float) -> dict[str, Any]:
+-    return daily_bar(at.date(), close) | {"t": at.isoformat().replace("+00:00", "Z")}
++    return daily_bar(at.date(), close) | {"t": utc_text(at)}
+ 
+ 
+ def weekdays(start: date, end: date) -> list[date]:
+@@ -96,18 +96,17 @@ class FakeAlpaca:
+         return dict(self.requests[n].url.params)
+ 
+ 
+-def instrument(slug: str, asset_class: str = "stock", id: int = 1) -> Instrument:
++def instrument(slug: str, asset_class: AssetClass = "stock", id: int = 1) -> Instrument:
+     """An instrument without a database row (for tests that make no database calls)."""
+     symbol = slug.upper()
+-    coin = asset_class == "coin"
+     return Instrument(
+         id=id,
+         slug=slug,
+         symbol=symbol,
+         name=symbol,
+-        asset_class="coin" if coin else "etf" if asset_class == "etf" else "stock",
+-        calendar="24/7" if coin else "XNYS",
+-        alpaca_symbol=f"{symbol}/USD" if coin else symbol,
++        asset_class=asset_class,
++        calendar="24/7" if asset_class == "coin" else "XNYS",
++        alpaca_symbol=alpaca_symbol(symbol, asset_class),
+         benchmark_id=None,
+         rebased_at=None,
+     )

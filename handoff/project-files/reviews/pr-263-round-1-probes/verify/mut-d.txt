@@ -1,0 +1,12 @@
+M51 | SURVIVED | daily windows past the data end not 'not yet' | 56s | 39 passed in 53.95s
+M52 | SURVIVED | no day-averaging in the gate | 60s | 39 passed in 58.37s
+M53 | SURVIVED | days counts calls | 54s | 39 passed in 52.00s
+M54 | killed | random times: any weekday | 4s | FAILED tests/test_backtest_stats.py::test_random_times_keep_the_weekday_and_hour_and_repeat_for_a_key ; 1 failed, 5 passed in 2.12s
+M55 | killed | random times: the next hour | 4s | FAILED tests/test_backtest_stats.py::test_random_times_keep_the_weekday_and_hour_and_repeat_for_a_key ; 1 failed, 5 passed in 2.02s
+M56 | killed | Wilson at 90% | 4s | FAILED tests/test_backtest_stats.py::test_wilson_intervals_match_known_values ; 1 failed, 1 passed in 2.05s
+M57 | SURVIVED | hit rate counts zero days | 54s | 39 passed in 52.00s
+M58 | killed | mean_20bp before costs | 6s | FAILED tests/test_backtest_gate.py::test_a_planted_effect_is_found_and_its_pair_passes ; 1 failed, 24 passed in 4.25s
+M59 | SURVIVED | match cap applied before the pool filter | 55s | 39 passed in 53.35s
+M60 | killed | a tie makes a down call | 4s | FAILED tests/test_backtest_gate.py::test_rule_4_needs_sixty_percent_one_way_and_a_median_beating_random ; 1 failed, 21 passed in 2.40s
+M61 | SURVIVED | pass rule: 3 days | 50s | 39 passed in 48.24s
+M62 | SURVIVED | condition 4 on p, not q | 50s | 39 passed in 47.93s

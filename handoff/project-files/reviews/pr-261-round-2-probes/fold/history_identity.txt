@@ -1,0 +1,9 @@
+posts: 17948
+old vs new code, sync-names book: 0 answers differ
+old code, +10 AI-added tickers: 105 posts change (topic/link/symbols/mentions)
+new code, +10 AI-added tickers: 0 posts change
+  old: {'symbols': 105, 'market_link': 62, 'topic': 64}
+  new: {}
+  old-code counted symbols gained, by ticker: {'ICE': 46, 'IRS': 14, 'CIA': 14, 'DEI': 13, 'NYT': 8, 'EU': 4, 'LNG': 4, 'SOS': 1, 'MS': 1}
+  new-code counted symbols gained: {} found_by of new mentions: {}
+posts with any cashtag: 5 ; cashtags (normalized, counted): {('$trump', False): 3, ('$worth', False): 1, ('$zero', False): 1}

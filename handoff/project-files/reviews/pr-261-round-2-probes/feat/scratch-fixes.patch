@@ -1,0 +1,186 @@
+diff --git a/engine/engine/extract/batch.py b/engine/engine/extract/batch.py
+index 78dd632..b5b05b4 100644
+--- a/engine/engine/extract/batch.py
++++ b/engine/engine/extract/batch.py
+@@ -109,6 +109,7 @@ async def run_embed(settings: Settings, say: Say = print, model: Embedder | None
+                 )
+             ).all()
+         todo = [(row.key, words) for row in rows if (words := normalize(row.text))]
++        todo.sort(key=lambda item: len(item[1]))  # pad each batch to similar lengths
+         for start in range(0, len(todo), EMBED_BATCH):
+             batch = todo[start : start + EMBED_BATCH]
+             vectors = await asyncio.to_thread(embedder.embed, [words for _, words in batch])
+diff --git a/engine/engine/extract/match_rule.json b/engine/engine/extract/match_rule.json
+index 59d1a76..ffff7f6 100644
+--- a/engine/engine/extract/match_rule.json
++++ b/engine/engine/extract/match_rule.json
+@@ -1,7 +1,7 @@
+ {
+   "about": "Set 2026-10-02 by reading 274 pairs from the 30 posts of set `match` in precision/samples.csv (labels in precision/match-labels.csv): 0.90 and up 14/14 same subject, 0.85 to 0.90 26/32, 0.80 to 0.85 28/58. The threshold is the lowest band at 80% or more. A new model version needs the pairs read again.",
+   "version": 1,
+-  "model_version": "bge-small-en-v1.5@5c38ec7c405e",
++  "model_version": "bge-small-en-v1.5@5c38ec7c405e.eaa83ab2",
+   "threshold": 0.85,
+   "max_matches": 50,
+   "normalisation": "engine.text.normalize: links removed and whitespace collapsed, no instruction prefix, cut at the model's 512 tokens"
+diff --git a/engine/engine/extract/similarity.py b/engine/engine/extract/similarity.py
+index 9e9d861..0c67858 100644
+--- a/engine/engine/extract/similarity.py
++++ b/engine/engine/extract/similarity.py
+@@ -51,8 +51,13 @@ class ModelPin:
+ 
+     @property
+     def version(self) -> str:
+-        """The model version recorded with every vector."""
+-        return f"{self.repo.rsplit('/', 1)[-1]}@{(self.revision or 'unpinned')[:12]}"
++        """The model version recorded with every vector: the repo's commit, and a digest
++        of everything else pinned (files, pooling, token limit), so any change shows."""
++        rest = json.dumps(
++            [self.files, self.pooling, self.max_tokens, self.dims], sort_keys=True
++        ).encode()
++        digest = hashlib.sha256(rest).hexdigest()[:8]
++        return f"{self.repo.rsplit('/', 1)[-1]}@{(self.revision or 'unpinned')[:12]}.{digest}"
+ 
+     def problems(self) -> list[str]:
+         found = [] if self.revision else ["no commit pinned"]
+@@ -268,7 +273,7 @@ async def load_similarity(conn: AsyncConnection, model_version: str) -> Similari
+             select(signal_embeddings.c.signal_key, signals.c.posted_at, signal_embeddings.c.vector)
+             .join(signals, signals.c.key == signal_embeddings.c.signal_key)
+             .where(signal_embeddings.c.model_version == model_version)
+-            .order_by(signals.c.posted_at)
++            .order_by(signals.c.posted_at, signal_embeddings.c.signal_key)
+         )
+     ).all()
+     vectors = np.array([np.frombuffer(row.vector, dtype="<f4") for row in rows], dtype=np.float32)
+diff --git a/engine/scripts/match_rule.py b/engine/scripts/match_rule.py
+index d654b7e..df6c3f0 100644
+--- a/engine/scripts/match_rule.py
++++ b/engine/scripts/match_rule.py
+@@ -102,24 +102,35 @@ def draw_pairs(index: Similarity, posts: dict[str, Any], reading: Path) -> None:
+     print(f"{len(pairs)} pairs from {len(chosen)} posts; text in {reading}, ids in {LABELS}")
+ 
+ 
+-def table() -> None:
++def pick_threshold(hits: dict[float, int], total: dict[float, int]) -> float | None:
++    """The lowest band at which that band and every band above it are at least SAME."""
++    threshold = None
++    for low in BANDS:  # highest first: stop at the first band under 80%
++        if total.get(low, 0) == 0 or hits.get(low, 0) / total[low] < SAME:
++            break
++        threshold = low
++    return threshold
++
++
++def counts(path: Path = LABELS) -> tuple[dict[float, int], dict[float, int]]:
+     hits: dict[float, int] = defaultdict(int)
+     total: dict[float, int] = defaultdict(int)
+-    with LABELS.open(newline="") as file:
++    with path.open(newline="") as file:
+         for row in csv.DictReader(file):
+             if row["same"] not in ("yes", "no"):
+                 raise SystemExit(f"unlabelled pair {row['key']} / {row['past_key']}")
+             low = float(row["band"])
+             total[low] += 1
+             hits[low] += row["same"] == "yes"
++    return hits, total
++
++
++def table() -> None:
++    hits, total = counts()
+     print("| Band | Same subject |\n| --- | --- |")
+     for low in BANDS:
+         print(f"| {band_name(low)} | {share(hits[low], total[low])} |")
+-    threshold = None
+-    for low in BANDS:  # highest first: stop at the first band under 80%
+-        if total[low] == 0 or hits[low] / total[low] < SAME:
+-            break
+-        threshold = low
++    threshold = pick_threshold(hits, total)
+     print(f"\nthreshold: {threshold}" if threshold else "\nno band reaches 80%")
+     if threshold:
+         low, high = wilson(hits[threshold], total[threshold])
+diff --git a/engine/tests/test_ai.py b/engine/tests/test_ai.py
+index 0240cc2..c7956d4 100644
+--- a/engine/tests/test_ai.py
++++ b/engine/tests/test_ai.py
+@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
+ from engine.extract.ai import (
+     MANIFEST,
+     SDK_HEADER_VARIABLES,
++    AiConfig,
+     AiPick,
+     AiPicker,
+     AnthropicMessages,
+@@ -66,6 +67,12 @@ def symbols(mentions: tuple[Mention, ...] | list[Mention]) -> set[str]:
+ # --- the version and the answer -----------------------------------------------------
+ 
+ 
++def without_xai(config: AiConfig) -> AiConfig:
++    return replace(
++        config, models={**config.models, "xai": replace(config.models["xai"], model=None)}
++    )
++
++
+ def test_the_picker_version_loads_with_dated_models_and_checked_prices() -> None:
+     config = current_ai_config()
+     assert config.version == 1
+@@ -75,9 +82,7 @@ def test_the_picker_version_loads_with_dated_models_and_checked_prices() -> None
+     assert not config.problems()
+     for spec in config.models.values():
+         assert re.search(r"\d{4}", spec.model or "")  # a dated snapshot, not an alias
+-    unpinned = replace(
+-        config, models={**config.models, "xai": replace(config.models["xai"], model=None)}
+-    )
++    unpinned = without_xai(config)
+     assert unpinned.problems() == ["xai: no model pinned"]
+ 
+ 
+@@ -194,9 +199,7 @@ def test_no_picker_without_all_three_keys_or_a_ready_version(settings: Settings)
+         AiPicker.from_settings(settings, CONFIG)
+     with pytest.raises(NotReady, match=r"not set: ENGINE_XAI_KEY, ENGINE_ANTHROPIC_KEY$"):
+         AiPicker.from_settings(with_keys(settings, openai_key=OPENAI_KEY), CONFIG)
+-    unpinned = replace(
+-        CONFIG, models={**CONFIG.models, "xai": replace(CONFIG.models["xai"], model=None)}
+-    )
++    unpinned = without_xai(CONFIG)
+     with pytest.raises(NotReady, match=r"isn.t ready: xai: no model pinned$"):
+         AiPicker.from_settings(with_keys(settings, **ALL_KEYS), unpinned)
+ 
+@@ -277,9 +280,7 @@ def test_clients_get_the_engine_keys_passed_in(settings: Settings) -> None:
+         ANTHROPIC_KEY,
+     ]
+     assert OPENAI_KEY not in repr(keyed)
+-    unpinned = replace(
+-        CONFIG, models={**CONFIG.models, "xai": replace(CONFIG.models["xai"], model=None)}
+-    )
++    unpinned = without_xai(CONFIG)
+     assert "xai" not in build_clients(keyed, unpinned)
+ 
+ 
+diff --git a/engine/tests/test_similarity.py b/engine/tests/test_similarity.py
+index a137185..265bfe2 100644
+--- a/engine/tests/test_similarity.py
++++ b/engine/tests/test_similarity.py
+@@ -205,6 +205,9 @@ def test_the_real_model_is_deterministic_normalised_and_ranks_a_paraphrase_first
+     assert post.vector @ paraphrase.vector > post.vector @ unrelated.vector
+     (long,) = model.embed(["tariffs " * 1000])
+     assert long.truncated and not post.truncated
++    # The CLS vector of the pinned files (catches a pooling, tokenizer or feed change).
++    golden = [-0.0720, 0.0076, -0.0272, 0.0465, 0.0500, 0.0316]
++    assert post.vector[:6] == pytest.approx(golden, abs=2e-4)
+ 
+ 
+ # --- the match rule and the stored index ------------------------------------------------------
+@@ -221,9 +224,11 @@ def test_a_match_rule_set_for_another_model_is_refused(tmp_path: Path) -> None:
+ 
+ 
+ def test_the_shipped_match_rule_is_v1_for_the_pinned_model() -> None:
++    from scripts.match_rule import counts, pick_threshold
++
+     rule = load_match_rule()
+     assert (rule.version, rule.model_version, rule.max_matches) == (1, REAL.version, 50)
+-    assert 0.7 <= rule.threshold < 1
++    assert rule.threshold == pick_threshold(*counts())  # what the committed reading gives
+ 
+ 
+ async def test_the_index_loads_every_stored_vector_with_its_post_time(db: AsyncEngine) -> None:

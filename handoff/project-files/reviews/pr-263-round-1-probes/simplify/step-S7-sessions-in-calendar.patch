@@ -1,0 +1,224 @@
+diff --git a/engine/engine/backtest/data.py b/engine/engine/backtest/data.py
+index 6c96156..9c92b9c 100644
+--- a/engine/engine/backtest/data.py
++++ b/engine/engine/backtest/data.py
+@@ -13,13 +13,14 @@ from sqlalchemy.ext.asyncio import AsyncConnection
+ 
+ from engine.backtest import gate
+ from engine.backtest.evaluate import Baseline, InstrumentInfo, Pick, Picker, Posts
+-from engine.backtest.moves import DAY_MINUTES, PriceData, Sessions
++from engine.backtest.moves import DAY_MINUTES, PriceData
+ from engine.backtest.randomtimes import NEW_YORK, bucket
+ from engine.extract.ai import AiConfig
+ from engine.extract.batch import TEXT_POSTS
+ from engine.extract.rules import Rules
+ from engine.extract.similarity import Similarity
+ from engine.market.bars import Hours, MinuteCache, MinuteSeries, regular_minutes
++from engine.market.calendar import Sessions
+ from engine.market.instruments import Instrument, all_instruments
+ from engine.tables import (
+     extractions,
+diff --git a/engine/engine/backtest/evaluate.py b/engine/engine/backtest/evaluate.py
+index 42e831e..541b3b2 100644
+--- a/engine/engine/backtest/evaluate.py
++++ b/engine/engine/backtest/evaluate.py
+@@ -23,7 +23,6 @@ from engine.backtest.moves import (
+     EntryRule,
+     Moves,
+     PriceData,
+-    Sessions,
+     Status,
+     adjusted,
+     compute_moves,
+@@ -32,6 +31,7 @@ from engine.backtest.moves import (
+ from engine.backtest.randomtimes import RandomTimes
+ from engine.backtest.stats import Days, benjamini_hochberg, days_needed, resampled_p, wilson
+ from engine.extract.similarity import Similarity
++from engine.market.calendar import Sessions
+ 
+ Floats = npt.NDArray[np.float64]
+ Ints = npt.NDArray[np.int64]
+diff --git a/engine/engine/backtest/moves.py b/engine/engine/backtest/moves.py
+index 8183505..9e961d5 100644
+--- a/engine/engine/backtest/moves.py
++++ b/engine/engine/backtest/moves.py
+@@ -6,7 +6,6 @@ here returns a price.
+ """
+ 
+ from dataclasses import dataclass, field
+-from datetime import date
+ from enum import IntEnum
+ from typing import Literal
+ 
+@@ -15,7 +14,7 @@ import numpy.typing as npt
+ 
+ from engine.backtest import gate
+ from engine.market.bars import MinuteSeries
+-from engine.market.calendar import schedule
++from engine.market.calendar import Sessions
+ 
+ Floats = npt.NDArray[np.float64]
+ Ints = npt.NDArray[np.int64]
+@@ -77,41 +76,6 @@ MIRRORS = EntryRule("mirrors", gate.MIRRORS_DELAY_SECONDS)
+ RULES = {rule.name: rule for rule in (MAIN, PREMARKET, MIRRORS)}
+ 
+ 
+-@dataclass(frozen=True)
+-class Sessions:
+-    """The trading calendar as arrays: each session's date (an ordinal), open and close."""
+-
+-    days: Ints
+-    opens: Ints
+-    closes: Ints
+-
+-    @classmethod
+-    def between(cls, first: date, last: date) -> "Sessions":
+-        rows = schedule(first, last)
+-        return cls(
+-            np.array([day.toordinal() for day, _, _ in rows], dtype=np.int64),
+-            np.array([int(o.timestamp()) // 60 for _, o, _ in rows], dtype=np.int64),
+-            np.array([int(c.timestamp()) // 60 for _, _, c in rows], dtype=np.int64),
+-        )
+-
+-    def __len__(self) -> int:
+-        return len(self.days)
+-
+-    def trading_at_or_after(self, minutes: Ints) -> Ints:
+-        """The session trading at each minute, or the next one: the first to close after
+-        it (len(self) past the end)."""
+-        found: Ints = np.searchsorted(self.closes, minutes, side="right").astype(np.int64)
+-        return found
+-
+-    def index_of(self, ordinals: Ints) -> Ints:
+-        """Each date's session index, NONE for a day without one."""
+-        at = np.searchsorted(self.days, ordinals).astype(np.int64)
+-        inside = at < len(self.days)
+-        hit = inside & (self.days[np.minimum(at, len(self.days) - 1)] == ordinals)
+-        result: Ints = np.where(hit, at, NONE)
+-        return result
+-
+-
+ @dataclass(frozen=True)
+ class PriceData:
+     """One instrument's prices for the backtest.
+diff --git a/engine/engine/market/bars.py b/engine/engine/market/bars.py
+index 3ec8dc2..4236267 100644
+--- a/engine/engine/market/bars.py
++++ b/engine/engine/market/bars.py
+@@ -39,7 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
+ from engine.db import error_text, make_engine, raise_if_cancelling
+ from engine.feeds.base import UNEXPECTED
+ from engine.market.alpaca import SIP_DELAY, Alpaca, AlpacaError, Bar, Timeframe
+-from engine.market.calendar import schedule
++from engine.market.calendar import Sessions
+ from engine.market.instruments import HISTORY_START, Instrument, all_instruments
+ from engine.settings import Settings
+ from engine.tables import instruments, market_bars
+@@ -386,12 +386,10 @@ def regular_minutes(minutes: npt.NDArray[np.int64]) -> npt.NDArray[np.bool_]:
+         return np.zeros(0, dtype=np.bool_)
+     first = datetime.fromtimestamp(int(minutes.min()) * 60, UTC).date() - timedelta(days=1)
+     last = datetime.fromtimestamp(int(minutes.max()) * 60, UTC).date() + timedelta(days=1)
+-    sessions = schedule(first, last)
+-    opens = np.array([int(o.timestamp()) // 60 for _, o, _ in sessions], dtype=np.int64)
+-    closes = np.array([int(c.timestamp()) // 60 for _, _, c in sessions], dtype=np.int64)
+-    at = np.searchsorted(closes, minutes, side="right")  # the first session closing after
+-    inside = at < len(closes)
+-    result: npt.NDArray[np.bool_] = inside & (opens[np.minimum(at, len(opens) - 1)] <= minutes)
++    sessions = Sessions.between(first, last)
++    at = sessions.trading_at_or_after(minutes)
++    opens = sessions.opens[np.minimum(at, len(sessions) - 1)]
++    result: npt.NDArray[np.bool_] = (at < len(sessions)) & (opens <= minutes)
+     return result
+ 
+ 
+diff --git a/engine/engine/market/calendar.py b/engine/engine/market/calendar.py
+index a1652e1..c7ed706 100644
+--- a/engine/engine/market/calendar.py
++++ b/engine/engine/market/calendar.py
+@@ -5,11 +5,14 @@ A session is a trading date. Its regular hours run from its open (inclusive) to
+ the clock and don't use this.
+ """
+ 
++from dataclasses import dataclass
+ from datetime import UTC, date, datetime
+ from functools import lru_cache
+ from typing import Any
+ 
+ import exchange_calendars
++import numpy as np
++import numpy.typing as npt
+ import pandas as pd
+ 
+ XNYS = "XNYS"
+@@ -87,10 +90,47 @@ def trading_days_after(session: date, days: int) -> date:
+     return later
+ 
+ 
+-def schedule(first: date, last: date) -> list[tuple[date, datetime, datetime]]:
+-    """Every session from `first` to `last` (both inclusive): its date, open and close."""
+-    frame = _xnys().schedule.loc[pd.Timestamp(first) : pd.Timestamp(last)]
+-    return [
+-        (stamp.date(), _utc(row.open), _utc(row.close))
+-        for stamp, row in zip(frame.index, frame.itertuples(), strict=True)
+-    ]
++Ints = npt.NDArray[np.int64]
++
++
++@dataclass(frozen=True)
++class Sessions:
++    """The calendar as arrays: each session's date (an ordinal), and its open and close
++    in minutes since the epoch."""
++
++    days: Ints
++    opens: Ints
++    closes: Ints
++
++    @classmethod
++    def between(cls, first: date, last: date) -> "Sessions":
++        """Every session from `first` to `last`, both inclusive."""
++        frame = _xnys().schedule.loc[pd.Timestamp(first) : pd.Timestamp(last)]
++        return cls(
++            np.array([stamp.toordinal() for stamp in frame.index], dtype=np.int64),
++            _minutes(frame["open"]),
++            _minutes(frame["close"]),
++        )
++
++    def __len__(self) -> int:
++        return len(self.days)
++
++    def trading_at_or_after(self, minutes: Ints) -> Ints:
++        """The session trading at each minute, or the next one: the first to close after
++        it (len(self) past the end)."""
++        found: Ints = np.searchsorted(self.closes, minutes, side="right").astype(np.int64)
++        return found
++
++    def index_of(self, ordinals: Ints) -> Ints:
++        """Each date's session index, -1 for a day without one."""
++        at = np.searchsorted(self.days, ordinals).astype(np.int64)
++        inside = at < len(self.days)
++        hit = inside & (self.days[np.minimum(at, len(self.days) - 1)] == ordinals)
++        result: Ints = np.where(hit, at, -1)
++        return result
++
++
++def _minutes(column: Any) -> Ints:
++    """A column of UTC times, in minutes since the epoch."""
++    minutes: Ints = column.dt.tz_convert(None).to_numpy("datetime64[m]").astype(np.int64)
++    return minutes
+diff --git a/engine/tests/backtest_helpers.py b/engine/tests/backtest_helpers.py
+index 625599e..9f3c1ba 100644
+--- a/engine/tests/backtest_helpers.py
++++ b/engine/tests/backtest_helpers.py
+@@ -11,10 +11,11 @@ from engine.backtest import gate
+ from engine.backtest.build import build_instrument
+ from engine.backtest.data import baseline_lookup, day_start, instrument_infos
+ from engine.backtest.evaluate import Matcher, MoveBook, Pick, Picker, Posts, Universe
+-from engine.backtest.moves import DAY_MINUTES, Floats, PriceData, Sessions
++from engine.backtest.moves import DAY_MINUTES, Floats, PriceData
+ from engine.backtest.randomtimes import NEW_YORK, RandomTimes, bucket
+ from engine.extract.similarity import Similarity
+ from engine.market.bars import MinuteSeries
++from engine.market.calendar import Sessions
+ from engine.market.instruments import AssetClass, Instrument
+ 
+ BARS_FROM = date(2022, 9, 1)

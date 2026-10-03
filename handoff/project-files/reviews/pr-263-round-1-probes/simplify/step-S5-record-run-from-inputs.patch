@@ -1,0 +1,50 @@
+diff --git a/engine/engine/backtest/run.py b/engine/engine/backtest/run.py
+index 6d20181..f63e77f 100644
+--- a/engine/engine/backtest/run.py
++++ b/engine/engine/backtest/run.py
+@@ -53,7 +53,7 @@ class CannotRun(RuntimeError):
+ class Done:
+     outcome: Outcome
+     written: report.Written
+-    data_to: date
++    inputs: report.Inputs
+ 
+ 
+ def divergent_days(path: Path) -> frozenset[int]:
+@@ -151,12 +151,12 @@ async def backtest(
+     sample_times = [datetime.fromtimestamp(s, UTC) for s in posts.seconds]
+     reading = match_reading(similarity, match.threshold, match.max_matches)
+     built = report.build(outcome, inputs, counts, sample_times, every_text_post, reading)
+-    return Done(outcome, report.write(built, out_dir), data_to)
++    return Done(outcome, report.write(built, out_dir), inputs)
+ 
+ 
+ async def record_run(settings: Settings, done: Done) -> int:
+-    """The run and its numbers, in backtest_runs and backtest_summary."""
+-    db = make_engine(settings.db_url)
++    """The run, with the inputs' hashes the report states, and its numbers."""
++    inputs, db = done.inputs, make_engine(settings.db_url)
+     try:
+         async with db.begin() as conn:
+             run_id: int = (
+@@ -164,13 +164,13 @@ async def record_run(settings: Settings, done: Done) -> int:
+                     insert(backtest_runs)
+                     .values(
+                         code_commit=settings.code_version,
+-                        gate_sha256=gate.file_sha256(gate.GATE_FILE),
+-                        rules_sha256=gate.file_sha256(RULES_MANIFEST),
+-                        ai_picker_sha256=current_ai_config().hash,
+-                        match_rule_sha256=gate.file_sha256(MATCH_RULE_FILE),
+-                        model_version=load_pin().version,
+-                        data_from=gate.DATA_START,
+-                        data_to=done.data_to,
++                        gate_sha256=inputs.gate_sha256,
++                        rules_sha256=inputs.rules_sha256,
++                        ai_picker_sha256=inputs.ai_sha256,
++                        match_rule_sha256=inputs.match_sha256,
++                        model_version=inputs.model_version,
++                        data_from=inputs.data_from,
++                        data_to=inputs.data_to,
+                         report_sha256=done.written.sha256,
+                     )
+                     .returning(backtest_runs.c.id)

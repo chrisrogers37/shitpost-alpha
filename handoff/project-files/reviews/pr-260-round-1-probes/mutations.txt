@@ -1,0 +1,10 @@
+M1-pacer-no-lock: SURVIVED | the limiter's lock removed (bursts under concurrency) | 45 passed in 12.58s
+M2-follow-redirects: SURVIVED | redirects followed (keys could travel to another host) | 45 passed in 13.10s
+M3-ignore-reset-header: SURVIVED | X-RateLimit-Reset ignored | 45 passed in 13.14s
+M4-unbounded-wait: SURVIVED | 429 wait no longer capped at 60 s | 45 passed in 13.06s
+M5-coin-feed-sip: SURVIVED | coins stored with feed sip | 45 passed in 12.40s
+M6-null-trades-zero: SURVIVED | a missing n stored as 0 instead of NULL | 45 passed in 12.86s
+M7-final-day-strict: CAUGHT | a daily bar final only a day late | 1 failed, 19 passed in 5.78s
+M8-sip-delay-1min: SURVIVED | stock_bars refuses only data under 6 minutes old | 45 passed in 11.95s
+M9-no-rate-cap: SURVIVED | default rate 1000/min, no 200 cap | 45 passed in 12.59s
+M10-overlap-on-coins-only-close: CAUGHT | only the newest overlapping bar compared | 1 failed, 20 passed in 6.60s

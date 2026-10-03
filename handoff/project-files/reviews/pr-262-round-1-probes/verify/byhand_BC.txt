@@ -1,0 +1,66 @@
+== Phase B: launcher = real CLI + the PR's test routes + /api/v1/vt/sleep
+  [GET /api/v1/test/query] 200 sec-headers OK {'content-type': 'application/json', 'access-control-allow-origin': '*'} body='{"stream_id":"bffa7a7a-f943-4aea-a8a7-22efc33b6664","answer":42}'
+   stream_id matches engine_meta: True
+-- paging
+  [first page] 200 sec-headers OK {'content-type': 'application/json', 'access-control-allow-origin': '*'} body='{"stream_id":"bffa7a7a-f943-4aea-a8a7-22efc33b6664","items":[{"n":50},{"n":49},{"n":48},{"n":47},{"n":46},{"n":45},{"n":44},{"n":43},{"n":42},{"n":41},{"n":40},{"n":39},{"n":38},{"n":37},{"n":36},{"n":35},{"n":34},{"n":33},{"n":32},{"n":31}],"next_before":"WzMxXQ"}'
+   keys: ['items', 'next_before', 'stream_id'] next_before: WzMxXQ decoded: [31]
+   walked 3 pages, 50 items, in order: True
+  [default limit] 200 sec-headers OK 20 items, first=50
+  [limit=100] 200 sec-headers OK 50 items, first=50
+  [limit=0] 400 sec-headers OK {"error":{"code":"bad_request","message":"limit: Input should be greater than or equal to 1"}}
+  [limit=101] 400 sec-headers OK {"error":{"code":"bad_request","message":"limit: Input should be less than or equal to 100"}}
+  [limit=abc (FastAPI's 422)] 400 sec-headers OK {"error":{"code":"bad_request","message":"limit: Input should be a valid integer, unable to parse string as an integer"}}
+  [limit=-1] 400 sec-headers OK {"error":{"code":"bad_request","message":"limit: Input should be greater than or equal to 1"}}
+  [limit=1.5] 400 sec-headers OK {"error":{"code":"bad_request","message":"limit: Input should be a valid integer, unable to parse string as an integer"}}
+  [good cursor WzMxXQ] 200 sec-headers OK 20 items, first=30
+  [cursor 'nope'] 400 sec-headers OK {"error":{"code":"bad_request","message":"before: not a cursor from this list"}}
+  [tampered cursor (char flipped)] 200 sec-headers OK 20 items, first=30
+  [cursor with = padding] 400 sec-headers OK {"error":{"code":"bad_request","message":"before: not a cursor from this list"}}
+  [cursor [1.5]] 400 sec-headers OK {"error":{"code":"bad_request","message":"before: not a cursor from this list"}}
+  [cursor [1,2]] 400 sec-headers OK {"error":{"code":"bad_request","message":"before: not a cursor from this list"}}
+  [cursor ['a']] 400 sec-headers OK {"error":{"code":"bad_request","message":"before: not a cursor from this list"}}
+  [cursor 2**63] 400 sec-headers OK {"error":{"code":"bad_request","message":"before: not a cursor from this list"}}
+  [cursor 201 chars] 400 sec-headers OK {"error":{"code":"bad_request","message":"before: String should have at most 200 characters"}}
+  [cursor non-utf8] 400 sec-headers OK {"error":{"code":"bad_request","message":"before: not a cursor from this list"}}
+  [cursor [ 31] (other spelling)] 400 sec-headers OK {"error":{"code":"bad_request","message":"before: not a cursor from this list"}}
+  [empty before=] 400 sec-headers OK {"error":{"code":"bad_request","message":"before: not a cursor from this list"}}
+-- cache
+  [cached k=1 x2, k=2] 200,200,200 cache-control='public, max-age=5'/'public, max-age=5' answers=1,1,2 sec-headers OK
+  [cached fail] 404 cache-control=None body={"error":{"code":"not_found","message":"Not cached"}}
+  [uncached route] cache-control=None
+-- unhandled error
+  [GET /api/v1/test/boom] 500 sec-headers OK {'content-type': 'application/json', 'access-control-allow-origin': '*'} body='{"error":{"code":"internal","message":"Internal error"}}'
+  [GET /api/v1/test/missing (ApiError)] 404 sec-headers OK {'content-type': 'application/json', 'access-control-allow-origin': '*'} body='{"error":{"code":"not_found","message":"No such thing"}}'
+  [POST /api/v1/test/query (405)] 429 sec-headers OK {'content-type': 'application/json', 'retry-after': '1'} body='{"error":{"code":"rate_limited","message":"Too many requests"}}'
+-- statement timeout (5 s) and pool (5)
+  [pg_sleep(8) -> statement timeout] 429 in 0.00s body='{"error":{"code":"rate_limited","message":"Too many requests"}}' sec-headers OK
+  [pg_sleep(1) -> fine] 429 in 0.00s body='{"error":{"code":"rate_limited","message":"Too many requests"}}' sec-headers OK
+  [healthz while 5 connections are busy and 2 wait] 503 in 2.00s body='{"ok":false}' sec-headers OK
+  [7 concurrent pg_sleep(4) on pool 5] ['200@4.0s', '200@4.0s', '200@4.0s', '200@4.0s', '200@4.0s', '200@8.0s', '200@8.0s']
+-- database stopped (proxy killed)
+  [api query, db down (stream_id cached)] 503 in 0.00s body='{"error":{"code":"unavailable","message":"The database is unavailable"}}' sec-headers OK
+  [healthz, db down] 503 in 0.00s body='{"ok":false}' sec-headers OK
+  [api query, db back] 200 in 0.02s body='{"stream_id":"bffa7a7a-f943-4aea-a8a7-22efc33b6664","answer":42}' sec-headers OK
+-- database silent
+  [healthz, silent] 503 in 2.00s body='{"ok":false}' sec-headers OK
+  [api query, silent (pooled conn, pre-ping)] 503 in 10.00s body='{"error":{"code":"unavailable","message":"The database is unavailable"}}' sec-headers OK
+  [api query, forwarding again] 200 in 0.02s body='{"stream_id":"bffa7a7a-f943-4aea-a8a7-22efc33b6664","answer":42}' sec-headers OK
+-- SIGTERM with a request in flight (pg_sleep 3)
+  [SIGTERM in-flight 3 s request] exit=-15 after 2.62s
+  in-flight request got: ['200']
+  log: tracebacks: 1 | 'secret detail' in log: True | password in log: False | 198.51.100 in log: False
+   | 2026-10-02 23:05:39,842 INFO uvicorn.error: Waiting for application startup.
+   | 2026-10-02 23:05:39,959 ERROR engine.web.access: unhandled error on GET /api/v1/test/boom
+   | 2026-10-02 23:05:42,485 WARNING engine.web.health: health check failed: TimeoutError
+   | 2026-10-02 23:05:48,127 WARNING engine.web.errors: database unavailable on /api/v1/test/query: OperationalError
+   | 2026-10-02 23:05:48,130 WARNING engine.web.health: health check failed: OperationalError
+   | 2026-10-02 23:05:50,214 WARNING engine.web.health: health check failed: TimeoutError
+   | 2026-10-02 23:06:00,218 WARNING engine.web.errors: database unavailable on /api/v1/test/query: OperationalError
+   | 2026-10-02 23:06:01,303 INFO uvicorn.error: Shutting down
+   | 2026-10-02 23:06:01,404 INFO uvicorn.error: Waiting for connections to close. (CTRL+C to force quit)
+   | 2026-10-02 23:06:03,819 INFO uvicorn.error: Waiting for application shutdown.
+   | 2026-10-02 23:06:03,820 INFO uvicorn.error: Finished server process [9231]
+== Phase C: SIGTERM while a healthz waits on a silent database
+  [SIGTERM healthz in flight on a silent db] exit=-15 after 11.77s
+  in-flight healthz got: ['503 after 12.01s']
+{"done": true}

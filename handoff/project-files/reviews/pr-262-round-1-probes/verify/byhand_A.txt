@@ -1,0 +1,67 @@
+== Phase A: python -m engine web (no /api/v1 routes but openapi.json)
+  [GET /healthz] 200 sec-headers OK {'content-type': 'application/json', 'cache-control': 'no-store'} body='{"ok":true}'
+  [GET /api/v1/openapi.json] 200 sec-headers OK {'content-type': 'application/json', 'access-control-allow-origin': '*'} body='{"openapi":"3.1.0","info":{"title":"shitpost-alpha","version":"1"},"paths":{}}'
+  [GET /api/v1/x] 404 sec-headers OK {'content-type': 'application/json', 'access-control-allow-origin': '*'} body='{"error":{"code":"not_found","message":"Not found"}}'
+  [GET /api/v1] 404 sec-headers OK {'content-type': 'application/json'} body='{"error":{"code":"not_found","message":"Not found"}}'
+  [GET /api/nope] 404 sec-headers OK {'content-type': 'application/json'} body='{"error":{"code":"not_found","message":"Not found"}}'
+  [GET /x (outside /api)] 404 sec-headers OK {'content-type': 'text/plain; charset=utf-8'} body='Not found'
+  [GET /docs] 404 sec-headers OK {'content-type': 'text/plain; charset=utf-8'} body='Not found'
+  [GET /redoc] 404 sec-headers OK {'content-type': 'text/plain; charset=utf-8'} body='Not found'
+  [GET /openapi.json] 404 sec-headers OK {'content-type': 'text/plain; charset=utf-8'} body='Not found'
+  [POST /api/v1/openapi.json (405)] 405 sec-headers OK {'content-type': 'application/json', 'allow': 'GET, HEAD'} body='{"error":{"code":"bad_request","message":"Method Not Allowed"}}'
+  [DELETE /api/v1/openapi.json (405)] 405 sec-headers OK {'content-type': 'application/json', 'allow': 'GET, HEAD'} body='{"error":{"code":"bad_request","message":"Method Not Allowed"}}'
+  [POST /healthz (405 outside api)] 405 sec-headers OK {'content-type': 'text/plain; charset=utf-8', 'allow': 'GET'} body='Method Not Allowed'
+  [HEAD /healthz] 405 sec-headers OK {'content-type': 'text/plain; charset=utf-8', 'allow': 'GET'} body=''
+  [OPTIONS preflight GET Origin=https://shitpostalpha.com] 405 sec-headers OK {'content-type': 'application/json', 'allow': 'GET, HEAD'} body='{"error":{"code":"bad_request","message":"Method Not Allowed"}}'
+  [OPTIONS preflight POST Origin=https://shitpostalpha.com] 405 sec-headers OK {'content-type': 'application/json', 'allow': 'GET, HEAD'} body='{"error":{"code":"bad_request","message":"Method Not Allowed"}}'
+  [GET with Origin=https://shitpostalpha.com] 200 sec-headers OK {'content-type': 'application/json', 'access-control-allow-origin': '*'} body='{"openapi":"3.1.0","info":{"title":"shitpost-alpha","version":"1"},"paths":{}}'
+  [OPTIONS preflight GET Origin=https://evil.example] 405 sec-headers OK {'content-type': 'application/json', 'allow': 'GET, HEAD'} body='{"error":{"code":"bad_request","message":"Method Not Allowed"}}'
+  [OPTIONS preflight POST Origin=https://evil.example] 405 sec-headers OK {'content-type': 'application/json', 'allow': 'GET, HEAD'} body='{"error":{"code":"bad_request","message":"Method Not Allowed"}}'
+  [GET with Origin=https://evil.example] 200 sec-headers OK {'content-type': 'application/json', 'access-control-allow-origin': '*'} body='{"openapi":"3.1.0","info":{"title":"shitpost-alpha","version":"1"},"paths":{}}'
+  [OPTIONS preflight GET Origin=null] 405 sec-headers OK {'content-type': 'application/json', 'allow': 'GET, HEAD'} body='{"error":{"code":"bad_request","message":"Method Not Allowed"}}'
+  [OPTIONS preflight POST Origin=null] 405 sec-headers OK {'content-type': 'application/json', 'allow': 'GET, HEAD'} body='{"error":{"code":"bad_request","message":"Method Not Allowed"}}'
+  [GET with Origin=null] 200 sec-headers OK {'content-type': 'application/json', 'access-control-allow-origin': '*'} body='{"openapi":"3.1.0","info":{"title":"shitpost-alpha","version":"1"},"paths":{}}'
+-- rate limit (defaults 120/min + burst 30), on GET /api/v1/x
+  [X-Real-IP A=198.51.100.1] 32 requests: 30x404 2x429 first429_at=30
+  [A again] 429 sec-headers OK {'content-type': 'application/json', 'access-control-allow-origin': '*', 'retry-after': '1'} body='{"error":{"code":"rate_limited","message":"Too many requests"}}'
+  [X-Real-IP B=198.51.100.2 (separate bucket)] 3 requests: 3x404 0x429 first429_at=None
+  [A + forged X-Forwarded-For] 2 requests: 0x404 2x429 first429_at=0
+  [two X-Real-IP lines [C, A] (last line wins)] 2 requests: 0x404 2x429 first429_at=0
+  [X-Real-IP 'C, A' (rightmost entry wins)] 2 requests: 0x404 2x429 first429_at=0
+  [X-Real-IP 'A, C' (rightmost=C, a fresh bucket)] 2 requests: 2x404 0x429 first429_at=None
+  [garbage X-Real-IP -> socket address] 2 requests: 2x404 0x429 first429_at=None
+  [no header -> socket address 127.0.0.1 (shared with garbage)] 32 requests: 9x404 23x429 first429_at=9
+  [spoofed X-Real-IP D (no edge locally, so it is honoured)] 2 requests: 2x404 0x429 first429_at=None
+  [IPv6 a in /64] 31 requests: 30x404 1x429 first429_at=30
+  [IPv6 b same /64 (shares a's bucket)] 1 requests: 0x404 1x429 first429_at=0
+  [healthz x40 from limited A] statuses={200}
+  [429 has every header] 429 sec-headers OK {'content-type': 'application/json', 'access-control-allow-origin': '*', 'retry-after': '1'} body='{"error":{"code":"rate_limited","message":"Too many requests"}}'
+  [429 outside /api is plain text] 429 sec-headers OK {'content-type': 'text/plain; charset=utf-8', 'retry-after': '1'} body='Too many requests'
+-- database stopped (proxy killed)
+  [healthz, db down] 503 in 0.00s body='{"ok":false}' sec-headers OK
+  [healthz, db down again] 503 in 0.00s body='{"ok":false}' sec-headers OK
+-- database back
+  [healthz, db back] 200 in 0.02s body='{"ok":true}' sec-headers OK
+-- database silent (accepts, never answers)
+  [healthz, db silent] 503 in 12.00s body='{"ok":false}' sec-headers OK
+  [healthz, db silent again] 503 in 2.00s body='{"ok":false}' sec-headers OK
+  [healthz, db forwarding again] 200 in 0.02s body='{"ok":true}' sec-headers OK
+  [healthz, db forwarding again (2)] 200 in 0.00s body='{"ok":true}' sec-headers OK
+-- SIGTERM with an idle keep-alive connection open
+  [SIGTERM idle, keep-alive open] exit=-15 after 0.21s
+  log lines: 199
+   | 2026-10-02 23:04:55,912 INFO uvicorn.error: Started server process [8458]
+   | 2026-10-02 23:04:55,912 INFO uvicorn.error: Waiting for application startup.
+   | 2026-10-02 23:04:55,913 INFO uvicorn.error: Application startup complete.
+   | 2026-10-02 23:04:55,913 INFO uvicorn.error: Uvicorn running on http://0.0.0.0:44927 (Press CTRL+C to quit)
+   | 2026-10-02 23:04:55,987 INFO engine.web.access: GET /healthz 200 40ms
+   | 2026-10-02 23:04:55,992 INFO engine.web.access: GET /healthz 200 4ms
+   | ...
+   | 2026-10-02 23:05:10,870 INFO engine.web.access: GET /healthz 200 3ms
+   | 2026-10-02 23:05:10,874 INFO engine.web.access: GET /healthz 200 3ms
+   | 2026-10-02 23:05:10,939 INFO uvicorn.error: Shutting down
+   | 2026-10-02 23:05:11,039 INFO uvicorn.error: Waiting for application shutdown.
+   | 2026-10-02 23:05:11,040 INFO uvicorn.error: Application shutdown complete.
+   | 2026-10-02 23:05:11,040 INFO uvicorn.error: Finished server process [8458]
+  log has 127.0.0.1: False | has 198.51.100: False | has 2001:db8: False | has password: False | has Traceback: False
+{"done": true}

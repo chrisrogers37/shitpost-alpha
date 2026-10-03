@@ -1,0 +1,10 @@
+spy: 811 daily bars (2021-06-01 to 2024-07-09); fetched 811, wrote 811
+btc: 1,135 daily bars (2021-06-01 to 2024-07-09); fetched 1,135, wrote 1,135
+qqq: 811 daily bars (2021-06-01 to 2024-07-09); fetched 811, wrote 811
+eth: 1,135 daily bars (2021-06-01 to 2024-07-09); fetched 1,135, wrote 1,135
+aapl: 811 daily bars (2021-06-01 to 2024-07-09); fetched 811, wrote 811
+xle: 811 daily bars (2021-06-01 to 2024-07-09); fetched 811, wrote 811
+spy: 172 post moves, 140 baseline rows
+btc: 172 post moves, 140 baseline rows
+KILLED
+rc -9

@@ -1,0 +1,13 @@
+F2' model rows without hash: KILLED | 1 failed, 45 passed in 9.79s | FAILED tests/test_ai.py::test_the_picker_asks_both_and_votes - KeyError: 'pic...
+G1 code pooling mean: KILLED | 1 failed, 12 passed in 12.29s | FAILED tests/test_similarity.py::test_the_real_model_is_deterministic_normalised_and_ranks_a_paraphrase_first
+G2 code truncation 256: SURVIVED | 16 passed in 12.36s | 
+C1 user message label: KILLED | 1 failed, 45 passed in 20.59s | FAILED tests/test_ai.py::test_the_picker_asks_both_and_votes - AssertionError...
+C2 openai developer role: SURVIVED | 116 passed in 87.73s (0:01:27) | 
+C3 anthropic system changed: SURVIVED | 116 passed in 45.49s | 
+C4 output cap ignored: SURVIVED | 116 passed in 64.21s (0:01:04) | 
+C5 why not cut: SURVIVED | 116 passed in 56.00s | 
+C6 quoted label: KILLED | 1 failed, 48 passed in 17.04s | FAILED tests/test_ai.py::test_the_quoted_post_goes_in_the_message - Assertion...
+C7 openai strict off: KILLED | 1 failed, 5 passed in 2.70s | FAILED tests/test_ai.py::test_openai_answer_through_the_sdk - assert False is...
+N4a rules finished before pick: SURVIVED | 116 passed in 51.57s | 
+N4b new instrument named otherwise: SURVIVED | 116 passed in 67.16s (0:01:07) | 
+done

@@ -1,0 +1,63 @@
+diff --git a/engine/engine/backtest/build.py b/engine/engine/backtest/build.py
+index 24aa2a4..fa9f588 100644
+--- a/engine/engine/backtest/build.py
++++ b/engine/engine/backtest/build.py
+@@ -63,8 +63,6 @@ SECTOR_FUNDS = {"xle": ("XLE", "Energy Select Sector SPDR Fund")}
+ """The sector funds Gate 0 reports (gate.SECTOR_TOPICS), added if missing."""
+ CHUNK_POSTS = 2_000
+ """Posts whose random times are moved at once (100 each), to bound memory."""
+-ROWS_PER_STATEMENT = 1_000
+-"""signal_moves rows per insert: 36 parameters each, under 65,535 a statement."""
+ 
+ 
+ class NotReady(RuntimeError):
+@@ -210,30 +208,28 @@ def build_instrument(
+ 
+ 
+ async def write_built(conn: AsyncConnection, built: Built) -> None:
+-    """Upsert both tables' rows. Rows whose values didn't change are left alone (their
+-    built_at too), so writing the same rows twice changes nothing."""
++    """Upsert both tables' rows (one executemany each). Rows whose values didn't change
++    are left alone (their built_at too), so writing the same rows twice changes nothing."""
+     keys = {"instrument_id", "entry", "signal_key", "built_at"}
+     values = [c.name for c in signal_moves.c if c.name not in keys]
+-    for start in range(0, len(built.moves), ROWS_PER_STATEMENT):
+-        stmt = insert(signal_moves).values(built.moves[start : start + ROWS_PER_STATEMENT])
+-        changed = tuple_(*(signal_moves.c[n] for n in values)).is_distinct_from(
+-            tuple_(*(stmt.excluded[n] for n in values))
+-        )
+-        await conn.execute(
+-            stmt.on_conflict_do_update(
+-                constraint="signal_moves_pkey",
+-                set_={n: stmt.excluded[n] for n in values} | {"built_at": func.now()},
+-                where=changed,
+-            )
+-        )
++    moves, baselines = insert(signal_moves), insert(random_baselines)
++    changed = tuple_(*(signal_moves.c[n] for n in values)).is_distinct_from(
++        tuple_(*(moves.excluded[n] for n in values))
++    )
+     medians = ("moves", "median_move", "adjusted", "median_adjusted")
+-    for start in range(0, len(built.baselines), ROWS_PER_STATEMENT):
+-        stmt = insert(random_baselines).values(built.baselines[start : start + ROWS_PER_STATEMENT])
+-        await conn.execute(
+-            stmt.on_conflict_do_update(
+-                constraint="random_baselines_pkey", set_={n: stmt.excluded[n] for n in medians}
+-            )
+-        )
++    upserts = (
++        moves.on_conflict_do_update(
++            constraint="signal_moves_pkey",
++            set_={n: moves.excluded[n] for n in values} | {"built_at": func.now()},
++            where=changed,
++        ),
++        baselines.on_conflict_do_update(
++            constraint="random_baselines_pkey", set_={n: baselines.excluded[n] for n in medians}
++        ),
++    )
++    for upsert, rows in zip(upserts, (built.moves, built.baselines), strict=True):
++        if rows:
++            await conn.execute(upsert, rows)
+ 
+ 
+ async def built_instruments(conn: AsyncConnection, data_to: date) -> set[int]:

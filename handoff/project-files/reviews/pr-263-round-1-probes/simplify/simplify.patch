@@ -1,0 +1,838 @@
+diff --git a/engine/engine/backtest/build.py b/engine/engine/backtest/build.py
+index 24aa2a4..c150f04 100644
+--- a/engine/engine/backtest/build.py
++++ b/engine/engine/backtest/build.py
+@@ -63,8 +63,6 @@ SECTOR_FUNDS = {"xle": ("XLE", "Energy Select Sector SPDR Fund")}
+ """The sector funds Gate 0 reports (gate.SECTOR_TOPICS), added if missing."""
+ CHUNK_POSTS = 2_000
+ """Posts whose random times are moved at once (100 each), to bound memory."""
+-ROWS_PER_STATEMENT = 1_000
+-"""signal_moves rows per insert: 36 parameters each, under 65,535 a statement."""
+ 
+ 
+ class NotReady(RuntimeError):
+@@ -192,7 +190,7 @@ def build_instrument(
+         adjusted: dict[str, list[Floats]] = {}
+         for start in range(0, len(posts), chunk):
+             part = slice(start, start + chunk)
+-            times = book.randoms.draw_all(posts.keys[part], posts.buckets[part])
++            times = book.random_times[part]
+             moves, net = _moves_and_adjusted(book, instrument.id, times.ravel(), rule)
+             for window, values in moves.move.items():
+                 raw.setdefault(window, []).append(values.reshape(times.shape))
+@@ -210,30 +208,28 @@ def build_instrument(
+ 
+ 
+ async def write_built(conn: AsyncConnection, built: Built) -> None:
+-    """Upsert both tables' rows. Rows whose values didn't change are left alone (their
+-    built_at too), so writing the same rows twice changes nothing."""
++    """Upsert both tables' rows (one executemany each). Rows whose values didn't change
++    are left alone (their built_at too), so writing the same rows twice changes nothing."""
+     keys = {"instrument_id", "entry", "signal_key", "built_at"}
+     values = [c.name for c in signal_moves.c if c.name not in keys]
+-    for start in range(0, len(built.moves), ROWS_PER_STATEMENT):
+-        stmt = insert(signal_moves).values(built.moves[start : start + ROWS_PER_STATEMENT])
+-        changed = tuple_(*(signal_moves.c[n] for n in values)).is_distinct_from(
+-            tuple_(*(stmt.excluded[n] for n in values))
+-        )
+-        await conn.execute(
+-            stmt.on_conflict_do_update(
+-                constraint="signal_moves_pkey",
+-                set_={n: stmt.excluded[n] for n in values} | {"built_at": func.now()},
+-                where=changed,
+-            )
+-        )
++    moves, baselines = insert(signal_moves), insert(random_baselines)
++    changed = tuple_(*(signal_moves.c[n] for n in values)).is_distinct_from(
++        tuple_(*(moves.excluded[n] for n in values))
++    )
+     medians = ("moves", "median_move", "adjusted", "median_adjusted")
+-    for start in range(0, len(built.baselines), ROWS_PER_STATEMENT):
+-        stmt = insert(random_baselines).values(built.baselines[start : start + ROWS_PER_STATEMENT])
+-        await conn.execute(
+-            stmt.on_conflict_do_update(
+-                constraint="random_baselines_pkey", set_={n: stmt.excluded[n] for n in medians}
+-            )
+-        )
++    upserts = (
++        moves.on_conflict_do_update(
++            constraint="signal_moves_pkey",
++            set_={n: moves.excluded[n] for n in values} | {"built_at": func.now()},
++            where=changed,
++        ),
++        baselines.on_conflict_do_update(
++            constraint="random_baselines_pkey", set_={n: baselines.excluded[n] for n in medians}
++        ),
++    )
++    for upsert, rows in zip(upserts, (built.moves, built.baselines), strict=True):
++        if rows:
++            await conn.execute(upsert, rows)
+ 
+ 
+ async def built_instruments(conn: AsyncConnection, data_to: date) -> set[int]:
+diff --git a/engine/engine/backtest/data.py b/engine/engine/backtest/data.py
+index 6c96156..9c92b9c 100644
+--- a/engine/engine/backtest/data.py
++++ b/engine/engine/backtest/data.py
+@@ -13,13 +13,14 @@ from sqlalchemy.ext.asyncio import AsyncConnection
+ 
+ from engine.backtest import gate
+ from engine.backtest.evaluate import Baseline, InstrumentInfo, Pick, Picker, Posts
+-from engine.backtest.moves import DAY_MINUTES, PriceData, Sessions
++from engine.backtest.moves import DAY_MINUTES, PriceData
+ from engine.backtest.randomtimes import NEW_YORK, bucket
+ from engine.extract.ai import AiConfig
+ from engine.extract.batch import TEXT_POSTS
+ from engine.extract.rules import Rules
+ from engine.extract.similarity import Similarity
+ from engine.market.bars import Hours, MinuteCache, MinuteSeries, regular_minutes
++from engine.market.calendar import Sessions
+ from engine.market.instruments import Instrument, all_instruments
+ from engine.tables import (
+     extractions,
+diff --git a/engine/engine/backtest/evaluate.py b/engine/engine/backtest/evaluate.py
+index 42e831e..147a7d7 100644
+--- a/engine/engine/backtest/evaluate.py
++++ b/engine/engine/backtest/evaluate.py
+@@ -4,7 +4,7 @@ the volumes. Pure: everything comes in as arrays and callables, so planted-effec
+ run it on synthetic prices and the real run on the cache and the database alike."""
+ 
+ from collections import Counter
+-from collections.abc import Callable, Iterable, Mapping, Sequence
++from collections.abc import Callable, Mapping, Sequence
+ from dataclasses import dataclass, field
+ from datetime import UTC, date, datetime, timedelta
+ from functools import cached_property
+@@ -20,10 +20,10 @@ from engine.backtest.moves import (
+     MIRRORS,
+     NONE,
+     PREMARKET,
++    RULES,
+     EntryRule,
+     Moves,
+     PriceData,
+-    Sessions,
+     Status,
+     adjusted,
+     compute_moves,
+@@ -32,6 +32,7 @@ from engine.backtest.moves import (
+ from engine.backtest.randomtimes import RandomTimes
+ from engine.backtest.stats import Days, benjamini_hochberg, days_needed, resampled_p, wilson
+ from engine.extract.similarity import Similarity
++from engine.market.calendar import Sessions
+ 
+ Floats = npt.NDArray[np.float64]
+ Ints = npt.NDArray[np.int64]
+@@ -131,7 +132,6 @@ class MoveBook:
+         self._beta: dict[int, Floats] = {}
+         self._moves: dict[tuple[int, str], Moves] = {}
+         self._judged: dict[tuple[int, str], tuple[dict[str, Floats], dict[str, Statuses]]] = {}
+-        self._random_rows: dict[int, Floats] = {}
+         self._random: dict[tuple[int, str, str], dict[int, Floats]] = {}
+ 
+     def prices(self, instrument_id: int) -> PriceData:
+@@ -185,12 +185,11 @@ class MoveBook:
+         net, status = self._judged[(instrument_id, rule.name)]
+         return Judged(net[window], moves.matured[window], status[window])
+ 
+-    def random_rows(self, posts: Iterable[int]) -> None:
+-        """Draw the random times of these posts (each post's draw is its own)."""
+-        for p in posts:
+-            if p not in self._random_rows:
+-                key, b = self.posts.keys[p], int(self.posts.buckets[p])
+-                self._random_rows[p] = self.randoms.draw(key, b)
++    @cached_property
++    def random_times(self) -> Floats:
++        """Every post's random times, one row per post: drawn once for every instrument
++        and entry rule (each post's draw is its own)."""
++        return self.randoms.draw_all(self.posts.keys, self.posts.buckets)
+ 
+     def random_judged(
+         self, instrument_id: int, rule: EntryRule, window: str, posts: Sequence[int]
+@@ -199,8 +198,7 @@ class MoveBook:
+         cache = self._random.setdefault((instrument_id, rule.name, window), {})
+         missing = [p for p in dict.fromkeys(posts) if p not in cache]
+         if missing:
+-            self.random_rows(missing)
+-            rows = np.stack([self._random_rows[p] for p in missing])
++            rows = self.random_times[missing]
+             _, net, _ = self.judged_at(instrument_id, rows.ravel(), rule)
+             for p, row in zip(missing, net[window].reshape(rows.shape), strict=True):
+                 cache[p] = row
+@@ -263,20 +261,23 @@ class Matcher:
+         if list(similarity.keys) != list(posts.keys):
+             raise ValueError("the similarity matrix must hold the sample's posts, in order")
+         self.index = {key: i for i, key in enumerate(posts.keys)}
+-        self._found: dict[tuple[int, int], Ints] = {}
++        self.latest = max(r.delay_seconds for r in RULES.values())
++        self._found: dict[int, Ints] = {}
+ 
+     def scored(self, post: int, rule: EntryRule) -> Ints:
+         """Every post scoring at the threshold or more and made before this post's alert
+-        time, best first (post indices)."""
+-        found_key = (post, rule.delay_seconds)
+-        if found_key not in self._found:
+-            key = self.posts.keys[post]
+-            before = datetime.fromtimestamp(self.posts.seconds[post] + rule.delay_seconds, UTC)
+-            vector = self.similarity.vectors[self.index[key]]
+-            everyone = len(self.similarity.keys)
++        time, best first (post indices). One similar() call per post, at the latest
++        rule's alert time, serves every rule (each similar() reads every vector)."""
++        if post not in self._found:
++            key, at = self.posts.keys[post], self.posts.seconds[post]
++            before = datetime.fromtimestamp(at + self.latest, UTC)
++            vector, everyone = self.similarity.vectors[post], len(self.posts)
+             matches = self.similarity.similar(key, vector, before, self.threshold, k=everyone)
+-            self._found[found_key] = np.array([self.index[m.key] for m in matches], dtype=np.int64)
+-        return self._found[found_key]
++            self._found[post] = np.array([self.index[m.key] for m in matches], dtype=np.int64)
++        found = self._found[post]
++        alert = self.posts.seconds[post] + rule.delay_seconds
++        result: Ints = found[self.posts.seconds[found] < alert]
++        return result
+ 
+     def matches(self, post: int, rule: EntryRule, judged: Judged) -> Ints:
+         """The match rule's matches from the pair's pool, best first."""
+@@ -342,8 +343,6 @@ class View:
+     name: str
+     rule: EntryRule
+     filters: bool = True
+-    judged: bool = False
+-    """One of the 22 gate tests (BH and the pass rule apply)."""
+     posts: frozenset[int] | None = None
+     """Only calls on these posts (None: all the picker answered)."""
+     drop_days: frozenset[int] = frozenset()
+@@ -401,7 +400,6 @@ class Universe:
+     matcher: Matcher
+     baseline: Baseline
+     pickers: Mapping[str, Picker]
+-    data_from: date
+     data_to: date
+ 
+     @cached_property
+@@ -461,7 +459,6 @@ class Universe:
+         result.counts["no_random_moves"] += len(measured) - len(usable)
+         measured = [measured[i] for i in usable]
+         self._statistics(result, measured, randoms[usable], rule, pair.window, seed_name)
+-        result.finish(view.judged)
+         return result
+ 
+     def _on_dropped_day(self, call: Call, rule: EntryRule, window: str, view: View) -> bool:
+@@ -543,7 +540,7 @@ class Outcome:
+     samples: list[dict[str, Any]]
+ 
+     def gate(self) -> list[PairResult]:
+-        return [r for r in self.results if r.view == "gate" and r.picker in ("rules", "ai")]
++        return [r for r in self.results if r.view == "gate"]
+ 
+ 
+ def views_for(
+@@ -551,7 +548,7 @@ def views_for(
+ ) -> list[tuple[str, View, Sequence[Pair]]]:
+     """Every (picker, view, pairs) the report shows, gate tests first."""
+     planned: list[tuple[str, View, Sequence[Pair]]] = []
+-    gate_view = View("gate", MAIN, judged=True)
++    gate_view = View("gate", MAIN)
+     for name in ("rules", "ai"):
+         if name in universe.pickers:
+             planned.append((name, gate_view, gate.GATE_PAIRS))
+@@ -592,7 +589,8 @@ def run_backtest(universe: Universe, drop_days: frozenset[int] = frozenset()) ->
+         judged, benjamini_hochberg([r.p_value or 1.0 for r in judged]), strict=True
+     ):
+         result.q_value = q
+-        result.finish(judged=True)
++    for result in results:
++        result.finish(judged=result.view == "gate")
+ 
+     def passing(name: str) -> list[PairResult]:
+         return [r for r in judged if r.picker == name and r.passes]
+diff --git a/engine/engine/backtest/moves.py b/engine/engine/backtest/moves.py
+index 8183505..fc55968 100644
+--- a/engine/engine/backtest/moves.py
++++ b/engine/engine/backtest/moves.py
+@@ -6,7 +6,6 @@ here returns a price.
+ """
+ 
+ from dataclasses import dataclass, field
+-from datetime import date
+ from enum import IntEnum
+ from typing import Literal
+ 
+@@ -15,7 +14,7 @@ import numpy.typing as npt
+ 
+ from engine.backtest import gate
+ from engine.market.bars import MinuteSeries
+-from engine.market.calendar import schedule
++from engine.market.calendar import Sessions
+ 
+ Floats = npt.NDArray[np.float64]
+ Ints = npt.NDArray[np.int64]
+@@ -77,41 +76,6 @@ MIRRORS = EntryRule("mirrors", gate.MIRRORS_DELAY_SECONDS)
+ RULES = {rule.name: rule for rule in (MAIN, PREMARKET, MIRRORS)}
+ 
+ 
+-@dataclass(frozen=True)
+-class Sessions:
+-    """The trading calendar as arrays: each session's date (an ordinal), open and close."""
+-
+-    days: Ints
+-    opens: Ints
+-    closes: Ints
+-
+-    @classmethod
+-    def between(cls, first: date, last: date) -> "Sessions":
+-        rows = schedule(first, last)
+-        return cls(
+-            np.array([day.toordinal() for day, _, _ in rows], dtype=np.int64),
+-            np.array([int(o.timestamp()) // 60 for _, o, _ in rows], dtype=np.int64),
+-            np.array([int(c.timestamp()) // 60 for _, _, c in rows], dtype=np.int64),
+-        )
+-
+-    def __len__(self) -> int:
+-        return len(self.days)
+-
+-    def trading_at_or_after(self, minutes: Ints) -> Ints:
+-        """The session trading at each minute, or the next one: the first to close after
+-        it (len(self) past the end)."""
+-        found: Ints = np.searchsorted(self.closes, minutes, side="right").astype(np.int64)
+-        return found
+-
+-    def index_of(self, ordinals: Ints) -> Ints:
+-        """Each date's session index, NONE for a day without one."""
+-        at = np.searchsorted(self.days, ordinals).astype(np.int64)
+-        inside = at < len(self.days)
+-        hit = inside & (self.days[np.minimum(at, len(self.days) - 1)] == ordinals)
+-        result: Ints = np.where(hit, at, NONE)
+-        return result
+-
+-
+ @dataclass(frozen=True)
+ class PriceData:
+     """One instrument's prices for the backtest.
+@@ -145,6 +109,17 @@ def price_at(series: MinuteSeries, minutes: Ints) -> Floats:
+     return result
+ 
+ 
++def first_bar(series: MinuteSeries, minutes: Ints) -> tuple[npt.NDArray[np.bool_], Ints, Floats]:
++    """Each minute's first bar at or after it: whether there is one, its start and its
++    open."""
++    n, size = len(series.minutes), len(minutes)
++    if not n:
++        return np.zeros(size, np.bool_), np.zeros(size, np.int64), np.full(size, np.nan)
++    at = np.searchsorted(series.minutes, minutes)
++    here = np.minimum(at, n - 1)
++    return at < n, series.minutes[here], series.opens[here]
++
++
+ @dataclass
+ class Moves:
+     """Each time's entry and, per window, its move, when it matured and its status."""
+@@ -160,9 +135,8 @@ class Moves:
+     def put(self, window: str, move: Floats, matured: Ints, status: npt.NDArray[np.int8]) -> None:
+         ok = status == Status.OK
+         self.move[window] = np.where(ok, move, np.nan)
+-        keep = (status != Status.NOT_YET) & (status != Status.NO_ENTRY)
+-        keep &= status != Status.NOT_PREMARKET
+-        self.matured[window] = np.where(keep, matured, NONE)
++        unknown = np.isin(status, (Status.NOT_YET, Status.NO_ENTRY, Status.NOT_PREMARKET))
++        self.matured[window] = np.where(unknown, NONE, matured)
+         self.status[window] = status
+ 
+ 
+@@ -202,12 +176,8 @@ def stock_moves(
+         series = prices.bars
+         applies = ~later
+         start = np.maximum(alert_minute, opens)
+-    n = len(series.minutes)
+-    at = np.searchsorted(series.minutes, start) if n else np.zeros(size, dtype=np.int64)
+-    here = np.minimum(at, max(n - 1, 0))
+-    entered = series.minutes[here] if n else np.zeros(size, dtype=np.int64)
+-    has_entry = applies & (at < n) & (entered < closes)
+-    entry_price = series.opens[here] if n else np.full(size, np.nan)
++    found, entered, entry_price = first_bar(series, start)
++    has_entry = applies & found & (entered < closes)
+     no_entry = applies & ~has_entry
+     moves = Moves(np.where(has_entry, entered, NONE), np.where(has_entry, s_safe, NONE))
+     before = (
+@@ -251,23 +221,18 @@ def coin_moves(prices: PriceData, times: Floats, rule: EntryRule, cutoff: int) -
+     """Moves for a coin at each time in seconds."""
+     size = len(times)
+     alert = times + rule.delay_seconds
+-    series = prices.bars
+-    n = len(series.minutes)
+-    at = np.searchsorted(series.minutes, ceil_minutes(alert)) if n else np.zeros(size, np.int64)
+-    here = np.minimum(at, max(n - 1, 0))
+-    entered = series.minutes[here] if n else np.zeros(size, dtype=np.int64)
+-    pending = ceil_minutes(alert) > cutoff
+-    found = at < n
++    alert_minute = ceil_minutes(alert)
++    found, entered, entry_price = first_bar(prices.bars, alert_minute)
++    pending = alert_minute > cutoff
+     late = found & (entered * 60 - alert > gate.COIN_ENTRY_SECONDS)
+     has_entry = found & ~late
+-    entry_price = series.opens[here] if n else np.full(size, np.nan)
+     moves = Moves(
+         np.where(has_entry, entered, NONE),
+         np.where(has_entry, entered // DAY_MINUTES - prices.day_base, NONE),
+     )
+     for window, minutes in COIN_WINDOWS.items():
+         exit_at = entered + minutes
+-        price = price_at(series, exit_at)
++        price = price_at(prices.bars, exit_at)
+         status = _status(
+             (pending, Status.NOT_YET),
+             (~found, Status.NO_ENTRY),
+diff --git a/engine/engine/backtest/randomtimes.py b/engine/engine/backtest/randomtimes.py
+index 698288f..727e3a6 100644
+--- a/engine/engine/backtest/randomtimes.py
++++ b/engine/engine/backtest/randomtimes.py
+@@ -66,16 +66,13 @@ class RandomTimes:
+ def bucket_medians(values: Floats, buckets: Ints) -> dict[int, tuple[int, float | None]]:
+     """Per bucket: how many values there are (NaN left out) and their median. `values`
+     has one row of random-time moves per post; `buckets` one bucket per post."""
+-    flat = values.ravel()
+-    each = np.repeat(buckets, values.shape[1]) if values.ndim == 2 else buckets
+-    keep = np.isfinite(flat)
+-    flat, each = flat[keep], each[keep]
+-    if not len(flat):
++    if not len(buckets):
+         return {}
+-    order = np.argsort(each, kind="stable")
+-    flat, each = flat[order], each[order]
+-    found, starts = np.unique(each, return_index=True)
++    order = np.argsort(buckets, kind="stable")  # the posts, not their 100 values each
++    found, starts = np.unique(buckets[order], return_index=True)
+     result: dict[int, tuple[int, float | None]] = {}
+-    for b, part in zip(found, np.split(flat, starts[1:]), strict=True):
+-        result[int(b)] = (len(part), float(np.median(part)))
++    for b, rows in zip(found, np.split(values[order], starts[1:]), strict=True):
++        part = rows[np.isfinite(rows)]
++        if len(part):
++            result[int(b)] = (len(part), float(np.median(part)))
+     return result
+diff --git a/engine/engine/backtest/report.py b/engine/engine/backtest/report.py
+index 1ebb648..0c734b5 100644
+--- a/engine/engine/backtest/report.py
++++ b/engine/engine/backtest/report.py
+@@ -91,8 +91,7 @@ def build(
+     reading: Reading,
+ ) -> dict[str, Any]:
+     """The report as one JSON-ready dict."""
+-    public = [r for r in outcome.results if r.view not in PRIVATE_VIEWS]
+-    gate_tests = [r for r in public if r.view == "gate"]
++    public, gate_tests = public_results(outcome), outcome.gate()
+     views: dict[str, list[dict[str, Any]]] = {}
+     for result in public:
+         if result.view != "gate":
+@@ -146,6 +145,10 @@ def build(
+     }
+ 
+ 
++def public_results(outcome: Outcome) -> list[PairResult]:
++    return [r for r in outcome.results if r.view not in PRIVATE_VIEWS]
++
++
+ def _text(day: date | None) -> str | None:
+     return None if day is None else day.isoformat()
+ 
+@@ -313,10 +316,6 @@ def _table(tests: Sequence[Mapping[str, Any]], judged: bool) -> list[str]:
+ 
+ def markdown(report: Mapping[str, Any]) -> str:
+     """The report in plain words, from the JSON alone."""
+-    data, g0, h2h = report["data"], report["gate0"], report["head_to_head"]
+-    answered = data["picker_posts"]
+-    ai = report["inputs"]["ai_picker"]
+-    passed = [t for t in g0["tests"] if t["passes"]]
+     lines = [
+         "# Backtest v1: the Gate 0 report",
+         "",
+@@ -325,23 +324,46 @@ def markdown(report: Mapping[str, Any]) -> str:
+         "direction, net of beta times the market for a company and for ETH; costs are "
+         "round trips. Every number counts New York days, not calls.",
+         "",
+-        "## Result",
++        *_result_lines(report),
++        "",
++        *_head_to_head_lines(report["head_to_head"]),
++        "",
++        *_send_lines(report),
+         "",
++        *_secondary_lines(report),
++        "## What the filters dropped and what was skipped",
++        "",
++        *_counts(report),
++        "",
++        *_burst_lines(report["bursts"]),
++        "",
++        *_reading_lines(report["match_reading"], report["inputs"]["match_rule"]),
++        "",
++        *_input_lines(report),
+     ]
++    return "\n".join(lines)
++
++
++def _result_lines(report: Mapping[str, Any]) -> list[str]:
++    data, g0 = report["data"], report["gate0"]
++    answered, ai = data["picker_posts"], report["inputs"]["ai_picker"]
++    passed = [t for t in g0["tests"] if t["passes"]]
+     if g0["passes"]:
+-        names = ", ".join(f"{PICKERS[t['picker']]} {_pair(t['pair'])}"
+-                          for t in passed)  # fmt: skip
+-        lines.append(
++        names = ", ".join(f"{PICKERS[t['picker']]} {_pair(t['pair'])}" for t in passed)
++        verdict = (
+             f"**Gate 0 passes:** {len(passed)} of {len(g0['tests'])} pairs pass ({names}). "
+             "A pass is a backtest result, before any live sample: the paid gate still needs "
+             "the live days below."
+         )
+     else:
+-        lines.append(
++        verdict = (
+             f"**Gate 0 does not pass:** none of the {len(g0['tests'])} pairs passes all five "
+             "conditions. No edge was found under Gate 0's rules."
+         )
+-    lines += [
++    return [
++        "## Result",
++        "",
++        verdict,
+         "",
+         f"Text posts from {data['from']} to {data['to']}: {data['text_posts']:,}. The rules "
+         f"picker answered {answered['rules']:,} of them; the AI picker answered "
+@@ -354,11 +376,11 @@ def markdown(report: Mapping[str, Any]) -> str:
+         "22 tests); 5, the mean over the last 12 months is above zero from at least 10 days.",
+         "",
+         *_table(g0["tests"], judged=True),
+-        "",
+-        "## Which picker picks",
+-        "",
+     ]
+-    rules_total, ai_total = h2h["total_20bp"]["rules"], h2h["total_20bp"]["ai"]
++
++
++def _head_to_head_lines(h2h: Mapping[str, Any]) -> list[str]:
++    lines = ["## Which picker picks", ""]
+     passing = h2h["passing_pairs"]
+     picks = "the AI picker picks" if h2h["picks"] == "ai" else "the rules pick"
+     if not h2h["shared_posts"]:
+@@ -368,41 +390,45 @@ def markdown(report: Mapping[str, Any]) -> str:
+         lines.append(
+             f"On the {h2h['shared_posts']:,} posts both pickers were tested on, the AI "
+             f"picker's passing pairs ({', '.join(map(_pair, passing['ai'])) or 'none'}) add "
+-            f"up to {_bp(ai_total)} after costs, and the rules' passing pairs "
+-            f"({', '.join(map(_pair, passing['rules'])) or 'none'}) to {_bp(rules_total)}: "
+-            f"**{picks}.**"
++            f"up to {_bp(h2h['total_20bp']['ai'])} after costs, and the rules' passing pairs "
++            f"({', '.join(map(_pair, passing['rules'])) or 'none'}) to "
++            f"{_bp(h2h['total_20bp']['rules'])}: **{picks}.**"
+         )
+     if passing["ai"] or passing["rules"]:
+         lines.append("The winner's figure is flattering: it is the better of two.")
+-    lines += [
+-        "",
++    return lines
++
++
++def _send_lines(report: Mapping[str, Any]) -> list[str]:
++    sends = report["sends"]
++    lines = [
+         "## Posts a year the send rule would have sent",
+         "",
+-    ]
+-    sends = report["sends"]
+-    lines += [
+         f"{sends['posts']:,} posts with a surviving call on a passing pair of the picking "
+         f"picker ({PICKERS[sends['picker']]}): {sends['per_year']:.1f} a year.",
+         "",
+         "## The live sample the paid gate needs",
+         "",
+     ]
+-    if report["live_sample"]:
+-        lines.append("Days of calls that confirm each passing pair's hit rate against 50% "
+-                     "(one-sided, 5% error, 80% power):")  # fmt: skip
+-        lines.append("")
+-        for row in report["live_sample"]:
+-            days = "not computable (hit rate not above 50%)" if row["days"] is None else (
+-                f"{row['days']:,} days"
+-            )  # fmt: skip
+-            lines.append(
+-                f"- {PICKERS[row['picker']]} {_pair(row['pair'])}: hit rate "
+-                f"{_share(row['hit_rate'])}, {days}"
+-            )
+-    else:
+-        lines.append("None: no pair passed.")
+-    lines += [
+-        "",
++    if not report["live_sample"]:
++        return [*lines, "None: no pair passed."]
++    lines += ["Days of calls that confirm each passing pair's hit rate against 50% "
++              "(one-sided, 5% error, 80% power):", ""]  # fmt: skip
++    for row in report["live_sample"]:
++        days = "not computable (hit rate not above 50%)" if row["days"] is None else (
++            f"{row['days']:,} days"
++        )  # fmt: skip
++        lines.append(
++            f"- {PICKERS[row['picker']]} {_pair(row['pair'])}: hit rate "
++            f"{_share(row['hit_rate'])}, {days}"
++        )
++    return lines
++
++
++def _secondary_lines(report: Mapping[str, Any]) -> list[str]:
++    """The views that can't pass the gate, each followed by a blank line."""
++    answered = report["data"]["picker_posts"]
++    lines = [
+         "## Also reported, never judged",
+         "",
+         "p-values here are not adjusted, and none of these can pass the gate.",
+@@ -415,25 +441,23 @@ def markdown(report: Mapping[str, Any]) -> str:
+         tests = [t for t in report["views"].get(view, []) if answered[t["picker"]]]
+         if tests:
+             lines += [f"### {title}", "", *_table(tests, judged=False), ""]
+-    lines += ["## What the filters dropped and what was skipped", "", *_counts(report), ""]
+-    lines += _burst_lines(report["bursts"])
+-    lines += ["", *_reading_lines(report["match_reading"], report["inputs"]["match_rule"])]
+-    lines += [
+-        "",
++    return lines
++
++
++def _input_lines(report: Mapping[str, Any]) -> list[str]:
++    inputs = report["inputs"]
++    ai, rules, match = inputs["ai_picker"], inputs["rules"], inputs["match_rule"]
++    return [
+         "## Inputs",
+         "",
+         f"- Gate 0 v1: `{report['gate']['sha256']}`",
+-        f"- Rules version {report['inputs']['rules']['version']}: "
+-        f"`{report['inputs']['rules']['sha256']}`",
++        f"- Rules version {rules['version']}: `{rules['sha256']}`",
+         f"- AI picker version {ai['version']}: `{ai['sha256']}`",
+-        f"- Match rule version {report['inputs']['match_rule']['version']}: "
+-        f"`{report['inputs']['match_rule']['sha256']}` (score "
+-        f"{report['inputs']['match_rule']['threshold']} or more, at most "
+-        f"{report['inputs']['match_rule']['max_matches']})",
+-        f"- Similarity model: {report['inputs']['model_version']}",
++        f"- Match rule version {match['version']}: `{match['sha256']}` (score "
++        f"{match['threshold']} or more, at most {match['max_matches']})",
++        f"- Similarity model: {inputs['model_version']}",
+         "",
+     ]
+-    return "\n".join(lines)
+ 
+ 
+ def _counts(report: Mapping[str, Any]) -> list[str]:
+diff --git a/engine/engine/backtest/run.py b/engine/engine/backtest/run.py
+index 6d20181..3c6a7b7 100644
+--- a/engine/engine/backtest/run.py
++++ b/engine/engine/backtest/run.py
+@@ -53,7 +53,7 @@ class CannotRun(RuntimeError):
+ class Done:
+     outcome: Outcome
+     written: report.Written
+-    data_to: date
++    inputs: report.Inputs
+ 
+ 
+ def divergent_days(path: Path) -> frozenset[int]:
+@@ -124,7 +124,6 @@ async def backtest(
+         matcher=Matcher(similarity, posts, match.threshold, match.max_matches),
+         baseline=baseline_lookup(table, infos),
+         pickers=pickers,
+-        data_from=span.first,
+         data_to=span.last,
+     )
+     outcome = run_backtest(universe, drop_days)
+@@ -151,12 +150,12 @@ async def backtest(
+     sample_times = [datetime.fromtimestamp(s, UTC) for s in posts.seconds]
+     reading = match_reading(similarity, match.threshold, match.max_matches)
+     built = report.build(outcome, inputs, counts, sample_times, every_text_post, reading)
+-    return Done(outcome, report.write(built, out_dir), data_to)
++    return Done(outcome, report.write(built, out_dir), inputs)
+ 
+ 
+ async def record_run(settings: Settings, done: Done) -> int:
+-    """The run and its numbers, in backtest_runs and backtest_summary."""
+-    db = make_engine(settings.db_url)
++    """The run, with the inputs' hashes the report states, and its numbers."""
++    inputs, db = done.inputs, make_engine(settings.db_url)
+     try:
+         async with db.begin() as conn:
+             run_id: int = (
+@@ -164,19 +163,19 @@ async def record_run(settings: Settings, done: Done) -> int:
+                     insert(backtest_runs)
+                     .values(
+                         code_commit=settings.code_version,
+-                        gate_sha256=gate.file_sha256(gate.GATE_FILE),
+-                        rules_sha256=gate.file_sha256(RULES_MANIFEST),
+-                        ai_picker_sha256=current_ai_config().hash,
+-                        match_rule_sha256=gate.file_sha256(MATCH_RULE_FILE),
+-                        model_version=load_pin().version,
+-                        data_from=gate.DATA_START,
+-                        data_to=done.data_to,
++                        gate_sha256=inputs.gate_sha256,
++                        rules_sha256=inputs.rules_sha256,
++                        ai_picker_sha256=inputs.ai_sha256,
++                        match_rule_sha256=inputs.match_sha256,
++                        model_version=inputs.model_version,
++                        data_from=inputs.data_from,
++                        data_to=inputs.data_to,
+                         report_sha256=done.written.sha256,
+                     )
+                     .returning(backtest_runs.c.id)
+                 )
+             ).scalar_one()
+-            rows = [summary_row(run_id, r) for r in public_results(done.outcome)]
++            rows = [summary_row(run_id, r) for r in report.public_results(done.outcome)]
+             if rows:
+                 await conn.execute(insert(backtest_summary), rows)
+     finally:
+@@ -184,10 +183,6 @@ async def record_run(settings: Settings, done: Done) -> int:
+     return run_id
+ 
+ 
+-def public_results(outcome: Outcome) -> list[PairResult]:
+-    return [r for r in outcome.results if r.view not in report.PRIVATE_VIEWS]
+-
+-
+ def summary_row(run_id: int, result: PairResult) -> dict[str, Any]:
+     numbers = report.pair_numbers(result)
+     return {
+@@ -253,7 +248,7 @@ def _line(result: PairResult) -> str:
+ 
+ 
+ def _summary(done: Done) -> Sequence[str]:
+-    gate_tests = [r for r in done.outcome.results if r.view == "gate"]
++    gate_tests = done.outcome.gate()
+     passed = [f"{r.picker} {r.pair.name}" for r in gate_tests if r.passes]
+     return [
+         f"Gate 0 {'passes' if done.outcome.passes else 'does not pass'}: "
+diff --git a/engine/engine/market/bars.py b/engine/engine/market/bars.py
+index 3ec8dc2..4236267 100644
+--- a/engine/engine/market/bars.py
++++ b/engine/engine/market/bars.py
+@@ -39,7 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
+ from engine.db import error_text, make_engine, raise_if_cancelling
+ from engine.feeds.base import UNEXPECTED
+ from engine.market.alpaca import SIP_DELAY, Alpaca, AlpacaError, Bar, Timeframe
+-from engine.market.calendar import schedule
++from engine.market.calendar import Sessions
+ from engine.market.instruments import HISTORY_START, Instrument, all_instruments
+ from engine.settings import Settings
+ from engine.tables import instruments, market_bars
+@@ -386,12 +386,10 @@ def regular_minutes(minutes: npt.NDArray[np.int64]) -> npt.NDArray[np.bool_]:
+         return np.zeros(0, dtype=np.bool_)
+     first = datetime.fromtimestamp(int(minutes.min()) * 60, UTC).date() - timedelta(days=1)
+     last = datetime.fromtimestamp(int(minutes.max()) * 60, UTC).date() + timedelta(days=1)
+-    sessions = schedule(first, last)
+-    opens = np.array([int(o.timestamp()) // 60 for _, o, _ in sessions], dtype=np.int64)
+-    closes = np.array([int(c.timestamp()) // 60 for _, _, c in sessions], dtype=np.int64)
+-    at = np.searchsorted(closes, minutes, side="right")  # the first session closing after
+-    inside = at < len(closes)
+-    result: npt.NDArray[np.bool_] = inside & (opens[np.minimum(at, len(opens) - 1)] <= minutes)
++    sessions = Sessions.between(first, last)
++    at = sessions.trading_at_or_after(minutes)
++    opens = sessions.opens[np.minimum(at, len(sessions) - 1)]
++    result: npt.NDArray[np.bool_] = (at < len(sessions)) & (opens <= minutes)
+     return result
+ 
+ 
+diff --git a/engine/engine/market/calendar.py b/engine/engine/market/calendar.py
+index a1652e1..c7ed706 100644
+--- a/engine/engine/market/calendar.py
++++ b/engine/engine/market/calendar.py
+@@ -5,11 +5,14 @@ A session is a trading date. Its regular hours run from its open (inclusive) to
+ the clock and don't use this.
+ """
+ 
++from dataclasses import dataclass
+ from datetime import UTC, date, datetime
+ from functools import lru_cache
+ from typing import Any
+ 
+ import exchange_calendars
++import numpy as np
++import numpy.typing as npt
+ import pandas as pd
+ 
+ XNYS = "XNYS"
+@@ -87,10 +90,47 @@ def trading_days_after(session: date, days: int) -> date:
+     return later
+ 
+ 
+-def schedule(first: date, last: date) -> list[tuple[date, datetime, datetime]]:
+-    """Every session from `first` to `last` (both inclusive): its date, open and close."""
+-    frame = _xnys().schedule.loc[pd.Timestamp(first) : pd.Timestamp(last)]
+-    return [
+-        (stamp.date(), _utc(row.open), _utc(row.close))
+-        for stamp, row in zip(frame.index, frame.itertuples(), strict=True)
+-    ]
++Ints = npt.NDArray[np.int64]
++
++
++@dataclass(frozen=True)
++class Sessions:
++    """The calendar as arrays: each session's date (an ordinal), and its open and close
++    in minutes since the epoch."""
++
++    days: Ints
++    opens: Ints
++    closes: Ints
++
++    @classmethod
++    def between(cls, first: date, last: date) -> "Sessions":
++        """Every session from `first` to `last`, both inclusive."""
++        frame = _xnys().schedule.loc[pd.Timestamp(first) : pd.Timestamp(last)]
++        return cls(
++            np.array([stamp.toordinal() for stamp in frame.index], dtype=np.int64),
++            _minutes(frame["open"]),
++            _minutes(frame["close"]),
++        )
++
++    def __len__(self) -> int:
++        return len(self.days)
++
++    def trading_at_or_after(self, minutes: Ints) -> Ints:
++        """The session trading at each minute, or the next one: the first to close after
++        it (len(self) past the end)."""
++        found: Ints = np.searchsorted(self.closes, minutes, side="right").astype(np.int64)
++        return found
++
++    def index_of(self, ordinals: Ints) -> Ints:
++        """Each date's session index, -1 for a day without one."""
++        at = np.searchsorted(self.days, ordinals).astype(np.int64)
++        inside = at < len(self.days)
++        hit = inside & (self.days[np.minimum(at, len(self.days) - 1)] == ordinals)
++        result: Ints = np.where(hit, at, -1)
++        return result
++
++
++def _minutes(column: Any) -> Ints:
++    """A column of UTC times, in minutes since the epoch."""
++    minutes: Ints = column.dt.tz_convert(None).to_numpy("datetime64[m]").astype(np.int64)
++    return minutes
+diff --git a/engine/tests/backtest_helpers.py b/engine/tests/backtest_helpers.py
+index 625599e..bffac1a 100644
+--- a/engine/tests/backtest_helpers.py
++++ b/engine/tests/backtest_helpers.py
+@@ -11,10 +11,11 @@ from engine.backtest import gate
+ from engine.backtest.build import build_instrument
+ from engine.backtest.data import baseline_lookup, day_start, instrument_infos
+ from engine.backtest.evaluate import Matcher, MoveBook, Pick, Picker, Posts, Universe
+-from engine.backtest.moves import DAY_MINUTES, Floats, PriceData, Sessions
++from engine.backtest.moves import DAY_MINUTES, Floats, PriceData
+ from engine.backtest.randomtimes import NEW_YORK, RandomTimes, bucket
+ from engine.extract.similarity import Similarity
+ from engine.market.bars import MinuteSeries
++from engine.market.calendar import Sessions
+ from engine.market.instruments import AssetClass, Instrument
+ 
+ BARS_FROM = date(2022, 9, 1)
+@@ -187,7 +188,6 @@ class World:
+             matcher=Matcher(similarity, posts, 0.85, 50),
+             baseline=baseline_lookup(table, infos),
+             pickers={n: Picker(n, chosen.get(n, {}), first) for n in names},
+-            data_from=first,
+             data_to=last,
+         )
+ 

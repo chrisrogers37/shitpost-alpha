@@ -1,0 +1,2 @@
+M63 | SURVIVED | no-price: a minute-bar close leaks into hit_high | 55s | 39 passed in 53.71s
+M64 | SURVIVED | no-price: a call's entry price leaks into hit_high | 54s | 39 passed in 52.09s

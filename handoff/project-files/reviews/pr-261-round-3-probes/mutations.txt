@@ -1,0 +1,42 @@
+S1a quota not fatal: KILLED | 1 failed, 41 passed in 10.84s | FAILED tests/test_ai.py::test_openai_out_of_credit_is_fatal_and_not_retried
+S1b quota retried before fatal: KILLED | 1 failed, 41 passed in 10.79s | FAILED tests/test_ai.py::test_openai_out_of_credit_is_fatal_and_not_retried
+S1c code only, not type: SURVIVED | 49 passed in 12.30s | 
+S2a no per-post renewal: KILLED | 1 failed, 14 passed in 14.71s | FAILED tests/test_batch.py::test_an_ai_pick_that_loses_its_lease_stops_before_the_next_post
+S2b no release: KILLED | 1 failed, 5 passed in 6.60s | FAILED tests/test_batch.py::test_ai_pick_records_answers_and_a_rerun_asks_again_without_overwriting
+S2c ai-pick on the engine's row: SURVIVED | 68 passed in 33.15s | 
+S2d take ignores name: KILLED | 1 failed, 5 passed in 6.06s | FAILED tests/test_batch.py::test_ai_pick_records_answers_and_a_rerun_asks_again_without_overwriting
+S2e release ignores name: KILLED | 1 failed, 5 passed in 6.59s | FAILED tests/test_batch.py::test_ai_pick_records_answers_and_a_rerun_asks_again_without_overwriting
+S2f TTL 1 s: KILLED | 1 failed, 13 passed in 13.32s | FAILED tests/test_batch.py::test_only_one_ai_pick_runs_at_a_time - assert False
+S4a version without digest: KILLED | 1 failed, 14 passed in 5.57s | FAILED tests/test_similarity.py::test_the_shipped_match_rule_is_v1_for_the_pinned_model
+S4b digest drops max_tokens: KILLED | 1 failed, 14 passed in 5.55s | FAILED tests/test_similarity.py::test_the_shipped_match_rule_is_v1_for_the_pinned_model
+S4c model.json max_tokens 256: KILLED | 1 failed, 14 passed in 6.05s | FAILED tests/test_similarity.py::test_the_shipped_match_rule_is_v1_for_the_pinned_model
+S4d model.json pooling mean: KILLED | 1 failed, 13 passed, 1 skipped in 4.75s | FAILED tests/test_similarity.py::test_the_shipped_match_rule_is_v1_for_the_pinned_model
+S5a threshold 0.80: KILLED | 1 failed, 14 passed in 5.87s | FAILED tests/test_similarity.py::test_the_shipped_match_rule_is_v1_for_the_pinned_model
+S5b threshold 0.90: KILLED | 1 failed, 14 passed in 5.99s | FAILED tests/test_similarity.py::test_the_shipped_match_rule_is_v1_for_the_pinned_model
+S6a no length sort: KILLED | 1 failed, 3 passed in 4.10s | FAILED tests/test_batch.py::test_embed_batches_hold_similar_lengths_within_the_padded_size
+S6b last batch dropped: KILLED | 1 failed, 1 passed in 3.17s | FAILED tests/test_batch.py::test_embed_resumes_and_skips_posts_without_words
+S6c no char budget: KILLED | 1 failed, 3 passed in 3.95s | FAILED tests/test_batch.py::test_embed_batches_hold_similar_lengths_within_the_padded_size
+F1 no frozen check: KILLED | 1 failed, 1 passed in 1.87s | FAILED tests/test_ai.py::test_version_1_is_frozen_and_a_changed_file_is_refused_even_when_repinned
+F2 model rows without hash: KILLED | 1 error in 0.15s | 
+F3 guard reads votes only: KILLED | 1 failed, 12 passed in 20.18s | FAILED tests/test_score.py::test_ai_answers_recorded_with_other_files_stop_the_worker
+F4 guard with != (NULL passes): KILLED | 1 failed, 12 passed in 21.29s | FAILED tests/test_score.py::test_ai_answers_recorded_with_other_files_stop_the_worker
+F5 worker skips the guard: KILLED | 1 failed, 12 passed in 19.74s | FAILED tests/test_score.py::test_ai_answers_recorded_with_other_files_stop_the_worker
+F6 window at UTC midnight: KILLED | 1 failed in 1.85s | FAILED tests/test_ai.py::test_version_1_is_two_dated_models_with_checked_prices_and_its_window
+F7 no window problem: KILLED | 1 error in 0.15s | 
+F8 Haiku price $3 (outside the hash): SURVIVED | 116 passed in 38.51s | 
+F9 picker edit, repinned and refrozen: KILLED | 1 failed, 1 passed in 2.10s | FAILED tests/test_ai.py::test_version_1_is_frozen_and_a_changed_file_is_refused_even_when_repinned
+F10 live_ai swallows RulesFileChanged: SURVIVED | 63 passed in 23.56s | 
+V1 NEEDED 1: KILLED | 1 failed, 30 passed in 9.76s | FAILED tests/test_ai.py::test_a_link_or_a_name_counts_only_when_both_make_it
+V2 fallback only if both fail: KILLED | 1 failed, 35 passed in 9.92s | FAILED tests/test_ai.py::test_if_either_model_fails_the_rules_stand_in[timeout after 15 s]
+V3 N1 sort removed: KILLED | 1 failed, 34 passed in 9.52s | FAILED tests/test_ai.py::test_a_model_naming_it_twice_keeps_its_mapped_mention
+V4 N2 sort reverted: KILLED | 1 failed, 33 passed in 9.33s | FAILED tests/test_ai.py::test_with_nothing_counted_the_name_most_models_gave_stays
+V5 review-list any model: SURVIVED | 53 passed in 18.93s | 
+N10a no chmod: KILLED | 1 failed, 11 passed in 5.17s | FAILED tests/test_similarity.py::test_a_dropped_download_leaves_nothing_and_a_killed_ones_part_is_cleared
+N10b no stale cleanup: KILLED | 1 failed, 11 passed in 4.74s | FAILED tests/test_similarity.py::test_a_dropped_download_leaves_nothing_and_a_killed_ones_part_is_cleared
+N13 no key tie-break: SURVIVED | 16 passed in 5.43s | 
+N6 held-out drawn: SURVIVED | 18 passed in 5.77s | 
+N7 marked labels overwritten: SURVIVED | 18 passed in 5.61s | 
+P1 precision keeps failed rows: SURVIVED | 55 passed in 17.37s | 
+P2 precision ignores the version's window: SURVIVED | 2 passed in 1.42s | 
+D1 samples rules guard off: SURVIVED | 55 passed in 17.24s | 
+done

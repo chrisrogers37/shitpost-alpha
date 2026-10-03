@@ -1,0 +1,26 @@
+M1 fetch-model hash refusal off: KILLED | FAILED tests/test_similarity.py::test_fetch_model_refuses_a_file_that_does_not_match | 1 failed, 10 passed in 4.02s
+M2 load-time hash check off: KILLED | FAILED tests/test_similarity.py::test_a_changed_model_file_is_refused - Excep... | 1 failed, 8 passed in 3.60s
+M3 threshold ignored in similar(): KILLED | FAILED tests/test_similarity.py::test_matching_applies_the_threshold - Assert... | 1 failed, 3 passed in 1.82s
+M4 k default 50 -> 51: KILLED | FAILED tests/test_similarity.py::test_matching_returns_at_most_50_best_first | 1 failed, 2 passed in 1.63s
+M5 post itself not excluded: KILLED | FAILED tests/test_similarity.py::test_matching_excludes_the_post_itself_and_later_posts | 1 failed in 1.66s
+M6 before: < -> <=: KILLED | FAILED tests/test_similarity.py::test_a_post_made_at_the_same_moment_is_not_a_match | 1 failed, 1 passed in 1.71s
+M7 before ignored: KILLED | FAILED tests/test_similarity.py::test_matching_excludes_the_post_itself_and_later_posts | 1 failed in 1.76s
+M8 match_rule.json threshold 0.85 -> 0.80: SURVIVED | 77 passed in 21.17s
+M9 match_rule.json max_matches 50 -> 60: KILLED | FAILED tests/test_similarity.py::test_the_shipped_match_rule_is_v1_for_the_pinned_model | 1 failed, 13 passed in 4.36s
+M10 match rule model guard off: KILLED | FAILED tests/test_similarity.py::test_a_match_rule_set_for_another_model_is_refused | 1 failed, 12 passed in 4.01s
+M11 vector row model_version constant: KILLED | FAILED tests/test_similarity.py::test_the_index_loads_every_stored_vector_with_its_post_time | 1 failed, 14 passed in 4.40s
+M12 load_similarity ignores model_version: KILLED | FAILED tests/test_similarity.py::test_the_index_loads_every_stored_vector_with_its_post_time | 1 failed, 14 passed in 4.55s
+M13 model.json max_tokens 512 -> 256 (version unchanged?): SURVIVED | 77 passed in 22.32s
+M14 CLS -> mean pooling: SURVIVED | 28 passed in 13.36s
+M15 no normalisation of vectors: KILLED | E         comparison failed | FAILED tests/test_similarity.py::test_the_real_model_is_deterministic_normalised_and_ranks_a_paraphrase_first | 1 failed, 11 passed in 4.60s
+M16 truncation flag always False: KILLED | FAILED tests/test_similarity.py::test_the_real_model_is_deterministic_normalised_and_ranks_a_paraphrase_first | 1 failed, 11 passed in 4.98s
+M17 fetch partial cleanup on error off: SURVIVED | 15 passed in 5.58s
+M18 fetch mismatch cleanup off: KILLED | FAILED tests/test_similarity.py::test_fetch_model_refuses_a_file_that_does_not_match | 1 failed, 10 passed in 4.35s
+M19 embed resumes ignoring model version: SURVIVED | 49 passed in 12.41s
+M20 store_embedding overwrites: KILLED | FAILED tests/test_score.py::test_one_vector_per_post_and_model_version - Asse... | 1 failed, 5 passed in 4.21s
+M21 version ignores revision: KILLED | FAILED tests/test_similarity.py::test_the_shipped_match_rule_is_v1_for_the_pinned_model | 1 failed, 13 passed in 4.83s
+M22 reason check drops benefit/harm: KILLED | FAILED tests/test_batch.py::test_the_reason_line_check[New tariffs benefit US steel makers like Nucor-direction] | 1 failed, 28 passed in 11.36s
+M23 Haiku price 1.0 -> 3.0 (rehashed): SURVIVED | 92 passed in 19.09s
+M24 prompt edited, hash not updated: KILLED | ERROR tests/test_ai.py - engine.extract.rules.RulesFileChanged: extract/promp...
+M25 xai model -> alias grok-4: KILLED | FAILED tests/test_ai.py::test_the_picker_version_loads_with_dated_models_and_checked_prices | 1 failed in 1.64s
+status: clean

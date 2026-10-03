@@ -1,0 +1,4717 @@
+{
+  "bursts": {
+    "all_text_posts": {
+      "clusters": 86,
+      "posts": 86,
+      "share_within_minutes": {
+        "15": 0.0,
+        "30": 0.0,
+        "5": 0.0,
+        "60": 0.0
+      }
+    },
+    "dropped": [
+      {
+        "dropped": 0,
+        "pair": "spy:1h",
+        "picker": "rules"
+      },
+      {
+        "dropped": 0,
+        "pair": "spy:close",
+        "picker": "rules"
+      },
+      {
+        "dropped": 0,
+        "pair": "spy:1d",
+        "picker": "rules"
+      },
+      {
+        "dropped": 0,
+        "pair": "qqq:1h",
+        "picker": "rules"
+      },
+      {
+        "dropped": 0,
+        "pair": "qqq:close",
+        "picker": "rules"
+      },
+      {
+        "dropped": 0,
+        "pair": "qqq:1d",
+        "picker": "rules"
+      },
+      {
+        "dropped": 0,
+        "pair": "btc:1h",
+        "picker": "rules"
+      },
+      {
+        "dropped": 0,
+        "pair": "btc:4h",
+        "picker": "rules"
+      },
+      {
+        "dropped": 0,
+        "pair": "btc:24h",
+        "picker": "rules"
+      },
+      {
+        "dropped": 0,
+        "pair": "company:close",
+        "picker": "rules"
+      },
+      {
+        "dropped": 0,
+        "pair": "company:1d",
+        "picker": "rules"
+      },
+      {
+        "dropped": 0,
+        "pair": "spy:1h",
+        "picker": "ai"
+      },
+      {
+        "dropped": 0,
+        "pair": "spy:close",
+        "picker": "ai"
+      },
+      {
+        "dropped": 0,
+        "pair": "spy:1d",
+        "picker": "ai"
+      },
+      {
+        "dropped": 0,
+        "pair": "qqq:1h",
+        "picker": "ai"
+      },
+      {
+        "dropped": 0,
+        "pair": "qqq:close",
+        "picker": "ai"
+      },
+      {
+        "dropped": 0,
+        "pair": "qqq:1d",
+        "picker": "ai"
+      },
+      {
+        "dropped": 0,
+        "pair": "btc:1h",
+        "picker": "ai"
+      },
+      {
+        "dropped": 0,
+        "pair": "btc:4h",
+        "picker": "ai"
+      },
+      {
+        "dropped": 0,
+        "pair": "btc:24h",
+        "picker": "ai"
+      },
+      {
+        "dropped": 0,
+        "pair": "company:close",
+        "picker": "ai"
+      },
+      {
+        "dropped": 0,
+        "pair": "company:1d",
+        "picker": "ai"
+      }
+    ],
+    "sample": {
+      "clusters": 86,
+      "posts": 86,
+      "share_within_minutes": {
+        "15": 0.0,
+        "30": 0.0,
+        "5": 0.0,
+        "60": 0.0
+      }
+    }
+  },
+  "coin_skips": [
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:1h",
+      "picker": "rules",
+      "view": "gate"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:4h",
+      "picker": "rules",
+      "view": "gate"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:24h",
+      "picker": "rules",
+      "view": "gate"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:1h",
+      "picker": "ai",
+      "view": "gate"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:4h",
+      "picker": "ai",
+      "view": "gate"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:24h",
+      "picker": "ai",
+      "view": "gate"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:1h",
+      "picker": "rules",
+      "view": "shared"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:4h",
+      "picker": "rules",
+      "view": "shared"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:24h",
+      "picker": "rules",
+      "view": "shared"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:1h",
+      "picker": "rules",
+      "view": "mirrors"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:4h",
+      "picker": "rules",
+      "view": "mirrors"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:24h",
+      "picker": "rules",
+      "view": "mirrors"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:1h",
+      "picker": "rules",
+      "view": "all_posts"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:4h",
+      "picker": "rules",
+      "view": "all_posts"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:24h",
+      "picker": "rules",
+      "view": "all_posts"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "eth:1h",
+      "picker": "rules",
+      "view": "secondary"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "eth:4h",
+      "picker": "rules",
+      "view": "secondary"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "eth:24h",
+      "picker": "rules",
+      "view": "secondary"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:5m",
+      "picker": "rules",
+      "view": "secondary"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:15m",
+      "picker": "rules",
+      "view": "secondary"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:1h",
+      "picker": "ai",
+      "view": "mirrors"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:4h",
+      "picker": "ai",
+      "view": "mirrors"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:24h",
+      "picker": "ai",
+      "view": "mirrors"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:1h",
+      "picker": "ai",
+      "view": "all_posts"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:4h",
+      "picker": "ai",
+      "view": "all_posts"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:24h",
+      "picker": "ai",
+      "view": "all_posts"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "eth:1h",
+      "picker": "ai",
+      "view": "secondary"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "eth:4h",
+      "picker": "ai",
+      "view": "secondary"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "eth:24h",
+      "picker": "ai",
+      "view": "secondary"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:5m",
+      "picker": "ai",
+      "view": "secondary"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:15m",
+      "picker": "ai",
+      "view": "secondary"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:1h",
+      "picker": "ai:openai",
+      "view": "model"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:4h",
+      "picker": "ai:openai",
+      "view": "model"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:24h",
+      "picker": "ai:openai",
+      "view": "model"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:1h",
+      "picker": "ai:anthropic",
+      "view": "model"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:4h",
+      "picker": "ai:anthropic",
+      "view": "model"
+    },
+    {
+      "coin_no_entry_bar": 0,
+      "no_exit_bar": 0,
+      "pair": "btc:24h",
+      "picker": "ai:anthropic",
+      "view": "model"
+    }
+  ],
+  "data": {
+    "from": "2022-02-01",
+    "picker_posts": {
+      "ai": 0,
+      "ai:anthropic": 0,
+      "ai:openai": 0,
+      "rules": 86
+    },
+    "shared_posts": 0,
+    "text_posts": 86,
+    "to": "2022-03-31"
+  },
+  "gate": {
+    "file": "gate0-v1.md",
+    "sha256": "b16fe89da2fde01da0af858804abe52c46f45229d89e549bed787c1043d4667a",
+    "version": "gate0-v1"
+  },
+  "gate0": {
+    "pairs_passed": 1,
+    "passes": true,
+    "tests": [
+      {
+        "calls": 31,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": true,
+          "enough_days": true,
+          "entry_2min": true,
+          "last12_holds": true
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 2
+        },
+        "days": 31,
+        "hit_high": 1.0,
+        "hit_low": 0.889745,
+        "hit_rate": 1.0,
+        "last12_days": 31,
+        "last12_mean": 0.008076,
+        "mean_20bp": 0.008076,
+        "mean_5bp": 0.009576,
+        "p_value": 0.0001,
+        "pair": "spy:1h",
+        "passes": true,
+        "picker": "rules",
+        "q_value": 0.0022,
+        "sent_posts": 31,
+        "total_20bp": 0.250357,
+        "view": "gate"
+      },
+      {
+        "calls": 19,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": true
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 14
+        },
+        "days": 19,
+        "hit_high": 0.970641,
+        "hit_low": 0.686059,
+        "hit_rate": 0.894737,
+        "last12_days": 19,
+        "last12_mean": 0.021431,
+        "mean_20bp": 0.021431,
+        "mean_5bp": 0.022931,
+        "p_value": 0.805719,
+        "pair": "spy:close",
+        "passes": false,
+        "picker": "rules",
+        "q_value": 1.0,
+        "sent_posts": 19,
+        "total_20bp": 0.407185,
+        "view": "gate"
+      },
+      {
+        "calls": 22,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": true
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 2,
+          "no_random_moves": 0,
+          "not_better_than_random": 9,
+          "not_yet": 1
+        },
+        "days": 22,
+        "hit_high": 0.991931,
+        "hit_low": 0.78202,
+        "hit_rate": 0.954545,
+        "last12_days": 22,
+        "last12_mean": 0.021486,
+        "mean_20bp": 0.021486,
+        "mean_5bp": 0.022986,
+        "p_value": 0.826817,
+        "pair": "spy:1d",
+        "passes": false,
+        "picker": "rules",
+        "q_value": 1.0,
+        "sent_posts": 23,
+        "total_20bp": 0.472688,
+        "view": "gate"
+      },
+      {
+        "calls": 2,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 7,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 6,
+          "not_one_way": 20,
+          "tie": 7
+        },
+        "days": 2,
+        "hit_high": 0.905469,
+        "hit_low": 0.094531,
+        "hit_rate": 0.5,
+        "last12_days": 2,
+        "last12_mean": -0.002229,
+        "mean_20bp": -0.002229,
+        "mean_5bp": -0.000729,
+        "p_value": 0.159384,
+        "pair": "qqq:1h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": 1.0,
+        "sent_posts": 2,
+        "total_20bp": -0.004457,
+        "view": "gate"
+      },
+      {
+        "calls": 4,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 29
+        },
+        "days": 4,
+        "hit_high": 1.0,
+        "hit_low": 0.510109,
+        "hit_rate": 1.0,
+        "last12_days": 4,
+        "last12_mean": 0.129304,
+        "mean_20bp": 0.129304,
+        "mean_5bp": 0.130804,
+        "p_value": 0.648235,
+        "pair": "qqq:close",
+        "passes": false,
+        "picker": "rules",
+        "q_value": 1.0,
+        "sent_posts": 4,
+        "total_20bp": 0.517217,
+        "view": "gate"
+      },
+      {
+        "calls": 4,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 2,
+          "no_random_moves": 0,
+          "not_better_than_random": 28
+        },
+        "days": 4,
+        "hit_high": 1.0,
+        "hit_low": 0.510109,
+        "hit_rate": 1.0,
+        "last12_days": 4,
+        "last12_mean": 0.136763,
+        "mean_20bp": 0.136763,
+        "mean_5bp": 0.138263,
+        "p_value": 0.254675,
+        "pair": "qqq:1d",
+        "passes": false,
+        "picker": "rules",
+        "q_value": 1.0,
+        "sent_posts": 4,
+        "total_20bp": 0.547053,
+        "view": "gate"
+      },
+      {
+        "calls": 2,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 8,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_one_way": 22,
+          "tie": 10
+        },
+        "days": 2,
+        "hit_high": 0.65762,
+        "hit_low": 0.0,
+        "hit_rate": 0.0,
+        "last12_days": 2,
+        "last12_mean": -0.00424,
+        "mean_20bp": -0.00424,
+        "mean_5bp": -0.00274,
+        "p_value": 0.908409,
+        "pair": "btc:1h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": 1.0,
+        "sent_posts": 2,
+        "total_20bp": -0.008479,
+        "view": "gate"
+      },
+      {
+        "calls": 2,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 7,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_one_way": 25,
+          "tie": 8
+        },
+        "days": 2,
+        "hit_high": 0.65762,
+        "hit_low": 0.0,
+        "hit_rate": 0.0,
+        "last12_days": 2,
+        "last12_mean": -0.005471,
+        "mean_20bp": -0.005471,
+        "mean_5bp": -0.003971,
+        "p_value": 0.844716,
+        "pair": "btc:4h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": 1.0,
+        "sent_posts": 2,
+        "total_20bp": -0.010942,
+        "view": "gate"
+      },
+      {
+        "calls": 18,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 8,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 4,
+          "not_one_way": 11,
+          "tie": 1
+        },
+        "days": 18,
+        "hit_high": 0.70969,
+        "hit_low": 0.29031,
+        "hit_rate": 0.5,
+        "last12_days": 18,
+        "last12_mean": -0.001984,
+        "mean_20bp": -0.001984,
+        "mean_5bp": -0.000484,
+        "p_value": 0.40416,
+        "pair": "btc:24h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": 1.0,
+        "sent_posts": 18,
+        "total_20bp": -0.035718,
+        "view": "gate"
+      },
+      {
+        "calls": 11,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": true
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 22
+        },
+        "days": 11,
+        "hit_high": 1.0,
+        "hit_low": 0.741167,
+        "hit_rate": 1.0,
+        "last12_days": 11,
+        "last12_mean": 0.21115,
+        "mean_20bp": 0.21115,
+        "mean_5bp": 0.21265,
+        "p_value": 0.20228,
+        "pair": "company:close",
+        "passes": false,
+        "picker": "rules",
+        "q_value": 1.0,
+        "sent_posts": 11,
+        "total_20bp": 2.322647,
+        "view": "gate"
+      },
+      {
+        "calls": 10,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": true
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 2,
+          "no_random_moves": 0,
+          "not_better_than_random": 22
+        },
+        "days": 10,
+        "hit_high": 1.0,
+        "hit_low": 0.722467,
+        "hit_rate": 1.0,
+        "last12_days": 10,
+        "last12_mean": 0.206359,
+        "mean_20bp": 0.206359,
+        "mean_5bp": 0.207859,
+        "p_value": 0.361364,
+        "pair": "company:1d",
+        "passes": false,
+        "picker": "rules",
+        "q_value": 1.0,
+        "sent_posts": 10,
+        "total_20bp": 2.063592,
+        "view": "gate"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": 1.0,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "gate"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:close",
+        "passes": false,
+        "picker": "ai",
+        "q_value": 1.0,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "gate"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1d",
+        "passes": false,
+        "picker": "ai",
+        "q_value": 1.0,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "gate"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": 1.0,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "gate"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:close",
+        "passes": false,
+        "picker": "ai",
+        "q_value": 1.0,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "gate"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1d",
+        "passes": false,
+        "picker": "ai",
+        "q_value": 1.0,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "gate"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:1h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": 1.0,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "gate"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:4h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": 1.0,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "gate"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:24h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": 1.0,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "gate"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:close",
+        "passes": false,
+        "picker": "ai",
+        "q_value": 1.0,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "gate"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:1d",
+        "passes": false,
+        "picker": "ai",
+        "q_value": 1.0,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "gate"
+      }
+    ]
+  },
+  "head_to_head": {
+    "passing_pairs": {
+      "ai": [],
+      "rules": [
+        "spy:1h"
+      ]
+    },
+    "picks": "rules",
+    "shared_posts": 0,
+    "total_20bp": {
+      "ai": 0,
+      "rules": 0.0
+    }
+  },
+  "inputs": {
+    "ai_picker": {
+      "sha256": "750126437c71c40cf07dcd9f870fb2742b9a81c4e173c2ff9989344ecce250b1",
+      "version": 1,
+      "window_start": "2025-11-01"
+    },
+    "match_rule": {
+      "max_matches": 50,
+      "sha256": "4a06e9dce150b2cc570de7872fd59deef8ee6f3def7ef5199b3a61f30f1e9d81",
+      "threshold": 0.85,
+      "version": 1
+    },
+    "model_version": "bge-small-en-v1.5@5c38ec7c405e.eaa83ab2",
+    "rules": {
+      "sha256": "a5abd56a85d8f57cb2e39ddd4546b09f302522b4d5116992e25e77ea5f10b809",
+      "version": 1
+    }
+  },
+  "live_sample": [
+    {
+      "days": 3,
+      "hit_rate": 1.0,
+      "pair": "spy:1h",
+      "picker": "rules"
+    }
+  ],
+  "match_reading": {
+    "bands": [
+      {
+        "high": null,
+        "low": 0.9,
+        "read": 14,
+        "same": 14,
+        "served": 0,
+        "weighted": null
+      },
+      {
+        "high": 0.9,
+        "low": 0.85,
+        "read": 32,
+        "same": 26,
+        "served": 0,
+        "weighted": null
+      },
+      {
+        "high": null,
+        "low": null,
+        "read": 46,
+        "same": 40,
+        "served": 0,
+        "weighted": null
+      }
+    ],
+    "labels_sha256": "8e6c35521ed22d465eedd6e7be8d238634cdee8910a3e92b6edfc7850dde1edc",
+    "read_posts": 0
+  },
+  "report": "backtest-v1",
+  "sends": {
+    "per_year": 191.911017,
+    "picker": "rules",
+    "posts": 31
+  },
+  "views": {
+    "all_posts": [
+      {
+        "calls": 42,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": true,
+          "entry_2min": true,
+          "last12_holds": true
+        },
+        "counts": {
+          "no_matches": 1,
+          "no_random_moves": 0
+        },
+        "days": 42,
+        "hit_high": 1.0,
+        "hit_low": 0.916201,
+        "hit_rate": 1.0,
+        "last12_days": 42,
+        "last12_mean": 0.007886,
+        "mean_20bp": 0.007886,
+        "mean_5bp": 0.009386,
+        "p_value": 0.0001,
+        "pair": "spy:1h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 42,
+        "total_20bp": 0.331193,
+        "view": "all_posts"
+      },
+      {
+        "calls": 42,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": true,
+          "entry_2min": true,
+          "last12_holds": true
+        },
+        "counts": {
+          "no_matches": 1,
+          "no_random_moves": 0
+        },
+        "days": 42,
+        "hit_high": 0.962338,
+        "hit_low": 0.779349,
+        "hit_rate": 0.904762,
+        "last12_days": 42,
+        "last12_mean": 0.029945,
+        "mean_20bp": 0.029945,
+        "mean_5bp": 0.031445,
+        "p_value": 0.230877,
+        "pair": "spy:close",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 42,
+        "total_20bp": 1.257697,
+        "view": "all_posts"
+      },
+      {
+        "calls": 40,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": true,
+          "entry_2min": true,
+          "last12_holds": true
+        },
+        "counts": {
+          "no_matches": 2,
+          "no_random_moves": 0,
+          "not_yet": 1
+        },
+        "days": 40,
+        "hit_high": 0.974164,
+        "hit_low": 0.801358,
+        "hit_rate": 0.925,
+        "last12_days": 40,
+        "last12_mean": 0.028558,
+        "mean_20bp": 0.028558,
+        "mean_5bp": 0.030058,
+        "p_value": 0.364364,
+        "pair": "spy:1d",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 41,
+        "total_20bp": 1.142302,
+        "view": "all_posts"
+      },
+      {
+        "calls": 35,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": true,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "tie": 7
+        },
+        "days": 35,
+        "hit_high": 0.591426,
+        "hit_low": 0.279846,
+        "hit_rate": 0.428571,
+        "last12_days": 35,
+        "last12_mean": -0.002839,
+        "mean_20bp": -0.002839,
+        "mean_5bp": -0.001339,
+        "p_value": 0.740726,
+        "pair": "qqq:1h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 35,
+        "total_20bp": -0.099371,
+        "view": "all_posts"
+      },
+      {
+        "calls": 42,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": true,
+          "entry_2min": true,
+          "last12_holds": true
+        },
+        "counts": {
+          "no_matches": 1,
+          "no_random_moves": 0
+        },
+        "days": 42,
+        "hit_high": 1.0,
+        "hit_low": 0.916201,
+        "hit_rate": 1.0,
+        "last12_days": 42,
+        "last12_mean": 0.135493,
+        "mean_20bp": 0.135493,
+        "mean_5bp": 0.136993,
+        "p_value": 0.432957,
+        "pair": "qqq:close",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 42,
+        "total_20bp": 5.690699,
+        "view": "all_posts"
+      },
+      {
+        "calls": 40,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": true,
+          "entry_2min": true,
+          "last12_holds": true
+        },
+        "counts": {
+          "no_matches": 2,
+          "no_random_moves": 0,
+          "not_yet": 1
+        },
+        "days": 40,
+        "hit_high": 1.0,
+        "hit_low": 0.912378,
+        "hit_rate": 1.0,
+        "last12_days": 40,
+        "last12_mean": 0.135944,
+        "mean_20bp": 0.135944,
+        "mean_5bp": 0.137444,
+        "p_value": 0.320468,
+        "pair": "qqq:1d",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 41,
+        "total_20bp": 5.437755,
+        "view": "all_posts"
+      },
+      {
+        "calls": 32,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": true,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "tie": 10
+        },
+        "days": 32,
+        "hit_high": 0.516889,
+        "hit_low": 0.204104,
+        "hit_rate": 0.34375,
+        "last12_days": 32,
+        "last12_mean": -0.002931,
+        "mean_20bp": -0.002931,
+        "mean_5bp": -0.001431,
+        "p_value": 0.856014,
+        "pair": "btc:1h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 32,
+        "total_20bp": -0.093776,
+        "view": "all_posts"
+      },
+      {
+        "calls": 34,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": true,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "tie": 8
+        },
+        "days": 34,
+        "hit_high": 0.577784,
+        "hit_low": 0.26366,
+        "hit_rate": 0.411765,
+        "last12_days": 34,
+        "last12_mean": -0.002995,
+        "mean_20bp": -0.002995,
+        "mean_5bp": -0.001495,
+        "p_value": 0.612939,
+        "pair": "btc:4h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 34,
+        "total_20bp": -0.101814,
+        "view": "all_posts"
+      },
+      {
+        "calls": 40,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": true,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_yet": 1,
+          "tie": 1
+        },
+        "days": 40,
+        "hit_high": 0.692947,
+        "hit_low": 0.398291,
+        "hit_rate": 0.55,
+        "last12_days": 40,
+        "last12_mean": -0.001017,
+        "mean_20bp": -0.001017,
+        "mean_5bp": 0.000483,
+        "p_value": 0.558444,
+        "pair": "btc:24h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 41,
+        "total_20bp": -0.040681,
+        "view": "all_posts"
+      },
+      {
+        "calls": 42,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": true,
+          "entry_2min": true,
+          "last12_holds": true
+        },
+        "counts": {
+          "no_matches": 1,
+          "no_random_moves": 0
+        },
+        "days": 42,
+        "hit_high": 1.0,
+        "hit_low": 0.916201,
+        "hit_rate": 1.0,
+        "last12_days": 42,
+        "last12_mean": 0.205977,
+        "mean_20bp": 0.205977,
+        "mean_5bp": 0.207477,
+        "p_value": 0.344366,
+        "pair": "company:close",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 42,
+        "total_20bp": 8.651053,
+        "view": "all_posts"
+      },
+      {
+        "calls": 40,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": true,
+          "entry_2min": true,
+          "last12_holds": true
+        },
+        "counts": {
+          "no_matches": 2,
+          "no_random_moves": 0,
+          "not_yet": 1
+        },
+        "days": 40,
+        "hit_high": 1.0,
+        "hit_low": 0.912378,
+        "hit_rate": 1.0,
+        "last12_days": 40,
+        "last12_mean": 0.209812,
+        "mean_20bp": 0.209812,
+        "mean_5bp": 0.211312,
+        "p_value": 0.219378,
+        "pair": "company:1d",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 41,
+        "total_20bp": 8.392465,
+        "view": "all_posts"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "all_posts"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:close",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "all_posts"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1d",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "all_posts"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "all_posts"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:close",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "all_posts"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1d",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "all_posts"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:1h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "all_posts"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:4h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "all_posts"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:24h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "all_posts"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:close",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "all_posts"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:1d",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "all_posts"
+      }
+    ],
+    "mirrors": [
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 8,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 1,
+          "not_one_way": 24,
+          "tie": 9
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "mirrors"
+      },
+      {
+        "calls": 8,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 25
+        },
+        "days": 8,
+        "hit_high": 0.863156,
+        "hit_low": 0.305742,
+        "hit_rate": 0.625,
+        "last12_days": 8,
+        "last12_mean": 0.003197,
+        "mean_20bp": 0.003197,
+        "mean_5bp": 0.004697,
+        "p_value": 0.988401,
+        "pair": "spy:close",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 8,
+        "total_20bp": 0.025572,
+        "view": "mirrors"
+      },
+      {
+        "calls": 9,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 2,
+          "no_random_moves": 0,
+          "not_better_than_random": 23
+        },
+        "days": 9,
+        "hit_high": 0.980109,
+        "hit_low": 0.565,
+        "hit_rate": 0.888889,
+        "last12_days": 9,
+        "last12_mean": 0.005542,
+        "mean_20bp": 0.005542,
+        "mean_5bp": 0.007042,
+        "p_value": 0.974503,
+        "pair": "spy:1d",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 9,
+        "total_20bp": 0.049875,
+        "view": "mirrors"
+      },
+      {
+        "calls": 2,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 8,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_one_way": 29,
+          "tie": 3
+        },
+        "days": 2,
+        "hit_high": 0.65762,
+        "hit_low": 0.0,
+        "hit_rate": 0.0,
+        "last12_days": 2,
+        "last12_mean": -0.006581,
+        "mean_20bp": -0.006581,
+        "mean_5bp": -0.005081,
+        "p_value": 0.813719,
+        "pair": "qqq:1h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 2,
+        "total_20bp": -0.013162,
+        "view": "mirrors"
+      },
+      {
+        "calls": 4,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 29
+        },
+        "days": 4,
+        "hit_high": 1.0,
+        "hit_low": 0.510109,
+        "hit_rate": 1.0,
+        "last12_days": 4,
+        "last12_mean": 0.1293,
+        "mean_20bp": 0.1293,
+        "mean_5bp": 0.1308,
+        "p_value": 0.656834,
+        "pair": "qqq:close",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 4,
+        "total_20bp": 0.517201,
+        "view": "mirrors"
+      },
+      {
+        "calls": 5,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 2,
+          "no_random_moves": 0,
+          "not_better_than_random": 26,
+          "not_yet": 1
+        },
+        "days": 5,
+        "hit_high": 1.0,
+        "hit_low": 0.565518,
+        "hit_rate": 1.0,
+        "last12_days": 5,
+        "last12_mean": 0.133329,
+        "mean_20bp": 0.133329,
+        "mean_5bp": 0.134829,
+        "p_value": 0.373063,
+        "pair": "qqq:1d",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 6,
+        "total_20bp": 0.666643,
+        "view": "mirrors"
+      },
+      {
+        "calls": 2,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 8,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 4,
+          "not_one_way": 18,
+          "tie": 10
+        },
+        "days": 2,
+        "hit_high": 0.905469,
+        "hit_low": 0.094531,
+        "hit_rate": 0.5,
+        "last12_days": 2,
+        "last12_mean": -0.003298,
+        "mean_20bp": -0.003298,
+        "mean_5bp": -0.001798,
+        "p_value": 0.520948,
+        "pair": "btc:1h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 2,
+        "total_20bp": -0.006595,
+        "view": "mirrors"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 7,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 1,
+          "not_one_way": 26,
+          "tie": 8
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:4h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "mirrors"
+      },
+      {
+        "calls": 12,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 8,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 5,
+          "not_one_way": 16,
+          "tie": 1
+        },
+        "days": 12,
+        "hit_high": 0.609378,
+        "hit_low": 0.13812,
+        "hit_rate": 0.333333,
+        "last12_days": 12,
+        "last12_mean": -0.003479,
+        "mean_20bp": -0.003479,
+        "mean_5bp": -0.001979,
+        "p_value": 0.488551,
+        "pair": "btc:24h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 12,
+        "total_20bp": -0.041747,
+        "view": "mirrors"
+      },
+      {
+        "calls": 12,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": true
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 21
+        },
+        "days": 12,
+        "hit_high": 1.0,
+        "hit_low": 0.757506,
+        "hit_rate": 1.0,
+        "last12_days": 12,
+        "last12_mean": 0.218423,
+        "mean_20bp": 0.218423,
+        "mean_5bp": 0.219923,
+        "p_value": 0.067193,
+        "pair": "company:close",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 12,
+        "total_20bp": 2.621081,
+        "view": "mirrors"
+      },
+      {
+        "calls": 11,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": true
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 2,
+          "no_random_moves": 0,
+          "not_better_than_random": 21
+        },
+        "days": 11,
+        "hit_high": 1.0,
+        "hit_low": 0.741167,
+        "hit_rate": 1.0,
+        "last12_days": 11,
+        "last12_mean": 0.209314,
+        "mean_20bp": 0.209314,
+        "mean_5bp": 0.210814,
+        "p_value": 0.276172,
+        "pair": "company:1d",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 11,
+        "total_20bp": 2.302451,
+        "view": "mirrors"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "mirrors"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:close",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "mirrors"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1d",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "mirrors"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "mirrors"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:close",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "mirrors"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1d",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "mirrors"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:1h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "mirrors"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:4h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "mirrors"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:24h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "mirrors"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:close",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "mirrors"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:1d",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "mirrors"
+      }
+    ],
+    "model": [
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1h",
+        "passes": false,
+        "picker": "ai:openai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:close",
+        "passes": false,
+        "picker": "ai:openai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1d",
+        "passes": false,
+        "picker": "ai:openai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1h",
+        "passes": false,
+        "picker": "ai:openai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:close",
+        "passes": false,
+        "picker": "ai:openai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1d",
+        "passes": false,
+        "picker": "ai:openai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:1h",
+        "passes": false,
+        "picker": "ai:openai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:4h",
+        "passes": false,
+        "picker": "ai:openai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:24h",
+        "passes": false,
+        "picker": "ai:openai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:close",
+        "passes": false,
+        "picker": "ai:openai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:1d",
+        "passes": false,
+        "picker": "ai:openai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1h",
+        "passes": false,
+        "picker": "ai:anthropic",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:close",
+        "passes": false,
+        "picker": "ai:anthropic",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1d",
+        "passes": false,
+        "picker": "ai:anthropic",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1h",
+        "passes": false,
+        "picker": "ai:anthropic",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:close",
+        "passes": false,
+        "picker": "ai:anthropic",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1d",
+        "passes": false,
+        "picker": "ai:anthropic",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:1h",
+        "passes": false,
+        "picker": "ai:anthropic",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:4h",
+        "passes": false,
+        "picker": "ai:anthropic",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:24h",
+        "passes": false,
+        "picker": "ai:anthropic",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:close",
+        "passes": false,
+        "picker": "ai:anthropic",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:1d",
+        "passes": false,
+        "picker": "ai:anthropic",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "model"
+      }
+    ],
+    "premarket": [
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "premarket"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:close",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "premarket"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1d",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "premarket"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "premarket"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:close",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "premarket"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1d",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "premarket"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "premarket"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:close",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "premarket"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1d",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "premarket"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "premarket"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:close",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "premarket"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": false,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1d",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "premarket"
+      }
+    ],
+    "secondary": [
+      {
+        "calls": 2,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 10,
+          "not_one_way": 19,
+          "tie": 2
+        },
+        "days": 2,
+        "hit_high": 1.0,
+        "hit_low": 0.34238,
+        "hit_rate": 1.0,
+        "last12_days": 2,
+        "last12_mean": 0.00281,
+        "mean_20bp": 0.00281,
+        "mean_5bp": 0.00431,
+        "p_value": 0.027397,
+        "pair": "eth:1h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 2,
+        "total_20bp": 0.00562,
+        "view": "secondary"
+      },
+      {
+        "calls": 2,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 5,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_one_way": 22,
+          "tie": 13
+        },
+        "days": 2,
+        "hit_high": 0.65762,
+        "hit_low": 0.0,
+        "hit_rate": 0.0,
+        "last12_days": 2,
+        "last12_mean": -0.007355,
+        "mean_20bp": -0.007355,
+        "mean_5bp": -0.005855,
+        "p_value": 0.851815,
+        "pair": "eth:4h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 2,
+        "total_20bp": -0.01471,
+        "view": "secondary"
+      },
+      {
+        "calls": 7,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 5,
+          "not_one_way": 20,
+          "tie": 1
+        },
+        "days": 7,
+        "hit_high": 0.641066,
+        "hit_low": 0.082219,
+        "hit_rate": 0.285714,
+        "last12_days": 7,
+        "last12_mean": -0.005327,
+        "mean_20bp": -0.005327,
+        "mean_5bp": -0.003827,
+        "p_value": 0.620338,
+        "pair": "eth:24h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 7,
+        "total_20bp": -0.037288,
+        "view": "secondary"
+      },
+      {
+        "calls": 33,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": true,
+          "entry_2min": true,
+          "last12_holds": true
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 1,
+          "no_random_moves": 0
+        },
+        "days": 33,
+        "hit_high": 1.0,
+        "hit_low": 0.89573,
+        "hit_rate": 1.0,
+        "last12_days": 33,
+        "last12_mean": 0.007192,
+        "mean_20bp": 0.007192,
+        "mean_5bp": 0.008692,
+        "p_value": 0.0001,
+        "pair": "spy:5m",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 33,
+        "total_20bp": 0.237321,
+        "view": "secondary"
+      },
+      {
+        "calls": 33,
+        "conditions": {
+          "above_costs": true,
+          "beats_random": false,
+          "enough_days": true,
+          "entry_2min": true,
+          "last12_holds": true
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 9,
+          "no_matches": 1,
+          "no_random_moves": 0
+        },
+        "days": 33,
+        "hit_high": 0.994631,
+        "hit_low": 0.846813,
+        "hit_rate": 0.969697,
+        "last12_days": 33,
+        "last12_mean": 0.007082,
+        "mean_20bp": 0.007082,
+        "mean_5bp": 0.008582,
+        "p_value": 0.0001,
+        "pair": "spy:15m",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 33,
+        "total_20bp": 0.233691,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 8,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 20,
+          "not_one_way": 11,
+          "tie": 3
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:5m",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 8,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 10,
+          "not_one_way": 19,
+          "tie": 5
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:15m",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 7,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 2,
+          "not_one_way": 27,
+          "tie": 6
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:5m",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 6,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_one_way": 25,
+          "tie": 11
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:15m",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 8,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 17,
+          "not_one_way": 16,
+          "tie": 1
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:5m",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "few_match_days": 8,
+          "no_matches": 1,
+          "no_random_moves": 0,
+          "not_better_than_random": 10,
+          "not_one_way": 21,
+          "tie": 3
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:15m",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "eth:1h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "eth:4h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "eth:24h",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:5m",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:15m",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:5m",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:15m",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:5m",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:15m",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:5m",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:15m",
+        "passes": false,
+        "picker": "ai",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "xle:1h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "xle:close",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "xle:1d",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "secondary"
+      }
+    ],
+    "shared": [
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "shared"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:close",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "shared"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "spy:1d",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "shared"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "shared"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:close",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "shared"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "qqq:1d",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "shared"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:1h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "shared"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:4h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "shared"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "btc:24h",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "shared"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:close",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "shared"
+      },
+      {
+        "calls": 0,
+        "conditions": {
+          "above_costs": false,
+          "beats_random": false,
+          "enough_days": false,
+          "entry_2min": true,
+          "last12_holds": false
+        },
+        "counts": {
+          "burst": 0,
+          "no_random_moves": 0
+        },
+        "days": 0,
+        "hit_high": null,
+        "hit_low": null,
+        "hit_rate": null,
+        "last12_days": 0,
+        "last12_mean": null,
+        "mean_20bp": null,
+        "mean_5bp": null,
+        "p_value": 1.0,
+        "pair": "company:1d",
+        "passes": false,
+        "picker": "rules",
+        "q_value": null,
+        "sent_posts": 0,
+        "total_20bp": 0.0,
+        "view": "shared"
+      }
+    ]
+  }
+}

@@ -1,0 +1,77 @@
+diff --git a/engine/engine/backtest/moves.py b/engine/engine/backtest/moves.py
+index 8183505..7f23021 100644
+--- a/engine/engine/backtest/moves.py
++++ b/engine/engine/backtest/moves.py
+@@ -145,6 +145,17 @@ def price_at(series: MinuteSeries, minutes: Ints) -> Floats:
+     return result
+ 
+ 
++def first_bar(series: MinuteSeries, minutes: Ints) -> tuple[npt.NDArray[np.bool_], Ints, Floats]:
++    """Each minute's first bar at or after it: whether there is one, its start and its
++    open."""
++    n, size = len(series.minutes), len(minutes)
++    if not n:
++        return np.zeros(size, np.bool_), np.zeros(size, np.int64), np.full(size, np.nan)
++    at = np.searchsorted(series.minutes, minutes)
++    here = np.minimum(at, n - 1)
++    return at < n, series.minutes[here], series.opens[here]
++
++
+ @dataclass
+ class Moves:
+     """Each time's entry and, per window, its move, when it matured and its status."""
+@@ -160,9 +171,8 @@ class Moves:
+     def put(self, window: str, move: Floats, matured: Ints, status: npt.NDArray[np.int8]) -> None:
+         ok = status == Status.OK
+         self.move[window] = np.where(ok, move, np.nan)
+-        keep = (status != Status.NOT_YET) & (status != Status.NO_ENTRY)
+-        keep &= status != Status.NOT_PREMARKET
+-        self.matured[window] = np.where(keep, matured, NONE)
++        unknown = np.isin(status, (Status.NOT_YET, Status.NO_ENTRY, Status.NOT_PREMARKET))
++        self.matured[window] = np.where(unknown, NONE, matured)
+         self.status[window] = status
+ 
+ 
+@@ -202,12 +212,8 @@ def stock_moves(
+         series = prices.bars
+         applies = ~later
+         start = np.maximum(alert_minute, opens)
+-    n = len(series.minutes)
+-    at = np.searchsorted(series.minutes, start) if n else np.zeros(size, dtype=np.int64)
+-    here = np.minimum(at, max(n - 1, 0))
+-    entered = series.minutes[here] if n else np.zeros(size, dtype=np.int64)
+-    has_entry = applies & (at < n) & (entered < closes)
+-    entry_price = series.opens[here] if n else np.full(size, np.nan)
++    found, entered, entry_price = first_bar(series, start)
++    has_entry = applies & found & (entered < closes)
+     no_entry = applies & ~has_entry
+     moves = Moves(np.where(has_entry, entered, NONE), np.where(has_entry, s_safe, NONE))
+     before = (
+@@ -251,23 +257,18 @@ def coin_moves(prices: PriceData, times: Floats, rule: EntryRule, cutoff: int) -
+     """Moves for a coin at each time in seconds."""
+     size = len(times)
+     alert = times + rule.delay_seconds
+-    series = prices.bars
+-    n = len(series.minutes)
+-    at = np.searchsorted(series.minutes, ceil_minutes(alert)) if n else np.zeros(size, np.int64)
+-    here = np.minimum(at, max(n - 1, 0))
+-    entered = series.minutes[here] if n else np.zeros(size, dtype=np.int64)
+-    pending = ceil_minutes(alert) > cutoff
+-    found = at < n
++    alert_minute = ceil_minutes(alert)
++    found, entered, entry_price = first_bar(prices.bars, alert_minute)
++    pending = alert_minute > cutoff
+     late = found & (entered * 60 - alert > gate.COIN_ENTRY_SECONDS)
+     has_entry = found & ~late
+-    entry_price = series.opens[here] if n else np.full(size, np.nan)
+     moves = Moves(
+         np.where(has_entry, entered, NONE),
+         np.where(has_entry, entered // DAY_MINUTES - prices.day_base, NONE),
+     )
+     for window, minutes in COIN_WINDOWS.items():
+         exit_at = entered + minutes
+-        price = price_at(series, exit_at)
++        price = price_at(prices.bars, exit_at)
+         status = _status(
+             (pending, Status.NOT_YET),
+             (~found, Status.NO_ENTRY),

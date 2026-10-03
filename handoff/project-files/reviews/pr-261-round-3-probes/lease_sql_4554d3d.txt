@@ -1,0 +1,9 @@
+held: True
+SELECT set_config('lock_timeout', %(t)s, true), set_config('statement_timeout', %(t)s, true)
+  params={'t': '10000ms'}
+INSERT INTO engine.engine_lease (name, holder, acquired_at, expires_at) VALUES (%(name)s::VARCHAR, %(holder)s::VARCHAR, now(), (now() + %(now_1)s)) ON CONFLICT (name) DO UPDATE SET holder = excluded.holder, acquired_at = CASE WHEN (engine.engine_lease.holder = excluded.holder) THEN engine.engine_lease.acquired_at ELSE now() END, expires_at = excluded.expires_at WHERE engine.engine_lease.holder = excluded.holder OR engine.engine_lease.expires_at < now() RETURNING engine.engine_lease.holder
+  params={'name': 'engine', 'holder': 'me', 'now_1': datetime.timedelta(seconds=30)}
+SELECT set_config('lock_timeout', %(t)s, true), set_config('statement_timeout', %(t)s, true)
+  params={'t': '10000ms'}
+DELETE FROM engine.engine_lease WHERE engine.engine_lease.name = %(name_1)s::VARCHAR AND engine.engine_lease.holder = %(holder_1)s::VARCHAR
+  params={'name_1': 'engine', 'holder_1': 'me'}

@@ -1,0 +1,79 @@
+diff --git a/engine/engine/db.py b/engine/engine/db.py
+index fc3426b..d052b5c 100644
+--- a/engine/engine/db.py
++++ b/engine/engine/db.py
+@@ -20,12 +20,14 @@ def sqlalchemy_url(url: str) -> str:
+ 
+ def make_engine(url: str, **pool: Any) -> AsyncEngine:
+     """Async engine (psycopg 3) for the engine database. `pool` sets pool options."""
+-    return create_async_engine(sqlalchemy_url(url), pool_pre_ping=True, **pool)
++    return create_async_engine(
++        sqlalchemy_url(url), pool_pre_ping=True, connect_args={"connect_timeout": 10}, **pool
++    )
+ 
+ 
+ def make_sync_engine(url: str) -> Engine:
+     """Sync engine, for migrations."""
+-    return create_engine(sqlalchemy_url(url), pool_pre_ping=True)
++    return create_engine(sqlalchemy_url(url), pool_pre_ping=True, connect_args={"connect_timeout": 10})
+ 
+ 
+ async def db_now(conn: AsyncConnection) -> datetime:
+diff --git a/engine/engine/lease.py b/engine/engine/lease.py
+index 10cfbbd..80271cc 100644
+--- a/engine/engine/lease.py
++++ b/engine/engine/lease.py
+@@ -47,6 +47,7 @@ class Lease:
+         self._renewed_at = 0.0  # start of the last successful renewal, by the loop clock
+         self._deadline = 0.0  # the step-down point
+         self._renewal: asyncio.Task[bool] | None = None
++        self._held_once = False
+ 
+     async def acquire(self) -> bool:
+         """Take the lease if it is free, expired or already ours. Returns whether we hold it."""
+@@ -75,6 +76,8 @@ class Lease:
+ 
+     async def release(self) -> None:
+         """Give the lease up, so the next copy can take it at once."""
++        if not self._held_once:
++            return
+         if self._renewal is not None:
+             await asyncio.wait({self._renewal})  # a renewal cancelled at the step-down
+         async with self._db.begin() as conn:
+@@ -124,6 +127,7 @@ class Lease:
+             )
+             held = (await conn.execute(stmt)).first() is not None
+         if held:
++            self._held_once = True
+             self._renewed_at = started
+             self._deadline = started + self._ttl - self._renew
+         return held
+diff --git a/engine/engine/migrations/env.py b/engine/engine/migrations/env.py
+index 339f3f1..bd995e3 100644
+--- a/engine/engine/migrations/env.py
++++ b/engine/engine/migrations/env.py
+@@ -10,7 +10,7 @@ from engine.settings import Settings
+ from engine.tables import metadata
+ 
+ url = context.config.attributes.get("url") or Settings().db_url
+-connectable = pin_search_path(create_engine(sqlalchemy_url(url), poolclass=NullPool))
++connectable = pin_search_path(create_engine(sqlalchemy_url(url), poolclass=NullPool, connect_args={"connect_timeout": 10}))
+ 
+ with connectable.connect() as connection:
+     # alembic_version lives in the engine schema, so the schema must exist first.
+diff --git a/engine/engine/runtime.py b/engine/engine/runtime.py
+index cb9b075..12f00f2 100644
+--- a/engine/engine/runtime.py
++++ b/engine/engine/runtime.py
+@@ -79,8 +79,9 @@ async def run_engine(settings: Settings, registry: Registry, stop: asyncio.Event
+             else:
+                 await _wait(stop, settings.lease_renew_seconds)
+     finally:
+-        with suppress(SQLAlchemyError, OSError):
+-            await lease.release()
++        with suppress(SQLAlchemyError, OSError, TimeoutError):
++            async with asyncio.timeout(settings.lease_renew_seconds):
++                await lease.release()
+         await db.dispose()
+         await lease_db.dispose()
+         log.info("engine copy %s stopped", lease.holder)
