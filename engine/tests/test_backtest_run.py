@@ -4,7 +4,7 @@ report, and a rebuild that reproduces the JSON's hash with no calls."""
 import hashlib
 import json
 import re
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Collection, Iterator
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
@@ -153,7 +153,9 @@ async def world(db: AsyncEngine, migrated: Settings) -> FakeAlpaca:
     return fake_market(rng)
 
 
-async def build(settings: Settings, fake: FakeAlpaca) -> tuple[int, list[str]]:
+async def build(
+    settings: Settings, fake: FakeAlpaca, only: Collection[int] | None = None
+) -> tuple[int, list[str]]:
     lines: list[str] = []
     code = await run_build_moves(
         market_settings(settings),
@@ -161,6 +163,7 @@ async def build(settings: Settings, fake: FakeAlpaca) -> tuple[int, list[str]]:
         lines.append,
         transport=httpx.MockTransport(fake.handle),
         clock=lambda: NOW,
+        only=only,
     )
     return code, lines
 
@@ -242,6 +245,25 @@ async def test_build_moves_then_backtest_then_a_rebuild_with_the_same_hash(
     assert (again / "backtest-v1.md").read_bytes() == (out / "backtest-v1.md").read_bytes()
     assert len(world.requests) == calls  # the backtest and the rebuild call nothing
     assert len(await table(db, select(backtest_runs))) == 1
+
+
+async def test_build_moves_for_chosen_instruments_builds_only_those(
+    db: AsyncEngine, migrated: Settings, world: FakeAlpaca
+) -> None:
+    """What the live moves filler runs (engine/alerts/fill.py) for a company new to alerts."""
+    ((aapl,),) = await table(db, select(instruments.c.id).where(instruments.c.slug == "aapl"))
+    code, lines = await build(migrated, world, only={aapl})
+    assert code == 0, lines
+    built = select(random_baselines.c.instrument_id).distinct()
+    assert await table(db, built) == [(aapl,)]
+    assert await table(db, select(signal_moves.c.instrument_id).distinct()) == [(aapl,)]
+    calls = len(world.requests)
+    code, _ = await build(migrated, world, only={aapl})  # built for this sample: nothing to do
+    assert code == 0 and len(world.requests) == calls
+
+    code, lines = await build(migrated, world)  # the full run builds the rest
+    assert code == 0, lines
+    assert len(await table(db, built)) == 6
 
 
 async def test_a_backtest_before_build_moves_says_what_to_run(

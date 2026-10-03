@@ -1,13 +1,14 @@
 """Test-only helpers for the alert stage: a full sample alert, planted history (past
 posts, their moves, the random-time medians, a backtest summary), a live run of the
-`score` and `alert` stages, and a dry-run delivery worker that follows the cursor and
-sends nothing."""
+`score` and `alert` stages, stub AI clients that also write the reason line, and a dry-run
+delivery worker that follows the cursor and sends nothing."""
 
+import functools
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, NoReturn
 
 import numpy as np
 from sqlalchemy import insert, select
@@ -18,8 +19,8 @@ from engine.alerts.model import AlertV1, Call, Evidence, Example, Instrument
 from engine.alerts.send_rule import SendRule, current_send_rule
 from engine.alerts.stage import ALERT, Alerted, Alerter
 from engine.alerts.store import Revision, read_changes
-from engine.alerts.wake import Wake
-from engine.extract.ai import AiPicker
+from engine.alerts.wake import Wake, sends_paused
+from engine.extract.ai import AiPicker, Client, Reply
 from engine.extract.rules import current_rules
 from engine.extract.score import Scorer, store_embedding
 from engine.extract.similarity import Embedded, Vector, load_match_rule
@@ -36,7 +37,7 @@ from engine.tables import (
     signals,
 )
 from engine.text import normalize
-from tests.extract_helpers import CountsAll, StubEmbedder
+from tests.extract_helpers import CountsAll, StubClient, StubEmbedder, answer
 from tests.feeds_helpers import status_id_at
 
 AT = datetime(2026, 3, 2, 15, 0, tzinfo=UTC)
@@ -144,10 +145,11 @@ async def plant_move(
     instrument_id: int,
     key: str,
     window: str,
-    move: float,
+    move: float | None,
     matured: datetime,
     adjusted: float | None = None,
 ) -> None:
+    """A stored move (None: the window was skipped)."""
     await conn.execute(
         insert(signal_moves).values(
             instrument_id=instrument_id,
@@ -195,8 +197,9 @@ async def plant_baselines(
 
 
 async def plant_backtest(
-    conn: AsyncConnection, picker: str, pair: str, hit: float, days: int
+    conn: AsyncConnection, results: Mapping[tuple[str, str], tuple[float, int]]
 ) -> None:
+    """One backtest run's Gate 0 rows: (picker, pair) -> (hit rate, days)."""
     run_id = (
         await conn.execute(
             insert(backtest_runs)
@@ -213,10 +216,14 @@ async def plant_backtest(
         True,
     )
     await conn.execute(
-        insert(backtest_summary).values(
-            run_id=run_id, picker=picker, view="gate", pair=pair, calls=days, days=days,
-            hit_rate=hit, last12_days=days, counts={}, **flags,
-        )
+        insert(backtest_summary),
+        [
+            {
+                "run_id": run_id, "picker": picker, "view": "gate", "pair": pair, "calls": days,
+                "days": days, "hit_rate": hit, "last12_days": days, "counts": {}, **flags,
+            }
+            for (picker, pair), (hit, days) in results.items()
+        ],
     )  # fmt: skip
 
 
@@ -265,29 +272,65 @@ class LiveRun:
 
 
 @dataclass
+class ReasonStub(StubClient):
+    """A stub provider that also writes the reason line (engine/extract/reason.py)."""
+
+    line: str = "The post names Apple and Nvidia plant plans"
+
+    async def ask(
+        self, instructions: str, user: str, schema: dict[str, Any] | None, max_tokens: int
+    ) -> Reply:
+        if "\n\nTopic: " in user:
+            self.asked.append(user)
+            return Reply({"id": "stub"}, self.line, 100, cached_input_tokens=0, output_tokens=10)
+        return await super().ask(instructions, user, schema, max_tokens)
+
+
+def stub_ai_clients(market_link: bool = True) -> dict[str, Client]:
+    """Both models give every post `market_link` and no names, at once; the Anthropic one
+    writes the reason line."""
+    said = answer(market_link)
+    return {
+        "openai": StubClient("openai", default=said),
+        "anthropic": ReasonStub("anthropic", default=said),
+    }
+
+
+@dataclass
 class DryRun:
     """Test-only dry-run delivery: follows the change cursor as an outlet does, waking on
-    the wake hook or every `poll` seconds, and records what it read (and when). It sends
-    nothing."""
+    the wake hook or every `poll` seconds and holding still while sends are paused, and
+    records what it read (and when). It sends nothing."""
 
     read: list[Revision] = field(default_factory=list)
     read_at: dict[int, float] = field(default_factory=dict)
     """seq -> perf_counter() when it was read."""
-    poll: float | None = None
 
-    def worker(self) -> WorkerFunc:
-        async def run(ctx: EngineContext) -> None:
-            poll = self.poll or ctx.settings.delivery_poll_seconds
-            bookmark, seen = 0, ctx.wake.rung
-            while True:
-                async with ctx.db.connect() as conn:
+    async def follow(
+        self,
+        db: AsyncEngine,
+        wake: Wake,
+        poll: float,
+        paused: Callable[[], bool] = lambda: False,
+    ) -> NoReturn:
+        bookmark, seen = 0, wake.rung
+        while True:
+            more = False
+            if not paused():
+                async with db.connect() as conn:
                     changes = await read_changes(conn, bookmark)
                 for revision in changes.revisions:
                     self.read.append(revision)
                     self.read_at[revision.seq] = time.perf_counter()
                     bookmark = revision.seq
-                if not changes.has_more:
-                    seen = await ctx.wake.wait(seen, poll)
+                more = changes.has_more
+            if not more:
+                seen = await wake.wait(seen, poll)
+
+    def worker(self) -> WorkerFunc:
+        async def run(ctx: EngineContext) -> None:
+            paused = functools.partial(sends_paused, ctx.settings)
+            await self.follow(ctx.db, ctx.wake, ctx.settings.delivery_poll_seconds, paused)
 
         return run
 
@@ -295,8 +338,8 @@ class DryRun:
 def similar_history(
     words: str, days: int, moves: Sequence[float], end: datetime, rng: np.random.Generator
 ) -> list[tuple[datetime, str, Vector, float]]:
-    """Past posts like `words`, one a day for `days` days before `end` at 10:00 New York
-    (each its own match day), with the given moves in turn."""
+    """Past posts like `words`, one a day for `days` days before `end` (each its own match
+    day), with the given moves in turn."""
     vector = stub_vector(words)
     found = []
     for day in range(days):

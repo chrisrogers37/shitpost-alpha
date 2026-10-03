@@ -2,10 +2,10 @@
 change cursor, and the recent sends rule 6 reads."""
 
 import asyncio
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
-from sqlalchemy import delete, func, select, text, update
+from sqlalchemy import Executable, delete, func, select, text, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
@@ -86,7 +86,7 @@ async def test_a_document_that_is_not_public_writes_nothing(db: AsyncEngine) -> 
 
 async def test_the_database_refuses_to_change_or_delete_a_revision(db: AsyncEngine) -> None:
     await an_alert(db, 1)
-    attempts = [
+    attempts: list[Executable] = [
         update(alert_revisions).values(kind="correction"),
         delete(alert_revisions),
         text("TRUNCATE engine.alert_revisions CASCADE"),
@@ -123,7 +123,7 @@ async def test_writers_commit_in_seq_order_and_a_reader_never_sees_a_gap(db: Asy
                 await asyncio.sleep(0)  # let the others queue on the lock
                 await add_revision(conn, alert_id, "result", {"n": taken.seq}, taken)
 
-    seen: list[tuple[int, object]] = []
+    seen: list[tuple[int, datetime]] = []
 
     async def reader() -> None:
         bookmark = 0
