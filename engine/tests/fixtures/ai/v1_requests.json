@@ -1,0 +1,166 @@
+{
+  "anthropic": {
+    "url": "https://api.anthropic.com/v1/messages",
+    "headers": {
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json"
+    },
+    "body": {
+      "max_tokens": 800,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Post:\nNvidia will build its new chip plants in Arizona. Great for American workers!\n\nQuoted post:\nTariffs on foreign chips are coming soon."
+        }
+      ],
+      "model": "claude-haiku-4-5-20251001",
+      "output_config": {
+        "format": {
+          "type": "json_schema",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "market_link": {
+                "type": "boolean"
+              },
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "ticker": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "asset": {
+                      "type": "string",
+                      "enum": [
+                        "stock",
+                        "etf",
+                        "coin"
+                      ]
+                    },
+                    "link": {
+                      "type": "string",
+                      "enum": [
+                        "explicit",
+                        "implied"
+                      ]
+                    },
+                    "why": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "ticker",
+                    "asset",
+                    "link",
+                    "why"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "market_link",
+              "instruments"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "system": "You read one post by Donald Trump from Truth Social, and sometimes the post it quotes. You answer two questions about it, as JSON:\n\n1. market_link: could a trader act on what this post says, for a US-listed stock or ETF, for bitcoin or ether, or for the market as a whole?\n2. instruments: which US-listed stocks and ETFs, and which of bitcoin and ether, does the post name or clearly imply?\n\nYou are not asked whether anything goes up or down, and you never say so.\n\n## market_link\n\ntrue when the post's main point, or a real part of it, is one of:\n- a government action, decision, threat or negotiation that changes conditions for companies, industries or markets: tariffs and trade deals or talks, sanctions, a tax or spending measure, a government shutdown, pressure on the Federal Reserve over rates, drug pricing, energy or crypto policy, rules for a named industry;\n- a named company, product or industry in a business sense: an investment or factory, a deal, an order, a lawsuit or threat against it, praise or attack aimed at the business, its stock;\n- the market or the economy as such: stocks, jobs numbers, inflation and prices, interest rates, oil or gas prices, crypto prices;\n- war, peace or military action involving a major economy, an oil region or a shipping lane, including a ceasefire or a peace deal.\n\nfalse when:\n- the economic words are campaign boilerplate, as in endorsements (\"He will Cut Taxes, Grow the Economy, Unleash American Energy, Secure the Border\");\n- the post is about elections, polls, rallies, courts and prosecutions, the media, crime, immigration, a person or himself, with nothing new about the economy, a company's business or a war;\n- a company is named only in passing, outside its business (an interview on a TV channel, a person's former employer).\n\n## instruments\n\nThe list does not depend on market_link: give every qualifying company the post names, whatever part it plays in the post, even when market_link is false.\n\nList at most 8. For each give:\n- name: the company, fund or coin, as you would write it (\"Nvidia\", \"Boeing\", \"Bitcoin\");\n- ticker: its US ticker (\"NVDA\"), or null if you are not sure;\n- asset: \"stock\", \"etf\" or \"coin\";\n- link: \"explicit\" or \"implied\";\n- why: 100 characters or fewer on where the post names or implies it. Never a direction, a price or advice, and never whether it gains or loses (no \"benefits\", \"hurts\" or \"beneficiary\").\n\nexplicit: the post names the company, one of its products or brands, or its ticker, even in an aside. A company's former name counts as the company (Facebook is Meta).\n\nimplied: the post doesn't name it but is clearly about it:\n- through its chief executive or founder acting for the company (an executive announcing the company's factory);\n- through a description that fits only that company;\n- through a direct, first-order industry link: the post's action targets an industry, and you list at most the three largest US-listed companies whose business is mostly that industry (tariffs on foreign steel point to US steel makers). Never second-order links (steel tariffs do not imply automakers), never whole sectors from a general remark about the economy, and never an industry that only appears in a list, a slogan, a campaign promise or a hypothetical (\"if Canada becomes a state, its steel and energy would quadruple\").\n\nName only:\n- stocks and ETFs listed on a US exchange (NYSE, Nasdaq), including the US listings of foreign companies;\n- bitcoin (BTC) and ether (ETH), and no other coin.\n\nNever name:\n- broad index funds or indexes (SPY, QQQ, the Dow, the S&P 500, the Nasdaq): a post about the whole market is a market_link, not an instrument;\n- private companies, companies listed only abroad or over the counter, government agencies;\n- news outlets, TV networks and video platforms named as sources or targets of media remarks (CNN, Fox News, NBC, the New York Times, Rumble), and Truth Social as the place he posts;\n- Trump Media because the post is signed \"DJT\" or \"President DJT\": that is his signature, not the ticker.\n\nA parent company named in its own right is an instrument (Comcast, Disney). When nothing qualifies, instruments is an empty list. market_link can be true with no instruments (a tariff on all imports) and false with an instrument named in an aside.\n\nRead only the post's words and the quoted post's words. Do not guess at what happened after the post.",
+      "temperature": 0
+    }
+  },
+  "openai": {
+    "url": "https://api.openai.com/v1/chat/completions",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You read one post by Donald Trump from Truth Social, and sometimes the post it quotes. You answer two questions about it, as JSON:\n\n1. market_link: could a trader act on what this post says, for a US-listed stock or ETF, for bitcoin or ether, or for the market as a whole?\n2. instruments: which US-listed stocks and ETFs, and which of bitcoin and ether, does the post name or clearly imply?\n\nYou are not asked whether anything goes up or down, and you never say so.\n\n## market_link\n\ntrue when the post's main point, or a real part of it, is one of:\n- a government action, decision, threat or negotiation that changes conditions for companies, industries or markets: tariffs and trade deals or talks, sanctions, a tax or spending measure, a government shutdown, pressure on the Federal Reserve over rates, drug pricing, energy or crypto policy, rules for a named industry;\n- a named company, product or industry in a business sense: an investment or factory, a deal, an order, a lawsuit or threat against it, praise or attack aimed at the business, its stock;\n- the market or the economy as such: stocks, jobs numbers, inflation and prices, interest rates, oil or gas prices, crypto prices;\n- war, peace or military action involving a major economy, an oil region or a shipping lane, including a ceasefire or a peace deal.\n\nfalse when:\n- the economic words are campaign boilerplate, as in endorsements (\"He will Cut Taxes, Grow the Economy, Unleash American Energy, Secure the Border\");\n- the post is about elections, polls, rallies, courts and prosecutions, the media, crime, immigration, a person or himself, with nothing new about the economy, a company's business or a war;\n- a company is named only in passing, outside its business (an interview on a TV channel, a person's former employer).\n\n## instruments\n\nThe list does not depend on market_link: give every qualifying company the post names, whatever part it plays in the post, even when market_link is false.\n\nList at most 8. For each give:\n- name: the company, fund or coin, as you would write it (\"Nvidia\", \"Boeing\", \"Bitcoin\");\n- ticker: its US ticker (\"NVDA\"), or null if you are not sure;\n- asset: \"stock\", \"etf\" or \"coin\";\n- link: \"explicit\" or \"implied\";\n- why: 100 characters or fewer on where the post names or implies it. Never a direction, a price or advice, and never whether it gains or loses (no \"benefits\", \"hurts\" or \"beneficiary\").\n\nexplicit: the post names the company, one of its products or brands, or its ticker, even in an aside. A company's former name counts as the company (Facebook is Meta).\n\nimplied: the post doesn't name it but is clearly about it:\n- through its chief executive or founder acting for the company (an executive announcing the company's factory);\n- through a description that fits only that company;\n- through a direct, first-order industry link: the post's action targets an industry, and you list at most the three largest US-listed companies whose business is mostly that industry (tariffs on foreign steel point to US steel makers). Never second-order links (steel tariffs do not imply automakers), never whole sectors from a general remark about the economy, and never an industry that only appears in a list, a slogan, a campaign promise or a hypothetical (\"if Canada becomes a state, its steel and energy would quadruple\").\n\nName only:\n- stocks and ETFs listed on a US exchange (NYSE, Nasdaq), including the US listings of foreign companies;\n- bitcoin (BTC) and ether (ETH), and no other coin.\n\nNever name:\n- broad index funds or indexes (SPY, QQQ, the Dow, the S&P 500, the Nasdaq): a post about the whole market is a market_link, not an instrument;\n- private companies, companies listed only abroad or over the counter, government agencies;\n- news outlets, TV networks and video platforms named as sources or targets of media remarks (CNN, Fox News, NBC, the New York Times, Rumble), and Truth Social as the place he posts;\n- Trump Media because the post is signed \"DJT\" or \"President DJT\": that is his signature, not the ticker.\n\nA parent company named in its own right is an instrument (Comcast, Disney). When nothing qualifies, instruments is an empty list. market_link can be true with no instruments (a tariff on all imports) and false with an instrument named in an aside.\n\nRead only the post's words and the quoted post's words. Do not guess at what happened after the post."
+        },
+        {
+          "role": "user",
+          "content": "Post:\nNvidia will build its new chip plants in Arizona. Great for American workers!\n\nQuoted post:\nTariffs on foreign chips are coming soon."
+        }
+      ],
+      "model": "gpt-4.1-2025-04-14",
+      "max_completion_tokens": 800,
+      "response_format": {
+        "type": "json_schema",
+        "json_schema": {
+          "name": "answer",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "market_link": {
+                "type": "boolean"
+              },
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "ticker": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "asset": {
+                      "type": "string",
+                      "enum": [
+                        "stock",
+                        "etf",
+                        "coin"
+                      ]
+                    },
+                    "link": {
+                      "type": "string",
+                      "enum": [
+                        "explicit",
+                        "implied"
+                      ]
+                    },
+                    "why": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "ticker",
+                    "asset",
+                    "link",
+                    "why"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "market_link",
+              "instruments"
+            ],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      },
+      "temperature": 0
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "about": "What can change about each pinned model without changing its answers, so it sits outside the AI picker's version (ai.json): the price, in US dollars per million tokens, and the retirement, each from the provider's page on the day in 'checked'. Every answer's cost and the spend checks use these prices, and a pinned model without a checked price here stops real calls.",
+  "gpt-4.1-2025-04-14": {
+    "prices": {
+      "input": 2.0,
+      "cached_input": 0.5,
+      "output": 8.0,
+      "checked": "2026-10-02"
+    },
+    "retirement": "none announced (https://developers.openai.com/api/docs/deprecations, checked 2026-10-02)"
+  },
+  "claude-haiku-4-5-20251001": {
+    "prices": {
+      "input": 1.0,
+      "cached_input": 0.1,
+      "output": 5.0,
+      "checked": "2026-10-02"
+    },
+    "retirement": "none announced; not sooner than 2026-10-15 (https://platform.claude.com/docs/en/about-claude/model-deprecations, checked 2026-10-02)"
+  }
+}

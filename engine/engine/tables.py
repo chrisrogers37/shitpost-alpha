@@ -7,6 +7,7 @@ Schemas:
 """
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     Column,
@@ -18,7 +19,9 @@ from sqlalchemy import (
     Identity,
     Index,
     Integer,
+    LargeBinary,
     MetaData,
+    Numeric,
     PrimaryKeyConstraint,
     SmallInteger,
     Table,
@@ -27,6 +30,7 @@ from sqlalchemy import (
     Uuid,
     func,
     literal_column,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -124,6 +128,7 @@ signals = Table(
     CheckConstraint(_one_of("kind", SIGNAL_KINDS), name="signals_kind_check"),
     CheckConstraint(_one_of("not_scored", NOT_SCORED), name="signals_not_scored_check"),
     Index("signals_source_id_posted_at_idx", "source_id", "posted_at"),
+    Index("signals_unfinished_idx", "key", postgresql_where=text("stage NOT IN ('done', 'error')")),
     Index(
         "signals_text_search_idx",
         func.to_tsvector(literal_column("'english'::regconfig"), literal_column("text")),
@@ -270,3 +275,94 @@ market_bars = Table(
 backfill; minute bars only for alert windows (PR 7). Prices are Alpaca's, adjusted for
 splits and dividends (adjustment 'all'; coins have nothing to adjust, 'raw'). feed: 'sip'
 for stocks and ETFs, 'crypto_us' for coins. fetched_at: when these values were fetched."""
+
+EXTRACTION_METHODS = ("rules", "ai:openai", "ai:anthropic", "ai:vote")
+FOUND_BY = ("cashtag", "ticker", "alias", "ai_explicit", "ai_implied")
+
+extractions = Table(
+    "extractions",
+    metadata,
+    Column("id", BigInteger, Identity(), primary_key=True),
+    Column("signal_key", Text, ForeignKey("engine.signals.key"), nullable=False),
+    Column("method", Text, nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("run", SmallInteger, nullable=False, server_default="1"),
+    Column("model", Text),
+    Column("started_at", DateTime(timezone=True), nullable=False),
+    Column("finished_at", DateTime(timezone=True), nullable=False),
+    Column("response", JSONB),
+    Column("result", JSONB),
+    Column("market_link", Boolean),
+    Column("topic", Text),
+    Column("input_tokens", Integer),
+    Column("cached_input_tokens", Integer),
+    Column("output_tokens", Integer),
+    Column("cost_usd", Numeric(12, 6)),
+    Column("error", Text),
+    UniqueConstraint("signal_key", "method", "version", "run", name="extractions_key"),
+    CheckConstraint(_one_of("method", EXTRACTION_METHODS), name="extractions_method_check"),
+    CheckConstraint("run >= 1", name="extractions_run_check"),
+    schema="engine",
+)
+"""What a picker said about a post: one row per signal, method and version (rules: the
+rules version; ai:*: the AI picker version). run 1 is the answer; a stability rerun is
+run 2, so a rerun never overwrites. model: the pinned model id (ai:openai,
+ai:anthropic). response: the provider's response body (no request headers), result: the
+normalised answer; market_link and topic (rules only) as columns. Tokens and cost_usd come
+from the response and the AI picker's price table. error: why a model's answer is missing
+(an error, an invalid answer, a timeout); the vote then takes the rules' picks."""
+
+signal_mentions = Table(
+    "signal_mentions",
+    metadata,
+    Column("id", BigInteger, Identity(), primary_key=True),
+    Column(
+        "extraction_id",
+        BigInteger,
+        ForeignKey("engine.extractions.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("signal_key", Text, ForeignKey("engine.signals.key"), nullable=False),
+    Column("name", Text, nullable=False),
+    Column("normalized", Text, nullable=False),
+    Column("ticker", Text),
+    Column("instrument_id", Integer, ForeignKey("engine.instruments.id")),
+    Column("unmapped", Text),
+    Column("found_by", Text, nullable=False),
+    Column("models", SmallInteger),
+    Column("counted", Boolean, nullable=False),
+    Column("posted_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("extraction_id", "normalized", name="signal_mentions_key"),
+    CheckConstraint(_one_of("found_by", FOUND_BY), name="signal_mentions_found_by_check"),
+    CheckConstraint(
+        "(instrument_id IS NULL) = (unmapped IS NOT NULL)", name="signal_mentions_mapped_check"
+    ),
+    CheckConstraint(
+        "NOT counted OR instrument_id IS NOT NULL", name="signal_mentions_counted_check"
+    ),
+    Index("signal_mentions_instrument_id_posted_at_idx", "instrument_id", "posted_at"),
+    schema="engine",
+)
+"""The names in a picker's answer (run 1 only): one row per name per extraction. name: as
+written in the post or as the model gave it; normalized: lowercase, single spaces
+($aapl for a cashtag). instrument_id, or unmapped with the reason. found_by: cashtag,
+ticker or alias (rules), ai_explicit or ai_implied (AI). models: how many models named it
+(ai:vote). counted: it counts for this answer. posted_at: the signal's, for the index."""
+
+signal_embeddings = Table(
+    "signal_embeddings",
+    metadata,
+    Column("signal_key", Text, ForeignKey("engine.signals.key"), nullable=False),
+    Column("model_version", Text, nullable=False),
+    Column("text_sha256", Text, nullable=False),
+    Column("dims", SmallInteger, nullable=False),
+    Column("vector", LargeBinary, nullable=False),
+    Column("truncated", Boolean, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    PrimaryKeyConstraint("signal_key", "model_version", name="signal_embeddings_pkey"),
+    CheckConstraint("octet_length(vector) = 4 * dims", name="signal_embeddings_dims_check"),
+    schema="engine",
+)
+"""One similarity vector per text post per model version. vector: dims little-endian
+float32, normalised to length 1. text_sha256: of the normalised text it was made from.
+truncated: the text was longer than the model's 512 tokens."""

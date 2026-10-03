@@ -2,9 +2,6 @@
 
 import asyncio
 import logging
-import os
-import secrets
-import socket
 from collections.abc import Awaitable
 from contextlib import suppress
 from typing import Any, NoReturn
@@ -13,7 +10,7 @@ from sqlalchemy import func, update
 from sqlalchemy.exc import SQLAlchemyError
 
 from engine.db import make_engine, raise_if_cancelling
-from engine.lease import Lease, LeaseLost
+from engine.lease import Lease, LeaseLost, holder_id
 from engine.notify import notify_operator
 from engine.registry import EngineContext, Registry, WorkerFunc
 from engine.scheduler import Scheduler
@@ -25,11 +22,6 @@ log = logging.getLogger(__name__)
 
 class _Stopping(Exception):
     """The process was asked to stop."""
-
-
-def holder_id() -> str:
-    """A name for this copy, unique per process: host, pid and a random suffix."""
-    return f"{socket.gethostname()}:{os.getpid()}:{secrets.token_hex(3)}"
 
 
 class FailureStreak:

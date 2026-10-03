@@ -63,7 +63,10 @@ def settings(database_url: str, tmp_path: Path) -> Settings:
         database_url=database_url,
         alpaca_key_id=None,  # never the session's real keys
         alpaca_secret_key=None,
+        openai_key=None,
+        anthropic_key=None,
         bars_cache_dir=tmp_path / "bars",
+        model_dir=tmp_path / "models",
         web_role=f"absent_{secrets.token_hex(4)}",
         code_version="test",
         lease_renew_seconds=0.2,
