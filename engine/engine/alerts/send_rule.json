@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "about": "Send rule v1 (the plan's): which picker's answers make alerts (the other one is the challenger, stored apart and never sent), the calls every alert makes (Gate 0's pairs; 'company' is each company the post names), and, per picker, the pairs that passed Gate 0 and may send. Version 1 has none passing: every alert is FYI no_passing_pair (research mode). After Gate 0, with Chris's OK, listing pairs under 'passing' (and naming the picker Gate 0 chose) switches sends on; raise the version with any change.",
+  "picker": "rules",
+  "calls": [
+    "spy:1h",
+    "spy:close",
+    "spy:1d",
+    "qqq:1h",
+    "qqq:close",
+    "qqq:1d",
+    "btc:1h",
+    "btc:4h",
+    "btc:24h",
+    "company:close",
+    "company:1d"
+  ],
+  "passing": {
+    "rules": [],
+    "ai": []
+  }
+}

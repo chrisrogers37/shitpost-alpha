@@ -10,7 +10,7 @@ and PR 7 runs this on Railway to fill production: nothing travels from the sandb
 """
 
 import os
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -278,8 +278,11 @@ async def run_build_moves(
     say: Callable[[str], None] = print,
     transport: httpx.AsyncBaseTransport | None = None,
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    only: Collection[int] | None = None,
 ) -> int:
-    """The command. Returns the exit code: 1 if an instrument failed (the others run)."""
+    """The command. Returns the exit code: 1 if an instrument failed (the others run).
+    With `only`, it builds just those instruments (the live moves filler,
+    engine/alerts/fill.py), skipping any already built for this sample."""
     span = sample_span(data_to)
     db = make_engine(settings.db_url)
     failed = 0
@@ -288,7 +291,7 @@ async def run_build_moves(
             check_data_to(data_to, alpaca.clock())
             async with db.begin() as conn:
                 await add_sector_funds(conn, Listings(alpaca), alpaca.clock())
-            todo, listed, posts = await _plan(db, span)
+            todo, listed, posts = await _plan(db, span, only)
             for instrument in _with_benchmarks(todo, listed):
                 try:
                     say((await backfill_daily(db, alpaca, instrument)).line())
@@ -314,16 +317,23 @@ async def run_build_moves(
     return 1 if failed else 0
 
 
-async def _plan(db: AsyncEngine, span: Span) -> tuple[list[int], dict[int, Instrument], Posts]:
+async def _plan(
+    db: AsyncEngine, span: Span, only: Collection[int] | None
+) -> tuple[list[int], dict[int, Instrument], Posts]:
     async with db.connect() as conn:
         posts, _ = await load_posts(conn, span, load_pin().version)
         if not len(posts):
             raise NotReady("no text posts with vectors in the sample: run embed first")
         listed = await load_instruments(conn)
-        infos = instrument_infos(listed.values())
-        pickers = await load_pickers(conn, posts, infos, current_rules(), current_ai_config(), span)
         done = await built_instruments(conn, span.last)
-    todo = [i for i in used_instruments(pickers, infos) if i not in done]
+        if only is not None:
+            wanted = sorted(set(only) & set(listed))
+        else:
+            infos = instrument_infos(listed.values())
+            ai = current_ai_config()
+            pickers = await load_pickers(conn, posts, infos, current_rules(), ai, span)
+            wanted = used_instruments(pickers, infos)
+    todo = [i for i in wanted if i not in done]
     return todo, listed, posts
 
 

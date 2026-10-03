@@ -1,22 +1,16 @@
 """The live `score` stage: new text posts wait at `score` (PR 2); this stage gives each its
 rules answer and mentions, its similarity vector and, when ENGINE_AI_LIVE is on, the AI
-picker's answers and vote. Then the post moves to `done` (PR 6 adds the alert stage).
+picker's answers and vote. Then the post moves to `alert` (engine/alerts/stage.py);
+engine/pipeline.py runs both stages and checks what they need when it starts.
 
 History never goes through this stage: `python -m engine extract`, `embed` and `ai-pick`
 process it in batch.
-
-The model files, the names and, with the AI on, its version are checked when the worker
-starts. If the files are missing, `sync-names` hasn't run or the AI picker's files no
-longer match its frozen version or its recorded answers, the worker fails with a clear
-error (and the operator message every failed worker sends), and posts wait at `score`
-until a fixed deploy picks them up.
 """
 
 import asyncio
 import logging
 import time
 from collections.abc import Callable
-from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -43,18 +37,13 @@ from engine.extract.rules import (
     Listed,
     NameBook,
     Rules,
-    RulesFileChanged,
     RulesPick,
-    current_rules,
     pick,
 )
-from engine.extract.similarity import Embedded, Embedder, load_embedder, text_hash
-from engine.feeds.store import SCORE
-from engine.market.alpaca import Alpaca, AlpacaError
+from engine.extract.similarity import Embedded, Embedder, text_hash
+from engine.market.alpaca import AlpacaError
 from engine.market.instruments import AssetClass, DoesNotCount, Listings, add_instrument
-from engine.registry import EngineContext, WorkerFunc
 from engine.settings import Settings
-from engine.stages import Stage, StageRunner
 from engine.tables import extractions, signal_embeddings, signals
 from engine.text import normalize
 
@@ -221,34 +210,3 @@ def live_ai(settings: Settings, config: AiConfig | None = None) -> AiPicker | No
     except NotReady as exc:
         log.warning("ENGINE_AI_LIVE is on but the AI picker is off: %s", exc)
         return None
-
-
-def score_worker(
-    embedder_loader: Callable[[Settings], Embedder] = load_embedder,
-    ai_loader: Callable[[Settings], AiPicker | None] = live_ai,
-    observe: Callable[[Scored], None] | None = None,
-) -> WorkerFunc:
-    """The worker build_registry() registers. Tests pass stub loaders."""
-
-    async def run(ctx: EngineContext) -> None:
-        settings = ctx.settings
-        embedder = await asyncio.to_thread(embedder_loader, settings)  # ModelMissing: fail here
-        rules = current_rules()
-        ai = ai_loader(settings)
-        async with ctx.db.connect() as conn:
-            await load_book(conn, rules)  # NamesNotSynced: fail here, not on every post
-            if ai is not None and (problem := await other_files(conn, ai.config)):
-                raise RulesFileChanged(problem)
-        async with AsyncExitStack() as stack:
-            listings = None
-            if ai is not None and settings.alpaca_keys is not None:
-                listings = Listings(await stack.enter_async_context(Alpaca(settings)))
-            scorer = Scorer(rules, embedder, ai, listings, observe)
-            runner = StageRunner(
-                ctx.db, signals, [Stage(SCORE, scorer.handle)], max_attempts=settings.max_attempts
-            )
-            while True:
-                await runner.run_once()
-                await asyncio.sleep(settings.score_tick_seconds)
-
-    return run

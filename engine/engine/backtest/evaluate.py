@@ -229,6 +229,18 @@ def _aligned(own: PriceData, other: PriceData) -> tuple[Floats, Floats]:
 # --- the calls -------------------------------------------------------------------------
 
 
+def pair_targets(pair: Pair, pick: Pick, slugs: Mapping[str, int]) -> list[int]:
+    """The instruments one pick is called on for `pair` (send rule v1's rule 1): each
+    company it counted; the sector fund when its topic maps there; else the pair's
+    instrument, when it makes a market link. Shared with live alerts."""
+    sector = {slug: topic for topic, slug in gate.SECTOR_TOPICS.items()}
+    if pair.instrument == "company":
+        return sorted(pick.companies)
+    if pair.instrument in sector:
+        return [slugs[pair.instrument]] if pick.topic == sector[pair.instrument] else []
+    return [slugs[pair.instrument]] if pick.market_link else []
+
+
 @dataclass(frozen=True)
 class Call:
     post: int
@@ -299,16 +311,21 @@ def call_for(
     matches: Ints, judged: Judged, posts: Posts, baseline: float | None, filters: bool
 ) -> Verdict:
     """The direction most matches moved and, with `filters`, send rule v1's rules 3 and 4."""
-    if not len(matches):
+    return verdict(judged.move[matches], posts.days[matches], baseline, filters)
+
+
+def verdict(moves: Floats, days: Ints, baseline: float | None, filters: bool) -> Verdict:
+    """call_for's rule on the matches' judged moves and their New York dates: the one
+    method the backtest and live alerts (engine/alerts/evidence.py) share."""
+    if not len(moves):
         return Verdict(0, "no_matches")
-    moves = judged.move[matches]
     up, down = int((moves > 0).sum()), int((moves < 0).sum())
     if up == down:
         return Verdict(0, "tie")
     direction = 1 if up > down else -1
     if not filters:
         return Verdict(direction, None)
-    if len(np.unique(posts.days[matches])) < gate.MIN_MATCH_DAYS:
+    if len(np.unique(days)) < gate.MIN_MATCH_DAYS:
         return Verdict(direction, "few_match_days")
     if max(up, down) / len(moves) < gate.ONE_WAY:
         return Verdict(direction, "not_one_way")
@@ -411,17 +428,9 @@ class Universe:
     def candidates(self, picker: Picker, pair: Pair, view: View) -> list[tuple[int, int]]:
         """(post, instrument) the picker's rule 1 lets through for this pair."""
         found: list[tuple[int, int]] = []
-        sector = {slug: topic for topic, slug in gate.SECTOR_TOPICS.items()}
         for post, pick in sorted(picker.picks.items()):
-            if view.posts is not None and post not in view.posts:
-                continue
-            if pair.instrument == "company":
-                found += [(post, company) for company in sorted(pick.companies)]
-            elif pair.instrument in sector:
-                if pick.topic == sector[pair.instrument]:
-                    found.append((post, self.slugs[pair.instrument]))
-            elif pick.market_link:
-                found.append((post, self.slugs[pair.instrument]))
+            if view.posts is None or post in view.posts:
+                found += [(post, target) for target in pair_targets(pair, pick, self.slugs)]
         return found
 
     def test(self, picker: Picker, view: View, pair: Pair, seed_name: str) -> PairResult:

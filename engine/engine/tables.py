@@ -34,7 +34,7 @@ from sqlalchemy import (
     literal_column,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, REAL
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, REAL
 
 from engine.stages import stage_columns
 
@@ -110,6 +110,12 @@ def _one_of(column: str, values: tuple[str, ...]) -> str:
     return f"{column} IN ({', '.join(f"'{value}'" for value in values)})"
 
 
+PUBLIC_ID_SQL = (
+    "translate(encode(substr(uuid_send(gen_random_uuid()), 1, 6), 'base64'), '+/', '-_')"
+)
+"""A short public id: 6 random bytes as 8 URL-safe base64 characters."""
+
+
 signals = Table(
     "signals",
     metadata,
@@ -127,6 +133,8 @@ signals = Table(
     Column("first_seen_via", Text, nullable=False),
     Column("not_scored", Text),
     *stage_columns(),
+    Column("public_id", Text, nullable=False, server_default=text(PUBLIC_ID_SQL)),
+    UniqueConstraint("public_id", name="signals_public_id_key"),
     CheckConstraint(_one_of("kind", SIGNAL_KINDS), name="signals_kind_check"),
     CheckConstraint(_one_of("not_scored", NOT_SCORED), name="signals_not_scored_check"),
     Index("signals_source_id_posted_at_idx", "source_id", "posted_at"),
@@ -145,7 +153,8 @@ post a reply, quote or repost points to, when the feed says. has_media: NULL whe
 first copy's feed doesn't report media (trumpstruth). raw/raw_via: that first copy and
 the feed (or import part) it came from. first_seen_*: the earliest sighting. not_scored:
 why the post skips live scoring (it is saved at stage done); NULL for posts that go
-through the live stages, starting at "score".
+through the live stages, starting at "score". public_id: a short random id for the post's
+public page (/s/<public_id>), set by the database on insert; an alert takes its post's.
 """
 
 signal_sightings = Table(
@@ -497,3 +506,112 @@ backtest_summary = Table(
 """One row per run, picker, view and pair with Gate 0's numbers: moves are fractions
 (0.001 is 10 bp), days are New York dates with calls. q_value only for the 22 gate tests;
 passes is false outside them. counts: the calls each filter dropped and each skip."""
+
+
+DISPOSITIONS = ("sent", "fyi")
+FYI_REASONS = ("no_passing_pair", "few_matches", "not_better_than_random", "late", "burst")
+"""Why an alert or call isn't sent, in send rule v1's order (rules 2 to 6)."""
+PICKERS = ("rules", "ai")
+
+alerts = Table(
+    "alerts",
+    metadata,
+    Column("id", BigInteger, Identity(), primary_key=True),
+    Column("signal_key", Text, ForeignKey("engine.signals.key"), nullable=False),
+    Column("public_id", Text, nullable=False),
+    Column("posted_at", DateTime(timezone=True), nullable=False),
+    Column("alerted_at", DateTime(timezone=True), nullable=False),
+    Column("send_until", DateTime(timezone=True), nullable=False),
+    Column("disposition", Text, nullable=False),
+    Column("fyi_reason", Text),
+    Column("picker", Text, nullable=False),
+    Column("picker_version", Integer, nullable=False),
+    Column("send_rule_version", Integer, nullable=False),
+    Column("topic", Text, nullable=False),
+    Column("instrument_ids", ARRAY(Integer), nullable=False),
+    Column("sent_instrument_ids", ARRAY(Integer), nullable=False),
+    Column("doc", JSONB, nullable=False),
+    UniqueConstraint("signal_key", name="alerts_signal_key_key"),
+    UniqueConstraint("public_id", name="alerts_public_id_key"),
+    CheckConstraint(_one_of("disposition", DISPOSITIONS), name="alerts_disposition_check"),
+    CheckConstraint(_one_of("fyi_reason", FYI_REASONS), name="alerts_fyi_reason_check"),
+    CheckConstraint(_one_of("picker", PICKERS), name="alerts_picker_check"),
+    CheckConstraint(
+        "(disposition = 'sent') = (fyi_reason IS NULL)", name="alerts_fyi_reason_set_check"
+    ),
+    CheckConstraint(
+        "(disposition = 'sent') = (cardinality(sent_instrument_ids) > 0)",
+        name="alerts_sent_instruments_check",
+    ),
+    Index("alerts_alerted_at_idx", "alerted_at"),
+    Index("alerts_posted_at_idx", "posted_at"),
+    schema="engine",
+)
+"""One alert per post with a market link by the picker in use (engine/alerts/). doc: the
+current alert.v1 document (engine/alerts/model.py), every field public; the columns are
+the fields queries filter on. instrument_ids: every instrument the calls are on;
+sent_instrument_ids: those it was sent for (send rule v1's rule 6 reads them). Every change
+writes an alert_revisions row in the same transaction."""
+
+REVISION_KINDS = ("created", "result", "correction")
+
+alert_revisions = Table(
+    "alert_revisions",
+    metadata,
+    Column("seq", BigInteger, primary_key=True, autoincrement=False),
+    Column("alert_id", BigInteger, ForeignKey("engine.alerts.id"), nullable=False),
+    Column("revision", Integer, nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("doc", JSONB, nullable=False),
+    UniqueConstraint("alert_id", "revision", name="alert_revisions_alert_id_revision_key"),
+    CheckConstraint(_one_of("kind", REVISION_KINDS), name="alert_revisions_kind_check"),
+    CheckConstraint(
+        "(revision = 1) = (kind = 'created')", name="alert_revisions_first_is_created_check"
+    ),
+    schema="engine",
+)
+"""Every change to an alert, insert-only (a trigger refuses UPDATE, DELETE and TRUNCATE):
+revision 1 is its creation, with the alert.v1 document; later ones are results (PR 7) and
+corrections. seq: one sequence across all alerts, taken under a lock held until commit
+(alert_seq), so seq order is commit order and created_at order. The change cursor
+(engine/alerts/store.py) reads it."""
+
+alert_seq = Table(
+    "alert_seq",
+    metadata,
+    Column("id", SmallInteger, primary_key=True, autoincrement=False),
+    Column("last_seq", BigInteger, nullable=False),
+    CheckConstraint("id = 1", name="alert_seq_single_row"),
+    schema="engine",
+)
+"""One row: the last alert_revisions.seq taken. A writer updates it, which locks the row
+until its transaction ends."""
+
+challenger_calls = Table(
+    "challenger_calls",
+    metadata,
+    Column("id", BigInteger, Identity(), primary_key=True),
+    Column("signal_key", Text, ForeignKey("engine.signals.key"), nullable=False),
+    Column("picker", Text, nullable=False),
+    Column("picker_version", Integer, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("disposition", Text, nullable=False),
+    Column("fyi_reason", Text),
+    Column("instrument_ids", ARRAY(Integer), nullable=False),
+    Column("sent_instrument_ids", ARRAY(Integer), nullable=False),
+    Column("calls", JSONB, nullable=False),
+    UniqueConstraint(
+        "signal_key", "picker", "picker_version", name="challenger_calls_signal_key_picker_key"
+    ),
+    CheckConstraint(_one_of("picker", PICKERS), name="challenger_calls_picker_check"),
+    CheckConstraint(
+        _one_of("disposition", DISPOSITIONS), name="challenger_calls_disposition_check"
+    ),
+    CheckConstraint(_one_of("fyi_reason", FYI_REASONS), name="challenger_calls_fyi_reason_check"),
+    Index("challenger_calls_created_at_idx", "created_at"),
+    schema="engine",
+)
+"""The picker not in use, on the same posts: its calls (alert.v1's calls, with the same
+evidence) and what the send rule would have done with them, judged against its own
+history. Never sent and never on the change cursor; PR 7 grades them."""

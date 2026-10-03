@@ -95,7 +95,16 @@ class Settings(BaseSettings):
     """Similarity model files (ENGINE_MODEL_DIR), outside the repo; `python -m engine
     fetch-model` fills it."""
     score_tick_seconds: float = Field(default=1.0, gt=0)
-    """How often the score stage looks for new posts."""
+    """How often the score and alert stages look for new posts."""
+    sends_paused: bool = False
+    """ENGINE_SENDS_PAUSED: no outlet sends while it's on; scoring, alerts and grading carry
+    on. Read it through engine.alerts.wake.sends_paused."""
+    delivery_poll_seconds: float = Field(default=30.0, gt=0)
+    """How often a delivery worker reads the change cursor without a wake."""
+    fill_moves_tick_seconds: float = Field(default=300.0, gt=0)
+    """How often the moves filler looks for alert instruments without stored moves."""
+    fill_moves_retry_seconds: float = Field(default=3600.0, gt=0)
+    """How long the moves filler waits before trying a failed instrument again."""
 
     @field_validator(
         "scrapecreators_key",

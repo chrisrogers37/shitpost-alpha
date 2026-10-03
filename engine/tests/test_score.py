@@ -17,10 +17,11 @@ from engine.extract.ai import AiPicker
 from engine.extract.names import load_book
 from engine.extract.records import Extraction, record, rules_extraction
 from engine.extract.rules import Mention, NamesNotSynced, RulesFileChanged, current_rules, pick
-from engine.extract.score import Scorer, live_ai, score_worker, store_embedding
+from engine.extract.score import Scorer, live_ai, store_embedding
 from engine.extract.similarity import Embedded, ModelMissing
 from engine.feeds.posts import Post
 from engine.feeds.store import SCORE, store_posts, trump_source_id
+from engine.pipeline import signals_worker
 from engine.registry import EngineContext, build_registry
 from engine.settings import Settings
 from engine.tables import extractions, signal_embeddings, signal_mentions, signals
@@ -57,7 +58,7 @@ async def stage_of(db: AsyncEngine, key: str) -> str:
 async def run_worker_until_done(
     settings: Settings, db: AsyncEngine, key: str, **loaders: Any
 ) -> None:
-    worker = asyncio.ensure_future(score_worker(**loaders)(EngineContext(settings, db)))
+    worker = asyncio.ensure_future(signals_worker(**loaders)(EngineContext(settings, db)))
     try:
         async with asyncio.timeout(10):
             while await stage_of(db, key) != "done":
@@ -180,8 +181,8 @@ async def test_one_vector_per_post_and_model_version(db: AsyncEngine) -> None:
 # --- the stage -------------------------------------------------------------------------------
 
 
-def test_the_registry_runs_the_score_stage() -> None:
-    assert "score" in build_registry().workers
+def test_the_registry_runs_the_live_stages_and_the_moves_filler() -> None:
+    assert {"signals", "fill-moves"} <= set(build_registry().workers)
 
 
 async def test_a_new_text_post_ends_at_done_with_rules_mentions_and_embedding(
@@ -282,7 +283,7 @@ async def test_missing_model_files_stop_the_worker_and_posts_wait_at_score(
     await store(db, post)
     with pytest.raises(ModelMissing):
         async with asyncio.timeout(10):
-            await score_worker()(EngineContext(migrated, db))
+            await signals_worker()(EngineContext(migrated, db))
     assert await stage_of(db, post.key) == SCORE
 
 
@@ -293,7 +294,7 @@ async def test_unsynced_names_stop_the_worker_and_posts_wait_at_score(
     await store(db, post)
     with pytest.raises(NamesNotSynced, match="sync-names"):
         async with asyncio.timeout(10):
-            await score_worker(embedder_loader=lambda s: StubEmbedder())(
+            await signals_worker(embedder_loader=lambda s: StubEmbedder())(
                 EngineContext(migrated, db)
             )
     assert await stage_of(db, post.key) == SCORE
@@ -324,7 +325,7 @@ async def test_ai_answers_recorded_with_other_files_stop_the_worker(
     await store(db, second)
     with pytest.raises(RulesFileChanged, match="AI picker version 1 has answers recorded"):
         async with asyncio.timeout(10):
-            await score_worker(**loaders)(EngineContext(migrated, db))
+            await signals_worker(**loaders)(EngineContext(migrated, db))
     assert await stage_of(db, second.key) == SCORE
 
 
