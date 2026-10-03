@@ -40,7 +40,8 @@ DIRECTION = re.compile(
     r"winners?|upgrad\w*|downgrad\w*|favou?r\w*|help(?:s|ed|ing|ful)?|hit(?:s|ting)?|"
     r"squeez\w*|brighten\w*|boom(?:s|ed|ing)?|rout|routs|routed|mooning|to\s+the\s+moon|"
     r"crater(?:s|ed|ing)?|nosediv\w*|skid(?:s|ded|ding)?|erod\w*|(?:under|over)valu\w*|"
-    r"(?:good|bad|great|terrible)\s+(?:news\s+)?for|watch|investors?|"
+    r"improv\w*|worsen\w*|undermin\w*|thriv\w*|slip(?:s|ped|ping)?|punish\w*|cheap\w*|"
+    r"(?:good|bad|great|terrible)\s+(?:news\s+|day\s+)?for|watch|investors?|"
     r"(?:stock|share)\s+prices?|price\s+target\w*)\b",
     re.IGNORECASE,
 )

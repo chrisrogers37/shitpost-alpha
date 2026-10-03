@@ -63,6 +63,13 @@ REJECTED = [
     "Bullish for steel makers",
     "Bitcoin to the moon on the reserve plan",
     "Apple sell-off feared over China tariffs",
+    "Apple's outlook improves after the tariff news",
+    "Nucor's margins worsen under the plan",
+    "The post undermines Apple's China plans",
+    "Nucor may thrive on tariffs",
+    "Imports slip on new tariffs",
+    "Tariffs punish Apple",
+    "Great day for Nucor",
     # advice, prices, targets
     "Buy Apple",
     "Nucor is a buy",
@@ -70,6 +77,7 @@ REJECTED = [
     "Investors may want to watch Boeing",
     "A good opportunity in Nucor",
     "Nucor looks undervalued after the tariff news",
+    "Nucor looks cheap",
     "Nucor's stock price could react",
     "Analysts' price target for Nucor in focus",
     # amounts, even ones the post has
