@@ -1,0 +1,12 @@
+M8 match_rule.json threshold 0.85 -> 0.80: KILLED | FAILED tests/test_similarity.py::test_the_shipped_match_rule_is_v1_for_the_pinned_model | 1 failed, 13 passed in 4.57s
+M13 model.json max_tokens 512 -> 256 (version unchanged?): KILLED | FAILED tests/test_similarity.py::test_the_shipped_match_rule_is_v1_for_the_pinned_model | 1 failed, 13 passed in 4.54s
+M14 CLS -> mean pooling: KILLED | E         comparison failed. Mismatched elements: 6 / 6: | FAILED tests/test_similarity.py::test_the_real_model_is_deterministic_normalised_and_ranks_a_paraphrase_first | 1 failed, 11 passed in 4.61s
+M17 fetch partial cleanup on error off: SURVIVED | 15 passed in 5.01s
+M19 embed resumes ignoring model version: SURVIVED | 49 passed in 11.47s
+status:  M engine/engine/extract/batch.py
+ M engine/engine/extract/match_rule.json
+ M engine/engine/extract/similarity.py
+ M engine/scripts/match_rule.py
+ M engine/tests/test_ai.py
+ M engine/tests/test_similarity.py
+

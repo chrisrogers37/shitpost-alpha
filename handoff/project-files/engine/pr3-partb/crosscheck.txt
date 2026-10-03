@@ -1,0 +1,37 @@
+SPY: 1,171 days in both; 0 over 0.5% apart (worst 0.00%); only Alpaca 0, only Yahoo 0
+QQQ: 1,171 days in both; 0 over 0.5% apart (worst 0.00%); only Alpaca 0, only Yahoo 0
+BTC: 1,704 days in both; 16 over 0.5% apart (worst 1.80%); only Alpaca 0, only Yahoo 0
+  2022-05-09: alpaca 30080.8500, yahoo 30296.9531
+  2022-05-28: alpaca 28998.6500, yahoo 28814.9004
+  2022-06-12: alpaca 26551.5200, yahoo 26762.6484
+  2022-06-30: alpaca 19937.2300, yahoo 19784.7266
+  2022-07-08: alpaca 21595.9900, yahoo 21731.1172
+  2022-09-13: alpaca 20173.7500, yahoo 20296.7070
+  2023-02-16: alpaca 23495.6400, yahoo 23623.4746
+  2023-04-12: alpaca 29913.1600, yahoo 30139.0527
+  2023-05-06: alpaca 29130.9509, yahoo 28904.6230
+  2023-05-07: alpaca 28967.0440, yahoo 28454.9785
+  2023-05-08: alpaca 28168.1088, yahoo 27694.2734
+  2023-05-09: alpaca 27857.3407, yahoo 27658.7754
+  2023-06-06: alpaca 27537.8300, yahoo 27238.7832
+  2023-06-12: alpaca 26115.7200, yahoo 25902.5000
+  2023-06-13: alpaca 26226.3000, yahoo 25918.7285
+  2024-12-05: alpaca 97114.9300, yahoo 96593.5703
+ETH: 1,704 days in both; 14 over 0.5% apart (worst 1.81%); only Alpaca 0, only Yahoo 0
+  2022-02-03: alpaca 2694.1100, yahoo 2679.1626
+  2022-05-09: alpaca 2226.9400, yahoo 2245.4304
+  2022-05-26: alpaca 1790.0800, yahoo 1803.9133
+  2022-05-28: alpaca 1789.7800, yahoo 1757.9418
+  2022-06-12: alpaca 1433.1700, yahoo 1445.2166
+  2022-07-08: alpaca 1215.8800, yahoo 1222.5062
+  2022-07-26: alpaca 1449.1200, yahoo 1441.8068
+  2023-05-06: alpaca 1914.9474, yahoo 1900.2218
+  2023-05-07: alpaca 1906.2200, yahoo 1873.0764
+  2023-05-08: alpaca 1882.1877, yahoo 1849.0427
+  2023-05-09: alpaca 1863.3780, yahoo 1848.6031
+  2023-06-06: alpaca 1902.7500, yahoo 1884.4949
+  2024-10-23: alpaca 2523.4975, yahoo 2509.0989
+  2024-12-05: alpaca 3791.7500, yahoo 3811.0083
+AAPL: 1,171 days in both; 0 over 0.5% apart (worst 0.00%); only Alpaca 0, only Yahoo 0
+NVDA: 1,171 days in both; 0 over 0.5% apart (worst 0.00%); only Alpaca 0, only Yahoo 0
+META: 1,171 days in both; 0 over 0.5% apart (worst 0.00%); only Alpaca 0, only Yahoo 0

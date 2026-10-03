@@ -1,0 +1,5 @@
+spy: 2,702 daily bars (2016-01-04 to 2026-10-01); fetched 2,702, wrote 2,702
+btc: 2,100 daily bars (2021-01-01 to 2026-10-01); fetched 2,100, wrote 2,100
+qqq: 2,702 daily bars (2016-01-04 to 2026-10-01); fetched 2,702, wrote 2,702
+eth: 2,100 daily bars (2021-01-01 to 2026-10-01); fetched 2,100, wrote 2,100
+4 of 4 instruments backfilled

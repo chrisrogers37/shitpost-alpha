@@ -1,0 +1,3 @@
+planted ('0407619d62391339', '632ec6f91c6bbdc6', 'bdb21b65b7b7f14a', [('rules', 'gate', 'spy:1h', True), ('rules', 'gate', 'spy:close', True), ('rules', 'gate', 'spy:1d', True)])
+ai ('048975700cc532e3', '3f93276054080698', 'bdb21b65b7b7f14a', [('rules', 'gate', 'spy:1h', True), ('rules', 'gate', 'spy:close', True), ('ai', 'gate', 'spy:1h', True), ('ai', 'gate', 'spy:close', True)])
+none ('7f200ae7a58819f7', '2c3bd618a7ac3dde', '9a4d4dff6875b5ca', [])

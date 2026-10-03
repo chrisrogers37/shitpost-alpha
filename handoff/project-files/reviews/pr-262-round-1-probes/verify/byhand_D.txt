@@ -1,0 +1,12 @@
+{"done": true}
+== Phase D: launcher with WEB_RATE_LIMIT_BURST=1000 (re-run of the rate-limited checks)
+  [POST /api/v1/test/query (405)] 405 sec-headers OK {'content-type': 'application/json', 'allow': 'GET'} body='{"error":{"code":"bad_request","message":"Method Not Allowed"}}'
+  [OPTIONS /api/v1/test/query preflight] 405 sec-headers OK {'content-type': 'application/json', 'allow': 'GET'} body='{"error":{"code":"bad_request","message":"Method Not Allowed"}}'
+  [GET /api/v1/test/numbers?limit=abc] 400 sec-headers OK {'content-type': 'application/json', 'access-control-allow-origin': '*'} body='{"error":{"code":"bad_request","message":"limit: Input should be a valid integer, unable to parse string as an integer"}}'
+  [GET /api/v1/test/numbers?limit=1&limit=2 (repeated)] 200 sec-headers OK {'content-type': 'application/json', 'access-control-allow-origin': '*'} body='{"stream_id":"bffa7a7a-f943-4aea-a8a7-22efc33b6664","items":[{"n":50},{"n":49}],"next_before":"WzQ5XQ"}'
+  [pg_sleep(8) -> statement timeout] 503 in 5.01s body='{"error":{"code":"unavailable","message":"The database is unavailable"}}' sec-headers OK
+  [pg_sleep(1) -> fine] 200 in 1.01s body='{"stream_id":"bffa7a7a-f943-4aea-a8a7-22efc33b6664","answer":1}' sec-headers OK
+-- database goes silent while a query runs (pg_sleep 2, silent at +0.5 s)
+  in-flight request: ['client gave up: ReadTimeout after 45.0s']
+  [api query after forwarding resumes] 200 in 0.01s body='{"stream_id":"bffa7a7a-f943-4aea-a8a7-22efc33b6664","answer":42}' sec-headers OK
+  [SIGTERM end of phase D] exit=-15 after 0.21s

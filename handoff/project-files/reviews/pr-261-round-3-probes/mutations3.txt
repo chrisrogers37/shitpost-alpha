@@ -1,0 +1,1 @@
+F7' no window problem: KILLED | 1 failed in 2.75s | FAILED tests/test_ai.py::test_version_1_is_two_dated_models_with_checked_prices_and_its_window

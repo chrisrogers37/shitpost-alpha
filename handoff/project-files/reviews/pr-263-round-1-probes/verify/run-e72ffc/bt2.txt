@@ -1,0 +1,4 @@
+Gate 0 does not pass: 0 of 22 pairs (none); rules pick
+wrote /tmp/claude-0/-home-user-shitpost-alpha/aa37c4ca-915a-53be-b149-d37cd9089ba3/scratchpad/review-263-r1/verify/run-e72ffc/out2/backtest-v1.json (SHA-256 c8fe82484df64efcc59ab631346ae09c45dc17b2834cf6d845cf3e70e60e69d8) and /tmp/claude-0/-home-user-shitpost-alpha/aa37c4ca-915a-53be-b149-d37cd9089ba3/scratchpad/review-263-r1/verify/run-e72ffc/out2/backtest-v1.md
+rebuild: JSON SHA-256 matches run 1
+rc=0

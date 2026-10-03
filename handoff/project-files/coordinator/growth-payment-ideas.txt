@@ -1,0 +1,75 @@
+From "Plan growth and revenue": the money ideas as yes/no questions, most important first. Numbers assume $25 a month through Whop, which nets about $23.28 a member. With no lawyer, Chris personally carries any adviser-law risk, so my recommendations lean toward the safer choice where it costs little.
+
+1. Plan a paid tier at all, once there's a proven edge?
+Context: at 2,000 followers it earns about $230-470 a month if 0.5-1% pay, or about $2,330 if 5% do (the stress test calls 2-5% optimistic). Costs before the first dollar: rights to show prices (Alpaca's written OK, or a feed with no quote yet). Risk: charging for alerts timed to events is where the publisher exemption from adviser registration is weakest (Lowe v. SEC; SEC v. Park).
+Yes: we build free now and keep one paid tier as a later step behind a gate.
+No: it stays free for good as a research tracker, with at most a sponsor.
+Recommend: yes, behind the gate.
+
+2. With the lawyer out, gate the paid tier on edge, live record and a poll?
+Context: the stress test found my gate undecidable. Replacement: (a) the backtest meets an edge rule written before it runs; (b) the live record, pooled and sized to a sample that can actually confirm the edge, holds up against the backtest; (c) a poll in the channel shows people would pay; (d) the price and post-source rights answers are in hand. Ninety days after the public launch, Chris picks one: stay free as research, sell API access, or wind down.
+Yes: the paid tier is built only when all four pass, and the 90-day choice stops it drifting.
+No: Chris decides when to charge by judgement, with no written test.
+Recommend: yes.
+
+3. Give paying members alerts before the free public channel gets them?
+Context: it earns the most if the edge lives in the first 15 minutes. It costs a delay on every public surface (channel, site, API, change feed, MCP), or the alerts leak. It sells timing, which is the riskiest version legally (Park was a $29-a-month alert service) and contradicts "we can't win on speed".
+Yes: we build the delay everywhere, and the paid channel gets alerts first.
+No: everyone gets every alert at the same moment, and paid buys tools instead (question 4).
+Recommend: no.
+
+4. Sell tools instead: personal filters, webhooks and higher API limits?
+Context: same alerts for everyone at the same time; paid buys convenience. Costs a tier column on API keys plus Whop, mostly built already in the notification plan's webhooks and keys. It's the lowest legal risk of the paid options. The direct messages in my draft are dropped, since they cut against the no-personal-advice rule.
+Yes: this is what the paid tier sells.
+No: the paid tier needs a different offer (or question 3).
+Recommend: yes.
+
+5. Start the paid tier at about $25 a month?
+Context: crypto signal groups charge $40-300 and Telegram Stars channels $1-7. My "Tokyo Joe $29" anchor was actually the Park defendant, so it's dropped. Nothing is built until the gate, so this only sets the plan's numbers.
+Yes: $25, revisited with the poll at the gate.
+No: Chris names a price, or we leave it to the poll.
+Recommend: yes.
+
+6. Take Telegram's 50% ad-revenue share on the public channel?
+Context: it needs 1,000+ subscribers, pays in TON and is likely small. It costs nothing to build. Telegram chooses the ads, which could be brokers or exchanges next to our calls, and income on the free channel arguably makes it compensated advice from day one.
+Yes: we switch it on at 1,000 subscribers.
+No: the free channel stays ad-free; it counts as $0.
+Recommend: no.
+
+7. Accept one sponsor for the report or weekly summary, non-brokers only?
+Context: a flat fee with no paywall and no change to alerts; the stress test's counter-plan named it the cleanest first revenue. Cost is Chris's time to find one. Risk is low if sponsors can't be brokers, exchanges or anyone selling the tickers we call.
+Yes: after the public launch, sponsorship is open on those terms.
+No: no sponsors.
+Recommend: yes.
+
+8. Earn from broker or exchange referral and affiliate links?
+Context: Whop's affiliate programme and exchange referrals pay per sign-up. Risk: a conflict of interest beside our own calls, and Hyperliquid bars US persons outright.
+Yes: we add referral links after the public launch.
+No: no referral or affiliate links anywhere.
+Recommend: no.
+
+9. Sell through Whop rather than Stripe or Telegram Stars?
+Context: Whop takes about 5.7% + $0.30 with Telegram gating built in. Stripe restricts investment-advice businesses, and Stars loses 20-35%, pays out in crypto and holds money 21 days (all unverified). Nothing is built until the gate.
+Yes: Whop at the gate.
+No: we compare again at the gate.
+Recommend: yes.
+
+10. Form an LLC before taking the first payment?
+Context: with no lawyer, an LLC keeps a claim against the service away from Chris's personal assets. Costs about $50-500 to form plus yearly state fees, depending on the state (unverified), outside the $250. Only needed at the gate.
+Yes: the gate list adds "LLC formed".
+No: Chris sells as himself.
+Recommend: yes, at the gate.
+
+11. Trade the signals yourself, only after each public alert?
+Context: it's Chris's own money, not product revenue. The 2022 SEC influencer case was buy, promote, sell into the rise; trading only after the public alert avoids the "buy" half, and /about says the operator may hold positions.
+Yes: allowed after the alert is public, with the notice on /about.
+No: Chris doesn't trade what the service calls.
+Recommend: yes, with those two rules.
+
+12. Keep the engine open source while charging for the service?
+Context: the repo is public under MIT. Kept open, it builds trust and developer reach, and the paid tier sells the running service and its record, not the code. Closed, it loses that, and the code already published stays out there.
+Yes: it stays MIT.
+No: we make the repo private before building starts.
+Recommend: yes.
+
+Relay each answer in words and I'll fold them in with the stress-test fix list in one revision. I'm still holding the planners' change list.

@@ -1,0 +1,19 @@
+M32 | SURVIVED | p-value draws not less costs | 57s | 39 passed in 55.28s
+M33 | SURVIVED | p-value observed mean before costs | 54s | 39 passed in 52.53s
+M34 | SURVIVED | last 12 months: 366 days (boundary) | 57s | 39 passed in 54.85s
+M35 | SURVIVED | last 12 months: 10 years | 52s | 39 passed in 50.72s
+M36 | SURVIVED | last-12 mean is the full mean | 54s | 39 passed in 52.22s
+M37 | SURVIVED | last 12 months: no 10-day minimum | 56s | 39 passed in 54.33s
+M38 | SURVIVED | condition 5 always holds | 54s | 39 passed in 52.41s
+M39 | SURVIVED | head-to-head: a tie goes to the AI | 55s | 39 passed in 52.65s
+M40 | SURVIVED | head-to-head: AI may pick with no passing pair | 68s | 39 passed in 66.19s (0:01:06)
+M41 | killed | head-to-head: rules' full-history total | 34s | FAILED tests/test_backtest_gate.py::test_the_ai_picks_only_with_a_passing_pair_and_a_bigger_total ; 1 failed, 26 passed in 32.13s
+M42 | killed | no-price: a stand-in daily close in the JSON | 48s | FAILED tests/test_backtest_run.py::test_build_moves_then_backtest_then_a_rebuild_with_the_same_hash ; 1 failed, 29 passed in 45.95s
+M43 | killed | no-price: a minute-bar open in the JSON | 45s | FAILED tests/test_backtest_run.py::test_build_moves_then_backtest_then_a_rebuild_with_the_same_hash ; 1 failed, 29 passed in 43.53s
+M44 | killed | no-link: an outside link in the Markdown | 50s | FAILED tests/test_backtest_run.py::test_build_moves_then_backtest_then_a_rebuild_with_the_same_hash ; 1 failed, 29 passed in 47.93s
+M45 | killed | no-link check disabled | 51s | FAILED tests/test_backtest_run.py::test_the_report_refuses_another_sites_link ; 1 failed, 34 passed in 49.19s
+M46 | killed | seeds vary across processes (PYTHONHASHSEED) | 49s | FAILED tests/test_backtest_run.py::test_the_report_from_a_planted_run_holds_moves_and_counts_only ; 1 failed, 35 passed in 47.28s
+M47 | SURVIVED | rebuild exits 0 on a hash mismatch | 50s | 39 passed in 48.49s
+M48 | killed | a timestamp in the JSON | 44s | FAILED tests/test_backtest_run.py::test_build_moves_then_backtest_then_a_rebuild_with_the_same_hash ; 1 failed, 29 passed in 42.12s
+M49 | killed | minute windows may run past the close | 4s | FAILED tests/test_backtest_moves.py::test_a_window_past_the_regular_close_is_skipped ; 1 failed, 10 passed in 1.93s
+M50 | killed | coin entry within 50 minutes | 3s | FAILED tests/test_backtest_moves.py::test_a_coin_call_without_a_bar_near_entry_or_exit_is_skipped ; 1 failed, 13 passed in 1.86s

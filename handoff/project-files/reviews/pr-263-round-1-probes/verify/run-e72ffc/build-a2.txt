@@ -1,0 +1,13 @@
+spy: 811 daily bars (2021-06-01 to 2024-07-09); fetched 11, wrote 0
+btc: 1,135 daily bars (2021-06-01 to 2024-07-09); fetched 15, wrote 0
+qqq: 811 daily bars (2021-06-01 to 2024-07-09); fetched 11, wrote 0
+eth: 1,135 daily bars (2021-06-01 to 2024-07-09); fetched 15, wrote 0
+aapl: 811 daily bars (2021-06-01 to 2024-07-09); fetched 11, wrote 0
+xle: 811 daily bars (2021-06-01 to 2024-07-09); fetched 11, wrote 0
+qqq: 172 post moves, 140 baseline rows
+eth: 172 post moves, 140 baseline rows
+aapl: 172 post moves, 140 baseline rows
+xle: 172 post moves, 140 baseline rows
+Alpaca calls: 18; minute cache: 18 files, 1.1 MB; signal_moves: 1,032 rows, 0.4 MB
+FAKE_REQUESTS 18
+rc=0

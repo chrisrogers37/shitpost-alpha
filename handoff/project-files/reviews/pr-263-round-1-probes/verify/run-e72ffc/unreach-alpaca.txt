@@ -1,0 +1,2 @@
+/v2/stocks/bars: ProxyError: 403 Forbidden
+rc=1

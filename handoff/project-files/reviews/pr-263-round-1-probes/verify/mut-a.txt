@@ -1,0 +1,31 @@
+M01 | killed | match pool: drop the matured-by-alert rule | 4s | FAILED tests/test_backtest_gate.py::test_the_match_pool_holds_only_windows_closed_by_the_alert ; 1 failed, 19 passed in 2.11s
+M02 | killed | match pool: windows maturing up to 1h after the alert | 4s | FAILED tests/test_backtest_gate.py::test_the_match_pool_holds_only_windows_closed_by_the_alert ; 1 failed, 19 passed in 2.33s
+M03 | killed | entry at the post, not +2 min | 4s | FAILED tests/test_backtest_moves.py::test_entry_is_two_minutes_after_the_post_and_twenty_for_mirrors ; 1 failed, 8 passed in 2.22s
+M04 | killed | stock entry ignores the delay | 5s | FAILED tests/test_backtest_moves.py::test_entry_is_two_minutes_after_the_post_and_twenty_for_mirrors ; 1 failed, 8 passed in 2.58s
+M05 | killed | entry bar: floor (a bar starting before the alert) | 4s | FAILED tests/test_backtest_moves.py::test_entry_is_two_minutes_after_the_post_and_twenty_for_mirrors ; 1 failed, 8 passed in 2.18s
+M06 | killed | close: no 30-minute minimum | 4s | FAILED tests/test_backtest_moves.py::test_the_close_is_at_least_30_minutes_after_entry_including_a_half_day ; 1 failed, 9 passed in 2.41s
+M07 | SURVIVED | close: >= 30 becomes > 30 (boundary) | 56s | 39 passed in 54.69s
+M08 | killed | close: never roll to the next session | 4s | FAILED tests/test_backtest_moves.py::test_the_close_is_at_least_30_minutes_after_entry_including_a_half_day ; 1 failed, 9 passed in 2.23s
+M09 | killed | rule 1: ignore the market link | 4s | FAILED tests/test_backtest_gate.py::test_rule_1_takes_the_pickers_market_link_and_its_companies ; 1 failed, 23 passed in 2.18s
+M10 | killed | rule 3: count matches, not days | 4s | FAILED tests/test_backtest_gate.py::test_rule_3_needs_matches_on_ten_different_days ; 1 failed, 20 passed in 2.29s
+M11 | killed | rule 3: 9 days | 4s | FAILED tests/test_backtest_gate.py::test_rule_3_needs_matches_on_ten_different_days ; 1 failed, 20 passed in 2.30s
+M12 | killed | rule 4: drop the 60% one-way test | 4s | FAILED tests/test_backtest_gate.py::test_rule_4_needs_sixty_percent_one_way_and_a_median_beating_random ; 1 failed, 21 passed in 2.17s
+M13 | killed | rule 4: 50% one way | 4s | FAILED tests/test_backtest_gate.py::test_rule_4_needs_sixty_percent_one_way_and_a_median_beating_random ; 1 failed, 21 passed in 2.23s
+M14 | killed | rule 4: beat random by >= 20 bp | 4s | FAILED tests/test_backtest_gate.py::test_rule_4_needs_sixty_percent_one_way_and_a_median_beating_random ; 1 failed, 21 passed in 2.30s
+M15 | SURVIVED | rule 4: either direction beats random | 58s | 39 passed in 55.93s
+M16 | killed | rule 4: no baseline counts as 0 | 5s | FAILED tests/test_backtest_gate.py::test_rule_4_needs_sixty_percent_one_way_and_a_median_beating_random ; 1 failed, 21 passed in 2.59s
+M17 | killed | rule 6: < 30 min becomes <= 30 min | 5s | FAILED tests/test_backtest_gate.py::test_rule_6_keeps_one_call_per_instrument_per_30_minutes ; 1 failed, 22 passed in 2.65s
+M18 | killed | rule 6: one call per 30 min across instruments | 4s | FAILED tests/test_backtest_gate.py::test_rule_6_keeps_one_call_per_instrument_per_30_minutes ; 1 failed, 22 passed in 2.30s
+M19 | SURVIVED | rule 6: not applied in the gate | 52s | 39 passed in 49.86s
+M20 | killed | beta forced to 1 | 5s | FAILED tests/test_backtest_moves.py::test_a_company_is_judged_net_of_beta_times_spy ; 1 failed, 17 passed in 2.60s
+M21 | killed | no benchmark netting | 4s | FAILED tests/test_backtest_moves.py::test_a_company_is_judged_net_of_beta_times_spy ; 1 failed, 17 passed in 2.39s
+M22 | killed | beta includes the entry session's own return (look-ahead) | 4s | FAILED tests/test_backtest_moves.py::test_beta_is_the_slope_on_the_120_sessions_before ; 1 failed, 16 passed in 2.12s
+M23 | killed | beta with 2 returns | 4s | FAILED tests/test_backtest_moves.py::test_beta_is_the_slope_on_the_120_sessions_before ; 1 failed, 16 passed in 2.20s
+M24 | SURVIVED | QQQ/XLE judged net of SPY | 57s | 39 passed in 55.14s
+M25 | SURVIVED | ETH/BTC daily axes not aligned | 52s | 39 passed in 50.37s
+M26 | SURVIVED | BH: no step-down monotonicity | 54s | 39 passed in 51.92s
+M27 | killed | BH: wrong rank | 4s | FAILED tests/test_backtest_stats.py::test_benjamini_hochberg_on_a_known_list ; 1 failed, 2 passed in 2.07s
+M28 | SURVIVED | BH not applied (q = p) | 55s | 39 passed in 53.59s
+M29 | killed | p-value without the +1 | 4s | FAILED tests/test_backtest_stats.py::test_the_p_value_counts_draws_at_or_above_the_observed_mean ; 1 failed, 3 passed in 2.39s
+M30 | killed | p-value counts > not >= | 5s | FAILED tests/test_backtest_stats.py::test_the_p_value_counts_draws_at_or_above_the_observed_mean ; 1 failed, 3 passed in 2.71s
+M31 | SURVIVED | p-value ignores the call's direction | 63s | 39 passed in 60.57s (0:01:00)

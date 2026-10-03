@@ -1,0 +1,2 @@
+stock bars need ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY; coin bars don't
+rc=1

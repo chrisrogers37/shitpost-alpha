@@ -1,0 +1,37 @@
+M1 | web role: grant prices | CAUGHT | 1 failed in 0.44s | FAILED tests/web/test_web_role.py::test_the_web_role_reads_engine_meta_and_nothing_else
+M2 | web role: grant writes on engine.* | CAUGHT | 1 failed in 0.44s | FAILED tests/web/test_web_role.py::test_the_web_role_reads_engine_meta_and_nothing_else
+M3 | web role: grant CREATE on app | CAUGHT | 1 failed in 1.70s | FAILED tests/web/test_web_role.py::test_the_web_role_reads_engine_meta_and_nothing_else
+M4 | web role: tests connect as the superuser | CAUGHT | 1 failed in 0.35s | FAILED tests/web/test_web_role.py::test_the_web_role_reads_engine_meta_and_nothing_else
+M5 | statement timeout listener removed | CAUGHT | 1 failed in 0.31s | FAILED tests/web/test_web_role.py::test_the_web_role_reads_engine_meta_and_nothing_else
+M6 | explicit fields: models accept extra fields | CAUGHT | 1 failed, 8 passed in 2.48s | FAILED tests/web/test_api_conventions.py::test_a_row_with_unlisted_fields_never_passes_through
+M7 | explicit fields: ApiRouter stops refusing non-ApiResponse models | CAUGHT | 1 failed, 7 passed in 2.36s | FAILED tests/web/test_api_conventions.py::test_every_api_route_must_declare_an_api_response
+M8 | no prices: walker stops following $ref | CAUGHT | 1 failed, 2 passed in 0.67s | FAILED tests/web/test_no_prices.py::test_the_check_catches_a_price_field - As...
+M9 | no prices: no camelCase split | CAUGHT | 1 failed in 0.03s | FAILED tests/web/test_no_prices.py::test_tokens_split_both_spellings - Assert...
+M10 | rate key: leftmost entry (visitor-written) | CAUGHT | 1 failed, 1 passed in 0.05s | FAILED tests/web/test_rate_limit.py::test_the_address_is_the_edges_entry_never_one_the_visitor_wrote
+M11 | rate key: header ignored, socket only | CAUGHT | 1 failed in 0.03s | FAILED tests/web/test_rate_limit.py::test_the_default_header_is_railways_x_real_ip
+M12 | rate key: one shared bucket | CAUGHT | 1 failed, 6 passed in 2.04s | FAILED tests/web/test_rate_limit.py::test_two_addresses_get_separate_buckets
+M13 | rate limit: /healthz limited | CAUGHT | 1 failed, 8 passed in 0.97s | FAILED tests/web/test_rate_limit.py::test_healthz_is_never_limited - assert 4...
+M14 | rate key: uvicorn proxy headers on | CAUGHT | 1 failed, 2 passed in 1.06s | FAILED tests/web/test_server.py::test_the_server_process - assert (404, 404) ...
+M15 | rate limit: no Retry-After | CAUGHT | 1 failed, 6 passed in 0.52s | FAILED tests/web/test_rate_limit.py::test_two_addresses_get_separate_buckets
+M16 | errors: unhandled exception not caught by ResponsePolicy | CAUGHT | 1 failed, 3 passed in 5.21s | FAILED tests/web/test_api_conventions.py::test_an_unhandled_error_is_a_500_without_its_details
+M17 | errors: 503 message leaks the driver error | CAUGHT | 1 failed, 1 passed in 0.79s | FAILED tests/web/test_health.py::test_a_refused_database_is_a_503 - Assertion...
+M18 | errors: 404 message from Starlette | CAUGHT | 1 failed in 0.33s | FAILED tests/web/test_api_conventions.py::test_an_unknown_api_path_is_a_json_404_with_every_header
+M19 | errors: FastAPI's 422 back | CAUGHT | 1 failed, 12 passed in 1.22s | FAILED tests/web/test_paging_and_cache.py::test_bad_paging_parameters_are_a_400[params0]
+M20 | errors: OperationalError unhandled (500 not 503) | CAUGHT | 1 failed, 1 passed in 3.14s | ERROR    engine.web.access:policy.py:56 unhandled error on GET /api/v1/test/query
+M21 | CORS: every method | CAUGHT | 1 failed, 4 passed in 1.40s | FAILED tests/web/test_api_conventions.py::test_cors_is_open_to_get_only - Ass...
+M22 | CORS: every path | CAUGHT | 1 failed, 1 passed in 0.60s | FAILED tests/web/test_api_conventions.py::test_errors_outside_the_api_are_plain_text
+M23 | CORS: credentials allowed | CAUGHT | 1 failed, 4 passed in 1.63s | FAILED tests/web/test_api_conventions.py::test_cors_is_open_to_get_only - ass...
+M24 | headers: HSTS gains includeSubDomains; preload | SURVIVED | 50 passed in 10.16s | 
+M25 | headers: Referrer-Policy dropped | SURVIVED | 50 passed in 10.98s | 
+M26 | headers: CSP weakened | SURVIVED | 50 passed in 10.75s | 
+M27 | access log: visitor address logged | CAUGHT | 1 failed, 11 passed in 3.38s | FAILED tests/web/test_api_conventions.py::test_the_access_log_has_no_address_and_no_forged_lines
+M28 | web command builds the engine's Settings first | CAUGHT | 1 failed in 0.06s | FAILED tests/web/test_server.py::test_web_reads_only_web_settings - pydantic_...
+M29 | healthz timeout 2 s -> 10 s | CAUGHT | 1 failed, 2 passed in 10.94s | FAILED tests/web/test_health.py::test_a_database_that_never_answers_fails_healthz_within_2s
+M30 | healthz cacheable | CAUGHT | 1 failed in 0.34s | FAILED tests/web/test_health.py::test_healthz_answers_ok - KeyError: 'cache-c...
+M31 | stream_id read every request | CAUGHT | 1 failed, 6 passed in 2.08s | FAILED tests/web/test_api_conventions.py::test_stream_id_is_read_once_a_minute
+M32 | cursor: any spelling accepted | CAUGHT | 1 failed, 3 passed in 0.03s | FAILED tests/web/test_paging_and_cache.py::test_a_bad_cursor_is_a_bad_request[WzFd=]
+M33 | cache: key ignores the query string | CAUGHT | 1 failed, 17 passed in 2.73s | FAILED tests/web/test_paging_and_cache.py::test_the_cache_serves_a_second_hit_without_building_and_expires
+M34 | cache: never expires | CAUGHT | 1 failed, 17 passed in 1.61s | FAILED tests/web/test_paging_and_cache.py::test_the_cache_serves_a_second_hit_without_building_and_expires
+M35 | docs pages back on | CAUGHT | 1 failed, 9 passed in 3.37s | FAILED tests/web/test_api_conventions.py::test_schema_is_served_and_the_docs_pages_are_off
+M36 | limit max 100 -> 1000 | CAUGHT | 1 failed, 13 passed in 1.04s | FAILED tests/web/test_paging_and_cache.py::test_bad_paging_parameters_are_a_400[params1]
+worktree clean after mutations: True
