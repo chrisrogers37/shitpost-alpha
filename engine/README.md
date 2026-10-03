@@ -221,8 +221,10 @@ names, mapped to instruments or kept with why not) and `engine.signal_embeddings
   with punctuation, an accent and a word that splits into pieces, and refuses an
   onnxruntime or tokenizers release, or a changed tokenizer, that moves its vector. When
   the runtime isn't the one the check was made with (`made_with` in `model.json`), the
-  error names those versions to install; when it is, the error says `check` is out of
-  date: record it again whenever the pin changes. It sits outside the version digest, so
+  error names those versions to install. When it is, the error names both causes: code
+  that tokenizes or embeds changed, which leaves stored vectors stale too (fix the code,
+  or change the pin and embed again), or a `check` that is out of date (record it again
+  whenever the pin changes). It sits outside the version digest, so
   recording it doesn't change the version. `embed` batches posts by length (at most 64,
   and at most about 64 posts of 128 tokens once padded), which keeps the history run near
   1.2 GB. Matching keeps all vectors in one numpy matrix. Match rule v1

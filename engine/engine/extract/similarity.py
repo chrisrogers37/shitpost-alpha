@@ -163,8 +163,9 @@ def _shown(values: Iterable[float]) -> str:
 def verify_check(check: Check, vector: Vector) -> None:
     """Refuse the vector a model made for `check.text` unless its first values are the
     check's, and say what to do. Another runtime than the one the check was made with
-    means installing that one; the same runtime moving the values means `check` itself is
-    out of date for the pinned files."""
+    means installing that one. The same runtime moving the values means either the code
+    that tokenizes or embeds changed (then stored vectors are stale too) or `check` itself
+    is out of date for the pinned files; the error names both."""
     first = vector[: len(check.first)]
     if np.allclose(first, check.first, atol=CHECK_TOLERANCE, rtol=0):
         return
@@ -177,8 +178,10 @@ def verify_check(check: Check, vector: Vector) -> None:
         )
     raise ModelMissing(
         f"the similarity model's check vector moved, though this is the {_named(runtime)} it "
-        "was made with: model.json's `check` is out of date for its pinned files, which give "
-        f"{_shown(first)} for its text, not {_shown(check.first)}; record `check` again"
+        f"was made with: its pinned files give {_shown(first)} for its text, not "
+        f"{_shown(check.first)}. Either the code that tokenizes or embeds changed, so stored "
+        "vectors are stale too (fix the code, or change the pin and embed again), or "
+        "model.json's `check` is out of date for its pinned files (record `check` again)"
     )
 
 

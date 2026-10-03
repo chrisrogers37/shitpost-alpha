@@ -343,15 +343,17 @@ def test_another_runtime_is_told_to_install_the_versions_the_check_was_made_with
     assert "out of date" not in message
 
 
-def test_a_check_that_moved_with_the_runtime_it_was_made_with_says_it_is_out_of_date() -> None:
+def test_a_check_that_moved_with_the_runtime_it_was_made_with_names_both_causes() -> None:
     check = Check("a post", CHECK_FIRST, runtime_versions())
     with pytest.raises(ModelMissing) as caught:
         verify_check(check, np.zeros(384, dtype=np.float32))
     message = str(caught.value)
-    assert "model.json's `check` is out of date for its pinned files" in message
     assert "give [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000] for its text" in message
     assert "not [-0.0459, 0.0641, -0.0161, 0.0269, 0.0341, -0.0148]" in message
-    assert message.endswith("record `check` again")
+    # Re-recording `check` alone would silence the guard if the code moved the vectors.
+    assert "the code that tokenizes or embeds changed, so stored vectors are stale" in message
+    assert "model.json's `check` is out of date for its pinned files" in message
+    assert "record `check` again" in message
     assert "install" not in message  # the runtime isn't the cause
 
 
